@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicktomlin/tauri/v2/core/tauri-config-schema/schema.json",
+  "productName": "Modpack Engine",
+  "version": "0.1.0",
+  "identifier": "com.modpackengine.app",
+  "build": {
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Modpack Engine",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "resizable": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}
