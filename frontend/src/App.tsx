@@ -15,6 +15,17 @@ interface Project {
   path: string
 }
 
+interface McInstance {
+  id: string
+  name: string
+  mc_version: string
+  loader: string
+  loader_version: string | null
+  game_dir: string
+  status: string
+  pid: number | null
+}
+
 function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -26,8 +37,19 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
 
+  // Instance state
+  const [instances, setInstances] = useState<McInstance[]>([])
+  const [showNewInstance, setShowNewInstance] = useState(false)
+  const [newInstanceName, setNewInstanceName] = useState('')
+  const [newInstanceMcVersion, setNewInstanceMcVersion] = useState('1.21.1')
+  const [newInstanceLoader, setNewInstanceLoader] = useState('vanilla')
+  const [selectedInstance, setSelectedInstance] = useState<McInstance | null>(null)
+  const [username, setUsername] = useState('Player')
+  const [instanceLogs, setInstanceLogs] = useState('')
+
   useEffect(() => {
     loadProjects()
+    loadInstances()
   }, [])
 
   async function loadProjects() {
@@ -36,6 +58,15 @@ function App() {
       setProjects(result)
     } catch (e) {
       console.error('Failed to load projects:', e)
+    }
+  }
+
+  async function loadInstances() {
+    try {
+      const result = await invoke<McInstance[]>('list_mc_instances')
+      setInstances(result)
+    } catch (e) {
+      console.error('Failed to load instances:', e)
     }
   }
 
@@ -70,28 +101,133 @@ function App() {
     }
   }
 
+  async function createInstance() {
+    try {
+      const instance = await invoke<McInstance>('create_mc_instance', {
+        name: newInstanceName,
+        mcVersion: newInstanceMcVersion,
+        loader: newInstanceLoader,
+        loaderVersion: null,
+      })
+      setInstances([...instances, instance])
+      setShowNewInstance(false)
+      setNewInstanceName('')
+    } catch (e) {
+      console.error('Failed to create instance:', e)
+    }
+  }
+
+  async function launchInstance(id: string) {
+    try {
+      await invoke('launch_mc_instance', {
+        instanceId: id,
+        username: username,
+        javaPath: null,
+        minMem: '2G',
+        maxMem: '4G',
+      })
+      loadInstances()
+    } catch (e) {
+      console.error('Failed to launch instance:', e)
+    }
+  }
+
+  async function stopInstance(id: string) {
+    try {
+      await invoke('stop_mc_instance', { instanceId: id })
+      loadInstances()
+    } catch (e) {
+      console.error('Failed to stop instance:', e)
+    }
+  }
+
+  async function removeInstance(id: string) {
+    try {
+      await invoke('remove_mc_instance', { instanceId: id })
+      setInstances(instances.filter(i => i.id !== id))
+      if (selectedInstance?.id === id) setSelectedInstance(null)
+    } catch (e) {
+      console.error('Failed to remove instance:', e)
+    }
+  }
+
+  async function loadLogs(id: string) {
+    try {
+      const logs = await invoke<string>('get_mc_logs', { instanceId: id })
+      setInstanceLogs(logs)
+    } catch (e) {
+      console.error('Failed to load logs:', e)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Running': return 'var(--success)'
+      case 'Installing': return 'var(--warning)'
+      case 'Stopped': return 'var(--text-muted)'
+      case 'Crashed': return 'var(--error)'
+      default: return 'var(--text-muted)'
+    }
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1>Modpack Engine</h1>
-          <button className="btn-primary" onClick={() => setShowNewProject(true)}>
-            + New Project
-          </button>
         </div>
-        <div className="project-list">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className={`project-item ${selectedProject?.id === project.id ? 'active' : ''}`}
-              onClick={() => setSelectedProject(project)}
-            >
-              <div className="project-name">{project.name}</div>
-              <div className="project-meta">
-                MC {project.minecraft_version} • {project.mod_loader}
+
+        <div className="sidebar-section">
+          <div className="section-header">
+            <h3>Projects</h3>
+            <button className="btn-icon" onClick={() => setShowNewProject(true)}>+</button>
+          </div>
+          <div className="project-list">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className={`project-item ${selectedProject?.id === project.id ? 'active' : ''}`}
+                onClick={() => setSelectedProject(project)}
+              >
+                <div className="project-name">{project.name}</div>
+                <div className="project-meta">
+                  MC {project.minecraft_version} • {project.mod_loader}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="section-header">
+            <h3>Instances</h3>
+            <button className="btn-icon" onClick={() => setShowNewInstance(true)}>+</button>
+          </div>
+          <div className="instance-list">
+            {instances.map((instance) => (
+              <div
+                key={instance.id}
+                className={`instance-item ${selectedInstance?.id === instance.id ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedInstance(instance)
+                  loadLogs(instance.id)
+                }}
+              >
+                <div className="instance-header">
+                  <div className="instance-name">{instance.name}</div>
+                  <div
+                    className="instance-status"
+                    style={{ color: getStatusColor(instance.status) }}
+                  >
+                    {instance.status}
+                  </div>
+                </div>
+                <div className="instance-meta">
+                  MC {instance.mc_version} • {instance.loader}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </aside>
 
@@ -115,7 +251,6 @@ function App() {
                   <option value="1.21.1">1.21.1</option>
                   <option value="1.20.1">1.20.1</option>
                   <option value="1.19.2">1.19.2</option>
-                  <option value="1.18.2">1.18.2</option>
                 </select>
               </div>
               <div className="form-group">
@@ -128,18 +263,97 @@ function App() {
                 </select>
               </div>
               <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setShowNewProject(false)}>
-                  Cancel
-                </button>
-                <button className="btn-primary" onClick={createProject}>
-                  Create
-                </button>
+                <button className="btn-secondary" onClick={() => setShowNewProject(false)}>Cancel</button>
+                <button className="btn-primary" onClick={createProject}>Create</button>
               </div>
             </div>
           </div>
         )}
 
-        {selectedProject ? (
+        {showNewInstance && (
+          <div className="modal-overlay" onClick={() => setShowNewInstance(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h2>New Instance</h2>
+              <div className="form-group">
+                <label>Instance Name</label>
+                <input
+                  type="text"
+                  value={newInstanceName}
+                  onChange={(e) => setNewInstanceName(e.target.value)}
+                  placeholder="My Instance"
+                />
+              </div>
+              <div className="form-group">
+                <label>Minecraft Version</label>
+                <select value={newInstanceMcVersion} onChange={(e) => setNewInstanceMcVersion(e.target.value)}>
+                  <option value="1.21.1">1.21.1</option>
+                  <option value="1.20.1">1.20.1</option>
+                  <option value="1.19.2">1.19.2</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Loader</label>
+                <select value={newInstanceLoader} onChange={(e) => setNewInstanceLoader(e.target.value)}>
+                  <option value="vanilla">Vanilla</option>
+                  <option value="forge">Forge</option>
+                  <option value="neoforge">NeoForge</option>
+                  <option value="fabric">Fabric</option>
+                  <option value="quilt">Quilt</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Player"
+                />
+              </div>
+              <div className="modal-actions">
+                <button className="btn-secondary" onClick={() => setShowNewInstance(false)}>Cancel</button>
+                <button className="btn-primary" onClick={createInstance}>Create</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedInstance ? (
+          <div className="instance-workspace">
+            <div className="workspace-header">
+              <h2>{selectedInstance.name}</h2>
+              <div className="workspace-meta">
+                MC {selectedInstance.mc_version} • {selectedInstance.loader}
+                {selectedInstance.loader_version && ` ${selectedInstance.loader_version}`}
+              </div>
+              <div className="instance-actions">
+                {selectedInstance.status === 'Stopped' && (
+                  <button
+                    className="btn-success"
+                    onClick={() => launchInstance(selectedInstance.id)}
+                  >
+                    Launch
+                  </button>
+                )}
+                {selectedInstance.status === 'Running' && (
+                  <button className="btn-danger" onClick={() => stopInstance(selectedInstance.id)}>
+                    Stop
+                  </button>
+                )}
+                <button
+                  className="btn-secondary"
+                  onClick={() => removeInstance(selectedInstance.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <div className="instance-logs">
+              <h3>Logs</h3>
+              <pre className="log-output">{instanceLogs || 'No logs available'}</pre>
+            </div>
+          </div>
+        ) : selectedProject ? (
           <div className="project-workspace">
             <div className="workspace-header">
               <h2>{selectedProject.name}</h2>
@@ -209,7 +423,7 @@ function App() {
           <div className="welcome">
             <div className="welcome-content">
               <h2>Welcome to Modpack Engine</h2>
-              <p>Select a project or create a new one to get started.</p>
+              <p>Select a project or instance, or create a new one to get started.</p>
             </div>
           </div>
         )}

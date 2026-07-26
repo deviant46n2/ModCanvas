@@ -19,6 +19,8 @@ uuid = { version = "1", features = ["v4", "serde"] }
 toml = "0.8"
 walkdir = "2"
 urlencoding = "2"
+anyhow = "1"
+lighty-launcher = { version = "26.5", features = ["all-loaders", "all-mods", "events"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

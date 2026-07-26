@@ -2,10 +2,12 @@ pub mod commands;
 pub mod db;
 pub mod models;
 pub mod mod_intelligence;
+pub mod minecraft;
 
 use tauri::Manager;
 
 use db::Database;
+use minecraft::InstanceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,6 +15,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
+
+            // Database
             let db_path = app_handle
                 .path()
                 .app_data_dir()
@@ -24,6 +28,19 @@ pub fn run() {
 
             let db = Database::open(&db_path).expect("failed to open database");
             app.manage(db);
+
+            // Minecraft instance manager
+            let instances_dir = app_handle
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir")
+                .join("instances");
+
+            std::fs::create_dir_all(&instances_dir)
+                .expect("failed to create instances directory");
+
+            let instance_manager = InstanceManager::new(instances_dir);
+            app.manage(instance_manager);
 
             Ok(())
         })
@@ -39,6 +56,12 @@ pub fn run() {
             commands::get_config,
             commands::save_config,
             commands::get_mod_metadata,
+            commands::create_mc_instance,
+            commands::list_mc_instances,
+            commands::launch_mc_instance,
+            commands::stop_mc_instance,
+            commands::remove_mc_instance,
+            commands::get_mc_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Modpack Engine");

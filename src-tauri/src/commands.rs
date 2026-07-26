@@ -1,8 +1,10 @@
 use chrono::Utc;
+use tauri::AppHandle;
 use tauri::State;
 use uuid::Uuid;
 
 use crate::db::Database;
+use crate::minecraft::{InstanceManager, MinecraftInstance};
 use crate::mod_intelligence;
 use crate::models::*;
 
@@ -156,4 +158,75 @@ pub fn save_config(path: String, content: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_mod_metadata(mod_id: String) -> Result<ModMetadata, String> {
     mod_intelligence::get_mod_metadata(&mod_id).await
+}
+
+// Minecraft Instance Commands
+
+#[tauri::command]
+pub fn create_mc_instance(
+    manager: State<'_, InstanceManager>,
+    name: String,
+    mc_version: String,
+    loader: String,
+    loader_version: Option<String>,
+) -> Result<MinecraftInstance, String> {
+    manager
+        .create_instance(&name, &mc_version, &loader, loader_version.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_mc_instances(manager: State<'_, InstanceManager>) -> Vec<MinecraftInstance> {
+    manager.list_instances()
+}
+
+#[tauri::command]
+pub fn launch_mc_instance(
+    manager: State<'_, InstanceManager>,
+    app: AppHandle,
+    instance_id: String,
+    username: String,
+    java_path: Option<String>,
+    min_mem: Option<String>,
+    max_mem: Option<String>,
+) -> Result<(), String> {
+    manager
+        .launch_instance(
+            app,
+            &instance_id,
+            &username,
+            min_mem.as_deref().unwrap_or("2G"),
+            max_mem.as_deref().unwrap_or("4G"),
+        )
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stop_mc_instance(
+    manager: State<'_, InstanceManager>,
+    instance_id: String,
+) -> Result<bool, String> {
+    manager
+        .stop_instance(&instance_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_mc_instance(
+    manager: State<'_, InstanceManager>,
+    instance_id: String,
+) -> Result<bool, String> {
+    manager
+        .remove_instance(&instance_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_mc_logs(
+    manager: State<'_, InstanceManager>,
+    instance_id: String,
+) -> Result<String, String> {
+    manager
+        .get_logs(&instance_id)
+        .map_err(|e| e.to_string())
 }
