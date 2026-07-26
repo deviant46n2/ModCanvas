@@ -16,10 +16,6 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
 
-            // Initialize lighty-launcher AppState once
-            lighty_launcher::prelude::AppState::init("ModpackEngine")
-                .expect("failed to initialize lighty-launcher");
-
             // Database
             let db_path = app_handle
                 .path()

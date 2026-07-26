@@ -1,10 +1,13 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
 use uuid::Uuid;
+
+static LIGHTY_INIT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinecraftInstance {
@@ -129,7 +132,7 @@ impl InstanceManager {
                 match result {
                     Ok(_) => inst.status = InstanceStatus::Stopped,
                     Err(e) => {
-                        eprintln!("Launch failed: {e}");
+                        eprintln!("[ModpackEngine] Launch failed for {}: {e}", id_owned);
                         inst.status = InstanceStatus::Crashed;
                     }
                 }
@@ -171,6 +174,13 @@ impl InstanceManager {
     }
 }
 
+fn ensure_lighty_init() {
+    if !LIGHTY_INIT.load(Ordering::SeqCst) {
+        let _ = lighty_launcher::prelude::AppState::init("ModpackEngine");
+        LIGHTY_INIT.store(true, Ordering::SeqCst);
+    }
+}
+
 async fn do_launch(
     id: &str,
     mc_version: &str,
@@ -182,6 +192,8 @@ async fn do_launch(
     max_mem: &str,
 ) -> Result<()> {
     use lighty_launcher::prelude::*;
+
+    ensure_lighty_init();
 
     let loader_enum = match loader {
         "fabric" => Loader::Fabric,
