@@ -166,12 +166,12 @@ impl InstanceManager {
     }
 }
 
-fn ensure_lighty_init() {
+fn ensure_lighty_init() -> Result<(), String> {
     use std::sync::atomic::{AtomicBool, Ordering};
     static INIT: AtomicBool = AtomicBool::new(false);
 
     if INIT.load(Ordering::SeqCst) {
-        return;
+        return Ok(());
     }
 
     let result = std::panic::catch_unwind(|| {
@@ -182,12 +182,13 @@ fn ensure_lighty_init() {
         Ok(Ok(_)) => {
             INIT.store(true, Ordering::SeqCst);
             eprintln!("[ModpackEngine] lighty-launcher initialized");
+            Ok(())
         }
         Ok(Err(e)) => {
-            eprintln!("[ModpackEngine] lighty-launcher init error: {e}");
+            Err(format!("lighty-launcher init error: {e}"))
         }
         Err(_) => {
-            eprintln!("[ModpackEngine] lighty-launcher init panicked!");
+            Err("lighty-launcher init panicked".to_string())
         }
     }
 }
@@ -201,7 +202,7 @@ async fn do_launch(
     min_mem: &str,
     max_mem: &str,
 ) -> Result<(), String> {
-    ensure_lighty_init();
+    ensure_lighty_init()?;
 
     use lighty_launcher::auth::OfflineAuth;
     use lighty_launcher::auth::Authenticator;
