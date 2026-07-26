@@ -2183,6 +2183,7 @@ checksum = "7e660d51b6669bb6ce7c64d5e1310f0a39f02f0d1957072c154502ac14fadde1"
 dependencies = [
  "base64 0.22.1",
  "lighty-core",
+ "lighty-event",
  "reqwest 0.13.4",
  "secrecy",
  "serde",
@@ -2203,6 +2204,7 @@ dependencies = [
  "fastrand",
  "futures-util",
  "hex",
+ "lighty-event",
  "once_cell",
  "os_info",
  "path-absolutize",
@@ -2219,12 +2221,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighty-event"
+version = "26.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68f3e89f09f46147626976a7310085c35dcb5d15496ad59d92e047d114cb8d87"
+dependencies = [
+ "once_cell",
+ "serde",
+ "thiserror 2.0.19",
+ "tokio",
+]
+
+[[package]]
 name = "lighty-java"
 version = "26.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ca2843f982b891f2b4a2234bc72385807290e51098c0379f4ddedb0d897580f"
 dependencies = [
  "lighty-core",
+ "lighty-event",
  "path-absolutize",
  "serde",
  "thiserror 2.0.19",
@@ -2245,6 +2260,7 @@ dependencies = [
  "hex",
  "lighty-auth",
  "lighty-core",
+ "lighty-event",
  "lighty-java",
  "lighty-loaders",
  "lighty-modsloader",
@@ -2271,6 +2287,7 @@ checksum = "8a53fb0a1039a4d638f158196bebb793774752475adacf6d23d4fd30d0b2809c"
 dependencies = [
  "lighty-auth",
  "lighty-core",
+ "lighty-event",
  "lighty-java",
  "lighty-launch",
  "lighty-loaders",
@@ -2310,6 +2327,7 @@ dependencies = [
  "async-trait",
  "futures",
  "lighty-core",
+ "lighty-event",
  "lighty-loaders",
  "once_cell",
  "reqwest 0.13.4",

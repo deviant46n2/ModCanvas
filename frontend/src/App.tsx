@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import './App.css'
 
 interface Project {
@@ -23,6 +24,13 @@ interface McInstance {
   loader_version: string | null
   game_dir: string
   status: string
+}
+
+interface LaunchProgress {
+  phase: string
+  message: string
+  bytes: number | null
+  total: number | null
 }
 
 function App() {
@@ -50,6 +58,8 @@ function App() {
   const [instanceLogs, setInstanceLogs] = useState('')
   const [launchError, setLaunchError] = useState('')
   const [isLaunching, setIsLaunching] = useState(false)
+  const [launchProgress, setLaunchProgress] = useState<LaunchProgress | null>(null)
+  const unlistenRef = useRef<UnlistenFn | null>(null)
 
   // Memory settings
   const [minMem, setMinMem] = useState('2G')
@@ -58,6 +68,11 @@ function App() {
   useEffect(() => {
     loadProjects()
     loadInstances()
+    return () => {
+      if (unlistenRef.current) {
+        unlistenRef.current()
+      }
+    }
   }, [])
 
   async function loadProjects() {
@@ -130,7 +145,27 @@ function App() {
   async function launchInstance(id: string) {
     setLaunchError('')
     setIsLaunching(true)
+    setLaunchProgress(null)
     localStorage.setItem('mp_username', username)
+
+    if (unlistenRef.current) {
+      unlistenRef.current()
+      unlistenRef.current = null
+    }
+
+    const unlisten = await listen<LaunchProgress>('mc-launch-progress', (event) => {
+      const p = event.payload
+      setLaunchProgress(p)
+      if (p.phase === 'done' || p.phase === 'error') {
+        setIsLaunching(false)
+        loadInstances()
+        if (p.phase === 'error') {
+          setLaunchError(p.message)
+        }
+      }
+    })
+    unlistenRef.current = unlisten
+
     try {
       await invoke('launch_mc_instance', {
         instanceId: id,
@@ -139,12 +174,15 @@ function App() {
         minMem: minMem,
         maxMem: maxMem,
       })
-      loadInstances()
     } catch (e: any) {
       console.error('Failed to launch instance:', e)
       setLaunchError(typeof e === 'string' ? e : e?.message || String(e))
-    } finally {
       setIsLaunching(false)
+      setLaunchProgress(null)
+      if (unlistenRef.current) {
+        unlistenRef.current()
+        unlistenRef.current = null
+      }
     }
   }
 
@@ -422,6 +460,25 @@ function App() {
               <div className="launch-error">
                 <strong>Launch Error:</strong>
                 <pre>{launchError}</pre>
+              </div>
+            )}
+
+            {launchProgress && (
+              <div className="launch-progress">
+                <div className="progress-phase">{launchProgress.message}</div>
+                {launchProgress.total != null && launchProgress.total > 0 && (
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          ((launchProgress.bytes || 0) / launchProgress.total) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
