@@ -190,6 +190,7 @@ pub async fn launch_mc_instance(
     min_mem: Option<String>,
     max_mem: Option<String>,
 ) -> Result<(), String> {
+    eprintln!("[ModpackEngine] launch_mc_instance called for {instance_id}");
     manager
         .launch_instance(
             app,

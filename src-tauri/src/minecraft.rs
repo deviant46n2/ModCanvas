@@ -388,17 +388,21 @@ async fn do_launch(
     let mut receiver = event_bus.subscribe();
 
     let mut auth = OfflineAuth::new(username);
+    eprintln!("[ModpackEngine] Authenticating...");
     let profile = auth
         .authenticate(Some(&event_bus))
         .await
         .map_err(|e| format!("Auth failed: {e}"))?;
+    eprintln!("[ModpackEngine] Auth OK, starting event forwarder...");
 
     let app_clone = app.clone();
     tokio::spawn(async move {
         use lighty_launcher::event::Event;
+        eprintln!("[ModpackEngine] Event forwarder task started");
         loop {
             match receiver.next().await {
                 Ok(event) => {
+                    eprintln!("[ModpackEngine] Event: {:?}", std::mem::discriminant(&event));
                     let progress = match &event {
                         Event::Java(lighty_launcher::event::JavaEvent::JavaNotFound {
                             distribution,
@@ -521,7 +525,9 @@ async fn do_launch(
                     };
 
                     if let Some(p) = progress {
-                        let _ = app_clone.emit("mc-launch-progress", &p);
+                        if let Err(e) = app_clone.emit("mc-launch-progress", &p) {
+                            eprintln!("[ModpackEngine] Emit error: {e}");
+                        }
                     }
                 }
                 Err(e) => {
@@ -532,6 +538,7 @@ async fn do_launch(
         }
     });
 
+    eprintln!("[ModpackEngine] Starting launch pipeline...");
     version
         .launch(&profile, JavaDistribution::Temurin)
         .with_event_bus(&event_bus)
@@ -542,6 +549,7 @@ async fn do_launch(
         .run()
         .await
         .map_err(|e| format!("Launch failed: {e}"))?;
+    eprintln!("[ModpackEngine] Launch pipeline completed");
 
     Ok(())
 }
