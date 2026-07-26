@@ -198,24 +198,31 @@ fn ensure_system_java_symlinked() {
 
     let jre_base = AppState::config_dir().join("jre");
 
-    let java_home = std::path::PathBuf::from("/usr/lib/jvm/java-21-openjdk");
-    if !java_home.exists() {
-        return;
-    }
-
-    let target_dir = jre_base.join("Temurin_21");
-    if target_dir.exists() {
-        return;
-    }
+    let java_versions: &[(u8, &str)] = &[
+        (17, "/usr/lib/jvm/java-17-openjdk"),
+        (21, "/usr/lib/jvm/java-21-openjdk"),
+    ];
 
     if let Err(e) = std::fs::create_dir_all(&jre_base) {
         eprintln!("[ModpackEngine] Failed to create JRE base dir: {e}");
         return;
     }
 
-    match std::os::unix::fs::symlink(&java_home, &target_dir) {
-        Ok(_) => eprintln!("[ModpackEngine] Symlinked system Java 21 for lighty"),
-        Err(e) => eprintln!("[ModpackEngine] Failed to symlink Java: {e}"),
+    for (version, java_home) in java_versions {
+        let java_path = std::path::Path::new(java_home);
+        if !java_path.exists() {
+            continue;
+        }
+
+        let target_dir = jre_base.join(format!("Temurin_{version}"));
+        if target_dir.exists() {
+            continue;
+        }
+
+        match std::os::unix::fs::symlink(java_path, &target_dir) {
+            Ok(_) => eprintln!("[ModpackEngine] Symlinked system Java {version} for lighty"),
+            Err(e) => eprintln!("[ModpackEngine] Failed to symlink Java {version}: {e}"),
+        }
     }
 }
 
