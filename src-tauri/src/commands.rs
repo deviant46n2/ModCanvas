@@ -181,7 +181,7 @@ pub fn list_mc_instances(manager: State<'_, InstanceManager>) -> Vec<MinecraftIn
 }
 
 #[tauri::command]
-pub fn launch_mc_instance(
+pub async fn launch_mc_instance(
     manager: State<'_, InstanceManager>,
     app: AppHandle,
     instance_id: String,
