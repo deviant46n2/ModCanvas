@@ -230,6 +230,8 @@ pub async fn resolve_loader_version(
         }
     }
 
+    let parts: Vec<&str> = mc_version.split('.').collect();
+
     match loader {
         "fabric" => {
             let url = format!(
@@ -272,42 +274,35 @@ pub async fn resolve_loader_version(
                 .ok_or_else(|| "No Quilt loader versions found".to_string())
         }
         "neoforge" => {
-            let url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-            let resp = reqwest::get(url)
-                .await
-                .map_err(|e| format!("Failed to fetch NeoForge metadata: {e}"))?;
-            let text = resp
-                .text()
-                .await
-                .map_err(|e| format!("Failed to read NeoForge metadata: {e}"))?;
+    let prefix = format!("{}.{}", parts[1], parts[2]);
 
-            let mut latest = String::new();
-            let mut in_release = false;
-            for line in text.lines() {
-                let trimmed = line.trim();
-                if trimmed == "<release>" || trimmed.starts_with("<release>") {
-                    in_release = true;
-                    if let Some(v) = trimmed
-                        .strip_prefix("<release>")
-                        .and_then(|s| s.strip_suffix("</release>"))
-                    {
-                        latest = v.to_string();
-                        in_release = false;
-                    }
-                } else if in_release {
-                    latest = trimmed
-                        .strip_suffix("</release>")
-                        .unwrap_or(trimmed)
-                        .to_string();
-                    in_release = false;
-                }
-            }
+    let url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
+    let resp = reqwest::get(url)
+        .await
+        .map_err(|e| format!("Failed to fetch NeoForge metadata: {e}"))?;
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read NeoForge metadata: {e}"))?;
 
-            if !latest.is_empty() {
-                Ok(latest)
-            } else {
-                Err("No NeoForge versions found in metadata".to_string())
+    let mut candidates: Vec<String> = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(v) = trimmed
+            .strip_prefix("<version>")
+            .and_then(|s| s.strip_suffix("</version>"))
+        {
+            if v.starts_with(&prefix) && !v.contains("beta") && !v.contains("alpha") {
+                candidates.push(v.to_string());
             }
+        }
+    }
+
+    candidates.sort();
+    candidates
+        .into_iter()
+        .next_back()
+        .ok_or_else(|| format!("No NeoForge versions found for MC {mc_version} (prefix: {prefix})"))
         }
         "forge" => {
             let url = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
