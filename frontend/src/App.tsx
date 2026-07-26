@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { listen } from '@tauri-apps/api/event'
+import type { UnlistenFn } from '@tauri-apps/api/event'
 import './App.css'
 
 interface Project {
@@ -74,6 +75,23 @@ function App() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!showNewInstance || newInstanceLoader === 'vanilla') {
+      return
+    }
+    let cancelled = false
+    invoke<string>('resolve_mc_loader_version', {
+      loader: newInstanceLoader,
+      mcVersion: newInstanceMcVersion,
+      requestedVersion: null,
+    }).then((v) => {
+      if (!cancelled && v) {
+        setNewInstanceLoaderVersion(v)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [showNewInstance, newInstanceMcVersion, newInstanceLoader])
 
   async function loadProjects() {
     try {
