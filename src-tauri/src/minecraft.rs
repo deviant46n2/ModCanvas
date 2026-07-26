@@ -226,12 +226,19 @@ fn ensure_system_java_symlinked() {
             continue;
         }
 
-        let target_dir = jre_base.join(format!("Temurin_{version}"));
-        if target_dir.exists() {
+        let runtime_dir = jre_base.join(format!("temurin_{version}"));
+        let home_link = runtime_dir.join("home");
+
+        if home_link.exists() {
             continue;
         }
 
-        match std::os::unix::fs::symlink(java_path, &target_dir) {
+        if let Err(e) = std::fs::create_dir_all(&runtime_dir) {
+            eprintln!("[ModpackEngine] Failed to create runtime dir for Java {version}: {e}");
+            continue;
+        }
+
+        match std::os::unix::fs::symlink(java_path, &home_link) {
             Ok(_) => eprintln!("[ModpackEngine] Symlinked system Java {version} for lighty"),
             Err(e) => eprintln!("[ModpackEngine] Failed to symlink Java {version}: {e}"),
         }
