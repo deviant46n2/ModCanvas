@@ -186,7 +186,7 @@ pub fn launch_mc_instance(
     app: AppHandle,
     instance_id: String,
     username: String,
-    java_path: Option<String>,
+    _java_path: Option<String>,
     min_mem: Option<String>,
     max_mem: Option<String>,
 ) -> Result<(), String> {

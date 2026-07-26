@@ -102,8 +102,8 @@ impl InstanceManager {
         let mc_version = instance.mc_version.clone();
         let loader = instance.loader.clone();
         let loader_version = instance.loader_version.clone();
-        let id_owned = id.to_string();
         let game_dir = instance.game_dir.clone();
+        let id_owned = id.to_string();
         drop(instances);
 
         let app_handle = app.clone();
@@ -128,7 +128,10 @@ impl InstanceManager {
             if let Some(inst) = instances.iter_mut().find(|i| i.id == id_owned) {
                 match result {
                     Ok(_) => inst.status = InstanceStatus::Stopped,
-                    Err(_) => inst.status = InstanceStatus::Crashed,
+                    Err(e) => {
+                        eprintln!("Launch failed: {e}");
+                        inst.status = InstanceStatus::Crashed;
+                    }
                 }
             }
         });
@@ -163,7 +166,7 @@ impl InstanceManager {
         if log_file.exists() {
             Ok(std::fs::read_to_string(&log_file)?)
         } else {
-            Ok(String::new())
+            Ok("No logs yet. Launch the instance first.".to_string())
         }
     }
 }
@@ -179,8 +182,6 @@ async fn do_launch(
     max_mem: &str,
 ) -> Result<()> {
     use lighty_launcher::prelude::*;
-
-    AppState::init("ModpackEngine")?;
 
     let loader_enum = match loader {
         "fabric" => Loader::Fabric,
