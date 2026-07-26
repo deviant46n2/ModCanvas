@@ -62,6 +62,7 @@ pub fn run() {
             commands::stop_mc_instance,
             commands::remove_mc_instance,
             commands::get_mc_logs,
+            commands::resolve_mc_loader_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Modpack Engine");

@@ -386,6 +386,11 @@ body {
   background: #16a34a;
 }
 
+.btn-success:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+}
+
 .btn-danger {
   padding: 10px 16px;
   border: none;
@@ -497,6 +502,57 @@ body {
   height: 100%;
 }
 
+.workspace-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.launch-settings {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.launch-settings h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.settings-row {
+  display: flex;
+  gap: 16px;
+}
+
+.settings-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.launch-error {
+  padding: 12px 20px;
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid var(--error);
+  font-size: 0.85rem;
+}
+
+.launch-error strong {
+  color: var(--error);
+}
+
+.launch-error pre {
+  margin-top: 8px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
 .instance-actions {
   display: flex;
   gap: 8px;
@@ -511,11 +567,18 @@ body {
   min-height: 0;
 }
 
-.instance-logs h3 {
+.logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.logs-header h3 {
   font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 12px;
   color: var(--text-secondary);
+  margin-bottom: 0;
 }
 
 .log-output {

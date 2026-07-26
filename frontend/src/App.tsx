@@ -23,7 +23,6 @@ interface McInstance {
   loader_version: string | null
   game_dir: string
   status: string
-  pid: number | null
 }
 
 function App() {
@@ -43,9 +42,18 @@ function App() {
   const [newInstanceName, setNewInstanceName] = useState('')
   const [newInstanceMcVersion, setNewInstanceMcVersion] = useState('1.21.1')
   const [newInstanceLoader, setNewInstanceLoader] = useState('vanilla')
+  const [newInstanceLoaderVersion, setNewInstanceLoaderVersion] = useState('')
   const [selectedInstance, setSelectedInstance] = useState<McInstance | null>(null)
-  const [username, setUsername] = useState('Player')
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem('mp_username') || 'Player'
+  })
   const [instanceLogs, setInstanceLogs] = useState('')
+  const [launchError, setLaunchError] = useState('')
+  const [isLaunching, setIsLaunching] = useState(false)
+
+  // Memory settings
+  const [minMem, setMinMem] = useState('2G')
+  const [maxMem, setMaxMem] = useState('4G')
 
   useEffect(() => {
     loadProjects()
@@ -103,32 +111,40 @@ function App() {
 
   async function createInstance() {
     try {
+      const loaderVersion = newInstanceLoaderVersion.trim() || null
       const instance = await invoke<McInstance>('create_mc_instance', {
         name: newInstanceName,
         mcVersion: newInstanceMcVersion,
         loader: newInstanceLoader,
-        loaderVersion: null,
+        loaderVersion: loaderVersion,
       })
       setInstances([...instances, instance])
       setShowNewInstance(false)
       setNewInstanceName('')
+      setNewInstanceLoaderVersion('')
     } catch (e) {
       console.error('Failed to create instance:', e)
     }
   }
 
   async function launchInstance(id: string) {
+    setLaunchError('')
+    setIsLaunching(true)
+    localStorage.setItem('mp_username', username)
     try {
       await invoke('launch_mc_instance', {
         instanceId: id,
         username: username,
         javaPath: null,
-        minMem: '2G',
-        maxMem: '4G',
+        minMem: minMem,
+        maxMem: maxMem,
       })
       loadInstances()
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to launch instance:', e)
+      setLaunchError(typeof e === 'string' ? e : e?.message || String(e))
+    } finally {
+      setIsLaunching(false)
     }
   }
 
@@ -287,6 +303,9 @@ function App() {
                 <label>Minecraft Version</label>
                 <select value={newInstanceMcVersion} onChange={(e) => setNewInstanceMcVersion(e.target.value)}>
                   <option value="1.21.1">1.21.1</option>
+                  <option value="1.21">1.21</option>
+                  <option value="1.20.6">1.20.6</option>
+                  <option value="1.20.4">1.20.4</option>
                   <option value="1.20.1">1.20.1</option>
                   <option value="1.19.2">1.19.2</option>
                 </select>
@@ -295,12 +314,23 @@ function App() {
                 <label>Loader</label>
                 <select value={newInstanceLoader} onChange={(e) => setNewInstanceLoader(e.target.value)}>
                   <option value="vanilla">Vanilla</option>
-                  <option value="forge">Forge</option>
-                  <option value="neoforge">NeoForge</option>
                   <option value="fabric">Fabric</option>
                   <option value="quilt">Quilt</option>
+                  <option value="forge">Forge</option>
+                  <option value="neoforge">NeoForge</option>
                 </select>
               </div>
+              {newInstanceLoader !== 'vanilla' && (
+                <div className="form-group">
+                  <label>Loader Version (leave empty for latest)</label>
+                  <input
+                    type="text"
+                    value={newInstanceLoaderVersion}
+                    onChange={(e) => setNewInstanceLoaderVersion(e.target.value)}
+                    placeholder="e.g. 0.16.10 (auto-resolves latest if empty)"
+                  />
+                </div>
+              )}
               <div className="form-group">
                 <label>Username</label>
                 <input
@@ -331,8 +361,9 @@ function App() {
                   <button
                     className="btn-success"
                     onClick={() => launchInstance(selectedInstance.id)}
+                    disabled={isLaunching}
                   >
-                    Launch
+                    {isLaunching ? 'Launching...' : 'Launch'}
                   </button>
                 )}
                 {selectedInstance.status === 'Running' && (
@@ -348,8 +379,59 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {selectedInstance.status === 'Stopped' && (
+              <div className="launch-settings">
+                <h3>Launch Settings</h3>
+                <div className="settings-row">
+                  <div className="form-group">
+                    <label>Min Memory</label>
+                    <select value={minMem} onChange={(e) => setMinMem(e.target.value)}>
+                      <option value="1G">1 GB</option>
+                      <option value="2G">2 GB</option>
+                      <option value="4G">4 GB</option>
+                      <option value="6G">6 GB</option>
+                      <option value="8G">8 GB</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Max Memory</label>
+                    <select value={maxMem} onChange={(e) => setMaxMem(e.target.value)}>
+                      <option value="2G">2 GB</option>
+                      <option value="4G">4 GB</option>
+                      <option value="6G">6 GB</option>
+                      <option value="8G">8 GB</option>
+                      <option value="12G">12 GB</option>
+                      <option value="16G">16 GB</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Username</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Player"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {launchError && (
+              <div className="launch-error">
+                <strong>Launch Error:</strong>
+                <pre>{launchError}</pre>
+              </div>
+            )}
+
             <div className="instance-logs">
-              <h3>Logs</h3>
+              <div className="logs-header">
+                <h3>Logs</h3>
+                <button className="btn-icon" onClick={() => loadLogs(selectedInstance.id)}>
+                  Refresh
+                </button>
+              </div>
               <pre className="log-output">{instanceLogs || 'No logs available'}</pre>
             </div>
           </div>

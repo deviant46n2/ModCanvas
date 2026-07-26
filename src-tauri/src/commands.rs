@@ -222,11 +222,20 @@ pub fn remove_mc_instance(
 }
 
 #[tauri::command]
-pub fn get_mc_logs(
+pub async fn get_mc_logs(
     manager: State<'_, InstanceManager>,
     instance_id: String,
 ) -> Result<String, String> {
     manager
         .get_logs(&instance_id)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn resolve_mc_loader_version(
+    loader: String,
+    mc_version: String,
+    requested_version: Option<String>,
+) -> Result<String, String> {
+    crate::minecraft::resolve_loader_version(&loader, &mc_version, requested_version.as_deref()).await
 }
