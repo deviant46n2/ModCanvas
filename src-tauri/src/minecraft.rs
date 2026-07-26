@@ -185,10 +185,37 @@ fn ensure_lighty_init() -> Result<(), String> {
         Ok(Ok(_)) => {
             INIT.store(true, Ordering::SeqCst);
             eprintln!("[ModpackEngine] lighty-launcher initialized");
+            ensure_system_java_symlinked();
             Ok(())
         }
         Ok(Err(e)) => Err(format!("lighty-launcher init error: {e}")),
         Err(_) => Err("lighty-launcher init panicked".to_string()),
+    }
+}
+
+fn ensure_system_java_symlinked() {
+    use lighty_launcher::core::AppState;
+
+    let jre_base = AppState::config_dir().join("jre");
+
+    let java_home = std::path::PathBuf::from("/usr/lib/jvm/java-21-openjdk");
+    if !java_home.exists() {
+        return;
+    }
+
+    let target_dir = jre_base.join("Temurin_21");
+    if target_dir.exists() {
+        return;
+    }
+
+    if let Err(e) = std::fs::create_dir_all(&jre_base) {
+        eprintln!("[ModpackEngine] Failed to create JRE base dir: {e}");
+        return;
+    }
+
+    match std::os::unix::fs::symlink(&java_home, &target_dir) {
+        Ok(_) => eprintln!("[ModpackEngine] Symlinked system Java 21 for lighty"),
+        Err(e) => eprintln!("[ModpackEngine] Failed to symlink Java: {e}"),
     }
 }
 
