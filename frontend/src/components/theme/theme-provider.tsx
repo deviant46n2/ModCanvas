@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { globalAssetCache } from './asset-cache';
+import { globalAssetCache } from '../../core/theme/asset-cache';
 import { ThemeContext } from './theme-context';
 import type { ThemeContextValue } from './theme-context';
-import type { ExtractedTheme } from './types';
+import type { ExtractedTheme } from '../../core/theme/types';
 
 export interface CanvasThemeProviderProps {
   children: React.ReactNode;

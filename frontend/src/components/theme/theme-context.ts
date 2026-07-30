@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { ExtractedTheme } from './types';
+import type { ExtractedTheme } from '../../core/theme/types';
 
 export interface ThemeContextValue {
   theme: ExtractedTheme | null;

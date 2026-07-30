@@ -18,7 +18,7 @@ use std::sync::{Arc, OnceLock};
 use tauri::Manager;
 
 use db::Database;
-use launcher::LauncherDriver;
+use launcher::{LauncherDriver, PrismLauncherDriver};
 use minecraft::InstanceManager;
 use mod_intelligence::ModIntelligence;
 
@@ -77,7 +77,8 @@ pub fn run() {
             std::fs::create_dir_all(&instances_dir)
                 .expect("failed to create instances directory");
 
-            let instance_manager = InstanceManager::new(instances_dir);
+            let launcher_driver: Arc<dyn LauncherDriver> = Arc::new(PrismLauncherDriver::new());
+            let instance_manager = InstanceManager::new(instances_dir, launcher_driver);
             app.manage(instance_manager);
 
             // WebSocket IPC Server for Minecraft Companion Mod

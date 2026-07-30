@@ -1,9 +1,9 @@
+use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::launcher::{LauncherDriver, PrismLauncherDriver};
+use crate::launcher::LauncherDriver;
 
 /// Trait for emitting launch progress events, abstracting away Tauri's AppHandle.
 /// The core layer uses this trait; the Tauri command layer provides the real implementation.
@@ -280,16 +280,16 @@ pub use crate::models::{MinecraftInstance, InstanceStatus};
 pub struct InstanceManager {
     instances: std::sync::Arc<Mutex<Vec<MinecraftInstance>>>,
     base_dir: PathBuf,
-    _driver: Box<dyn LauncherDriver>,
+    _driver: Arc<dyn LauncherDriver>,
 }
 
 impl InstanceManager {
-    pub fn new(base_dir: PathBuf) -> Self {
+    pub fn new(base_dir: PathBuf, driver: Arc<dyn LauncherDriver>) -> Self {
         eprintln!("[ModCanvas] InstanceManager::new() called with base_dir: {:?}", base_dir);
         let manager = Self {
             instances: std::sync::Arc::new(Mutex::new(Vec::new())),
             base_dir,
-            _driver: Box::new(PrismLauncherDriver::new()),
+            _driver: driver,
         };
         manager.load_instances();
         eprintln!("[ModCanvas] InstanceManager::new() completed, instances loaded: {}", manager.instances.lock().unwrap().len());
@@ -619,7 +619,6 @@ _username: &str,
 
         let min_mem = min_mem.to_string();
         let max_mem = max_mem.to_string();
-        let driver: Box<dyn LauncherDriver> = Box::new(PrismLauncherDriver::new());
 
         {
             let mut instances = self.instances.lock().unwrap();
@@ -631,6 +630,7 @@ _username: &str,
         // Clone the Arc for the spawned task so it can update instance status
         let instances_arc = self.instances.clone();
 
+        let driver = self._driver.clone();
         tokio::spawn(async move {
             let result = do_launch(
                 &*emitter,

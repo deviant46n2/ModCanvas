@@ -5,22 +5,6 @@ export class Minecraft1211FabricAdapter extends BaseMinecraftAdapter {
   readonly mcVersion = '1.21.1';
   readonly loader = 'fabric' as const;
 
-  getQuestPath(instanceDir: string): string {
-    return `${instanceDir}/config/ftbquests/quests`;
-  }
-
-  getRecipeScriptPath(instanceDir: string): string {
-    return `${instanceDir}/kubejs/server_scripts`;
-  }
-
-  getQuestReloadCommand(): string {
-    return '/ftbquests reload';
-  }
-
-  getRecipeReloadCommand(): string {
-    return '/kubejs reload server_scripts';
-  }
-
   getSNBTSpec(): SNBTSpecification {
     return {
       useCommas: false,

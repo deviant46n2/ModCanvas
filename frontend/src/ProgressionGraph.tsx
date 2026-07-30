@@ -1,17 +1,11 @@
 import { useCallback, useState, useMemo } from 'react'
 import {
-  ReactFlow,
-  Controls,
-  Background,
-  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
   MarkerType,
 } from '@xyflow/react'
-import type { Connection, Node, Edge, NodeTypes, NodeProps } from '@xyflow/react'
-import { Handle, Position as RFPosition } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+import type { Connection, Node, Edge } from '@xyflow/react'
 import {
   getProgressionGraph,
   saveProgressionGraph,
@@ -22,50 +16,10 @@ import type {
   ProgressionGraphData,
   ProgressionAnalysis,
 } from './services/api'
-
-function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
-  const nodeType = (data.nodeType as string) || 'milestone'
-  const icons: Record<string, string> = {
-    milestone: '🎯', unlock: '🔓', phase: '⚡', achievement: '🏆', content: '📦',
-  }
-  const modCount = ((data.mod_refs as string[]) || []).length
-  const label = (data.label as string) || 'Node'
-  const desc = (data.description as string) || ''
-  const phase = (data.phase as string) || ''
-  const nodeColor = (data.color as string) || ''
-
-  const borderColor = nodeColor || (
-    nodeType === 'phase' ? '#10b981' :
-    nodeType === 'milestone' ? '#3b82f6' :
-    nodeType === 'unlock' ? '#8b5cf6' :
-    nodeType === 'achievement' ? '#f59e0b' :
-    nodeType === 'content' ? '#ef4444' : '#6b7280'
-  )
-
-  return (
-    <div className={`progression-node ${nodeType}-node ${selected ? 'selected' : ''}`} style={{ borderColor }}>
-      <div className="node-header">
-        <div className="node-icon">{icons[nodeType] || '📦'}</div>
-        <div className="node-title">
-          <div className="node-label">{label}</div>
-          {phase && <div className="node-subtitle">{phase}</div>}
-        </div>
-      </div>
-      {desc && <div className="node-desc">{desc.length > 80 ? desc.slice(0, 80) + '...' : desc}</div>}
-      {modCount > 0 && <div className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</div>}
-      <Handle type="target" position={RFPosition.Top} />
-      <Handle type="source" position={RFPosition.Bottom} />
-    </div>
-  )
-}
-
-const nodeTypes: NodeTypes = {
-  milestone: ProgressionNodeComponent,
-  unlock: ProgressionNodeComponent,
-  phase: ProgressionNodeComponent,
-  achievement: ProgressionNodeComponent,
-  content: ProgressionNodeComponent,
-}
+import ProgressionCanvas from './components/progression/ProgressionCanvas'
+import ProgressionToolbar from './components/progression/ProgressionToolbar'
+import ProgressionNodeInspector from './components/progression/ProgressionNodeInspector'
+import ProgressionAnalysisOverlay from './components/progression/ProgressionAnalysisOverlay'
 
 interface ProgressionGraphProps {
   projectId: string
@@ -209,6 +163,11 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
 
   const onPaneClick = useCallback(() => { setSelectedNode(null) }, [])
 
+  const handleDeleteEdge = useCallback((edge: Edge) => {
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id))
+    setTimeout(saveGraph, 100)
+  }, [setEdges, saveGraph])
+
   const updateSelectedNode = useCallback(() => {
     if (!selectedNode) return
     setNodes((nds) =>
@@ -275,31 +234,17 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
 
   return (
     <div className="progression-panel">
-      <div className="progression-toolbar">
-        <div className="toolbar-section">
-          <h3>Progression Graph</h3>
-        </div>
-        <div className="toolbar-actions">
-          <div className="node-type-selector">
-            <label>Type:</label>
-            <select value={selectedNodeType} onChange={(e) => setSelectedNodeType(e.target.value)}>
-              <option value="milestone">Milestone</option>
-              <option value="unlock">Unlock</option>
-              <option value="phase">Phase</option>
-              <option value="achievement">Achievement</option>
-              <option value="content">Content</option>
-            </select>
-          </div>
-          <button className="btn-primary" onClick={() => addNode(selectedNodeType)}>+ Add</button>
-          <button className="btn-success" onClick={autoGenerate}>Load from Pack</button>
-          <button className="btn-secondary" onClick={saveGraph}>Save</button>
-          <button className="btn-secondary" onClick={loadAnalysis}>Analyze</button>
-        </div>
-      </div>
-
+      <ProgressionToolbar
+        selectedNodeType={selectedNodeType}
+        setSelectedNodeType={setSelectedNodeType}
+        onAddNode={() => addNode(selectedNodeType)}
+        onAutoGenerate={autoGenerate}
+        onSave={saveGraph}
+        onAnalyze={loadAnalysis}
+      />
       <div className="progression-layout">
         <div className="progression-canvas">
-          <ReactFlow
+          <ProgressionCanvas
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -307,145 +252,34 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
-            nodeTypes={nodeTypes}
-            fitView
-            snapToGrid
-            snapGrid={[15, 15]}
-            onEdgeDoubleClick={(_, edge) => {
-              if (confirm('Delete this connection?')) {
-                setEdges((eds) => eds.filter((e) => e.id !== edge.id))
-                setTimeout(saveGraph, 100)
-              }
-            }}
-          >
-            <Controls />
-            <MiniMap
-              nodeColor={(node) => {
-                const type = (node.data?.nodeType as string) || 'milestone'
-                const colors: Record<string, string> = {
-                  phase: '#10b981', milestone: '#3b82f6', unlock: '#8b5cf6',
-                  achievement: '#f59e0b', content: '#ef4444',
-                }
-                return colors[type] || '#6b7280'
-              }}
-              maskColor="rgba(0,0,0,0.7)"
-            />
-            <Background color="#374151" gap={15} />
-          </ReactFlow>
+            onDeleteEdge={handleDeleteEdge}
+          />
         </div>
-
         {selectedNode && (
-          <div className="progression-inspector">
-            <div className="inspector-header">
-              <h4>Edit Node</h4>
-              <button className="btn-close" onClick={() => setSelectedNode(null)}>×</button>
-            </div>
-            <div className="inspector-body">
-              <div className="inspector-field">
-                <label>Label</label>
-                <input type="text" value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && updateSelectedNode()}
-                />
-              </div>
-              <div className="inspector-field">
-                <label>Description</label>
-                <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3} />
-              </div>
-              <div className="inspector-row">
-                <div className="inspector-field half">
-                  <label>Phase</label>
-                  <input type="text" value={editPhase} onChange={(e) => setEditPhase(e.target.value)} placeholder="Early Game" />
-                </div>
-                <div className="inspector-field half">
-                  <label>Stage Name</label>
-                  <input type="text" value={editStageName} onChange={(e) => setEditStageName(e.target.value)} />
-                </div>
-              </div>
-              <div className="inspector-row">
-                <div className="inspector-field half">
-                  <label>Color (hex)</label>
-                  <input type="color" value={editColor || '#3b82f6'} onChange={(e) => setEditColor(e.target.value)} />
-                </div>
-                <div className="inspector-field half">
-                  <label>Icon (item id)</label>
-                  <input type="text" value={editIcon} onChange={(e) => setEditIcon(e.target.value)} placeholder="minecraft:nether_star" />
-                </div>
-              </div>
-
-              {modRefs.length > 0 && (
-                <div className="inspector-field">
-                  <label>Linked Mods</label>
-                  <div className="inspector-mods">
-                    {modRefs.map((modId, i) => {
-                      const displayName = graph?.mod_names?.[modId] || modId
-                      return <span key={i} className="mod-tag" title={modId}>{displayName}</span>
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="inspector-actions">
-                <button className="btn-primary" onClick={updateSelectedNode}>Apply</button>
-                <button className="btn-danger" onClick={deleteSelectedNode}>Delete</button>
-              </div>
-            </div>
-          </div>
+          <ProgressionNodeInspector
+            selectedNode={selectedNode}
+            graph={graph}
+            editLabel={editLabel}
+            editDesc={editDesc}
+            editPhase={editPhase}
+            editStageName={editStageName}
+            editColor={editColor}
+            editIcon={editIcon}
+            modRefs={modRefs}
+            onSetEditLabel={setEditLabel}
+            onSetEditDesc={setEditDesc}
+            onSetEditPhase={setEditPhase}
+            onSetEditStageName={setEditStageName}
+            onSetEditColor={setEditColor}
+            onSetEditIcon={setEditIcon}
+            onClose={() => setSelectedNode(null)}
+            onApply={updateSelectedNode}
+            onDelete={deleteSelectedNode}
+          />
         )}
       </div>
-
       {showAnalysis && analysis && (
-        <div className="modal-overlay" onClick={() => setShowAnalysis(false)}>
-          <div className="modal analysis-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Progression Analysis</h2>
-            <div className="analysis-grid">
-              <div className="analysis-stat">
-                <div className="stat-value">{analysis.total_nodes}</div>
-                <div className="stat-label">Nodes</div>
-              </div>
-              <div className="analysis-stat">
-                <div className="stat-value">{analysis.total_edges}</div>
-                <div className="stat-label">Connections</div>
-              </div>
-              <div className="analysis-stat">
-                <div className="stat-value">{analysis.phases.length}</div>
-                <div className="stat-label">Phases</div>
-              </div>
-              <div className="analysis-stat">
-                <div className="stat-value">{analysis.coverage.total_mods}</div>
-                <div className="stat-label">Mods Referenced</div>
-              </div>
-            </div>
-            {analysis.issues.length > 0 && (
-              <div className="analysis-issues">
-                <h3>Issues</h3>
-                {analysis.issues.map((issue, i) => (
-                  <div key={i} className={`issue-${issue.severity}`}>{issue.message}</div>
-                ))}
-              </div>
-            )}
-            {analysis.bottlenecks.length > 0 && (
-              <div className="analysis-section">
-                <h3>Bottlenecks</h3>
-                {analysis.bottlenecks.map((b) => (
-                  <div key={b.node_id} className="bottleneck-item">
-                    <strong>{b.node_label}</strong> — {b.incoming_count} prerequisites
-                    <span className={`severity-${b.severity}`}>{b.severity}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {analysis.dead_ends.length > 0 && (
-              <div className="analysis-section">
-                <h3>Dead Ends</h3>
-                <p>{analysis.dead_ends.length} node(s) with no connections</p>
-              </div>
-            )}
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowAnalysis(false)}>Close</button>
-            </div>
-          </div>
-        </div>
+        <ProgressionAnalysisOverlay analysis={analysis} onClose={() => setShowAnalysis(false)} />
       )}
     </div>
   )
