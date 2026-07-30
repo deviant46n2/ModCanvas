@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+issueTrackerURL="https://github.com/modcanvas/workbench-companion/issues"
+[[mods]]
+modId="workbench_companion"
+version="1.0.0"
+displayName="Workbench Companion"
+description="Real-time WebSocket bridge for ModCanvas hot-swap integration with FTB Quests and KubeJS"
+authors=["ModCanvas Team"]
+credits="ModCanvas Team"
+displayURL="https://github.com/modcanvas/workbench-companion"
+updateJSONURL="https://github.com/modcanvas/workbench-companion/releases/latest/download/update.json"
+[[dependencies.workbench_companion]]
+    modId="neoforge"
+    mandatory=true
+    versionRange="[21.1.1,)"
+    ordering="NONE"
+    side="BOTH"
+[[dependencies.workbench_companion]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.21.1,1.21.2)"
+    ordering="NONE"
+    side="BOTH"

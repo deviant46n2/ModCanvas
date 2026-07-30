@@ -1,0 +1,82 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.neoforged.net" }
+    }
+    dependencies {
+        classpath "net.neoforged:neoforge-gradle-plugin:1.20.1-48.1.0"
+    }
+}
+
+apply plugin: "net.neoforged.gradle"
+apply plugin: "java"
+
+group = "com.modcanvas.companion"
+version = "1.0.0"
+archivesBaseName = "workbench-companion"
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://maven.neoforged.net" }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.20.1"
+    mappings "net.neoforged:forge:1.20.1-48.1.0:recomp"
+
+    // NeoForge API
+    implementation fg.deobf("net.neoforged:neoforge:1.20.1-48.1.0")
+
+    // WebSocket client
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+
+    // JSON parsing
+    implementation "com.google.code.gson:gson:2.10.1"
+
+    // Testing
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+}
+
+neoforge {
+    mappingsChannel = "official"
+    mappingsVersion = "1.20.1"
+}
+
+// Shadow plugin for relocating dependencies
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.neoforged.net" }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:8.1.1"
+    }
+}
+
+apply plugin: "com.github.johnrengelman.shadow"
+
+shadowJar {
+    archiveClassifier.set("")
+    relocate 'org.java_websocket', 'com.modcanvas.companion.shaded.org.java_websocket'
+    relocate 'com.google.gson', 'com.modcanvas.companion.shaded.com.google.gson'
+
+    manifest {
+        attributes(
+            "Implementation-Title": "Workbench Companion",
+            "Implementation-Version": version,
+            "Main-Class": "com.modcanvas.companion.WorkbenchCompanionForge",
+            "NeoForge-Mod": "META-INF/neoforge.mods.toml"
+        )
+    }
+}
+
+tasks.build.dependsOn(shadowJar)
+
+// Testing
+tasks.test {
+    useJUnitPlatform()
+}

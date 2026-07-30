@@ -1,13 +1,15 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModLoader {
     Forge,
     NeoForge,
     Fabric,
     Quilt,
+    Vanilla,
 }
 
 impl std::fmt::Display for ModLoader {
@@ -17,6 +19,20 @@ impl std::fmt::Display for ModLoader {
             ModLoader::NeoForge => write!(f, "NeoForge"),
             ModLoader::Fabric => write!(f, "Fabric"),
             ModLoader::Quilt => write!(f, "Quilt"),
+            ModLoader::Vanilla => write!(f, "Vanilla"),
+        }
+    }
+}
+
+impl ModLoader {
+    pub fn from_str(s: &str) -> ModLoader {
+        match s.to_lowercase().as_str() {
+            "forge" => ModLoader::Forge,
+            "neoforge" | "neo" => ModLoader::NeoForge,
+            "fabric" => ModLoader::Fabric,
+            "quilt" => ModLoader::Quilt,
+            "vanilla" => ModLoader::Vanilla,
+            _ => ModLoader::Fabric, // Default to Fabric
         }
     }
 }
@@ -87,6 +103,19 @@ pub struct ModMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModpackMetadata {
+    pub project_id: String,
+    pub slug: String,
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    pub categories: Vec<String>,
+    pub downloads: u64,
+    pub versions: Vec<String>,
+    pub project_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModDependency {
     pub mod_id: String,
     pub dependency_type: DependencyType,
@@ -112,6 +141,7 @@ pub struct CompatibilityIssue {
     pub severity: IssueSeverity,
     pub message: String,
     pub affected_mods: Vec<String>,
+    pub affected_mod_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,4 +169,70 @@ pub enum ConfigType {
     Enum(Vec<String>),
     List,
     Object,
+}
+
+// ── Prism Instance types (moved from minecraft.rs to break db → minecraft coupling) ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinecraftInstance {
+    pub id: String,
+    pub name: String,
+    pub mc_version: String,
+    pub loader: String,
+    pub loader_version: Option<String>,
+    pub game_dir: String,
+    pub status: InstanceStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum InstanceStatus {
+    Stopped,
+    Installing,
+    Running,
+    Crashed,
+    Unknown,
+}
+
+/// Recipe system types for visual recipe editor
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Recipe {
+    pub id: String,
+    pub name: String,
+    pub r#type: RecipeType,
+    pub group: Option<String>,
+    pub pattern: Option<Vec<String>>,
+    pub key: Option<HashMap<String, RecipeIngredient>>,
+    pub ingredients: Option<Vec<RecipeIngredient>>,
+    pub output: RecipeOutput,
+    pub experience: Option<f32>,
+    pub cooking_time: Option<i32>,
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum RecipeType {
+    Shaped,
+    Shapeless,
+    Smithing,
+    Stonecutting,
+    Smelting,
+    Blasting,
+    Smoking,
+    Campfire,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipeIngredient {
+    pub item: String,
+    pub count: Option<i32>,
+    pub tag: Option<bool>,
+    pub nbt: Option<HashMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecipeOutput {
+    pub item: String,
+    pub count: i32,
+    pub nbt: Option<HashMap<String, serde_json::Value>>,
 }

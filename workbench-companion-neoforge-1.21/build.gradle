@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '1.0.11'
+}
+
+group = 'com.modcanvas.companion'
+version = '1.0.0'
+base.archivesName = 'workbench-companion'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForge'
+        url = 'https://maven.neoforged.net'
+    }
+}
+
+neoForge {
+    version = '21.1.103'
+
+    runs {
+        client {
+            client()
+        }
+    }
+
+    mods {
+        workbench_companion {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    jarJar(implementation('org.java-websocket:Java-WebSocket:1.5.4')) {
+        version {
+            strictly '[1.5.0, 2.0.0)'
+            prefer '1.5.4'
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}

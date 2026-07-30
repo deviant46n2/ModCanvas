@@ -1,0 +1,8 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        maven { url "https://maven.neoforged.net" }
+        gradlePluginPortal()
+    }
+}
+rootProject.name = 'workbench-companion'

@@ -1,0 +1,579 @@
+:root {
+  --ftb-bg: #1a1a1e;
+  --ftb-surface: #25252a;
+  --ftb-surface-alt: #2d2d33;
+  --ftb-border: #8b7355;
+  --ftb-border-light: #a08860;
+  --ftb-accent: #d4a843;
+  --ftb-accent-hover: #e8bc5e;
+  --ftb-text: #c8c8c8;
+  --ftb-text-dim: #8a8a8a;
+  --ftb-text-bright: #f0e6c0;
+  --ftb-input-bg: #1e1e22;
+  --ftb-danger: #cc4444;
+  --ftb-success: #55aa55;
+}
+
+.book-panel {
+  background-color: var(--ftb-bg);
+  color: var(--ftb-text);
+}
+
+.quest-editor-chapters {
+  width: 250px;
+  min-width: 250px;
+  background: var(--ftb-surface);
+  border-right: 2px solid var(--ftb-border);
+  overflow: hidden;
+}
+
+.quest-editor-canvas {
+  flex: 1;
+  min-height: 0;
+  background: var(--ftb-bg);
+  overflow: hidden;
+  position: relative;
+}
+
+.quest-canvas-container {
+  background: var(--ftb-bg);
+  height: 100%;
+}
+
+.quest-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ftb-bg);
+  color: var(--ftb-text);
+  overflow: hidden;
+}
+
+.quest-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--ftb-surface);
+  border-bottom: 2px solid var(--ftb-border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.quest-editor-toolbar-left,
+.quest-editor-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest-editor-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ftb-text-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 12px;
+}
+
+.quest-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.quest-editor-inspector {
+  width: 340px;
+  min-width: 340px;
+  background: var(--ftb-surface);
+  border-left: 2px solid var(--ftb-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-in-right 0.2s ease-out;
+}
+
+@keyframes slide-in-right {
+  from { width: 0; min-width: 0; opacity: 0; }
+  to { width: 340px; min-width: 340px; opacity: 1; }
+}
+
+.quest-editor-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--ftb-surface-alt);
+  border-bottom: 2px solid var(--ftb-border);
+  flex-shrink: 0;
+}
+
+.quest-editor-inspector-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-editor-inspector-close {
+  background: none;
+  border: none;
+  color: var(--ftb-text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+.quest-editor-inspector-close:hover {
+  color: var(--ftb-accent);
+}
+
+.quest-editor-inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* ── FTB-themed form elements ── */
+
+.book-section {
+  margin-bottom: 16px;
+}
+
+.book-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.section-icon {
+  font-size: 14px;
+}
+
+.book-field {
+  margin-bottom: 8px;
+}
+
+.book-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ftb-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.book-field input[type="text"],
+.book-field input[type="number"],
+.book-field textarea,
+.book-field select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--ftb-input-bg);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  box-sizing: border-box;
+}
+
+.book-field input[type="text"]:focus,
+.book-field input[type="number"]:focus,
+.book-field textarea:focus,
+.book-field select:focus {
+  outline: none;
+  border-color: var(--ftb-accent);
+}
+
+.book-field textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.book-field-half {
+  display: flex;
+  gap: 8px;
+}
+
+.book-field-half .book-field {
+  flex: 1;
+}
+
+.book-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.book-checkbox label {
+  font-size: 11px;
+  color: var(--ftb-text);
+  cursor: pointer;
+}
+
+.book-checkbox input[type="checkbox"] {
+  accent-color: var(--ftb-accent);
+}
+
+.book-card {
+  background: var(--ftb-input-bg);
+  border: 1px solid var(--ftb-border);
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.book-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.book-card-index {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.book-card-remove {
+  background: none;
+  border: none;
+  color: var(--ftb-danger);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.book-card-remove:hover {
+  color: #ff6666;
+}
+
+.book-page-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--ftb-surface);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  transition: all 0.15s;
+}
+
+.book-page-btn:hover {
+  background: var(--ftb-surface-alt);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-page-btn.accent {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-page-btn.accent:hover {
+  background: var(--ftb-accent);
+  color: var(--ftb-bg);
+}
+
+.book-btn {
+  background: var(--ftb-surface);
+  border: 2px solid var(--ftb-border);
+  border-radius: 0;
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.book-btn:hover {
+  background: var(--ftb-surface-alt);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-btn.primary {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-bg);
+  font-weight: 700;
+}
+
+.book-btn.primary:hover {
+  background: var(--ftb-accent-hover);
+  border-color: var(--ftb-accent-hover);
+}
+
+.book-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.book-btn.danger {
+  border-color: var(--ftb-danger);
+  color: var(--ftb-danger);
+}
+
+.book-btn.danger:hover {
+  background: var(--ftb-danger);
+  color: var(--ftb-bg);
+}
+
+/* ── Empty state ── */
+
+.book-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.book-empty-icon {
+  font-size: 48px;
+}
+
+.book-empty-text {
+  color: var(--ftb-text-dim);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.book-empty-hint {
+  color: var(--ftb-text-dim);
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* ── Popups ── */
+
+.ftb-quest-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ftb-quest-popup {
+  background: var(--ftb-surface);
+  border: 3px solid var(--ftb-border);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(212, 168, 67, 0.1);
+}
+
+.ftb-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--ftb-surface-alt);
+  border-bottom: 2px solid var(--ftb-border);
+}
+
+.ftb-popup-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ftb-popup-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ftb-popup-type {
+  font-size: 10px;
+  color: var(--ftb-text-dim);
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--ftb-input-bg);
+  padding: 2px 6px;
+  border: 1px solid var(--ftb-border);
+}
+
+.ftb-popup-close {
+  background: none;
+  border: none;
+  color: var(--ftb-text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+.ftb-popup-close:hover {
+  color: var(--ftb-accent);
+}
+
+.ftb-popup-body {
+  padding: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.ftb-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 2px solid var(--ftb-border);
+  gap: 8px;
+}
+
+.ftb-popup-btn {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--ftb-surface);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.15s;
+}
+
+.ftb-popup-btn:hover {
+  background: var(--ftb-surface-alt);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.ftb-popup-btn.primary {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-bg);
+}
+
+.ftb-popup-btn.primary:hover {
+  background: var(--ftb-accent-hover);
+}
+
+.ftb-popup-section {
+  margin-bottom: 16px;
+}
+
+.ftb-popup-field {
+  margin-bottom: 10px;
+}
+
+.ftb-popup-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ftb-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ftb-popup-field input[type="text"],
+.ftb-popup-field input[type="number"],
+.ftb-popup-field textarea,
+.ftb-popup-field select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--ftb-input-bg);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  box-sizing: border-box;
+}
+
+.ftb-popup-field input[type="text"]:focus,
+.ftb-popup-field textarea:focus,
+.ftb-popup-field select:focus {
+  outline: none;
+  border-color: var(--ftb-accent);
+}
+
+/* ── Icon picker ── */
+
+.icon-picker-modal {
+  width: 520px;
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+
+.icon-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--ftb-input-bg);
+  border: 2px solid var(--ftb-border);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.icon-picker-item:hover {
+  border-color: var(--ftb-accent);
+}
+
+.icon-picker-label {
+  font-size: 8px;
+  color: var(--ftb-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
+}
+
+/* ── Quest editor popup ── */
+
+.quest-editor-popup {
+  width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.quest-editor-popup .ftb-popup-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ── Chapter tree node hover states ── */
+.ch-tree-chapter:hover {
+  background: var(--ftb-surface-alt) !important;
+}

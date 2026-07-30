@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Implementation-Title: Workbench Companion
+Implementation-Version: 1.0.0
+Main-Class: com.modcanvas.companion.WorkbenchCompanionForge
+FMLCorePlugin: com.modcanvas.companion.WorkbenchCompanionForge
+FMLCorePluginContainsFMLMod: true

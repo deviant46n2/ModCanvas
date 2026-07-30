@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "workbench-companion",
+  "version": "1.0.0",
+  "name": "Workbench Companion",
+  "description": "Real-time WebSocket bridge for ModCanvas hot-swap integration with FTB Quests and KubeJS",
+  "authors": ["ModCanvas Team"],
+  "contact": {
+    "homepage": "https://github.com/modcanvas/workbench-companion",
+    "issues": "https://github.com/modcanvas/workbench-companion/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/workbench-companion/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.modcanvas.companion.WorkbenchCompanionCommon"],
+    "client": ["com.modcanvas.companion.client.WorkbenchCompanionClient"]
+  },
+  "mixins": [
+    "workbench-companion.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": ">=1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "ftbquests": "*",
+    "kubejs": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "issues": "https://github.com/modcanvas/workbench-companion/issues"
+      }
+    }
+  }
+}

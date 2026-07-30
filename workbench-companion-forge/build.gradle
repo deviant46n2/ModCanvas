@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.modcanvas.companion'
+version = '1.0.0'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+repositories {
+    mavenCentral()
+}
+
+def prismLibs = "$System.env.HOME/.local/share/PrismLauncher/libraries"
+
+dependencies {
+    implementation files(
+        "$prismLibs/net/minecraftforge/forge/1.20.1-47.4.10/forge-1.20.1-47.4.10-universal.jar",
+        "$prismLibs/net/minecraftforge/fmlcore/1.20.1-47.4.10/fmlcore-1.20.1-47.4.10.jar",
+        "$prismLibs/net/minecraftforge/fmlloader/1.20.1-47.4.10/fmlloader-1.20.1-47.4.10.jar",
+        "$prismLibs/net/minecraftforge/javafmllanguage/1.20.1-47.4.10/javafmllanguage-1.20.1-47.4.10.jar",
+        "$prismLibs/net/minecraftforge/eventbus/6.0.5/eventbus-6.0.5.jar",
+        "$prismLibs/net/minecraftforge/mergetool/1.1.5/mergetool-1.1.5-api.jar",
+        "$prismLibs/com/mojang/minecraft/1.20.1/minecraft-1.20.1-client.jar",
+        "$prismLibs/org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.jar",
+        "$prismLibs/org/apache/logging/log4j/log4j-api/2.22.1/log4j-api-2.22.1.jar",
+        "$prismLibs/com/mojang/brigadier/1.1.8/brigadier-1.1.8.jar",
+        "$prismLibs/com/mojang/authlib/3.11.50/authlib-3.11.50.jar",
+        "$prismLibs/com/mojang/datafixerupper/6.0.8/datafixerupper-6.0.8.jar",
+        fileTree(dir: "$prismLibs/net/minecraftforge/forgespi/7.0.1", include: "*.jar"),
+        fileTree(dir: "$prismLibs/net/minecraftforge/fmlearlydisplay/1.20.1-47.4.10", include: "*.jar"),
+    )
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes(
+            'Implementation-Title': 'Workbench Companion',
+            'Implementation-Version': version,
+        )
+    }
+}

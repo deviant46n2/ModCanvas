@@ -1,0 +1,1638 @@
+use super::types::{SnbtMapHelper, FtBQuestsFormat, FtBQuestsLayout, FtBQuestsImportResult, ImportStats, ImportIssue, IssueSeverity, IssueCategory};
+use super::detect::{detect_format, detect_layout};
+use crate::imports::snbt::{SnbtValue, parse_snbt};
+use crate::quest::*;
+use anyhow::{Result, Context};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
+
+/// Locate the FTB Quests data directory within a pack
+fn find_quests_dir(pack_dir: &Path) -> Option<PathBuf> {
+    let candidates = [
+        pack_dir.join("config").join("ftbquests").join("quests"),
+        pack_dir.join("world").join("ftbquests"),
+        pack_dir.join("ftbquests").join("quests"),
+        pack_dir.join("ftbquests"),
+    ];
+    for c in &candidates {
+        if c.exists() && c.is_dir() {
+            return Some(c.clone());
+        }
+    }
+    // Check if pack_dir itself contains data.snbt / data.json5
+    if pack_dir.join("data.snbt").exists() || pack_dir.join("data.json5").exists() {
+        return Some(pack_dir.to_path_buf());
+    }
+    None
+}
+
+/// Import FTB Quests from a directory (auto-detects format) with detailed reporting
+pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
+    let mut result = FtBQuestsImportResult::default();
+    
+    // FTB Quests data can be at:
+    //   <pack_dir>/config/ftbquests/quests/    (modpack config)
+    //   <pack_dir>/world/ftbquests/            (server world data)
+    //   <pack_dir>/ftbquests/                  (direct)
+    //   <pack_dir>/                            (direct if contains data.snbt)
+    let quests_dir = match find_quests_dir(pack_dir) {
+        Some(dir) => dir,
+        None => return Ok(FtBQuestsImportResult {
+            issues: vec![ImportIssue {
+                severity: IssueSeverity::Error,
+                category: IssueCategory::ParseError,
+                message: format!("No FTB Quests data found in {}", pack_dir.display()),
+                file: None,
+                node_id: None,
+            }],
+            ..Default::default()
+        }),
+    };
+
+    let format = detect_format(&quests_dir);
+    let layout = detect_layout(&quests_dir);
+    result.format = format!("{:?}", format);
+    result.layout = format!("{:?}", layout);
+    
+    eprintln!("[ModCanvas] FTB Quests format: {:?}, layout: {:?} at {}", format, layout, quests_dir.display());
+
+    let mut graph = QuestGraph::new("", "FTB Quests Import");
+
+    // Parse global settings and detect version
+    if let Some(version) = parse_global_settings(&quests_dir, format, &mut graph, &mut result)? {
+        result.ftb_quests_version = Some(version);
+    }
+    
+    // Infer Minecraft version from format
+    result.minecraft_version = Some(infer_minecraft_version(format, &result.ftb_quests_version));
+
+    let mut chapter_count = 0usize;
+    let mut quest_count = 0usize;
+    let mut files_processed = 0usize;
+    let mut files_failed = 0usize;
+    let mut unknown_task_types = Vec::new();
+    let mut unknown_reward_types = Vec::new();
+
+    match layout {
+        FtBQuestsLayout::Subdirs => {
+            // New layout: quests_dir/<chapter_dir>/chapter.snbt
+            if let Ok(entries) = std::fs::read_dir(&quests_dir) {
+                for entry in entries.flatten() {
+                    let dir_path = entry.path();
+                    if !dir_path.is_dir() { continue; }
+
+                    match format {
+                        FtBQuestsFormat::Snbt => {
+                            let chapter_file = dir_path.join("chapter.snbt");
+                            if !chapter_file.exists() { continue; }
+                            files_processed += 1;
+                            match parse_snbt_chapter_file(&chapter_file, &mut graph, &mut result) {
+                                Ok((quests_in_chapter, chapter_id)) => {
+                                    chapter_count += 1;
+                                    quest_count += quests_in_chapter;
+                                    quest_count += parse_standalone_quest_files(&dir_path, &chapter_id, &mut graph, &mut result)?;
+                                }
+                                Err(e) => {
+                                    files_failed += 1;
+                                    result.issues.push(ImportIssue {
+                                        severity: IssueSeverity::Error,
+                                        category: IssueCategory::ParseError,
+                                        message: format!("Failed to parse chapter: {}", e),
+                                        file: Some(chapter_file.display().to_string()),
+                                        node_id: None,
+                                    });
+                                    eprintln!("[ModCanvas] Failed to parse chapter {}: {}", dir_path.display(), e);
+                                }
+                            }
+                        }
+                        FtBQuestsFormat::Json5 => {
+                            let chapter_file = if dir_path.join("chapter.json5").exists() {
+                                dir_path.join("chapter.json5")
+                            } else if dir_path.join("chapter.json").exists() {
+                                dir_path.join("chapter.json")
+                            } else { continue; };
+                            files_processed += 1;
+                            match parse_json5_chapter_file(&chapter_file, &mut graph, &mut result) {
+                                Ok((quests_in_chapter, chapter_id)) => {
+                                    chapter_count += 1;
+                                    quest_count += quests_in_chapter;
+                                    quest_count += parse_standalone_json5_quest_files(&dir_path, &chapter_id, &mut graph, &mut result)?;
+                                }
+                                Err(e) => {
+                                    files_failed += 1;
+                                    result.issues.push(ImportIssue {
+                                        severity: IssueSeverity::Error,
+                                        category: IssueCategory::ParseError,
+                                        message: format!("Failed to parse chapter: {}", e),
+                                        file: Some(chapter_file.display().to_string()),
+                                        node_id: None,
+                                    });
+                                    eprintln!("[ModCanvas] Failed to parse chapter {}: {}", dir_path.display(), e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        FtBQuestsLayout::FlatChapters => {
+            // Old layout: quests_dir/chapters/*.snbt (or *.json5)
+            let chapters_dir = quests_dir.join("chapters");
+            // Parse chapter_groups.snbt for ordering if present
+            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result);
+            if let Ok(entries) = std::fs::read_dir(&chapters_dir) {
+                for entry in entries.flatten() {
+                    let file_path = entry.path();
+                    if !file_path.is_file() { continue; }
+                    let ext = file_path.extension().unwrap_or_default();
+                    if ext != "snbt" && ext != "json5" && ext != "json" { continue; }
+
+                    let parse_result = match format {
+                        FtBQuestsFormat::Snbt if ext == "snbt" => {
+                            files_processed += 1;
+                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result)
+                        }
+                        FtBQuestsFormat::Json5 if ext == "json5" || ext == "json" => {
+                            files_processed += 1;
+                            parse_json5_chapter_file(&file_path, &mut graph, &mut result)
+                        }
+                        _ => continue,
+                    };
+                    match parse_result {
+                        Ok((quests_in_chapter, _chapter_id)) => {
+                            chapter_count += 1;
+                            quest_count += quests_in_chapter;
+                        }
+                        Err(e) => {
+                            files_failed += 1;
+                            result.issues.push(ImportIssue {
+                                severity: IssueSeverity::Error,
+                                category: IssueCategory::ParseError,
+                                message: format!("Failed to parse chapter: {}", e),
+                                file: Some(file_path.display().to_string()),
+                                node_id: None,
+                            });
+                            eprintln!("[ModCanvas] Failed to parse chapter {}: {}", file_path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
+        FtBQuestsLayout::Flat => {
+            // Very old layout: *.snbt directly in quests_dir
+            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result);
+            if let Ok(entries) = std::fs::read_dir(&quests_dir) {
+                for entry in entries.flatten() {
+                    let file_path = entry.path();
+                    if !file_path.is_file() { continue; }
+                    let name = file_path.file_name().unwrap_or_default().to_string_lossy();
+                    if name == "data.snbt" || name == "data.json5" || name == "data.json"
+                        || name == "chapter_groups.snbt" || name == "chapter_groups.json5" {
+                        continue;
+                    }
+                    let ext = file_path.extension().unwrap_or_default();
+                    if ext != "snbt" && ext != "json5" && ext != "json" { continue; }
+
+                    let parse_result = match format {
+                        FtBQuestsFormat::Snbt if ext == "snbt" => {
+                            files_processed += 1;
+                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result)
+                        }
+                        FtBQuestsFormat::Json5 if ext == "json5" || ext == "json" => {
+                            files_processed += 1;
+                            parse_json5_chapter_file(&file_path, &mut graph, &mut result)
+                        }
+                        _ => continue,
+                    };
+                    match parse_result {
+                        Ok((quests_in_chapter, _chapter_id)) => {
+                            chapter_count += 1;
+                            quest_count += quests_in_chapter;
+                        }
+                        Err(e) => {
+                            files_failed += 1;
+                            result.issues.push(ImportIssue {
+                                severity: IssueSeverity::Error,
+                                category: IssueCategory::ParseError,
+                                message: format!("Failed to parse chapter: {}", e),
+                                file: Some(file_path.display().to_string()),
+                                node_id: None,
+                            });
+                            eprintln!("[ModCanvas] Failed to parse chapter {}: {}", file_path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Build dependency edges from quest dependency fields
+    let deps_resolved = build_dependency_edges(&mut graph, &mut result);
+
+    // Collect stats
+    let tasks_parsed: usize = graph.nodes.iter()
+        .filter(|n| matches!(n.node_type, QuestNodeType::Quest | QuestNodeType::SideQuest))
+        .map(|n| n.objectives.len())
+        .sum();
+    let rewards_parsed: usize = graph.nodes.iter()
+        .filter(|n| matches!(n.node_type, QuestNodeType::Quest | QuestNodeType::SideQuest))
+        .map(|n| n.rewards.len())
+        .sum();
+
+    // Log sample icons for debugging
+    let sample_icons: Vec<&str> = graph.nodes.iter()
+        .filter(|n| !matches!(n.node_type, QuestNodeType::Chapter) && !n.icon.is_empty())
+        .take(10)
+        .map(|n| n.icon.as_str())
+        .collect();
+    eprintln!("[ModCanvas] FTB Quests import: {} chapters, {} quests", chapter_count, quest_count);
+    eprintln!("[ModCanvas] Sample icons: {:?}", sample_icons);
+    let total_with_icon = graph.nodes.iter().filter(|n| !matches!(n.node_type, QuestNodeType::Chapter) && !n.icon.is_empty()).count();
+    let total_no_icon = graph.nodes.iter().filter(|n| n.icon.is_empty() && !matches!(n.node_type, QuestNodeType::Chapter)).count();
+    eprintln!("[ModCanvas] Quests with icon: {}, without icon: {}", total_with_icon, total_no_icon);
+
+    result.graph = graph;
+    result.quest_count = quest_count;
+    result.chapter_count = chapter_count;
+    result.stats = ImportStats {
+        quests_parsed: quest_count,
+        chapters_parsed: chapter_count,
+        chapter_groups_parsed: result.graph.chapter_groups.len(),
+        tasks_parsed,
+        rewards_parsed,
+        dependencies_resolved: deps_resolved,
+        dependencies_missing: result.issues.iter().filter(|i| i.category == IssueCategory::MissingDependency).count(),
+        unknown_task_types: unknown_task_types.clone(),
+        unknown_reward_types: unknown_reward_types.clone(),
+        files_processed,
+        files_failed,
+    };
+
+    // Add summary issues
+    if result.stats.dependencies_missing > 0 {
+        result.issues.push(ImportIssue {
+            severity: IssueSeverity::Warning,
+            category: IssueCategory::MissingDependency,
+            message: format!("{} quest dependencies could not be resolved", result.stats.dependencies_missing),
+            file: None,
+            node_id: None,
+        });
+    }
+    if files_failed > 0 {
+        result.issues.push(ImportIssue {
+            severity: IssueSeverity::Warning,
+            category: IssueCategory::ParseError,
+            message: format!("{} file(s) failed to parse", files_failed),
+            file: None,
+            node_id: None,
+        });
+    }
+    if !unknown_task_types.is_empty() {
+        result.issues.push(ImportIssue {
+            severity: IssueSeverity::Info,
+            category: IssueCategory::UnsupportedType,
+            message: format!("Unknown task types encountered: {}", unknown_task_types.join(", ")),
+            file: None,
+            node_id: None,
+        });
+    }
+    if !unknown_reward_types.is_empty() {
+        result.issues.push(ImportIssue {
+            severity: IssueSeverity::Info,
+            category: IssueCategory::UnsupportedType,
+            message: format!("Unknown reward types encountered: {}", unknown_reward_types.join(", ")),
+            file: None,
+            node_id: None,
+        });
+    }
+
+    Ok(result)
+}
+
+/// Infer Minecraft version from FTB Quests format and version
+fn infer_minecraft_version(format: FtBQuestsFormat, ftb_version: &Option<String>) -> String {
+    match format {
+        FtBQuestsFormat::Json5 => {
+            // Json5 format was introduced in FTB Quests 1800+ (1.20.5+)
+            if let Some(v) = ftb_version {
+                if let Some(major) = v.split('.').next() {
+                    if let Ok(major_num) = major.parse::<u32>() {
+                        if major_num >= 26 {
+                            return "1.20.5+".to_string();
+                        }
+                    }
+                }
+            }
+            "1.20.5+".to_string()
+        }
+        FtBQuestsFormat::Snbt => {
+            // SNBT format is older
+            if let Some(v) = ftb_version {
+                if let Some(major) = v.split('.').next() {
+                    if let Ok(major_num) = major.parse::<u32>() {
+                        if major_num >= 20 {
+                            return "1.20.x".to_string();
+                        } else if major_num >= 18 {
+                            return "1.19.x".to_string();
+                        } else if major_num >= 16 {
+                            return "1.18.x".to_string();
+                        }
+                    }
+                }
+            }
+            "1.16.x-1.19.x".to_string()
+        }
+    }
+}
+
+// ─── Global Settings ───────────────────────────────────────────────────────
+
+/// Parse global settings and return FTB Quests version if available
+fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<Option<String>> {
+    match format {
+        FtBQuestsFormat::Snbt => {
+            let data_file = quests_dir.join("data.snbt");
+            if !data_file.exists() { return Ok(None); }
+            let content = std::fs::read_to_string(&data_file)?;
+            let snbt = parse_snbt(&content)?;
+            if let Some(shape) = snbt.get_str("default_quest_shape") {
+                graph.default_quest_shape = QuestShape::from_string(shape);
+            }
+            if let Some(mode) = snbt.get_str("progression_mode") {
+                graph.book_progression_mode = QuestProgressionMode::from_string(mode);
+            }
+            // Try to get version
+            let version = snbt.get_str("version")
+                .or_else(|| snbt.get_str("Version"))
+                .map(|s| s.to_string());
+            result.stats.files_processed += 1;
+            Ok(version)
+        }
+        FtBQuestsFormat::Json5 => {
+            let data_file = if quests_dir.join("data.json5").exists() {
+                quests_dir.join("data.json5")
+            } else {
+                quests_dir.join("data.json")
+            };
+            if !data_file.exists() { return Ok(None); }
+            let content = std::fs::read_to_string(&data_file)?;
+            let val: serde_json::Value = json5::from_str(&content)
+                .or_else(|_| serde_json::from_str(&content))?;
+            if let Some(shape) = val.get("default_quest_shape").and_then(|v| v.as_str()) {
+                graph.default_quest_shape = QuestShape::from_string(shape);
+            }
+            if let Some(mode) = val.get("progression_mode").and_then(|v| v.as_str()) {
+                graph.book_progression_mode = QuestProgressionMode::from_string(mode);
+            }
+            let version = val.get("version")
+                .or_else(|| val.get("Version"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            result.stats.files_processed += 1;
+            Ok(version)
+        }
+    }
+}
+
+// ─── Chapter Groups ────────────────────────────────────────────────────────
+
+/// Parse chapter_groups.snbt/json5 for chapter ordering
+fn parse_chapter_groups(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) {
+    match format {
+        FtBQuestsFormat::Snbt => {
+            let file = quests_dir.join("chapter_groups.snbt");
+            if !file.exists() { return; }
+            if let Ok(content) = std::fs::read_to_string(&file) {
+                if let Ok(snbt) = parse_snbt(&content) {
+                    if let Some(groups) = snbt.get("chapter_groups").and_then(|v| v.as_list()) {
+                        for (i, g) in groups.iter().enumerate() {
+                            if let Some(m) = g.as_compound() {
+                                let id = m.get_str("id").unwrap_or("").to_string();
+                                let title = m.get_str("title").unwrap_or(&id).to_string();
+                                if !id.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == id) {
+                                    graph.chapter_groups.push(QuestChapterGroup {
+                                        id,
+                                        title,
+                                        order_index: i as i32,
+                                        ..Default::default()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            result.stats.files_processed += 1;
+        }
+        FtBQuestsFormat::Json5 => {
+            let file = if quests_dir.join("chapter_groups.json5").exists() {
+                quests_dir.join("chapter_groups.json5")
+            } else {
+                quests_dir.join("chapter_groups.json")
+            };
+            if !file.exists() { return; }
+            if let Ok(content) = std::fs::read_to_string(&file) {
+                if let Ok(val) = json5::from_str::<serde_json::Value>(&content)
+                    .or_else(|_| serde_json::from_str(&content))
+                {
+                    if let Some(groups) = val.get("chapter_groups").and_then(|v| v.as_array()) {
+                        for (i, g) in groups.iter().enumerate() {
+                            let id = g.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            let title = g.get("title").and_then(|v| v.as_str()).unwrap_or(&id).to_string();
+                            if !id.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == id) {
+                                graph.chapter_groups.push(QuestChapterGroup {
+                                    id,
+                                    title,
+                                    order_index: i as i32,
+                                    ..Default::default()
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            result.stats.files_processed += 1;
+        }
+    }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+/// Extract icon string from SNBT value (handles both string and compound forms)
+fn extract_icon_str(m: &SnbtValue) -> String {
+    if let Some(s) = m.get_str("icon") {
+        return s.to_string();
+    }
+    // Old format: icon is a compound { id: "...", components: {...} }
+    if let Some(icon_val) = m.get("icon") {
+        if let Some(icon_m) = icon_val.as_compound() {
+            let id = icon_m.get_str("id").unwrap_or("").to_string();
+            // ftbquests:custom_icon uses nested components for the actual texture
+            if id == "ftbquests:custom_icon" {
+                if let Some(components) = icon_m.get("components") {
+                    if let Some(comp_m) = components.as_compound() {
+                        // The actual item texture is stored under "ftbquests:icon"
+                        // It can be a string like "ae2:block/cell_workbench_top"
+                        // or a compound like { id: "minecraft:diamond" }
+                        if let Some(icon_ref) = comp_m.get_str("ftbquests:icon") {
+                            let resolved = resolve_ftbquests_icon(icon_ref);
+                            if !resolved.is_empty() {
+                                return resolved;
+                            }
+                        } else if let Some(icon_comp) = comp_m.get("ftbquests:icon") {
+                            if let Some(icon_cm) = icon_comp.as_compound() {
+                                if let Some(inner_id) = icon_cm.get_str("id") {
+                                    return inner_id.to_string();
+                                }
+                            }
+                        }
+                    }
+                }
+                return id;
+            }
+            if !id.is_empty() {
+                return id;
+            }
+            // Last resort: check for nested icon compound
+            if let Some(nested) = icon_m.get("icon") {
+                if let Some(nested_m) = nested.as_compound() {
+                    if let Some(nested_id) = nested_m.get_str("id") {
+                        return nested_id.to_string();
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Resolve an FTB Quests icon reference (e.g. "ae2:block/cell_workbench_top") to an item/block ID
+fn resolve_ftbquests_icon(icon_ref: &str) -> String {
+    // Handle bare paths without namespace (e.g. "diamond", "stone")
+    if !icon_ref.contains(':') {
+        return format!("minecraft:{}", icon_ref);
+    }
+    let parts: Vec<&str> = icon_ref.splitn(2, ':').collect();
+    if parts.len() != 2 { return String::new(); }
+    let namespace = parts[0];
+    let raw_path = parts[1];
+    // Strip common prefixes like "textures/item/" or "textures/block/"
+    let clean = raw_path
+        .strip_prefix("textures/item/").or_else(|| raw_path.strip_prefix("textures/block/"))
+        .unwrap_or(raw_path)
+        .strip_suffix(".png").unwrap_or(raw_path);
+    // Determine if it's a block or item reference
+    if clean.starts_with("block/") {
+        format!("{}:{}", namespace, &clean[6..])
+    } else if clean.starts_with("item/") {
+        format!("{}:{}", namespace, &clean[5..])
+    } else {
+        format!("{}:{}", namespace, clean)
+    }
+}
+
+// ─── SNBT Chapter Parser ───────────────────────────────────────────────────
+
+/// Parse a chapter.snbt file. Returns (quest_count, chapter_node_id).
+fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<(usize, String)> {
+    let content = std::fs::read_to_string(path)?;
+    let snbt = parse_snbt(&content)?;
+    snbt.as_compound().context("chapter.snbt root is not a compound")?;
+    let m = &snbt;
+    result.stats.files_processed += 1;
+
+    let chapter_id = m.get_str("id")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get_str("title")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            // For old flat layout (chapters/ae2.snbt), use the file stem as title
+            path.file_stem()
+                .map(|f| f.to_string_lossy().replace('_', " "))
+                .or_else(|| path.parent().and_then(|p| p.file_name()).map(|f| f.to_string_lossy().to_string()))
+                .unwrap_or_default()
+        })
+        .to_string();
+    let _filename = m.get_str("filename").unwrap_or("").to_string();
+
+    // Chapter-level settings
+    let default_shape = m.get_str("default_quest_shape").unwrap_or("").to_string();
+    let progression_mode = m.get_str("progression_mode").unwrap_or("flexible").to_string();
+    let group = m.get_str("group").unwrap_or("").to_string();
+    let order_index = m.get_i64("order_index").unwrap_or(0) as i32;
+    let hide_dep_lines = m.get_bool("default_hide_dependency_lines").unwrap_or(false);
+    let chapter_default_enabled = m.get_bool("default_enabled").unwrap_or(true);
+
+    // Chapter groups
+    if !group.is_empty() {
+        if !graph.chapter_groups.iter().any(|cg| cg.id == group || cg.title == group) {
+            graph.chapter_groups.push(QuestChapterGroup {
+                id: group.clone(),
+                title: group.clone(),
+                ..Default::default()
+            });
+        }
+    }
+
+    // Create chapter node
+    let chapter_node = QuestNode {
+        id: chapter_id.clone(),
+        node_type: QuestNodeType::Chapter,
+        label: title.clone(),
+        description: String::new(),
+        position: Position { x: 0.0, y: 0.0 },
+        chapter_id: None,
+        ..Default::default()
+    };
+    graph.nodes.push(chapter_node);
+
+    // Chapter metadata
+    graph.chapters.push(QuestChapter {
+        id: chapter_id.clone(),
+        title,
+        description: String::new(),
+        icon: resolve_ftbquests_icon(&extract_icon_str(&m.value)),
+        background_image: String::new(),
+        order_index,
+        hide_until_first_quest_complete: false,
+        default_quest_size: QuestSize { width: 24.0, height: 24.0 },
+        quest_color: String::new(),
+        group_id: if group.is_empty() { None } else { Some(group) },
+        default_quest_shape: QuestShape::from_string(&default_shape),
+        default_enabled: chapter_default_enabled,
+        progression_mode: QuestProgressionMode::from_string(&progression_mode),
+    });
+
+    // Parse quests array
+    let mut quest_count = 0usize;
+        if let Some(quests_val) = m.get("quests") {
+            if let Some(quests_list) = quests_val.as_list() {
+                for quest_val in quests_list {
+                    if let Ok(node) = parse_snbt_quest(quest_val, &chapter_id, hide_dep_lines, chapter_default_enabled) {
+                        graph.nodes.push(node);
+                        quest_count += 1;
+                    }
+                }
+        }
+    }
+
+    Ok((quest_count, chapter_id))
+}
+
+/// Parse a single quest from an SNBT compound
+fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: bool, chapter_default_enabled: bool) -> Result<QuestNode> {
+    let id = m.get_str("id")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    let title = m.get_str("title").unwrap_or("").to_string();
+    let description = parse_description(m);
+    let x = m.get_f64("x").unwrap_or(0.0);
+    let y = m.get_f64("y").unwrap_or(0.0);
+    let icon = extract_icon_str(m);
+    let icon = resolve_ftbquests_icon(&icon);
+    let color_int = m.get_i64("color").unwrap_or(-1);
+    let color = if color_int >= 0 { format_color(color_int) } else { String::new() };
+    let subtitle = m.get_str("subtitle").unwrap_or("").to_string();
+    let shape = m.get_str("shape").unwrap_or("").to_string();
+    let visibility = m.get_str("visibility").unwrap_or("normal").to_string();
+    let optional = m.get_bool("optional").unwrap_or(false);
+    let default_enabled = m.get_bool("default_enabled").unwrap_or(chapter_default_enabled);
+    let silently_complete = m.get_bool("silently_complete").unwrap_or(false);
+    let can_be_repeatable = m.get_bool("can_be_repeatable").unwrap_or(false) || m.get_i64("repeatability").unwrap_or(0) > 0;
+    let repeat_min_delay = m.get_i64("repeat_min_delay").unwrap_or(0);
+    let repeat_max_delay = m.get_i64("repeat_max_delay").unwrap_or(0);
+    let repeat_time = m.get_i64("repeat_time").unwrap_or(0);
+    let hide_quest_until_deps_complete = m.get_bool("hide_quest_until_deps_complete").unwrap_or(false);
+    let hide_quest_until_quest_complete = m.get_bool("hide_quest_until_quest_complete").unwrap_or(false);
+    let hide_quest_until_all_complete = m.get_bool("hide_quest_until_all_complete").unwrap_or(false);
+    let disable_reward = m.get_bool("disable_reward").unwrap_or(false);
+    let pause_reward = m.get_bool("pause_reward").unwrap_or(false);
+    let lock_icon = m.get_str("lock_icon").unwrap_or("").to_string();
+    let quest_background = m.get_str("quest_background").unwrap_or("").to_string();
+    let icon_scaling = m.get_f64("icon_scaling").unwrap_or(1.0);
+    let progression_mode = m.get_str("progression_mode").unwrap_or("default").to_string();
+    let sequential_tasks = m.get_bool("sequential_tasks").unwrap_or(false);
+    let disable_completion_toast = m.get_bool("disable_completion_toast").unwrap_or(false);
+    let ignore_reward_blocking = m.get_bool("ignore_reward_blocking").unwrap_or(false);
+    let disable_jei_recipe = m.get_bool("disable_jei_recipe").unwrap_or(false) || m.get_bool("default_quest_disable_jei").unwrap_or(false);
+    let min_window_width = m.get_i64("min_window_width").unwrap_or(0) as i32;
+    let hide_details_until_startable = m.get_bool("hide_details_until_startable").unwrap_or(false);
+    let hide_text_until_completed = m.get_bool("hide_text_until_completed").unwrap_or(false);
+    let invisible_until_completed = m.get_bool("invisible_until_completed").unwrap_or(false) || m.get_bool("invisible").unwrap_or(false);
+    let invisible_until_x_tasks = m.get_i64("invisible_until_x_tasks").unwrap_or(0) as i32;
+    let hide_dependency_lines = m.get_bool("hide_dependency_lines").unwrap_or(default_hide_dep_lines);
+    let hide_dependent_lines = m.get_bool("hide_dependent_lines").unwrap_or(false);
+    let min_required_dependencies = m.get_i64("min_required_dependencies").unwrap_or(0) as i32;
+    let dependency_requirement = m.get_str("dependency_requirement").unwrap_or("default").to_string();
+    let _max_completable_dependents = m.get_i64("max_completable_dependents").unwrap_or(0);
+
+    // Parse size
+    // Supports: list [width, height], compound { width, height }, or scalar multiplier (FlatChapters)
+    let size = if let Some(size_val) = m.get("size") {
+        if let Some(size_list) = size_val.as_list() {
+            if size_list.len() >= 2 {
+                QuestSize {
+                    width: size_list[0].as_f64().unwrap_or(24.0),
+                    height: size_list[1].as_f64().unwrap_or(24.0),
+                }
+            } else { QuestSize::default() }
+        } else if let Some(size_m) = size_val.as_compound() {
+            QuestSize {
+                width: size_m.get("width").and_then(|v| v.as_f64()).unwrap_or(24.0),
+                height: size_m.get("height").and_then(|v| v.as_f64()).unwrap_or(24.0),
+            }
+        } else if let Some(scalar) = size_val.as_f64() {
+            // FlatChapters scalar multiplier: size = 1.0 means 24x24, 2.0 means 48x48
+            QuestSize {
+                width: scalar.max(0.5) * 24.0,
+                height: scalar.max(0.5) * 24.0,
+            }
+        } else { QuestSize::default() }
+    } else { QuestSize::default() };
+
+    // Parse tasks
+    let objectives = parse_snbt_tasks(m)?;
+
+    // Parse rewards
+    let rewards = parse_snbt_rewards(m)?;
+
+    // Parse dependencies (stored for later edge building)
+    let mut data = HashMap::new();
+    if let Some(deps) = m.get("dependencies") {
+        if let Some(deps_list) = deps.as_list() {
+            let dep_ids: Vec<String> = deps_list.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            if !dep_ids.is_empty() {
+                data.insert("_dependencies".to_string(), dep_ids.join(","));
+            }
+        }
+    }
+
+    let node_type = if !default_enabled {
+        QuestNodeType::SideQuest
+    } else {
+        QuestNodeType::Quest
+    };
+
+    let parsed_visibility = match visibility.as_str() {
+        "always" | "always_visible" => QuestVisibility::AlwaysVisible,
+        "never" | "never_visible" => QuestVisibility::NeverVisible,
+        "when_dependencies_complete" | "deps_complete" => QuestVisibility::WhenDependenciesComplete,
+        "when_quest_complete" | "quest_complete" => QuestVisibility::WhenQuestComplete,
+        "when_all_complete" | "all_complete" => QuestVisibility::WhenAllComplete,
+        _ => QuestVisibility::Normal,
+    };
+
+    let parsed_dependency_requirement = match dependency_requirement.as_str() {
+        "one" | "one_completed" => DependencyRequirement::OneCompleted,
+        "all_started" | "started" => DependencyRequirement::AllStarted,
+        "one_started" => DependencyRequirement::OneStarted,
+        _ => DependencyRequirement::AllCompleted,
+    };
+
+    Ok(QuestNode {
+        id,
+        node_type,
+        label: title,
+        description,
+        position: Position { x, y },
+        data,
+        objectives,
+        rewards,
+        required_items: Vec::new(),
+        chapter_id: Some(chapter_id.to_string()),
+        icon,
+        size,
+        color,
+        visibility: parsed_visibility,
+        optional,
+        silently_complete,
+        can_be_repeatable,
+        repeat_min_delay,
+        repeat_max_delay,
+        repeat_time,
+        hide_quest_until_deps_complete,
+        hide_quest_until_quest_complete,
+        hide_quest_until_all_complete,
+        disable_reward,
+        pause_reward,
+        lock_icon,
+        subtitle,
+        quest_background,
+        shape: QuestShape::from_string(&shape),
+        icon_scaling,
+        tags: Vec::new(),
+        progression_mode: QuestProgressionMode::from_string(&progression_mode),
+        sequential_tasks,
+        disable_completion_toast,
+        ignore_reward_blocking,
+        disable_jei_recipe,
+        min_window_width,
+        hide_details_until_startable,
+        hide_text_until_completed,
+        invisible_until_completed,
+        invisible_until_x_tasks,
+        hide_dependency_lines,
+        hide_dependent_lines,
+        min_required_dependencies,
+        dependency_requirement: parsed_dependency_requirement,
+    })
+}
+
+/// Parse description from SNBT (can be string or list of strings)
+fn parse_description(m: &SnbtValue) -> String {
+    if let Some(desc) = m.get("description") {
+        match desc {
+            SnbtValue::String(s) => s.clone(),
+            SnbtValue::List(items) => {
+                let lines: Vec<String> = items.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+                lines.join("\n")
+            }
+            _ => String::new(),
+        }
+    } else { String::new() }
+}
+
+/// Format a Minecraft color integer (like 16777215 = 0xFFFFFF) to hex string
+fn parse_color_int(v: i64) -> String {
+    if v < 0 { return String::new(); }
+    format!("#{:06x}", v as u32)
+}
+
+fn format_color(v: i64) -> String {
+    parse_color_int(v)
+}
+
+// ─── SNBT Task Parser ──────────────────────────────────────────────────────
+
+fn parse_snbt_tasks(m: &SnbtValue) -> Result<Vec<QuestObjective>> {
+    let mut objectives = Vec::new();
+
+    // Tasks can be: compound with "tasks" key containing a list, or direct list
+    let tasks_val = m.get("tasks");
+    let tasks_list = tasks_val.and_then(|v| v.as_list());
+
+    if let Some(tasks) = tasks_list {
+        for task_val in tasks {
+            if let Ok(obj) = parse_snbt_single_task(task_val) {
+                objectives.push(obj);
+            }
+        }
+    }
+
+    Ok(objectives)
+}
+
+fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
+    let id = m.get_str("id")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get_str("title").unwrap_or("").to_string();
+    let task_type = m.get_str("type").unwrap_or("item").to_string();
+    let description = parse_description(m);
+
+    let (objective_type, target, target_count) = match task_type.as_str() {
+        // Item acquisition (detection/retrieval/crafting)
+        "item" | "ftbquests:item" | "minecraft:item" | "detection" | "item_detection" => {
+            let (item, count) = parse_item_task(m);
+            (ObjectiveType::ItemAcquisition, item, count)
+        }
+        "item_retrieval" | "ftbquests:item_retrieval" | "retrieval" => {
+            let (item, count) = parse_item_task(m);
+            (ObjectiveType::ItemRetrieval, item, count)
+        }
+        "item_crafting" | "ftbquests:item_crafting" | "crafting" | "craft" => {
+            let (item, count) = parse_item_task(m);
+            (ObjectiveType::ItemCrafting, item, count)
+        }
+        // Block break/place
+        "block_break" | "ftbquests:block_break" | "minecraft:block_break" | "break" => {
+            let (item, count) = parse_item_task(m);
+            (ObjectiveType::BlockBreak, item, count)
+        }
+        "block_place" | "ftbquests:block_place" | "minecraft:block_place" | "place" => {
+            let (item, count) = parse_item_task(m);
+            (ObjectiveType::BlockPlace, item, count)
+        }
+        // Entity kill
+        "kill" | "ftbquests:kill" | "minecraft:kill" => {
+            let entity = m.get_str("entity")
+                .or_else(|| m.get_str("entity_type"))
+                .or_else(|| m.get_str("mob"))
+                .unwrap_or("").to_string();
+            let count = m.get_i64("count").unwrap_or(1) as i32;
+            (ObjectiveType::EntityKill, entity, count)
+        }
+        // Location visit
+        "location" | "ftbquests:location" | "minecraft:location" => {
+            let dim = m.get_str("dimension").unwrap_or("").to_string();
+            let x = m.get_f64("x").unwrap_or(0.0);
+            let y = m.get_f64("y").unwrap_or(0.0);
+            let z = m.get_f64("z").unwrap_or(0.0);
+            let radius = m.get_f64("radius").unwrap_or(0.0);
+            let target = if !dim.is_empty() { dim } else { format!("{},{},{},{}", x, y, z, radius) };
+            (ObjectiveType::LocationVisit, target, 1)
+        }
+        // Advancement
+        "advancement" | "ftbquests:advancement" | "minecraft:advancement" => {
+            let adv = m.get_str("advancement").unwrap_or("").to_string();
+            (ObjectiveType::Advancement, adv, 1)
+        }
+        // Checkmark
+        "checkmark" | "ftbquests:checkmark" | "minecraft:checkmark" => {
+            (ObjectiveType::Checkmark, String::new(), 1)
+        }
+        // XP
+        "xp" | "ftbquests:xp" | "minecraft:xp" => {
+            let amount = m.get_i64("xp").unwrap_or(0) as i32;
+            (ObjectiveType::Xp, String::new(), amount)
+        }
+        // Fluid
+        "fluid" | "ftbquests:fluid" | "minecraft:fluid" => {
+            let fluid = m.get_str("fluid").unwrap_or("").to_string();
+            let amount = m.get_f64("amount").unwrap_or(0.0);
+            (ObjectiveType::Fluid, fluid, amount as i32)
+        }
+        // Energy
+        "energy" | "ftbquests:energy" | "minecraft:energy" => {
+            let amount = m.get_f64("amount").unwrap_or(0.0);
+            let unit = m.get_str("unit").unwrap_or("FE").to_string();
+            (ObjectiveType::Energy, unit, amount as i32)
+        }
+        // Dimension
+        "dimension" | "ftbquests:dimension" | "minecraft:dimension" => {
+            let dim = m.get_str("dimension").unwrap_or("").to_string();
+            (ObjectiveType::LocationVisit, dim, 1)
+        }
+        // Stat
+        "stat" | "ftbquests:stat" | "minecraft:stat" => {
+            let stat = m.get_str("stat").unwrap_or("").to_string();
+            let count = m.get_i64("count").unwrap_or(1) as i32;
+            (ObjectiveType::Stat, stat, count)
+        }
+        // Observation
+        "observation" | "ftbquests:observation" | "minecraft:observation" => {
+            (ObjectiveType::Observation, String::new(), 1)
+        }
+        // Biome
+        "biome" | "ftbquests:biome" | "minecraft:biome" => {
+            let biome = m.get_str("biome").unwrap_or("").to_string();
+            (ObjectiveType::VisitBiome, biome, 1)
+        }
+        // Structure
+        "structure" | "ftbquests:structure" | "minecraft:structure" => {
+            let structure = m.get_str("structure").unwrap_or("").to_string();
+            (ObjectiveType::FindStructure, structure, 1)
+        }
+        // Game Stage
+        "stage" | "ftbquests:stage" | "minecraft:stage" | "gamestage" => {
+            let stage = m.get_str("stage").unwrap_or("").to_string();
+            (ObjectiveType::GameStage, stage, 1)
+        }
+        // Custom
+        "custom" | "ftbquests:custom" | "minecraft:custom" => {
+            (ObjectiveType::Custom, String::new(), m.get_i64("max_progress").unwrap_or(1) as i32)
+        }
+        _ => {
+            (ObjectiveType::Custom, task_type, 1)
+        }
+    };
+
+    let mut obj = QuestObjective {
+        id,
+        label: if title.is_empty() { objective_type.display_name().to_string() } else { title },
+        objective_type,
+        target,
+        target_count,
+        required: !m.get_bool("optional").unwrap_or(false),
+        description,
+        ..Default::default()
+    };
+
+    // Extract task-type-specific fields
+    if let Some(nbt) = m.get_str("nbt") {
+        obj.nbt_data = nbt.to_string();
+    }
+    // 1.20.5+ Data Components support
+    if let Some(components) = m.get("components") {
+        if let Some(comp_m) = components.as_compound() {
+            // Serialize components back to string for storage
+            obj.nbt_data = crate::imports::snbt::compound_to_snbt(&comp_m);
+        }
+    }
+    if let Some(tag) = m.get_str("tag") {
+        obj.item_tag = tag.to_string();
+    }
+    obj.consume_items = m.get_bool("consume_items").unwrap_or(false);
+    obj.match_nbt = m.get_bool("match_nbt").unwrap_or(false);
+    obj.ignore_nbt = m.get_bool("ignore_nbt").unwrap_or(false);
+    
+    // Location/radius for location tasks
+    if matches!(obj.objective_type, ObjectiveType::LocationVisit) {
+        obj.x = m.get_f64("x").unwrap_or(0.0);
+        obj.y = m.get_f64("y").unwrap_or(0.0);
+        obj.z = m.get_f64("z").unwrap_or(0.0);
+        obj.radius = m.get_f64("radius").unwrap_or(0.0);
+        obj.dimension = m.get_str("dimension").unwrap_or("").to_string();
+    }
+    
+    // Entity for kill tasks
+    if matches!(obj.objective_type, ObjectiveType::EntityKill) {
+        obj.entity_id = m.get_str("entity")
+            .or_else(|| m.get_str("entity_type"))
+            .or_else(|| m.get_str("mob"))
+            .unwrap_or("").to_string();
+    }
+    
+    // Advancement ID
+    if matches!(obj.objective_type, ObjectiveType::Advancement) {
+        obj.advancement_id = m.get_str("advancement").unwrap_or("").to_string();
+    }
+    
+    // Custom JSON for custom tasks
+    if matches!(obj.objective_type, ObjectiveType::Custom) {
+        if let Some(custom) = m.get("custom") {
+            obj.custom_json = custom.to_snbt_string();
+        }
+    }
+    
+    // Stat name/value
+    if matches!(obj.objective_type, ObjectiveType::Stat) {
+        obj.stat_name = m.get_str("stat").unwrap_or("").to_string();
+        obj.stat_value = m.get_i64("count").unwrap_or(1) as i32;
+    }
+    
+    // Biome ID
+    if matches!(obj.objective_type, ObjectiveType::VisitBiome) {
+        obj.biome_id = m.get_str("biome").unwrap_or("").to_string();
+    }
+    
+    // Structure ID
+    if matches!(obj.objective_type, ObjectiveType::FindStructure) {
+        obj.structure_id = m.get_str("structure").unwrap_or("").to_string();
+    }
+    
+    // Observation range
+    if matches!(obj.objective_type, ObjectiveType::Observation) {
+        obj.observation_range = m.get_f64("range").unwrap_or(4.0);
+    }
+    
+    // Fluid amount
+    if matches!(obj.objective_type, ObjectiveType::Fluid) {
+        obj.fluid_id = m.get_str("fluid").unwrap_or("").to_string();
+        obj.fluid_amount = m.get_f64("amount").unwrap_or(0.0);
+    }
+    
+    // Energy amount/unit
+    if matches!(obj.objective_type, ObjectiveType::Energy) {
+        obj.energy_amount = m.get_f64("amount").unwrap_or(0.0);
+        obj.energy_unit = m.get_str("unit").unwrap_or("FE").to_string();
+    }
+    
+    // XP levels/points
+    if matches!(obj.objective_type, ObjectiveType::Xp) {
+        obj.xp_levels = m.get_i64("levels").unwrap_or(0) as i32;
+        obj.xp_points = m.get_i64("xp").unwrap_or(0) as i32;
+    }
+    
+    // Command
+    if matches!(obj.objective_type, ObjectiveType::Command) {
+        obj.command = m.get_str("command").unwrap_or("").to_string();
+    }
+    
+    // Game Stage
+    if matches!(obj.objective_type, ObjectiveType::GameStage) {
+        obj.advancement_id = m.get_str("stage").unwrap_or("").to_string(); // reuse field
+    }
+
+    Ok(obj)
+}
+
+/// Parse item from task compound - handles both old and new formats, plus 1.20.5+ Data Components
+fn parse_item_task(m: &SnbtValue) -> (String, i32) {
+    let count = m.get_i64("count").unwrap_or(1) as i32;
+
+    // 1.20.5+ Data Components format: item { id = "minecraft:diamond", components = {...} }
+    if let Some(item_m) = m.get("item").and_then(|v| v.as_compound()) {
+        let id = item_m.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let inner_count = item_m.get("count").and_then(|v| v.as_i64()).unwrap_or(count as i64) as i32;
+        // Store components in NBT data if present
+        if item_m.get("components").is_some() {
+            // Will be handled by caller
+        }
+        return (id, inner_count);
+    }
+
+    // New format: item = "minecraft:oak_log" (string)
+    if let Some(item_str) = m.get_str("item") {
+        return (item_str.to_string(), count);
+    }
+
+    // Tag-based: tag = "forge:ingots/iron"
+    if let Some(tag) = m.get_str("tag") {
+        return (format!("#{}", tag), count);
+    }
+
+    (String::new(), count)
+}
+
+// ─── SNBT Reward Parser ────────────────────────────────────────────────────
+
+fn parse_snbt_rewards(m: &SnbtValue) -> Result<Vec<QuestReward>> {
+    let mut rewards = Vec::new();
+
+    if let Some(rewards_val) = m.get("rewards") {
+        if let Some(rewards_list) = rewards_val.as_list() {
+            for reward_val in rewards_list {
+                if let Ok(r) = parse_snbt_single_reward(reward_val) {
+                    rewards.push(r);
+                }
+            }
+        }
+    }
+
+    Ok(rewards)
+}
+
+fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
+    let id = m.get_str("id")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get_str("title").unwrap_or("").to_string();
+    let reward_type_str = m.get_str("type").unwrap_or("item").to_string();
+    let description = parse_description(m);
+
+    let mut reward = QuestReward {
+        id,
+        label: String::new(),
+        reward_type: RewardType::Item,
+        items: Vec::new(),
+        description,
+        item_id: String::new(),
+        item_count: 1,
+        item_tag: String::new(),
+        nbt_data: String::new(),
+        xp_amount: 0,
+        xp_levels: 0,
+        command: String::new(),
+        loot_table: String::new(),
+        game_stage: String::new(),
+        weight: 1.0,
+        reward_chests: Vec::new(),
+        team_reward: false,
+        toast_message: String::new(),
+        table_id: String::new(),
+        choices: Vec::new(),
+        consume_items: false,
+        match_nbt: false,
+        ignore_nbt: false,
+    };
+
+    match reward_type_str.as_str() {
+        "item" | "ftbquests:item" | "minecraft:item" => {
+            let (item, count) = parse_item_task(m);
+            reward.reward_type = RewardType::Item;
+            reward.item_id = item;
+            reward.item_count = count;
+            // Handle components (1.20.5+)
+            if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
+                reward.nbt_data = crate::imports::snbt::compound_to_snbt(&components);
+            }
+        }
+        "item_weighted" | "ftbquests:item_weighted" | "minecraft:item_weighted" => {
+            let (item, count) = parse_item_task(m);
+            reward.reward_type = RewardType::ItemWithWeight;
+            reward.item_id = item;
+            reward.item_count = count;
+            reward.weight = m.get_f64("weight").unwrap_or(1.0);
+            if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
+                reward.nbt_data = crate::imports::snbt::compound_to_snbt(&components);
+            }
+        }
+        "xp" | "ftbquests:xp" | "minecraft:xp" => {
+            reward.reward_type = RewardType::Experience;
+            reward.xp_amount = m.get_i64("xp").unwrap_or(0) as i32;
+        }
+        "levels" | "ftbquests:levels" | "minecraft:levels" | "xp_levels" => {
+            reward.reward_type = RewardType::XpLevels;
+            reward.xp_levels = m.get_i64("levels").unwrap_or(0) as i32;
+        }
+        "command" | "ftbquests:command" | "minecraft:command" => {
+            reward.reward_type = RewardType::Command;
+            reward.command = m.get_str("command").unwrap_or("").to_string();
+        }
+        "loot" | "ftbquests:loot" | "minecraft:loot" => {
+            reward.reward_type = RewardType::LootTable;
+            reward.loot_table = m.get_str("loot_table").unwrap_or("").to_string();
+        }
+        "choice" | "ftbquests:choice" | "minecraft:choice" => {
+            reward.reward_type = RewardType::Choice;
+            reward.items = parse_reward_items(m);
+        }
+        "random" | "ftbquests:random" | "minecraft:random" => {
+            reward.reward_type = RewardType::Random;
+            reward.items = parse_reward_items(m);
+        }
+        "all" | "ftbquests:all" | "minecraft:all" => {
+            reward.reward_type = RewardType::AllTable;
+            reward.items = parse_reward_items(m);
+        }
+        "advancement" | "ftbquests:advancement" | "minecraft:advancement" => {
+            reward.reward_type = RewardType::Advancement;
+            reward.item_id = m.get_str("advancement").unwrap_or("").to_string();
+        }
+        "toast" | "ftbquests:toast" | "minecraft:toast" => {
+            reward.reward_type = RewardType::Toast;
+            reward.toast_message = m.get_str("message").unwrap_or("").to_string();
+        }
+        "stage" | "ftbquests:stage" | "minecraft:stage" => {
+            reward.reward_type = RewardType::GameStage;
+            reward.game_stage = m.get_str("stage").unwrap_or("").to_string();
+        }
+        "unlock" | "ftbquests:unlock" | "minecraft:unlock" => {
+            reward.reward_type = RewardType::Unlock;
+            reward.game_stage = m.get_str("stage").unwrap_or("").to_string();
+        }
+        _ => {
+            reward.reward_type = RewardType::Custom;
+            reward.item_id = reward_type_str;
+        }
+    }
+
+    // Common fields
+    if let Some(nbt) = m.get_str("nbt") {
+        reward.nbt_data = nbt.to_string();
+    }
+    if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
+        reward.nbt_data = crate::imports::snbt::compound_to_snbt(&components);
+    }
+    if let Some(tag) = m.get_str("tag") {
+        reward.item_tag = tag.to_string();
+    }
+    reward.consume_items = m.get_bool("consume_items").unwrap_or(false);
+    reward.match_nbt = m.get_bool("match_nbt").unwrap_or(false);
+    reward.ignore_nbt = m.get_bool("ignore_nbt").unwrap_or(false);
+
+    reward.label = if title.is_empty() { reward.reward_type.display_name().to_string() } else { title };
+
+    Ok(reward)
+}
+
+fn parse_reward_items(m: &SnbtValue) -> Vec<String> {
+    let mut items = Vec::new();
+
+    if let Some(items_val) = m.get("items") {
+        match items_val {
+            SnbtValue::Compound(map) => {
+                for (_key, val) in map {
+                    if let Some(item_str) = val.get_str("item") {
+                        items.push(item_str.to_string());
+                    } else if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+                        items.push(id.to_string());
+                    }
+                }
+            }
+            SnbtValue::List(list) => {
+                for val in list {
+                    if let Some(item_str) = val.get_str("item") {
+                        items.push(item_str.to_string());
+                    } else if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+                        items.push(id.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    items
+}
+
+// ─── Standalone Quest Files (SNBT) ─────────────────────────────────────────
+
+/// Parse individual quest .snbt files in a chapter directory
+fn parse_standalone_quest_files(dir: &Path, chapter_id: &str, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<usize> {
+    let mut count = 0usize;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() && p.extension().map_or(false, |ext| ext == "snbt") {
+                let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if name == "chapter" || name == "data" {
+                    continue;
+                }
+                // Check if this quest is already in the graph (from quests array in chapter.snbt)
+                let content = std::fs::read_to_string(&p)?;
+                if let Ok(snbt) = parse_snbt(&content) {
+                    if snbt.as_compound().is_some() {
+                        let quest_id = snbt.get_str("id").unwrap_or(name);
+                        if graph.nodes.iter().any(|n| n.id == quest_id) {
+                            continue;
+                        }
+                        let chapter_default = graph.chapters.iter().find(|c| c.id == chapter_id).map(|c| c.default_enabled).unwrap_or(true);
+                        if let Ok(node) = parse_snbt_quest(&snbt.value, chapter_id, false, chapter_default) {
+                            graph.nodes.push(node);
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result.stats.files_processed += 1;
+    Ok(count)
+}
+
+// ─── Json5 Chapter Parser ──────────────────────────────────────────────────
+
+fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<(usize, String)> {
+    let content = std::fs::read_to_string(path)?;
+    let val: serde_json::Value = json5::from_str(&content)
+        .or_else(|_| serde_json::from_str(&content))
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    let chapter_id = val.get("id").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = val.get("title").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            path.parent().and_then(|p| p.file_name()).map(|f| f.to_string_lossy().to_string()).unwrap_or_default()
+        })
+        .to_string();
+    let _filename = val.get("filename").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let default_shape = val.get("default_quest_shape").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let progression_mode = val.get("progression_mode").and_then(|v| v.as_str()).unwrap_or("flexible").to_string();
+    let group = val.get("group").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let order_index = val.get("order_index").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let chapter_default_enabled = val.get("default_enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+    result.stats.files_processed += 1;
+
+    if !group.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == group || cg.title == group) {
+        graph.chapter_groups.push(QuestChapterGroup {
+            id: group.clone(),
+            title: group.clone(),
+            ..Default::default()
+        });
+    }
+
+    graph.nodes.push(QuestNode {
+        id: chapter_id.clone(),
+        node_type: QuestNodeType::Chapter,
+        label: title.clone(),
+        description: String::new(),
+        position: Position { x: 0.0, y: 0.0 },
+        chapter_id: None,
+        ..Default::default()
+    });
+
+    graph.chapters.push(QuestChapter {
+        id: chapter_id.clone(),
+        title,
+        description: String::new(),
+        icon: val.get("icon").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        background_image: String::new(),
+        order_index,
+        hide_until_first_quest_complete: false,
+        default_quest_size: QuestSize { width: 24.0, height: 24.0 },
+        quest_color: String::new(),
+        group_id: if group.is_empty() { None } else { Some(group) },
+        default_quest_shape: QuestShape::from_string(&default_shape),
+        default_enabled: chapter_default_enabled,
+        progression_mode: QuestProgressionMode::from_string(&progression_mode),
+    });
+
+    let mut quest_count = 0usize;
+    if let Some(quests) = val.get("quests").and_then(|v| v.as_array()) {
+        for quest_val in quests {
+            if let Some(quest_m) = quest_val.as_object() {
+                if let Ok(node) = parse_json5_quest(quest_m, &chapter_id, chapter_default_enabled) {
+                    graph.nodes.push(node);
+                    quest_count += 1;
+                }
+            }
+        }
+    }
+
+    Ok((quest_count, chapter_id))
+}
+
+fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id: &str, chapter_default_enabled: bool) -> Result<QuestNode> {
+    let id = m.get("id").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let description = json5_description(m);
+    let x = m.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let y = m.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let icon = m.get("icon").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let color_int = m.get("color").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let color = if color_int >= 0 { format_color(color_int) } else { String::new() };
+    let _subtitle = m.get("subtitle").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let shape = m.get("shape").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let visibility = m.get("visibility").and_then(|v| v.as_str()).unwrap_or("normal").to_string();
+    let optional = m.get("optional").and_then(|v| v.as_bool()).unwrap_or(false);
+    let default_enabled = m.get("default_enabled").and_then(|v| v.as_bool()).unwrap_or(chapter_default_enabled);
+    let progression_mode = m.get("progression_mode").and_then(|v| v.as_str()).unwrap_or("default").to_string();
+
+    let mut data = HashMap::new();
+    if let Some(deps) = m.get("dependencies").and_then(|v| v.as_array()) {
+        let dep_ids: Vec<String> = deps.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+        if !dep_ids.is_empty() {
+            data.insert("_dependencies".to_string(), dep_ids.join(","));
+        }
+    }
+
+    let parsed_visibility = match visibility.as_str() {
+        "always" | "always_visible" => QuestVisibility::AlwaysVisible,
+        "never" | "never_visible" => QuestVisibility::NeverVisible,
+        "when_dependencies_complete" => QuestVisibility::WhenDependenciesComplete,
+        "when_quest_complete" => QuestVisibility::WhenQuestComplete,
+        "when_all_complete" => QuestVisibility::WhenAllComplete,
+        _ => QuestVisibility::Normal,
+    };
+
+    // Parse tasks
+    let objectives = if let Some(tasks) = m.get("tasks").and_then(|v| v.as_array()) {
+        tasks.iter().filter_map(|t| {
+            t.as_object().and_then(|tm| parse_json5_task(tm).ok())
+        }).collect()
+    } else { Vec::new() };
+
+    // Parse rewards
+    let rewards = if let Some(rewards_arr) = m.get("rewards").and_then(|v| v.as_array()) {
+        rewards_arr.iter().filter_map(|r| {
+            r.as_object().and_then(|rm| parse_json5_reward(rm).ok())
+        }).collect()
+    } else { Vec::new() };
+
+    Ok(QuestNode {
+        id,
+        node_type: if !default_enabled { QuestNodeType::SideQuest } else { QuestNodeType::Quest },
+        label: title,
+        description,
+        position: Position { x, y },
+        data,
+        objectives,
+        rewards,
+        required_items: Vec::new(),
+        chapter_id: Some(chapter_id.to_string()),
+        icon,
+        size: QuestSize::default(),
+        color,
+        visibility: parsed_visibility,
+        optional,
+        shape: QuestShape::from_string(&shape),
+        progression_mode: QuestProgressionMode::from_string(&progression_mode),
+        ..Default::default()
+    })
+}
+
+fn json5_description(m: &serde_json::Map<String, serde_json::Value>) -> String {
+    match m.get("description") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Array(arr)) => {
+            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>().join("\n")
+        }
+        _ => String::new(),
+    }
+}
+
+fn parse_json5_task(m: &serde_json::Map<String, serde_json::Value>) -> Result<QuestObjective> {
+    let id = m.get("id").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let task_type = m.get("type").and_then(|v| v.as_str()).unwrap_or("item").to_string();
+    let count = m.get("count").and_then(|v| v.as_i64()).unwrap_or(1) as i32;
+
+    let (objective_type, target) = match task_type.as_str() {
+        "item" | "ftbquests:item" | "minecraft:item" => {
+            let item = m.get("item").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::ItemAcquisition, item)
+        }
+        "kill" | "ftbquests:kill" => {
+            let entity = m.get("entity").or_else(|| m.get("entity_type")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::EntityKill, entity)
+        }
+        "advancement" | "ftbquests:advancement" => {
+            let adv = m.get("advancement").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::Advancement, adv)
+        }
+        "checkmark" | "ftbquests:checkmark" => (ObjectiveType::Checkmark, String::new()),
+        "xp" | "ftbquests:xp" => (ObjectiveType::Xp, String::new()),
+        "fluid" | "ftbquests:fluid" => {
+            let fluid = m.get("fluid").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::Fluid, fluid)
+        }
+        "energy" | "ftbquests:energy" => (ObjectiveType::Energy, String::new()),
+        "stat" | "ftbquests:stat" => {
+            let stat = m.get("stat").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::Stat, stat)
+        }
+        "observation" | "ftbquests:observation" => (ObjectiveType::Observation, String::new()),
+        "biome" | "ftbquests:biome" => {
+            let biome = m.get("biome").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::VisitBiome, biome)
+        }
+        "structure" | "ftbquests:structure" => {
+            let s = m.get("structure").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::FindStructure, s)
+        }
+        "stage" | "ftbquests:stage" => {
+            let stage = m.get("stage").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::GameStage, stage)
+        }
+        "location" | "ftbquests:location" => {
+            let dim = m.get("dimension").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (ObjectiveType::LocationVisit, dim)
+        }
+        _ => (ObjectiveType::Custom, task_type),
+    };
+
+    Ok(QuestObjective {
+        id,
+        label: if title.is_empty() { objective_type.display_name().to_string() } else { title },
+        objective_type,
+        target,
+        target_count: count,
+        required: !m.get("optional").and_then(|v| v.as_bool()).unwrap_or(false),
+        ..Default::default()
+    })
+}
+
+fn parse_json5_reward(m: &serde_json::Map<String, serde_json::Value>) -> Result<QuestReward> {
+    let id = m.get("id").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let title = m.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let reward_type_str = m.get("type").and_then(|v| v.as_str()).unwrap_or("item").to_string();
+
+    let (reward_type, item_id) = match reward_type_str.as_str() {
+        "item" | "ftbquests:item" | "minecraft:item" => {
+            let item = m.get("item").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (RewardType::Item, item)
+        }
+        "xp" | "ftbquests:xp" => (RewardType::Experience, String::new()),
+        "levels" | "ftbquests:levels" => (RewardType::XpLevels, String::new()),
+        "command" | "ftbquests:command" => {
+            let cmd = m.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (RewardType::Command, cmd)
+        }
+        "loot" | "ftbquests:loot" => {
+            let table = m.get("loot_table").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (RewardType::LootTable, table)
+        }
+        "choice" | "ftbquests:choice" => (RewardType::Choice, String::new()),
+        "random" | "ftbquests:random" => (RewardType::Random, String::new()),
+        "advancement" | "ftbquests:advancement" => {
+            let adv = m.get("advancement").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (RewardType::Advancement, adv)
+        }
+        "toast" | "ftbquests:toast" => (RewardType::Toast, String::new()),
+        "stage" | "ftbquests:stage" => {
+            let stage = m.get("stage").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            (RewardType::GameStage, stage)
+        }
+        _ => (RewardType::Custom, reward_type_str),
+    };
+
+    Ok(QuestReward {
+        id,
+        label: if title.is_empty() { reward_type.display_name().to_string() } else { title },
+        reward_type,
+        item_id,
+        ..Default::default()
+    })
+}
+
+// ─── Standalone Json5 Quest Files ──────────────────────────────────────────
+
+fn parse_standalone_json5_quest_files(dir: &Path, chapter_id: &str, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<usize> {
+    let mut count = 0usize;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() {
+                let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+                if ext != "json5" && ext != "json" { continue; }
+                let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if name == "chapter" || name == "data" { continue; }
+                let content = std::fs::read_to_string(&p)?;
+                let val: serde_json::Value = json5::from_str(&content)
+                    .or_else(|_| serde_json::from_str(&content))?;
+                if let Some(m) = val.as_object() {
+                    let quest_id = m.get("id").and_then(|v| v.as_str()).unwrap_or(name);
+                    if graph.nodes.iter().any(|n| n.id == quest_id) { continue; }
+                    let chapter_default = graph.chapters.iter().find(|c| c.id == chapter_id).map(|c| c.default_enabled).unwrap_or(true);
+                    if let Ok(node) = parse_json5_quest(m, chapter_id, chapter_default) {
+                        graph.nodes.push(node);
+                        count += 1;
+                    }
+                }
+            }
+        }
+    }
+    result.stats.files_processed += 1;
+    Ok(count)
+}
+
+// ─── Dependency Edge Building ──────────────────────────────────────────────
+
+/// Build dependency edges from the _dependencies data field stored on each node
+fn build_dependency_edges(graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> usize {
+    let node_ids: Vec<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
+    let mut resolved = 0;
+
+    for node in &graph.nodes {
+        if let Some(deps_str) = node.data.get("_dependencies") {
+            for dep_id in deps_str.split(',') {
+                let dep_id = dep_id.trim().to_string();
+                if dep_id.is_empty() { continue; }
+                // The dep_id might be the SNBT key or the actual quest ID
+                // Try to find a matching node
+                let target_id = if node_ids.contains(&dep_id) {
+                    dep_id
+                } else {
+                    // Try to find by partial match
+                    match graph.nodes.iter().find(|n| n.id.contains(&dep_id) || dep_id.contains(&n.id)) {
+                        Some(found) => found.id.clone(),
+                        None => {
+                            result.issues.push(ImportIssue {
+                                severity: IssueSeverity::Warning,
+                                category: IssueCategory::MissingDependency,
+                                message: format!("Quest '{}' depends on missing quest '{}'", node.label, dep_id),
+                                file: None,
+                                node_id: Some(node.id.clone()),
+                            });
+                            continue;
+                        }
+                    }
+                };
+
+                graph.edges.push(QuestEdge {
+                    id: Uuid::new_v4().to_string(),
+                    source: target_id,
+                    target: node.id.clone(),
+                    label: None,
+                    edge_type: EdgeType::Prerequisite,
+                    inverted: false,
+                });
+                resolved += 1;
+            }
+        }
+    }
+
+    // Remove the temporary _dependencies data from nodes
+    for node in &mut graph.nodes {
+        node.data.remove("_dependencies");
+    }
+
+    resolved
+}

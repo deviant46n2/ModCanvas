@@ -1,0 +1,39 @@
+plugins {
+    id "fabric-loom" version "1.10.1"
+}
+
+group = "com.modcanvas.companion"
+version = "1.0.0"
+
+repositories {
+    mavenCentral()
+    maven { url "https://maven.fabricmc.net" }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.20.1"
+    mappings "net.fabricmc:yarn:1.20.1+build.10:v2"
+
+    modImplementation "net.fabricmc:fabric-loader:0.16.9"
+    modApi "net.fabricmc.fabric-api:fabric-api:0.92.11+1.20.1"
+
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    implementation "com.google.code.gson:gson:2.10.1"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+}
+
+// Testing
+tasks.test {
+    useJUnitPlatform()
+}
+
+// Run client with Fabric
+tasks.named("runClient") {
+    jvmArgs = ["-Dfabric.dli.config=disabled"]
+}
+
+// Run server with Fabric
+tasks.named("runServer") {
+    jvmArgs = ["-Dfabric.dli.config=disabled"]
+}

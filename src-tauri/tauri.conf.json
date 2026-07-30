@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicktomlin/tauri/v2/core/tauri-config-schema/schema.json",
-  "productName": "Modpack Engine",
+  "productName": "ModCanvas",
   "version": "0.1.0",
-  "identifier": "com.modpackengine.app",
+  "identifier": "com.modcanvas.app",
   "build": {
-    "frontendDist": "frontend/dist",
+    "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "cd frontend && npm run dev",
     "beforeBuildCommand": "cd frontend && npm run build"
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Modpack Engine",
+        "title": "ModCanvas",
         "width": 1400,
         "height": 900,
         "minWidth": 1000,
