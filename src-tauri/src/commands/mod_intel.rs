@@ -225,3 +225,23 @@ pub fn get_pack_icon(path: String) -> Result<Option<String>, String> {
     let p = std::path::Path::new(&path);
     Ok(crate::icons::get_pack_icon(p))
 }
+
+#[tauri::command]
+pub fn log_debug(message: String) -> Result<(), String> {
+    println!("[DEBUG] {}", message);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reindex_textures(mods_dir: String) -> Result<std::collections::HashMap<String, String>, String> {
+    let path = std::path::Path::new(&mods_dir);
+    // Clear texture cache to force full re-scan
+    let cache = crate::icons::cache_path(path);
+    if cache.exists() {
+        eprintln!("[ModCanvas] Clearing texture cache at {:?}", cache);
+        std::fs::remove_file(&cache).map_err(|e| format!("Failed to clear texture cache: {}", e))?;
+    }
+    let result = crate::icons::scan_directory_for_jar_textures(path);
+    eprintln!("[ModCanvas] Re-indexed {} textures from {}", result.by_item_id.len(), mods_dir);
+    Ok(result.by_item_id)
+}

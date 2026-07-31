@@ -31,11 +31,41 @@ pub struct QuestChapter {
     pub default_enabled: bool,
     #[serde(default)]
     pub progression_mode: QuestProgressionMode,
+    #[serde(default)]
+    pub images: Vec<ChapterImage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ChapterImage {
+    #[serde(default)]
+    pub x: f64,
+    #[serde(default)]
+    pub y: f64,
+    #[serde(default)]
+    pub width: f64,
+    #[serde(default)]
+    pub height: f64,
+    #[serde(default)]
+    pub rotation: f64,
+    #[serde(default)]
+    pub image: String,
+    #[serde(default)]
+    pub scale: f64,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub alpha: u8,
+    #[serde(default)]
+    pub color: i32,
+    #[serde(default)]
+    pub click: String,
+    #[serde(default)]
+    pub hover: Vec<String>,
 }
 
 fn default_true() -> bool { true }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestShape {
     #[default]
@@ -71,7 +101,7 @@ impl QuestShape {
         match s.to_lowercase().as_str() {
             "circle" => QuestShape::Circle,
             "square" => QuestShape::Square,
-            "rounded_square" | "rounded" => QuestShape::RoundedSquare,
+            "rounded_square" | "rounded" | "rsquare" | "roundedsquare" => QuestShape::RoundedSquare,
             "diamond" => QuestShape::Diamond,
             "pentagon" => QuestShape::Pentagon,
             "hexagon" => QuestShape::Hexagon,
@@ -874,4 +904,37 @@ pub struct QuestIssue {
     pub severity: String,
     pub message: String,
     pub node_id: Option<String>,
+}
+
+#[cfg(test)]
+mod quest_shape_tests {
+    use super::QuestShape;
+
+    #[test]
+    fn parses_modern_ftb_shape_ids() {
+        assert_eq!(QuestShape::from_string("circle"), QuestShape::Circle);
+        assert_eq!(QuestShape::from_string("square"), QuestShape::Square);
+        assert_eq!(QuestShape::from_string("rounded_square"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::from_string("diamond"), QuestShape::Diamond);
+        assert_eq!(QuestShape::from_string("pentagon"), QuestShape::Pentagon);
+        assert_eq!(QuestShape::from_string("hexagon"), QuestShape::Hexagon);
+        assert_eq!(QuestShape::from_string("octagon"), QuestShape::Octagon);
+        assert_eq!(QuestShape::from_string("heart"), QuestShape::Heart);
+        assert_eq!(QuestShape::from_string("gear"), QuestShape::Gear);
+    }
+
+    #[test]
+    fn parses_legacy_shape_aliases() {
+        assert_eq!(QuestShape::from_string("rsquare"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::from_string("roundedsquare"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::from_string("rounded"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::from_string("RSQUARE"), QuestShape::RoundedSquare);
+    }
+
+    #[test]
+    fn unknown_and_empty_fall_back_to_default() {
+        assert_eq!(QuestShape::from_string(""), QuestShape::Default);
+        assert_eq!(QuestShape::from_string("blob"), QuestShape::Default);
+        assert_eq!(QuestShape::from_string("default"), QuestShape::Default);
+    }
 }

@@ -3,6 +3,9 @@ pub mod config_parser;
 pub mod db;
 pub mod icons;
 pub mod imports;
+pub mod indexer;
+pub mod ingest;
+pub mod instance_textures;
 pub mod launcher;
 pub mod models;
 pub mod mod_intelligence;
@@ -10,6 +13,7 @@ pub mod minecraft;
 pub mod path_safety;
 pub mod progression;
 pub mod quest;
+pub mod quest_cache;
 pub mod scriptgen;
 pub mod shared;
 pub mod ws_ipc;
@@ -189,11 +193,14 @@ pub fn run() {
             commands::delete_quest_edge,
             commands::analyze_quest_graph,
             commands::auto_generate_quest,
+            commands::write_quest_graph_to_instance,
             commands::save_project,
             commands::test_project,
+            commands::log_debug,
             commands::scan_mod_jar_textures,
             commands::get_texture_by_id,
             commands::get_pack_icon,
+            commands::reindex_textures,
             commands::import_ftb_quests_from_dir,
             commands::import_ftb_quests_one_click,
             commands::export_ftb_quests_to_dir,
@@ -204,11 +211,17 @@ pub fn run() {
             commands::get_packwiz_workspace,
             commands::get_kubejs_scripts,
             commands::get_all_kubejs_scripts,
+            commands::list_prism_instances,
             commands::search_items,
             commands::search_tags,
             commands::get_item_details,
             commands::generate_recipe_scripts,
             commands::write_script_files,
+            crate::indexer::scan_instance_items_cmd,
+            crate::ingest::ingest_active_instance_cmd,
+            crate::ingest::get_texture_file,
+            crate::ingest::get_texture_files,
+            crate::instance_textures::scan_instance_textures_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Minecraft Modpack Maker");

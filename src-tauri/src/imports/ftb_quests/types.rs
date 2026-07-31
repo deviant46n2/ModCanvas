@@ -91,6 +91,12 @@ pub struct ImportStats {
     pub unknown_reward_types: Vec<String>,
     pub files_processed: usize,
     pub files_failed: usize,
+    /// Quests whose title was derived from the first task's item (fallback)
+    pub title_from_task: usize,
+    /// Quests whose icon was derived from the first task's item (fallback)
+    pub icon_from_task: usize,
+    /// Total chapter images parsed from images: [...] arrays
+    pub chapter_images_total: usize,
 }
 
 /// Enhanced import result with detailed reporting

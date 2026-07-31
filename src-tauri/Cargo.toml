@@ -33,6 +33,7 @@ base64 = "0.22"
 json5 = "0.4"
 dirs-next = "2"
 dotenvy = "0.15"
+rayon = "1.10"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

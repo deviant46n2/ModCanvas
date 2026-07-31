@@ -161,17 +161,7 @@ pub fn auto_generate_progression(
 
 #[tauri::command]
 pub fn get_quest_graph(project_id: String) -> Result<QuestGraph, String> {
-    let config_dir = std::env::temp_dir()
-        .join("modcanvas_configs")
-        .join(&project_id);
-    let graph_path = config_dir.join("quests.json");
-
-    if graph_path.exists() {
-        let content = std::fs::read_to_string(&graph_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&content).map_err(|e| e.to_string())
-    } else {
-        Ok(QuestGraph::new(&project_id, "New Questline"))
-    }
+    crate::quest_cache::load(&project_id)
 }
 
 #[tauri::command]
@@ -185,7 +175,9 @@ pub fn save_quest_graph(
     std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     let graph_path = config_dir.join("quests.json");
     let content = serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())?;
-    crate::path_safety::atomic_write_str(&graph_path, &content).map_err(|e| e.to_string())
+    crate::path_safety::atomic_write_str(&graph_path, &content).map_err(|e| e.to_string())?;
+    crate::quest_cache::put(&project_id, &graph);
+    Ok(())
 }
 
 #[tauri::command]
@@ -305,4 +297,29 @@ pub fn auto_generate_quest(
     save_quest_graph(project_id, graph.clone())?;
 
     Ok(graph)
+}
+
+#[tauri::command]
+pub fn write_quest_graph_to_instance(
+    project_id: String,
+    db: State<'_, Database>,
+) -> Result<(), String> {
+    let pid = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+
+    // Get the project to find the instance path
+    let project = db.get_project(&pid).map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let instance_path = std::path::PathBuf::from(&project.path);
+    let quests_dir = instance_path.join("config").join("ftbquests").join("quests");
+
+    // Get the quest graph from database
+    let graph = get_quest_graph(project_id.clone())?;
+
+    // Export to SNBT files in the instance
+    crate::imports::ftb_quests::export::export_ftb_quests_snbt(&graph, &quests_dir)
+        .map_err(|e| format!("Failed to export quest SNBT: {}", e))?;
+
+    eprintln!("[ModCanvas] Wrote quest graph to SNBT files at {:?}", quests_dir);
+    Ok(())
 }

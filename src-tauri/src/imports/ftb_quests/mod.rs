@@ -1,7 +1,7 @@
 mod types;
 mod detect;
 mod import;
-mod export;
+pub mod export;
 
 pub use types::*;
 pub use detect::*;
@@ -10,6 +10,7 @@ pub use export::*;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::*;
     use crate::imports::snbt::{SnbtValue, parse_snbt, compound_to_snbt};
     use crate::quest::*;

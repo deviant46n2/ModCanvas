@@ -74,6 +74,9 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
     let mut unknown_task_types = Vec::new();
     let mut unknown_reward_types = Vec::new();
 
+    // Parse language files (chapter & group titles are stored in lang/ rather than chapter files)
+    let lang_titles = parse_lang_titles(&quests_dir);
+
     match layout {
         FtBQuestsLayout::Subdirs => {
             // New layout: quests_dir/<chapter_dir>/chapter.snbt
@@ -87,7 +90,7 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
                             let chapter_file = dir_path.join("chapter.snbt");
                             if !chapter_file.exists() { continue; }
                             files_processed += 1;
-                            match parse_snbt_chapter_file(&chapter_file, &mut graph, &mut result) {
+                            match parse_snbt_chapter_file(&chapter_file, &mut graph, &mut result, &lang_titles) {
                                 Ok((quests_in_chapter, chapter_id)) => {
                                     chapter_count += 1;
                                     quest_count += quests_in_chapter;
@@ -113,7 +116,7 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
                                 dir_path.join("chapter.json")
                             } else { continue; };
                             files_processed += 1;
-                            match parse_json5_chapter_file(&chapter_file, &mut graph, &mut result) {
+                            match parse_json5_chapter_file(&chapter_file, &mut graph, &mut result, &lang_titles) {
                                 Ok((quests_in_chapter, chapter_id)) => {
                                     chapter_count += 1;
                                     quest_count += quests_in_chapter;
@@ -140,7 +143,7 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
             // Old layout: quests_dir/chapters/*.snbt (or *.json5)
             let chapters_dir = quests_dir.join("chapters");
             // Parse chapter_groups.snbt for ordering if present
-            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result);
+            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result, &lang_titles);
             if let Ok(entries) = std::fs::read_dir(&chapters_dir) {
                 for entry in entries.flatten() {
                     let file_path = entry.path();
@@ -151,11 +154,11 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
                     let parse_result = match format {
                         FtBQuestsFormat::Snbt if ext == "snbt" => {
                             files_processed += 1;
-                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result)
+                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result, &lang_titles)
                         }
                         FtBQuestsFormat::Json5 if ext == "json5" || ext == "json" => {
                             files_processed += 1;
-                            parse_json5_chapter_file(&file_path, &mut graph, &mut result)
+                            parse_json5_chapter_file(&file_path, &mut graph, &mut result, &lang_titles)
                         }
                         _ => continue,
                     };
@@ -181,7 +184,7 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
         }
         FtBQuestsLayout::Flat => {
             // Very old layout: *.snbt directly in quests_dir
-            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result);
+            parse_chapter_groups(&quests_dir, format, &mut graph, &mut result, &lang_titles);
             if let Ok(entries) = std::fs::read_dir(&quests_dir) {
                 for entry in entries.flatten() {
                     let file_path = entry.path();
@@ -197,11 +200,11 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
                     let parse_result = match format {
                         FtBQuestsFormat::Snbt if ext == "snbt" => {
                             files_processed += 1;
-                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result)
+                            parse_snbt_chapter_file(&file_path, &mut graph, &mut result, &lang_titles)
                         }
                         FtBQuestsFormat::Json5 if ext == "json5" || ext == "json" => {
                             files_processed += 1;
-                            parse_json5_chapter_file(&file_path, &mut graph, &mut result)
+                            parse_json5_chapter_file(&file_path, &mut graph, &mut result, &lang_titles)
                         }
                         _ => continue,
                     };
@@ -252,6 +255,10 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
     let total_no_icon = graph.nodes.iter().filter(|n| n.icon.is_empty() && !matches!(n.node_type, QuestNodeType::Chapter)).count();
     eprintln!("[ModCanvas] Quests with icon: {}, without icon: {}", total_with_icon, total_no_icon);
 
+    // Order chapters and groups by in-game order_index so the editor and exports match the game
+    graph.chapters.sort_by_key(|c| c.order_index);
+    graph.chapter_groups.sort_by_key(|g| g.order_index);
+
     result.graph = graph;
     result.quest_count = quest_count;
     result.chapter_count = chapter_count;
@@ -267,6 +274,9 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
         unknown_reward_types: unknown_reward_types.clone(),
         files_processed,
         files_failed,
+        title_from_task: result.stats.title_from_task,
+        icon_from_task: result.stats.icon_from_task,
+        chapter_images_total: result.stats.chapter_images_total,
     };
 
     // Add summary issues
@@ -398,7 +408,7 @@ fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut
 // ─── Chapter Groups ────────────────────────────────────────────────────────
 
 /// Parse chapter_groups.snbt/json5 for chapter ordering
-fn parse_chapter_groups(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) {
+fn parse_chapter_groups(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult, lang_titles: &LangTitles) {
     match format {
         FtBQuestsFormat::Snbt => {
             let file = quests_dir.join("chapter_groups.snbt");
@@ -409,7 +419,11 @@ fn parse_chapter_groups(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut 
                         for (i, g) in groups.iter().enumerate() {
                             if let Some(m) = g.as_compound() {
                                 let id = m.get_str("id").unwrap_or("").to_string();
-                                let title = m.get_str("title").unwrap_or(&id).to_string();
+                                let title = m.get_str("title")
+                                    .map(|s| s.to_string())
+                                    .filter(|t| !t.is_empty())
+                                    .or_else(|| lang_titles.chapter_group.get(&id).cloned())
+                                    .unwrap_or_else(|| id.clone());
                                 if !id.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == id) {
                                     graph.chapter_groups.push(QuestChapterGroup {
                                         id,
@@ -439,7 +453,12 @@ fn parse_chapter_groups(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut 
                     if let Some(groups) = val.get("chapter_groups").and_then(|v| v.as_array()) {
                         for (i, g) in groups.iter().enumerate() {
                             let id = g.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let title = g.get("title").and_then(|v| v.as_str()).unwrap_or(&id).to_string();
+                            let title = g.get("title")
+                                .and_then(|v| v.as_str())
+                                .filter(|t| !t.is_empty())
+                                .map(|s| s.to_string())
+                                .or_else(|| lang_titles.chapter_group.get(&id).cloned())
+                                .unwrap_or_else(|| id.clone());
                             if !id.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == id) {
                                 graph.chapter_groups.push(QuestChapterGroup {
                                     id,
@@ -532,10 +551,123 @@ fn resolve_ftbquests_icon(icon_ref: &str) -> String {
     }
 }
 
+// ─── Language File Parser ───────────────────────────────────────────────────
+
+/// Parse language files in quests/lang/ to extract chapter UUID → title mapping.
+/// Titles resolved from the pack's language files.
+#[derive(Default)]
+pub(crate) struct LangTitles {
+    /// `chapter.{uuid}.title` -> readable chapter title
+    pub chapter: HashMap<String, String>,
+    /// `chapter_group.{uuid}.title` -> readable group title
+    pub chapter_group: HashMap<String, String>,
+}
+
+/// Scan `quests/lang/**` and collect both chapter and chapter-group titles.
+/// `en_us` files are scanned first so they win over other locales.
+pub fn parse_lang_titles(quests_dir: &Path) -> LangTitles {
+    let mut titles = LangTitles::default();
+    for (category, uuid, title) in collect_lang_title_entries(quests_dir) {
+        let map = match category.as_str() {
+            "chapter" => &mut titles.chapter,
+            "chapter_group" => &mut titles.chapter_group,
+            _ => continue,
+        };
+        map.entry(uuid).or_insert(title);
+    }
+    titles
+}
+
+/// Language files use keys like `chapter.{uuid}.title`.
+pub fn parse_chapter_titles(quests_dir: &Path) -> HashMap<String, String> {
+    parse_lang_titles(quests_dir).chapter
+}
+
+/// Language files use keys like `chapter_group.{uuid}.title` for groups.
+pub fn parse_group_titles(quests_dir: &Path) -> HashMap<String, String> {
+    parse_lang_titles(quests_dir).chapter_group
+}
+
+fn collect_lang_title_entries(quests_dir: &Path) -> Vec<(String, String, String)> {
+    let lang_dir = quests_dir.join("lang");
+    let mut entries: Vec<(String, String, String)> = Vec::new();
+
+    fn collect_lang_files(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect_lang_files(&path, files)?;
+                } else if path.extension().map_or(false, |ext| ext == "snbt") {
+                    files.push(path);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    let mut lang_files: Vec<PathBuf> = Vec::new();
+    let _ = collect_lang_files(&lang_dir, &mut lang_files);
+
+    // Prefer en_us first, then any other language - check if path contains "en_us"
+    lang_files.sort_by_key(|p| {
+        let path_str = p.to_string_lossy().to_string();
+        if path_str.contains("/en_us/") || path_str.contains("\\en_us\\") { 0 } else { 1 }
+    });
+
+    for lang_file in lang_files {
+        if let Ok(content) = std::fs::read_to_string(&lang_file) {
+            if let Ok(ref snbt) = parse_snbt(&content) {
+                if let Some(compound) = snbt.as_compound() {
+                    for (key, val) in compound {
+                        let Some(title) = val.as_str() else { continue };
+                        for prefix in ["chapter.", "chapter_group."] {
+                            if let Some(uuid) = key.strip_prefix(prefix).and_then(|k| k.strip_suffix(".title")) {
+                                entries.push((
+                                    prefix.trim_end_matches('.').to_string(),
+                                    uuid.to_string(),
+                                    title.to_string(),
+                                ));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    entries
+}
+
+// ─── Chapter Image Parser ───────────────────────────────────────────────────
+
+fn parse_chapter_image(val: &SnbtValue) -> ChapterImage {
+    ChapterImage {
+        x: val.get_f64("x").unwrap_or(0.0),
+        y: val.get_f64("y").unwrap_or(0.0),
+        width: val.get_f64("width").unwrap_or(1.0),
+        height: val.get_f64("height").unwrap_or(1.0),
+        rotation: val.get_f64("rotation").unwrap_or(0.0),
+        image: val.get_str("image").unwrap_or("").to_string(),
+        scale: val.get_f64("scale").unwrap_or(1.0),
+        order: val.get_i64("order").unwrap_or(0) as i32,
+        alpha: val.get_i64("alpha").unwrap_or(255) as u8,
+        color: val.get_i64("color").unwrap_or(0) as i32,
+        click: val.get_str("click").unwrap_or("").to_string(),
+        hover: val.get_list("hover")
+            .map(|list| {
+                list.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+
 // ─── SNBT Chapter Parser ───────────────────────────────────────────────────
 
 /// Parse a chapter.snbt file. Returns (quest_count, chapter_node_id).
-fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<(usize, String)> {
+fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult, lang_titles: &LangTitles) -> Result<(usize, String)> {
     let content = std::fs::read_to_string(path)?;
     let snbt = parse_snbt(&content)?;
     snbt.as_compound().context("chapter.snbt root is not a compound")?;
@@ -548,6 +680,10 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     let title = m.get_str("title")
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
+            // Try language file titles first
+            if let Some(lang_title) = lang_titles.chapter.get(&chapter_id) {
+                return lang_title.clone();
+            }
             // For old flat layout (chapters/ae2.snbt), use the file stem as title
             path.file_stem()
                 .map(|f| f.to_string_lossy().replace('_', " "))
@@ -568,9 +704,10 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     // Chapter groups
     if !group.is_empty() {
         if !graph.chapter_groups.iter().any(|cg| cg.id == group || cg.title == group) {
+            let group_title = lang_titles.chapter_group.get(&group).cloned().unwrap_or_else(|| group.clone());
             graph.chapter_groups.push(QuestChapterGroup {
                 id: group.clone(),
-                title: group.clone(),
+                title: group_title,
                 ..Default::default()
             });
         }
@@ -588,6 +725,16 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     };
     graph.nodes.push(chapter_node);
 
+    // Parse images array
+    let images: Vec<ChapterImage> = m.get("images")
+        .and_then(|v| v.as_list())
+        .map(|list| {
+            let imgs: Vec<_> = list.iter().map(|val| parse_chapter_image(val)).collect();
+            result.stats.chapter_images_total += imgs.len();
+            imgs
+        })
+        .unwrap_or_default();
+
     // Chapter metadata
     graph.chapters.push(QuestChapter {
         id: chapter_id.clone(),
@@ -603,6 +750,7 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
         default_quest_shape: QuestShape::from_string(&default_shape),
         default_enabled: chapter_default_enabled,
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
+        images,
     });
 
     // Parse quests array
@@ -610,7 +758,7 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
         if let Some(quests_val) = m.get("quests") {
             if let Some(quests_list) = quests_val.as_list() {
                 for quest_val in quests_list {
-                    if let Ok(node) = parse_snbt_quest(quest_val, &chapter_id, hide_dep_lines, chapter_default_enabled) {
+                    if let Ok(node) = parse_snbt_quest(quest_val, &chapter_id, hide_dep_lines, chapter_default_enabled, result) {
                         graph.nodes.push(node);
                         quest_count += 1;
                     }
@@ -621,18 +769,74 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     Ok((quest_count, chapter_id))
 }
 
+/// Extract the item ID from the first `item`-type task (for title/icon fallback).
+/// Returns `None` if no item task is found.
+fn extract_first_task_item(m: &SnbtValue) -> Option<String> {
+    let tasks_val = m.get("tasks");
+    let tasks_list = tasks_val.and_then(|v| v.as_list())?;
+    let first = tasks_list.first()?;
+    let task_type = first.get_str("type").unwrap_or("item");
+    if task_type != "item" && task_type != "ftbquests:item" && task_type != "minecraft:item"
+        && task_type != "item_retrieval" && task_type != "ftbquests:item_retrieval"
+        && task_type != "item_crafting" && task_type != "crafting" && task_type != "craft"
+    {
+        return None;
+    }
+    if let Some(item_m) = first.get("item").and_then(|v| v.as_compound()) {
+        return item_m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string());
+    }
+    if let Some(item_str) = first.get_str("item") {
+        return Some(item_str.to_string());
+    }
+    None
+}
+
+/// Format an item ID like "minecraft:diamond" or "allthemodium:allthemodium_ingot"
+/// into a human-readable title.
+fn format_item_title(item_id: &str) -> String {
+    let path = item_id.split(':').nth(1).unwrap_or(item_id);
+    path.replace('_', " ")
+        .split_whitespace()
+        .map(|w| {
+            let mut chars = w.chars();
+            chars.next().map(|c| c.to_uppercase().to_string() + chars.as_str()).unwrap_or_default()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Parse a single quest from an SNBT compound
-fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: bool, chapter_default_enabled: bool) -> Result<QuestNode> {
+fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: bool, chapter_default_enabled: bool, result: &mut FtBQuestsImportResult) -> Result<QuestNode> {
     let id = m.get_str("id")
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    let title = m.get_str("title").unwrap_or("").to_string();
+    let first_task_item = extract_first_task_item(m);
+    let title = m.get_str("title")
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            let from_task = first_task_item.as_ref().map(|item| format_item_title(item));
+            if from_task.is_some() {
+                result.stats.title_from_task += 1;
+            }
+            from_task.unwrap_or_else(|| {
+                // Last resort: use the quest id
+                id.chars().take(8).collect()
+            })
+        });
     let description = parse_description(m);
     let x = m.get_f64("x").unwrap_or(0.0);
     let y = m.get_f64("y").unwrap_or(0.0);
     let icon = extract_icon_str(m);
-    let icon = resolve_ftbquests_icon(&icon);
+    let icon = if icon.is_empty() || icon == "minecraft:" {
+        if first_task_item.is_some() {
+            result.stats.icon_from_task += 1;
+        }
+        resolve_ftbquests_icon(first_task_item.as_deref().unwrap_or(""))
+    } else {
+        resolve_ftbquests_icon(&icon)
+    };
     let color_int = m.get_i64("color").unwrap_or(-1);
     let color = if color_int >= 0 { format_color(color_int) } else { String::new() };
     let subtitle = m.get_str("subtitle").unwrap_or("").to_string();
@@ -1276,7 +1480,7 @@ fn parse_standalone_quest_files(dir: &Path, chapter_id: &str, graph: &mut QuestG
                             continue;
                         }
                         let chapter_default = graph.chapters.iter().find(|c| c.id == chapter_id).map(|c| c.default_enabled).unwrap_or(true);
-                        if let Ok(node) = parse_snbt_quest(&snbt.value, chapter_id, false, chapter_default) {
+                        if let Ok(node) = parse_snbt_quest(&snbt.value, chapter_id, false, chapter_default, result) {
                             graph.nodes.push(node);
                             count += 1;
                         }
@@ -1291,7 +1495,7 @@ fn parse_standalone_quest_files(dir: &Path, chapter_id: &str, graph: &mut QuestG
 
 // ─── Json5 Chapter Parser ──────────────────────────────────────────────────
 
-fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) -> Result<(usize, String)> {
+fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult, lang_titles: &LangTitles) -> Result<(usize, String)> {
     let content = std::fs::read_to_string(path)?;
     let val: serde_json::Value = json5::from_str(&content)
         .or_else(|_| serde_json::from_str(&content))
@@ -1303,6 +1507,10 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
     let title = val.get("title").and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
+            // Try language file titles first
+            if let Some(lang_title) = lang_titles.chapter.get(&chapter_id) {
+                return lang_title.clone();
+            }
             path.parent().and_then(|p| p.file_name()).map(|f| f.to_string_lossy().to_string()).unwrap_or_default()
         })
         .to_string();
@@ -1315,9 +1523,10 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
     result.stats.files_processed += 1;
 
     if !group.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == group || cg.title == group) {
+        let group_title = lang_titles.chapter_group.get(&group).cloned().unwrap_or_else(|| group.clone());
         graph.chapter_groups.push(QuestChapterGroup {
             id: group.clone(),
-            title: group.clone(),
+            title: group_title,
             ..Default::default()
         });
     }
@@ -1331,6 +1540,32 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
         chapter_id: None,
         ..Default::default()
     });
+
+    let images: Vec<ChapterImage> = val.get("images")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter().map(|item| {
+                let obj = item.as_object().map(|o| {
+                    let x = o.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let y = o.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let width = o.get("width").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let height = o.get("height").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let rotation = o.get("rotation").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let image = o.get("image").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let scale = o.get("scale").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let order = o.get("order").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let alpha = o.get("alpha").and_then(|v| v.as_i64()).unwrap_or(255) as u8;
+                    let color = o.get("color").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let click = o.get("click").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let hover: Vec<String> = o.get("hover").and_then(|v| v.as_array())
+                        .map(|h| h.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+                        .unwrap_or_default();
+                    ChapterImage { x, y, width, height, rotation, image, scale, order, alpha, color, click, hover }
+                }).unwrap_or_default();
+                obj
+            }).collect()
+        })
+        .unwrap_or_default();
 
     graph.chapters.push(QuestChapter {
         id: chapter_id.clone(),
@@ -1346,6 +1581,7 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
         default_quest_shape: QuestShape::from_string(&default_shape),
         default_enabled: chapter_default_enabled,
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
+        images,
     });
 
     let mut quest_count = 0usize;
@@ -1635,4 +1871,106 @@ fn build_dependency_edges(graph: &mut QuestGraph, result: &mut FtBQuestsImportRe
     }
 
     resolved
+}
+
+#[cfg(test)]
+mod chapter_title_tests {
+    use super::{parse_chapter_titles, parse_group_titles};
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_parse_chapter_titles_recursive_scanning() {
+        let dir = tempdir().unwrap();
+        let quests_dir = dir.path().join("quests");
+        let lang_dir = quests_dir.join("lang").join("en_us").join("chapters");
+        fs::create_dir_all(&lang_dir).unwrap();
+        
+        let chapter1_content = r#"{
+    chapter.007B547630FF0478.title: "Theurgy"
+    chapter.05E614FDA677D85E.title: "Food and Farming"
+}"#;
+        fs::write(lang_dir.join("chapter1.snbt"), chapter1_content).unwrap();
+        
+        let chapter2_content = r#"{
+    chapter.07210DDF872160BA.title: "Applied Energistics 2"
+    chapter.0A093D8C4429B627.title: "Mekanism: Reactors"
+}"#;
+        fs::write(lang_dir.join("chapter2.snbt"), chapter2_content).unwrap();
+        
+        let nested_dir = lang_dir.join("mods");
+        fs::create_dir_all(&nested_dir).unwrap();
+        let nested_content = r#"{
+    chapter.1BE666F01EFFC00D.title: "Tips and Tricks"
+    chapter.1D42B373285DEF81.title: "Silent Gear"
+}"#;
+        fs::write(nested_dir.join("utils.snbt"), nested_content).unwrap();
+        
+        let titles = parse_chapter_titles(&quests_dir);
+        
+        assert_eq!(titles.len(), 6);
+        assert_eq!(titles.get("007B547630FF0478"), Some(&"Theurgy".to_string()));
+        assert_eq!(titles.get("05E614FDA677D85E"), Some(&"Food and Farming".to_string()));
+        assert_eq!(titles.get("07210DDF872160BA"), Some(&"Applied Energistics 2".to_string()));
+        assert_eq!(titles.get("0A093D8C4429B627"), Some(&"Mekanism: Reactors".to_string()));
+        assert_eq!(titles.get("1BE666F01EFFC00D"), Some(&"Tips and Tricks".to_string()));
+        assert_eq!(titles.get("1D42B373285DEF81"), Some(&"Silent Gear".to_string()));
+    }
+
+    #[test]
+    fn test_parse_chapter_titles_handles_missing_dir() {
+        let dir = tempdir().unwrap();
+        let quests_dir = dir.path().join("quests");
+        fs::create_dir_all(&quests_dir).unwrap();
+        // No lang dir
+        
+        let titles = parse_chapter_titles(&quests_dir);
+        assert!(titles.is_empty());
+    }
+
+    #[test]
+    fn test_parse_chapter_titles_prefers_en_us() {
+        let dir = tempdir().unwrap();
+        let quests_dir = dir.path().join("quests");
+        let lang_dir = quests_dir.join("lang");
+        
+        let en_us_dir = lang_dir.join("en_us").join("chapters");
+        fs::create_dir_all(&en_us_dir).unwrap();
+        let en_content = r#"{
+    chapter.TEST_UUID.title: "English Title"
+}"#;
+        fs::write(en_us_dir.join("test.snbt"), en_content).unwrap();
+        
+        let fr_fr_dir = lang_dir.join("fr_fr").join("chapters");
+        fs::create_dir_all(&fr_fr_dir).unwrap();
+        let fr_content = r#"{
+    chapter.TEST_UUID.title: "Titre Francais"
+}"#;
+        fs::write(fr_fr_dir.join("test.snbt"), fr_content).unwrap();
+        
+        let titles = parse_chapter_titles(&quests_dir);
+        assert_eq!(titles.get("TEST_UUID"), Some(&"English Title".to_string()));
+    }
+
+    #[test]
+    fn test_parse_group_titles_resolves_chapter_group_prefix() {
+        let dir = tempdir().unwrap();
+        let quests_dir = dir.path().join("quests");
+        let lang_dir = quests_dir.join("lang").join("en_us");
+        fs::create_dir_all(&lang_dir).unwrap();
+
+        let content = r#"{
+    chapter_group.029264819125415F.title: "&f&lSkyblock Quests"
+    chapter_group.428CE9AF17D90D68.title: "&f&lThe Basics"
+    chapter.6D5CCD51C7A73F40.title: "&fWelcome"
+}"#;
+        fs::write(lang_dir.join("en_us.snbt"), content).unwrap();
+
+        let groups = parse_group_titles(&quests_dir);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups.get("029264819125415F"), Some(&"&f&lSkyblock Quests".to_string()));
+        assert_eq!(groups.get("428CE9AF17D90D68"), Some(&"&f&lThe Basics".to_string()));
+        // Chapter keys must not leak into group titles
+        assert!(groups.get("6D5CCD51C7A73F40").is_none());
+    }
 }

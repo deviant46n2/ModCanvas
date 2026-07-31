@@ -87,6 +87,7 @@ pub(super) fn load_quest_from_pack(project_id: &str, pack_dir: &PathBuf) -> Resu
         std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
         let graph_path = config_dir.join("quests.json");
         crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())?)?;
+        crate::quest_cache::put(project_id, &graph);
         eprintln!("[ModCanvas] Loaded quest graph from pack: {} nodes, {} edges", graph.nodes.len(), graph.edges.len());
         return Ok(());
     }
@@ -100,6 +101,7 @@ pub(super) fn load_quest_from_pack(project_id: &str, pack_dir: &PathBuf) -> Resu
                 &graph_path,
                 &serde_json::to_string_pretty(&result.graph).map_err(|e| e.to_string())?,
             )?;
+            crate::quest_cache::put(project_id, &result.graph);
             eprintln!(
                 "[ModCanvas] Imported FTB Quests from pack: {} chapters, {} quests, {} nodes, {} edges",
                 result.chapter_count,
@@ -229,4 +231,65 @@ pub fn write_script_files(project_id: String, kubejs_script: String, crafttweake
 pub struct ScriptOutput {
     pub kubejs: String,
     pub crafttweaker: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PrismInstance {
+    pub name: String,
+    pub path: String,
+}
+
+/// List Prism Launcher instances by scanning the standard instances directory.
+#[tauri::command]
+pub fn list_prism_instances() -> Result<Vec<PrismInstance>, String> {
+    let home = dirs_next::home_dir().ok_or_else(|| "Cannot find home directory".to_string())?;
+    let instances_dir = home.join(".local/share/PrismLauncher/instances");
+    if !instances_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut instances = Vec::new();
+    for entry in std::fs::read_dir(&instances_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let cfg_path = path.join("instance.cfg");
+        if !cfg_path.exists() {
+            continue;
+        }
+
+        let name = read_prism_instance_name(&cfg_path).unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+
+        let mc_dir = if path.join(".minecraft").exists() {
+            path.join(".minecraft")
+        } else if path.join("minecraft").exists() {
+            path.join("minecraft")
+        } else {
+            continue;
+        };
+
+        instances.push(PrismInstance {
+            name,
+            path: mc_dir.to_string_lossy().to_string(),
+        });
+    }
+
+    instances.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(instances)
+}
+
+fn read_prism_instance_name(cfg_path: &std::path::Path) -> Option<String> {
+    let content = std::fs::read_to_string(cfg_path).ok()?;
+    for line in content.lines() {
+        if line.starts_with("name=") {
+            return Some(line[5..].trim().to_string());
+        }
+    }
+    None
 }

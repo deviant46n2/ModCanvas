@@ -11,6 +11,7 @@ use crate::minecraft::deploy_companion_mod_to_dir;
 use crate::mod_intelligence::{ModIntelligence, search_modpacks as search_modpacks_mint};
 use crate::models::*;
 use crate::path_safety::atomic_write_str;
+use super::{resolve_curseforge_api_key, load_progression_from_pack, load_quest_from_pack};
 
 fn try_deploy_companion(loader: &ModLoader, mc_version: &str, game_dir: &str) {
     let loader_str = match loader {
@@ -26,13 +27,13 @@ fn try_deploy_companion(loader: &ModLoader, mc_version: &str, game_dir: &str) {
     }
 }
 
-use super::{resolve_curseforge_api_key, load_progression_from_pack, load_quest_from_pack};
-
 #[tauri::command]
 pub async fn search_mods(
     query: String,
     loader: String,
     mc_version: String,
+    db: State<'_, Database>,
+    intelligence: State<'_, ModIntelligence>,
 ) -> Result<Vec<ModMetadata>, String> {
     let loader_enum = match loader.as_str() {
         "Fabric" => ModLoader::Fabric,
@@ -40,7 +41,49 @@ pub async fn search_mods(
         "NeoForge" => ModLoader::NeoForge,
         _ => ModLoader::Forge,
     };
-    ModIntelligence::new().search_modrinth(&query, loader_enum, &mc_version).await.map_err(|e| e.to_string())
+
+    let mut results = Vec::new();
+
+    // Search Modrinth (always available)
+    match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version).await {
+        Ok(mut mods) => results.append(&mut mods),
+        Err(e) => eprintln!("[ModCanvas] Modrinth mod search failed: {}", e),
+    }
+
+    // Search CurseForge if API key configured
+    let api_key = resolve_curseforge_api_key(&db)?;
+    if let Some(key) = api_key {
+        match intelligence.search_curseforge(&query, &key).await {
+            Ok(mut mods) => {
+                // Filter by loader and mc_version
+                let mut filtered: Vec<ModMetadata> = mods.into_iter()
+                    .filter(|m| {
+                        let loader_match = loader == "Any" || 
+                            m.supported_loaders.iter().any(|l| {
+                                match (l, &loader_enum) {
+                                    (ModLoader::Fabric, ModLoader::Fabric) => true,
+                                    (ModLoader::Quilt, ModLoader::Quilt) => true,
+                                    (ModLoader::NeoForge, ModLoader::NeoForge) => true,
+                                    (ModLoader::Forge, ModLoader::Forge) => true,
+                                    _ => false,
+                                }
+                            });
+                        let version_match = mc_version.is_empty() || 
+                            m.supported_versions.iter().any(|v| v == &mc_version);
+                        loader_match && version_match
+                    })
+                    .collect();
+                results.append(&mut filtered);
+            }
+            Err(e) => eprintln!("[ModCanvas] CurseForge mod search failed: {}", e),
+        }
+    }
+
+    // Deduplicate by mod_id
+    results.sort_by_key(|m| m.mod_id.clone());
+    results.dedup_by(|a, b| a.mod_id == b.mod_id);
+
+    Ok(results)
 }
 
 #[tauri::command]
@@ -503,6 +546,7 @@ pub async fn import_modrinth_mrpack(
             std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
             let graph_path = config_dir.join("quests.json");
             crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&quest_graph).map_err(|e| e.to_string())?)?;
+            crate::quest_cache::put(&final_result.project.id.to_string(), &quest_graph);
             eprintln!("[ModCanvas] Parsed and saved quest graph from configs: {} nodes, {} edges", 
                 quest_graph.nodes.len(), quest_graph.edges.len());
         }
