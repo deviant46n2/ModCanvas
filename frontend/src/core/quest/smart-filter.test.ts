@@ -75,7 +75,23 @@ describe('smart-filter DSL parser', () => {
     expect(memberKey({ type: 'mod', mod: 'a' })).toBe('mod:a')
   })
 
-  it('parses the real-world roots_4 crop exclusion filter', () => {
+  it('parses the real-world enchantment capturing component filter', () => {
+    const dsl = 'or(component(fuzzy:{"minecraft:stored_enchantments":{levels:{"apothic_spawners:capturing":1}}})component(fuzzy:{"minecraft:stored_enchantments":{levels:{"apothic_spawners:capturing":2}}}))item(minecraft:enchanted_book)'
+    const nodes = parseSmartFilterDsl(dsl)
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]).toMatchObject({ type: 'or' })
+    expect(nodes[1]).toEqual({ type: 'item', id: 'minecraft:enchanted_book' })
+  })
+
+  it('preserves component/block/stack_size as filter members but excludes them from icon candidates', () => {
+    const dsl = 'or(stack_size(>4)item(ae2:quantum_entangled_singularity)block())'
+    const members = smartFilterMembers(dsl)
+    expect(members).toEqual([{ type: 'item', id: 'ae2:quantum_entangled_singularity' }])
+    const nodes = parseSmartFilterDsl(dsl)
+    expect(nodes[0]).toMatchObject({ type: 'or' })
+  })
+
+  it('parses the real-world roots_4 crop exclusion query', () => {
     const dsl = 'item_tag(roots:crops)not(or(item(roots:wildroot)item(roots:wildewheet)item(roots:spiritleaf)))'
     const members = smartFilterMembers(dsl)
     expect(members).toHaveLength(1)

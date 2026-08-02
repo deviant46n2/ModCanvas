@@ -4,6 +4,7 @@ import { smartFilterMembers } from '../../core/quest/smart-filter'
 import { getIconUrl, resolveIconKey } from './QuestTileTypes'
 import { isTexturePending } from '../../services/texture-loader'
 import { getTagItems, getTagVersion, isTagPending, subscribeTagChanges } from '../../services/smart-filter-tags'
+import { getModItems, getModVersion, isModPending, subscribeModChanges } from '../../services/smart-filter-mods'
 import { QuestIcon } from './QuestIcon'
 import { AnimatedSprite } from './AnimatedSprite'
 
@@ -42,6 +43,7 @@ function useMemberUrls(
   textureIndex: Record<string, string>,
 ): { members: MemberState[]; pending: boolean } {
   const tagVersion = useTagVersion()
+  const modVersion = useModVersion()
   return useMemo(() => {
     const members: MemberState[] = []
     let pending = false
@@ -68,17 +70,41 @@ function useMemberUrls(
             pending = true
           }
         }
+      } else if (member.type === 'mod') {
+        const items = getModItems(member.mod)
+        if (!items || isModPending(member.mod)) {
+          pending = true
+          continue
+        }
+        for (const item of items) {
+          const { url, key, pending: p } = itemState(item, textureIndex)
+          if (url && !seen.has(key)) {
+            seen.add(key)
+            members.push({ url, key })
+          } else if (p) {
+            pending = true
+          }
+        }
       }
     }
     return { members, pending }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dsl, textureIndex, tagVersion])
+  }, [dsl, textureIndex, tagVersion, modVersion])
 }
 
 function useTagVersion(): number {
   const [version, setVersion] = useState(getTagVersion())
   useEffect(() => {
     const unsub = subscribeTagChanges(() => setVersion(getTagVersion()))
+    return unsub
+  }, [])
+  return version
+}
+
+function useModVersion(): number {
+  const [version, setVersion] = useState(getModVersion())
+  useEffect(() => {
+    const unsub = subscribeModChanges(() => setVersion(getModVersion()))
     return unsub
   }, [])
   return version

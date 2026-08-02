@@ -5,6 +5,7 @@ import { useMcTheme } from '../theme/theme-context';
 import { normalizeShape } from './quest-form-constants';
 import { AnimatedSprite } from './AnimatedSprite';
 import { bakeShapeTile } from '../../services/shape-textures';
+import { SmartFilterIcon } from './SmartFilterIcon';
 
 // Fallback shape plate (only when the instance's real shape textures are not
 // available): a neutral grey instead of the editor's accent blue.
@@ -19,6 +20,7 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const label = d.label || 'Untitled Quest';
   const iconUrl = d.iconUrl as string | undefined;
   const hasIcon = d.icon as string;
+  const smartFilter: string | undefined = d.smartFilter as string | undefined;
   const isOptional = d.optional as boolean;
   const pixelSize = d.pixelSize as { width: number; height: number } | undefined;
   const shapeTextures = d.shapeTextures as { background: string; outline: string; shape: string } | undefined;
@@ -134,6 +136,17 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
             ) : (
               <span className="ftb-quest-node-icon-fallback">📜</span>
             )}
+          </div>
+        )}
+        {!hasIcon && smartFilter && (
+          <div className="ftb-quest-node-icon" style={{ width: iconSize, height: iconSize }}>
+            <SmartFilterIcon
+              dsl={smartFilter}
+              textureIndex={d.textureIndex || {}}
+              fallback={null}
+              size={iconSize}
+              imgSize={iconSize}
+            />
           </div>
         )}
       </div>

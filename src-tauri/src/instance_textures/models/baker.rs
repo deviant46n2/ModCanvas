@@ -89,6 +89,9 @@ impl MergedModel {
             let m = models.lookup(&cur.1, &cur.0, &cur.2)?;
             if let Some(t) = m.get("textures").and_then(Value::as_object) {
                 for (slot, v) in t {
+                    if textures.contains_key(slot) {
+                        continue;
+                    }
                     let raw = if let Some(s) = v.as_str() {
                         s.to_string()
                     } else if let Some(o) = v.as_object().and_then(|o| o.get("sprite")).and_then(Value::as_str) {

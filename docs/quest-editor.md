@@ -148,6 +148,10 @@ Block/plant models resolve icons from these `textures` slots, in order:
 `cross`/`fan` are the standard grass/plant/vegetation slots — without them,
 cross-model plants (saplings, crops, flowers) would fall back to a flat texture.
 
+Merged texture slots follow **Minecraft semantics**: the deepest (child) model in
+a parent chain overrides an ancestor on the same slot. `baker::resolve` walks
+child → root and keeps the *first* definition it sees for each slot.
+
 ## Materialization flow
 
 1. Cache miss → `models_for` + `resolve_bare_keys` insert `bake:<model_ref>` keys
@@ -158,6 +162,11 @@ cross-model plants (saplings, crops, flowers) would fall back to a flat texture.
    into a `data:image/png` URL.
 4. No image bytes are ever stored in the cache — only `bake:` descriptor strings.
    `attach_animations` skips `bake:` keys (baked icons have no `.png.mcmeta`).
+
+Never-materialized keys are **retried**, not permanently dropped: the frontend
+texture loader tracks failure attempts per key and re-requests them on later
+passes (`requestMaterialize`), so a key that failed once (e.g. because a bake
+couldn't resolve its textures) can succeed after the index is refreshed.
 
 ## Rendering
 

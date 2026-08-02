@@ -194,6 +194,8 @@ function QuestCanvasInner({
           iconKey = node.objectives[0].target;
         }
         const iconUrl = iconKey ? questIconUrl(iconKey, textureIndex || {}) : undefined;
+        const smartFilter: string | undefined =
+          node.objectives?.find((o) => o.smart_filter)?.smart_filter || undefined;
         // Center anchor: position is node center, so offset by half size
         const centerX = node.position.x * GRID_SCALE;
         const centerY = node.position.y * GRID_SCALE;
@@ -209,6 +211,7 @@ function QuestCanvasInner({
             ...node,
             iconUrl,
             iconDataUrl: iconUrl,
+            smartFilter,
             textureIndex,
             pixelSize,
             shapeTextures: getShapeTextures(node.shape || 'square', textureIndex || {}),

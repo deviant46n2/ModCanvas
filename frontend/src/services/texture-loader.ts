@@ -158,7 +158,8 @@ export function collectNeededTargets(
 }
 
 const materialized = new Map<string, string>()
-const notFound = new Set<string>()
+const notFound = new Map<string, number>()
+const MAX_NOT_FOUND_RETRIES = 3
 const queued: string[] = []
 const queuedSet = new Set<string>()
 const subscribers = new Set<(added: string[]) => void>()
@@ -214,7 +215,9 @@ export function textureDisplayUrl(
 export function requestMaterialize(keys: string[], instancePath: string): void {
   let added = false
   for (const key of keys) {
-    if (materialized.has(key) || notFound.has(key) || queuedSet.has(key)) continue
+    if (materialized.has(key) || queuedSet.has(key)) continue
+    const attempts = notFound.get(key) ?? 0
+    if (attempts >= MAX_NOT_FOUND_RETRIES) continue
     queuedSet.add(key)
     queued.push(key)
     added = true
@@ -242,9 +245,10 @@ function flush(instancePath: string): void {
         const url = result[key]
         if (url) {
           materialized.set(key, url)
+          notFound.delete(key)
           added.push(key)
         } else {
-          notFound.add(key)
+          notFound.set(key, (notFound.get(key) ?? 0) + 1)
         }
       }
       if (added.length > 0) {

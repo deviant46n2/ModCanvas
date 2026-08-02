@@ -5,6 +5,8 @@
  * `item: { components: { "ftbfiltersystem:filter": "or(item(a:b)item(c:d))" } }`.
  * Grammar observed in the wild:
  *   - leaves:  `item(ns:path)`, `item_tag(ns:tag)`, bare `tag(ns:tag)`, `mod(ns)`
+ *   - contextual leaves: `component(fuzzy:{...})`, `block(ns:path)`, `stack_size(N)`
+ *     — parsed and preserved but never used as icon candidates
  *   - wrappers: `or(...)`, `and(...)`, `xor(...)`, `not(...)`
  *   - optional `ftbfiltersystem:` prefix on any call, e.g. `ftbfiltersystem:item_tag(...)`
  *   - members are whitespace-separated top-level calls, e.g.
@@ -15,6 +17,7 @@ export type SmartFilterMember =
   | { type: 'item'; id: string }
   | { type: 'tag'; tag: string }
   | { type: 'mod'; mod: string }
+  | { type: 'filter'; name: string; args: string }
 
 export type SmartFilterNode =
   | SmartFilterMember
@@ -25,6 +28,9 @@ export type SmartFilterNode =
 
 const CALL_NAME_RE = /^[A-Za-z0-9_:.]+/
 const KNOWN_OPS = new Set(['item', 'item_tag', 'tag', 'mod', 'or', 'and', 'xor', 'not'])
+/** Non-item Filter System calls that describe the filter but have no single
+ * representative texture of their own. */
+const FILTER_CALLS = new Set(['component', 'block', 'stack_size'])
 
 /** Scan a DSL string into a list of balanced top-level calls. */
 export function scanCalls(src: string): string[] {
@@ -72,11 +78,13 @@ export function parseSmartFilterCall(call: string): SmartFilterNode | null {
   const raw = nameMatch[1]
   const inner = nameMatch[2]
   const name = baseName(raw)
-  if (!KNOWN_OPS.has(name)) return null
-
   if (name === 'item') return { type: 'item', id: inner.trim() }
   if (name === 'item_tag' || name === 'tag') return { type: 'tag', tag: inner.trim() }
   if (name === 'mod') return { type: 'mod', mod: inner.trim() }
+  if (FILTER_CALLS.has(name)) {
+    return { type: 'filter', name, args: inner.trim() }
+  }
+  if (!KNOWN_OPS.has(name)) return null
 
   const children = scanCalls(inner)
     .map(parseSmartFilterCall)
@@ -109,6 +117,7 @@ function flattenNode(node: SmartFilterNode, out: SmartFilterMember[]): void {
       for (const child of node.children) flattenNode(child, out)
       break
     case 'not':
+    case 'filter':
       // Excluded members — never shown as filter alternatives.
       break
   }
@@ -148,5 +157,7 @@ export function memberKey(member: SmartFilterMember): string {
       return `#${member.tag}`
     case 'mod':
       return `mod:${member.mod}`
+    case 'filter':
+      return `${member.name}:${member.args}`
   }
 }

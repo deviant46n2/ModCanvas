@@ -121,7 +121,7 @@ FTB task registry (`TaskTypes.java`): item, custom, xp, dimension, stat, kill, l
 
 | FTB task | FTB editable fields | ModCanvas | Notes / what to add |
 |---|---|---|---|
-| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt | 🟡 | Has item/count/consume/nbt. `only_from_crafting` ≈ separate `item_crafting` type; `match_components` ≈ `match_nbt`/`ignore_nbt`; `task_screen_only` missing |
+| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt + smart filter | 🟡 | Has item/count/consume/nbt. `only_from_crafting` ≈ separate `item_crafting` type; `match_components` ≈ `match_nbt`/`ignore_nbt`; `task_screen_only` missing. FTB **smart filters** (`ftbfiltersystem:filter` DSL) are imported/exported, and their member icons render on canvas nodes/objectives/rewards — cycling `item`/`tag`/`mod` members, with `mod(...)` resolved to a representative item from the instance item registry. `component`/`block`/`stack_size` members are preserved but not used as icon candidates (no single representative texture). |
 | Custom | custom JSON, max_progress | 🟡 | `custom_json` parsed/exported; not editable in UI, no max_progress |
 | XP | value, points | ✅ | xp_points / xp_levels inputs |
 | Dimension | dim | 🟡 | Imported as `location_visit`; no dedicated UI |

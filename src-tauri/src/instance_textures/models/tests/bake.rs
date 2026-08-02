@@ -173,3 +173,51 @@ fn block_item_with_parent_chain_elements_bakes() {
     let url = out.get("mymod:stone").and_then(|u| u.as_deref()).expect("materialized");
     assert!(url.starts_with("data:image/png;base64,"));
 }
+
+/// Child models must override parent textures on the same slot (Minecraft
+/// semantics). The baker walks child→root, so the deepest definition of a slot
+/// wins and the parent's value must not clobber it.
+#[test]
+fn child_model_overrides_parent_texture_slot() {
+    let (dir, instance) = new_instance();
+    write_jar_entries(
+        &instance.join("mods").join("a.jar"),
+        &[
+            ("assets/mymod/textures/block/child.png", &real_png(90)),
+            ("assets/mymod/textures/block/parent.png", &real_png(91)),
+            (
+                "assets/mymod/models/item/override.json",
+                br#"{"parent":"mymod:block/override"}"#,
+            ),
+            (
+                "assets/mymod/models/block/override.json",
+                br##"{
+                    "parent": "mymod:block/base",
+                    "textures": {"all": "mymod:block/child"},
+                    "elements": [{
+                        "from": [0,0,0], "to": [16,16,16],
+                        "faces": {
+                            "up": {"texture": "#all", "uv": [0,0,16,16]},
+                            "down": {"texture": "#all", "uv": [0,0,16,16]},
+                            "north": {"texture": "#all", "uv": [0,0,16,16]},
+                            "south": {"texture": "#all", "uv": [0,0,16,16]},
+                            "west": {"texture": "#all", "uv": [0,0,16,16]},
+                            "east": {"texture": "#all", "uv": [0,0,16,16]}
+                        }
+                    }]
+                }"##,
+            ),
+            (
+                "assets/mymod/models/block/base.json",
+                br##"{"textures": {"all": "mymod:block/parent"}}"##,
+            ),
+        ],
+    );
+
+    let idx = scan_instance_textures(&instance);
+    let bake = idx.get("mymod:override").expect("override resolves");
+    assert!(bake.starts_with("bake:mymod:block/override"), "expected bake descriptor, got {bake}");
+    let out = resolve_texture_urls(&instance, &["mymod:override".to_string()]);
+    let url = out.get("mymod:override").and_then(|u| u.as_deref()).expect("materialized");
+    assert!(url.starts_with("data:image/png;base64,"));
+}

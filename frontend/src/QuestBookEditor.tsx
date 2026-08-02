@@ -14,6 +14,7 @@ import { resolveIconKey, getIconUrl } from './components/quest/questIcons'
 import { resolveAssetUrl } from './services/asset-resolver'
 import type { IngestResult, ItemRegistryEntry } from './services/quest-types'
 import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, scanModJarTextures, getQuestThemeBackground } from './services/recipes'
+import { registerModItems } from './services/smart-filter-mods'
 import {
   subscribeMaterialized,
   subscribeLoadingChange,
@@ -107,6 +108,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     if (ingestResult?.active_instance) {
       scanInstanceItems(ingestResult.active_instance).then((registry) => {
         setItems(registry);
+        registerModItems(registry);
       }).catch((e) => console.error('[QuestBookEditor] Failed to scan instance items:', e));
     }
   }, [ingestResult])
