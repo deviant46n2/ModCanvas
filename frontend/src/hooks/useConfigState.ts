@@ -48,15 +48,16 @@ export function useConfigState(selectedProject: Project | null) {
   }
 
   async function openConfigFile(file: ConfigFileInfo) {
+    if (!selectedProject) return
     try {
-      const content = await readConfigFile(file.path)
+      const content = await readConfigFile(selectedProject.id, file.path)
       setSelectedConfig(file)
       setConfigContent(content)
       setConfigMode('structured')
       setConfigUndoStack([])
 
       try {
-        const parsed = await parseConfigFile(file.path)
+        const parsed = await parseConfigFile(selectedProject.id, file.path)
         setParsedConfig(parsed)
       } catch {
         setParsedConfig(null)
@@ -68,13 +69,13 @@ export function useConfigState(selectedProject: Project | null) {
   }
 
   async function saveConfigFile() {
-    if (!selectedConfig) return
+    if (!selectedConfig || !selectedProject) return
     setConfigSaving(true)
     try {
       if (configMode === 'structured' && parsedConfig) {
-        await saveStructuredConfig(selectedConfig.path, parsedConfig.root)
+        await saveStructuredConfig(selectedProject.id, selectedConfig.path, parsedConfig.root)
       } else {
-        await writeConfigFile(selectedConfig.path, configContent)
+        await writeConfigFile(selectedProject.id, selectedConfig.path, configContent)
       }
     } catch (e) {
       console.error('Failed to save config file:', e)
