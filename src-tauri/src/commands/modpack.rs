@@ -539,12 +539,8 @@ pub async fn import_modrinth_mrpack(
     if final_result.quest_graph.is_none() && !final_result.config_files.is_empty() {
         eprintln!("[ModCanvas] Attempting to parse quest configs from {} config files", final_result.config_files.len());
         if let Ok(Some(quest_graph)) = quest_config::parse_all_quest_configs(&final_result.config_files) {
-            // Save the parsed quest graph to project config
-            let config_dir = std::env::temp_dir()
-                .join("modcanvas_configs")
-                .join(&final_result.project.id.to_string());
-            std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-            let graph_path = config_dir.join("quests.json");
+            // Save the parsed quest graph into the project workspace state dir
+            let graph_path = crate::path_safety::quest_graph_path(&final_result.project.path)?;
             crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&quest_graph).map_err(|e| e.to_string())?)?;
             crate::quest_cache::put(&final_result.project.id.to_string(), &quest_graph);
             eprintln!("[ModCanvas] Parsed and saved quest graph from configs: {} nodes, {} edges", 
@@ -890,10 +886,11 @@ pub fn import_ftb_quests_one_click(pack_dir: String) -> Result<crate::imports::f
 
 #[tauri::command]
 pub fn export_ftb_quests_to_dir(
+    db: State<'_, Database>,
     project_id: String,
     output_dir: String,
 ) -> Result<(), String> {
-    let graph = super::progression::get_quest_graph(project_id)?;
+    let graph = super::progression::get_quest_graph(db, project_id)?;
     let path = std::path::Path::new(&output_dir);
     crate::imports::ftb_quests::export_ftb_quests_snbt(&graph, path)
         .map_err(|e| format!("FTB Quests export failed: {}", e))

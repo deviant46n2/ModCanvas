@@ -1,4 +1,5 @@
 import './App.css'
+import { useEffect } from 'react'
 import { ToastProvider } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Sidebar } from './components/common/sidebar'
@@ -6,14 +7,61 @@ import { ProjectWorkspace } from './components/common/ProjectWorkspace'
 import { NewProjectModal, ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
 import { SettingsModal } from './components/common/settings-modal'
 import { useAppState } from './hooks/useAppState'
+import { HistoryProvider, useHistory } from './hooks/history-provider'
+import { saveQuestGraph } from './services/quest'
+import type { QuestGraphData } from './services/api'
 
 function App() {
-  const s = useAppState()
-
   return (
     <ToastProvider>
       <ErrorBoundary>
-        <div className="app">
+        <HistoryProvider>
+          <AppRoot />
+        </HistoryProvider>
+      </ErrorBoundary>
+    </ToastProvider>
+  )
+}
+
+function AppRoot() {
+  const s = useAppState()
+  const history = useHistory()
+
+  useEffect(() => {
+    history.attachProject(s.selectedProject?.id ?? null)
+  }, [history, s.selectedProject?.id])
+
+  // Cross-tool undo routing: when a history step targets an editor that may be
+  // unmounted, persist the restored snapshot canonically and switch tabs so a
+  // reload shows the restored state.
+  useEffect(() => {
+    const projectId = s.selectedProject?.id ?? null
+    if (!projectId) return
+    const unregister: (() => void)[] = [
+      history.registerRoute('graph', {
+        restore: (entry, direction) => {
+          const payload = direction === 'before' ? entry.before : entry.after
+          if (payload && typeof payload === 'object') {
+            saveQuestGraph(projectId, payload as QuestGraphData).catch(() => {})
+          }
+        },
+        navigate: () => {
+          if (s.activeTab !== 'quests') s.handleTabChange('quests')
+        },
+      }),
+      history.registerRoute('config', {
+        navigate: () => {
+          if (s.activeTab !== 'configs') s.handleTabChange('configs')
+        },
+      }),
+    ]
+    return () => {
+      unregister.forEach((fn) => fn())
+    }
+  }, [history, s.selectedProject?.id, s.activeTab, s.handleTabChange])
+
+  return (
+    <div className="app">
           <Sidebar
             projects={s.projects}
             selectedProject={s.selectedProject}
@@ -95,7 +143,7 @@ function App() {
                   onSaveConfig: s.saveConfigFile,
                   parsedConfig: s.parsedConfig,
                   onUpdateConfigValue: s.updateConfigValue,
-                  configUndoStack: s.configUndoStack,
+                  canUndoConfig: s.canUndoConfig,
                   onUndoConfig: s.undoConfigChange,
                 }}
                 ingestResult={s.ingestResult}
@@ -159,8 +207,6 @@ function App() {
             onSave={s.saveCurseforgeApiKey}
           />
         </div>
-      </ErrorBoundary>
-    </ToastProvider>
   )
 }
 

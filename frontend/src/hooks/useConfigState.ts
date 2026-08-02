@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { listConfigFiles, readConfigFile, parseConfigFile, saveStructuredConfig, writeConfigFile } from '../services/api'
 import type { Project } from './useProjectState'
+import { useHistory } from './history-provider'
 
 interface ConfigFileInfo {
   path: string
@@ -28,6 +29,26 @@ interface ParsedConfig {
   raw: string
 }
 
+function formatForPath(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  switch (ext) {
+    case 'toml':
+    case 'cfg':
+    case 'properties':
+      return 'toml'
+    case 'json':
+    case 'json5':
+      return 'json'
+    case 'yaml':
+    case 'yml':
+      return 'yaml'
+    case 'hocon':
+      return 'hocon'
+    default:
+      return 'toml'
+  }
+}
+
 export function useConfigState(selectedProject: Project | null) {
   const [configFiles, setConfigFiles] = useState<ConfigFileInfo[]>([])
   const [selectedConfig, setSelectedConfig] = useState<ConfigFileInfo | null>(null)
@@ -35,7 +56,47 @@ export function useConfigState(selectedProject: Project | null) {
   const [configSaving, setConfigSaving] = useState(false)
   const [parsedConfig, setParsedConfig] = useState<ParsedConfig | null>(null)
   const [configMode, setConfigMode] = useState<'structured' | 'raw'>('structured')
-  const [configUndoStack, setConfigUndoStack] = useState<ConfigValue[]>([])
+  const history = useHistory()
+
+  // Restore history steps that target the currently-open config file. If the
+  // step targets a different file, open that file with the restored payload so
+  // cross-tool undo is visible even when you weren't editing it. Object payloads
+  // are structured trees; string payloads are raw file content.
+  useEffect(() => {
+    return history.register('config', (entry, direction) => {
+      const payload = direction === 'before' ? entry.before : entry.after
+      if (payload === null || payload === undefined) return
+      const isStructured = typeof payload === 'object'
+      const isOpen = selectedConfig && entry.target === selectedConfig.path
+
+      if (isStructured) {
+        if (isOpen) {
+          setParsedConfig((prev) => (prev ? { ...prev, root: payload as ConfigValue } : prev))
+          return
+        }
+        const file = configFiles.find((f) => f.path === entry.target)
+        if (file) {
+          setSelectedConfig(file)
+          setConfigMode('structured')
+          setParsedConfig((prev) => ({
+            format: prev?.format ?? formatForPath(file.path),
+            root: payload as ConfigValue,
+            raw: prev?.raw ?? '',
+          }))
+        }
+      } else if (isOpen) {
+        setConfigContent(payload as string)
+        setConfigMode('raw')
+      } else {
+        const file = configFiles.find((f) => f.path === entry.target)
+        if (file) {
+          setSelectedConfig(file)
+          setConfigContent(payload as string)
+          setConfigMode('raw')
+        }
+      }
+    })
+  }, [history, selectedConfig, configFiles])
 
   async function loadConfigFiles() {
     if (!selectedProject) return
@@ -54,7 +115,6 @@ export function useConfigState(selectedProject: Project | null) {
       setSelectedConfig(file)
       setConfigContent(content)
       setConfigMode('structured')
-      setConfigUndoStack([])
 
       try {
         const parsed = await parseConfigFile(selectedProject.id, file.path)
@@ -85,10 +145,9 @@ export function useConfigState(selectedProject: Project | null) {
   }
 
   function updateConfigValue(path: string[], value: ConfigValue) {
-    if (!parsedConfig) return
+    if (!parsedConfig || !selectedConfig) return
 
-    setConfigUndoStack((prev) => [...prev, JSON.parse(JSON.stringify(parsedConfig.root))])
-
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
     const newRoot = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
 
     let current = newRoot
@@ -112,13 +171,34 @@ export function useConfigState(selectedProject: Project | null) {
     }
 
     setParsedConfig({ ...parsedConfig, root: newRoot })
+    history.commit({
+      subject: 'config',
+      target: selectedConfig.path,
+      label: `Edit ${selectedConfig.name}`,
+      before,
+      after: newRoot,
+    })
   }
 
   function undoConfigChange() {
-    if (configUndoStack.length === 0 || !parsedConfig) return
-    const prev = configUndoStack[configUndoStack.length - 1]
-    setConfigUndoStack((s) => s.slice(0, -1))
-    setParsedConfig({ ...parsedConfig, root: prev })
+    history.undo()
+  }
+
+  // Raw-mode edits are also recorded, so typing in the textarea participates in
+  // the app-wide undo/redo (rapid keystrokes coalesce into one step).
+  function setRawConfigContent(content: string) {
+    if (!selectedConfig) {
+      setConfigContent(content)
+      return
+    }
+    history.commit({
+      subject: 'config',
+      target: selectedConfig.path,
+      label: `Edit ${selectedConfig.name} (raw)`,
+      before: configContent,
+      after: content,
+    })
+    setConfigContent(content)
   }
 
   function resetConfigState() {
@@ -127,14 +207,18 @@ export function useConfigState(selectedProject: Project | null) {
     setConfigContent('')
   }
 
+  // The config tab's undo button only shows when the top history entry is a
+  // config edit, so it never implies undoing a quest change from here.
+  const canUndoConfig = history.canUndo && history.peekUndo?.subject === 'config'
+
   return {
     configFiles,
     selectedConfig,
-    configContent, setConfigContent,
+    configContent, setConfigContent: setRawConfigContent,
     configSaving,
     parsedConfig,
     configMode, setConfigMode,
-    configUndoStack,
+    canUndoConfig,
     loadConfigFiles,
     openConfigFile,
     saveConfigFile,

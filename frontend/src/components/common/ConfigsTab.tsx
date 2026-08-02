@@ -15,7 +15,7 @@ export interface ConfigsTabProps {
   onSaveConfig: () => void
   parsedConfig: ParsedConfig | null
   onUpdateConfigValue: (path: string[], value: ConfigValue) => void
-  configUndoStack: ConfigValue[]
+  canUndoConfig: boolean
   onUndoConfig: () => void
 }
 
@@ -67,7 +67,7 @@ export function ConfigsTab(props: ConfigsTabProps) {
                       </button>
                     </div>
                   )}
-                  {props.configMode === 'structured' && props.configUndoStack.length > 0 && (
+                  {props.configMode === 'structured' && props.canUndoConfig && (
                     <button className="btn-secondary btn-sm" onClick={props.onUndoConfig}>
                       Undo
                     </button>

@@ -1,4 +1,5 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
+import { useHistory } from './hooks/history-provider'
 import { getQuestGraph } from './services/api'
 import type { QuestGraphData, QuestChapter, QuestChapterGroup, QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel } from './services/api'
 import { QuestCanvas } from './components/quest/QuestCanvas'
@@ -67,11 +68,20 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
   const toolbarApiRef = useRef<ToolbarAPI | null>(null)
   const [simProgress, setSimProgress] = useState<ProgressState>({})
   const [simMode, setSimMode] = useState(false)
-  // Undo/redo history (Ctrl+Z / Ctrl+Y). Snapshots are capture of the whole
-  // graph before each mutating commit; bounded to avoid unbounded growth.
-  const undoHistory = useRef<QuestGraphData[]>([])
-  const redoHistory = useRef<QuestGraphData[]>([])
-  const [histVersion, setHistVersion] = useState(0)
+  // App-wide history (Ctrl+Z / Ctrl+Y). Every graph mutation commits into the
+  // shared store so undo/redo stays chronological across the whole workspace;
+  // the graph apply handler below restores snapshots to the live canvas.
+  const history = useHistory()
+
+  // Restore history steps that target this quest graph.
+  useEffect(() => {
+    return history.register('graph', (entry, direction) => {
+      const value = direction === 'before' ? entry.before : entry.after
+      if (value && typeof value === 'object') {
+        setGraph(value as QuestGraphData)
+      }
+    })
+  }, [history])
 
   const setModsDir = useCallback((dir: string) => {
     setModsDirState(dir)
@@ -79,46 +89,21 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     else localStorage.removeItem('modcanvas_mods_dir')
   }, [])
 
-  // Commit helper: pushes the current graph onto the undo stack (before any
-  // mutation) and clears redo, so every discrete edit is Ctrl+Z-able.
-  const commitGraph = useCallback((next: QuestGraphData) => {
+  // Commit helper: records the before/after snapshot in the app-wide history
+  // and applies the new graph. Rapid same-target edits coalesce into one undo
+  // gesture (e.g. a node drag); discrete ops can pass `split` for a clean step.
+  const commitGraph = useCallback((next: QuestGraphData, opts?: { split?: boolean }) => {
     if (graph) {
-      undoHistory.current.push(graph)
-      if (undoHistory.current.length > 120) undoHistory.current.shift()
+      history.commit({
+        subject: 'graph',
+        target: 'quest',
+        label: 'Edit quest graph',
+        before: graph,
+        after: next,
+      }, opts)
     }
-    redoHistory.current = []
     setGraph(next)
-    setHistVersion(v => v + 1)
-  }, [graph])
-
-  const undo = useCallback(() => {
-    if (undoHistory.current.length === 0) return
-    const prev = undoHistory.current.pop()!
-    if (graph) redoHistory.current.push(graph)
-    setGraph(prev)
-    setHistVersion(v => v + 1)
-  }, [graph])
-
-  const redo = useCallback(() => {
-    if (redoHistory.current.length === 0) return
-    const next = redoHistory.current.pop()!
-    if (graph) undoHistory.current.push(graph)
-    setGraph(next)
-    setHistVersion(v => v + 1)
-  }, [graph])
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null
-      if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return
-      const mod = e.ctrlKey || e.metaKey
-      if (!mod || e.shiftKey) return
-      if (e.key === 'y') { e.preventDefault(); redo(); return }
-      if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [undo, redo])
+  }, [graph, history])
 
   const onReady = useCallback((api: ToolbarAPI) => {
     toolbarApiRef.current = api
@@ -638,9 +623,9 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
   const editGroup = editGroupId ? graph?.chapter_groups.find(g => g.id === editGroupId) : null
 
   const histStatus = useMemo(() => ({
-    undo: undoHistory.current.length > 0,
-    redo: redoHistory.current.length > 0,
-  }), [histVersion])
+    undo: history.canUndo,
+    redo: history.canRedo,
+  }), [history])
 
   const ingestPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(ingestIndex)), [ingestIndex])
   const scanPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(textureIndex)), [textureIndex])
@@ -743,8 +728,8 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             onSetQuestProgress={setQuestProgress}
             onCompleteAll={completeAllInChapter}
             onResetAll={resetAllInChapter}
-            onUndo={undo}
-            onRedo={redo}
+            onUndo={history.undo}
+            onRedo={history.redo}
             canUndo={histStatus.undo}
             canRedo={histStatus.redo}
           />

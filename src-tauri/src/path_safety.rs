@@ -1,4 +1,5 @@
 use std::path::{Component, Path, PathBuf};
+use uuid::Uuid;
 
 /// Config base directory: `~/.config/modcanvas/mirrored_configs`. The previously
 /// used temp mirror (`{temp_dir}/modcanvas_configs`) is deprecated in favor of
@@ -178,6 +179,27 @@ pub fn atomic_write(path: &std::path::Path, contents: &[u8]) -> Result<(), Strin
 /// Write a string to a file atomically.
 pub fn atomic_write_str(path: &std::path::Path, contents: &str) -> Result<(), String> {
     atomic_write(path, contents.as_bytes())
+}
+
+/// Resolve the durable history journal for a project, scoped under a given
+/// cache base (`<base>/history/<project-id>/journal.jsonl`). Rejects anything
+/// that is not a valid project id (defense against traversal via the id), and
+/// creates the journal directory if missing. Exposed with an injectable base so
+/// tests can target a tempdir without touching the real cache.
+pub fn history_journal_path_in(base: &Path, project_id: &str) -> Result<PathBuf, String> {
+    let pid = Uuid::parse_str(project_id)
+        .map_err(|_| "History journal requires a valid project id".to_string())?;
+    let dir = base.join("history").join(pid.to_string());
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create history directory: {e}"))?;
+    Ok(dir.join("journal.jsonl"))
+}
+
+/// Resolve the durable history journal path under the app cache dir.
+pub fn history_journal_path(project_id: &str) -> Result<PathBuf, String> {
+    let base = crate::instance_textures::dirs_cache_dir()
+        .unwrap_or_else(|| std::env::temp_dir().join("modcanvas_cache"));
+    history_journal_path_in(&base, project_id)
 }
 ///
 /// Returns the normalized relative path if safe, or an error if the path escapes
@@ -457,6 +479,67 @@ mod tests {
         let validated = validate_project_write(&root, "sub/dir/nested.toml").unwrap();
         assert_eq!(validated, project_config_root(&root).join("sub").join("dir").join("nested.toml"));
     }
+
+    #[test]
+    fn test_history_journal_path_is_scoped_and_created() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pid = uuid::Uuid::new_v4().to_string();
+
+        let path = history_journal_path_in(tmp.path(), &pid).unwrap();
+        assert!(path.ends_with("journal.jsonl"));
+        let dir = path.parent().unwrap();
+        assert_eq!(dir.file_name().unwrap(), pid.as_str());
+        assert!(dir.starts_with(tmp.path().join("history")));
+        assert!(dir.exists(), "history dir should be created");
+    }
+
+    #[test]
+    fn test_history_journal_rejects_invalid_project_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(history_journal_path_in(tmp.path(), "../escape").is_err());
+        assert!(history_journal_path_in(tmp.path(), "not-a-uuid").is_err());
+        assert!(history_journal_path_in(tmp.path(), "").is_err());
+    }
+
+    #[test]
+    fn test_history_journal_round_trip_via_atomic_write() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pid = uuid::Uuid::new_v4().to_string();
+        let path = history_journal_path_in(tmp.path(), &pid).unwrap();
+
+        atomic_write_str(&path, "{\"id\":1}\n{\"id\":2}\n").unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "{\"id\":1}\n{\"id\":2}\n");
+    }
+
+    #[test]
+    fn test_quest_graph_path_is_scoped_to_project_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_string_lossy().to_string();
+
+        let path = quest_graph_path(&root).unwrap();
+        assert!(path.ends_with(".modcanvas/quests.json"));
+        assert!(path.parent().unwrap().is_dir(), "state dir should be created");
+        assert!(path.starts_with(tmp.path()));
+    }
+
+    #[test]
+    fn test_quest_graph_path_requires_existing_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing = tmp.path().join("does-not-exist").to_string_lossy().to_string();
+        assert!(quest_graph_path(&missing).is_err());
+    }
+
+    #[test]
+    fn test_quest_graph_path_writes_atomically() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_string_lossy().to_string();
+        let path = quest_graph_path(&root).unwrap();
+
+        atomic_write_str(&path, "{\"nodes\":[]}").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"nodes\":[]}");
+        assert!(path.starts_with(tmp.path()));
+    }
 }
 
 pub fn sanitize_project_name(name: &str) -> Result<String, String> {
@@ -479,6 +562,39 @@ pub fn sanitize_project_name(name: &str) -> Result<String, String> {
         return Err("Project name cannot be a path traversal sequence".to_string());
     }
     Ok(trimmed.to_string())
+}
+
+/// Resolve the ModCanvas-owned working-graph file for a project workspace.
+///
+/// Editor state (the quest working graph) lives in a hidden `.modcanvas/`
+/// state directory under the instance root so it survives restarts and stays
+/// scoped strictly inside the project/instance directory. The directory is
+/// created on demand; the returned path is validated to resolve inside the
+/// project root (defense against traversal/symlink escapes).
+pub fn quest_graph_path(project_path: &str) -> Result<PathBuf, String> {
+    let root = PathBuf::from(project_path);
+    if !root.exists() {
+        return Err(format!(
+            "Project root does not exist: '{}'",
+            root.display()
+        ));
+    }
+    let root_canonical = root
+        .canonicalize()
+        .map_err(|e| format!("Project root resolution failed: {e}"))?;
+
+    let state_dir = root.join(".modcanvas");
+    std::fs::create_dir_all(&state_dir)
+        .map_err(|e| format!("Failed to create ModCanvas state dir: {e}"))?;
+    let state_canonical = state_dir
+        .canonicalize()
+        .map_err(|e| format!("ModCanvas state dir resolution failed: {e}"))?;
+
+    if !state_canonical.starts_with(&root_canonical) {
+        return Err("Access denied: ModCanvas state dir escapes the project root".to_string());
+    }
+
+    Ok(state_canonical.join("quests.json"))
 }
 
 /// Validate a path is safe to read as a config file (must be inside the temp

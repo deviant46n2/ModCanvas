@@ -152,6 +152,8 @@ pub fn run() {
             commands::write_config_file,
             commands::parse_config_file,
             commands::save_structured_config,
+            commands::read_history_journal,
+            commands::write_history_journal,
             commands::create_mc_instance,
             commands::list_mc_instances,
             commands::debug_instance_scan,

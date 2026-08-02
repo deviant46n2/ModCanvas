@@ -159,21 +159,30 @@ pub fn auto_generate_progression(
 
 // ─── Quest Graph Commands ───────────────────────────────────────────────────
 
+/// Resolve the project workspace working-graph path for a project id.
+fn quest_graph_path_for(db: &Database, project_id: &str) -> Result<std::path::PathBuf, String> {
+    let pid = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let project = db.get_project(&pid).map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+    crate::path_safety::quest_graph_path(&project.path)
+}
+
 #[tauri::command]
-pub fn get_quest_graph(project_id: String) -> Result<QuestGraph, String> {
-    crate::quest_cache::load(&project_id)
+pub fn get_quest_graph(
+    db: State<'_, Database>,
+    project_id: String,
+) -> Result<QuestGraph, String> {
+    let path = quest_graph_path_for(&db, &project_id)?;
+    crate::quest_cache::load(&project_id, &path)
 }
 
 #[tauri::command]
 pub fn save_quest_graph(
+    db: State<'_, Database>,
     project_id: String,
     graph: QuestGraph,
 ) -> Result<(), String> {
-    let config_dir = std::env::temp_dir()
-        .join("modcanvas_configs")
-        .join(&project_id);
-    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-    let graph_path = config_dir.join("quests.json");
+    let graph_path = quest_graph_path_for(&db, &project_id)?;
     let content = serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())?;
     crate::path_safety::atomic_write_str(&graph_path, &content).map_err(|e| e.to_string())?;
     crate::quest_cache::put(&project_id, &graph);
@@ -182,13 +191,14 @@ pub fn save_quest_graph(
 
 #[tauri::command]
 pub fn add_quest_node(
+    db: State<'_, Database>,
     project_id: String,
     node_type: String,
     label: String,
     x: f64,
     y: f64,
 ) -> Result<QuestNode, String> {
-    let mut graph = get_quest_graph(project_id.clone())?;
+    let mut graph = get_quest_graph(db.clone(), project_id.clone())?;
 
     let node = QuestNode {
         id: uuid::Uuid::new_v4().to_string(),
@@ -199,16 +209,17 @@ pub fn add_quest_node(
     };
 
     graph.nodes.push(node.clone());
-    save_quest_graph(project_id, graph)?;
+    save_quest_graph(db, project_id, graph)?;
     Ok(node)
 }
 
 #[tauri::command]
 pub fn update_quest_node(
+    db: State<'_, Database>,
     project_id: String,
     node: QuestNode,
 ) -> Result<(), String> {
-    let mut graph = get_quest_graph(project_id.clone())?;
+    let mut graph = get_quest_graph(db.clone(), project_id.clone())?;
 
     if let Some(existing) = graph.nodes.iter_mut().find(|n| n.id == node.id) {
         *existing = node;
@@ -216,28 +227,30 @@ pub fn update_quest_node(
         graph.nodes.push(node);
     }
 
-    save_quest_graph(project_id, graph)
+    save_quest_graph(db, project_id, graph)
 }
 
 #[tauri::command]
 pub fn delete_quest_node(
+    db: State<'_, Database>,
     project_id: String,
     node_id: String,
 ) -> Result<(), String> {
-    let mut graph = get_quest_graph(project_id.clone())?;
+    let mut graph = get_quest_graph(db.clone(), project_id.clone())?;
     graph.nodes.retain(|n| n.id != node_id);
     graph.edges.retain(|e| e.source != node_id && e.target != node_id);
-    save_quest_graph(project_id, graph)
+    save_quest_graph(db, project_id, graph)
 }
 
 #[tauri::command]
 pub fn add_quest_edge(
+    db: State<'_, Database>,
     project_id: String,
     source: String,
     target: String,
     edge_type: String,
 ) -> Result<QuestEdge, String> {
-    let mut graph = get_quest_graph(project_id.clone())?;
+    let mut graph = get_quest_graph(db.clone(), project_id.clone())?;
 
     let edge = QuestEdge {
         id: uuid::Uuid::new_v4().to_string(),
@@ -249,23 +262,27 @@ pub fn add_quest_edge(
     };
 
     graph.edges.push(edge.clone());
-    save_quest_graph(project_id, graph)?;
+    save_quest_graph(db, project_id, graph)?;
     Ok(edge)
 }
 
 #[tauri::command]
 pub fn delete_quest_edge(
+    db: State<'_, Database>,
     project_id: String,
     edge_id: String,
 ) -> Result<(), String> {
-    let mut graph = get_quest_graph(project_id.clone())?;
+    let mut graph = get_quest_graph(db.clone(), project_id.clone())?;
     graph.edges.retain(|e| e.id != edge_id);
-    save_quest_graph(project_id, graph)
+    save_quest_graph(db, project_id, graph)
 }
 
 #[tauri::command]
-pub fn analyze_quest_graph(project_id: String) -> Result<QuestAnalysis, String> {
-    let graph = get_quest_graph(project_id)?;
+pub fn analyze_quest_graph(
+    db: State<'_, Database>,
+    project_id: String,
+) -> Result<QuestAnalysis, String> {
+    let graph = get_quest_graph(db, project_id)?;
     Ok(crate::quest::analyze_quest_graph(&graph))
 }
 
@@ -294,7 +311,7 @@ pub fn auto_generate_quest(
     let graph = crate::quest::auto_generate_quest(&project_id, &mod_list);
 
     // Save it
-    save_quest_graph(project_id, graph.clone())?;
+    save_quest_graph(db, project_id, graph.clone())?;
 
     Ok(graph)
 }
@@ -314,7 +331,7 @@ pub fn write_quest_graph_to_instance(
     let quests_dir = instance_path.join("config").join("ftbquests").join("quests");
 
     // Get the quest graph from database
-    let graph = get_quest_graph(project_id.clone())?;
+    let graph = get_quest_graph(db.clone(), project_id.clone())?;
 
     // Export to SNBT files in the instance
     crate::imports::ftb_quests::export::export_ftb_quests_snbt(&graph, &quests_dir)

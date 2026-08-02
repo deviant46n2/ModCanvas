@@ -1,4 +1,5 @@
 pub mod config;
+pub mod history;
 pub mod mod_intel;
 pub mod modpack;
 pub mod progression;
@@ -6,6 +7,7 @@ pub mod project;
 pub mod runtime;
 
 pub use config::*;
+pub use history::*;
 pub use mod_intel::*;
 pub use modpack::*;
 pub use progression::*;
@@ -76,16 +78,13 @@ pub(super) fn load_progression_from_pack(project_id: &str, pack_dir: &PathBuf) -
 /// Load quest graph from a pack directory and save to project config.
 /// Tries native quests.json first, then falls back to FTB Quests SNBT import.
 pub(super) fn load_quest_from_pack(project_id: &str, pack_dir: &PathBuf) -> Result<(), String> {
-    let config_dir = std::env::temp_dir()
-        .join("modcanvas_configs")
-        .join(project_id);
-
     let quest_path = pack_dir.join("quests.json");
     if quest_path.exists() {
         let content = std::fs::read_to_string(&quest_path).map_err(|e| e.to_string())?;
         let graph: QuestGraph = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-        std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-        let graph_path = config_dir.join("quests.json");
+        let graph_path = crate::path_safety::quest_graph_path(
+            pack_dir.to_str().ok_or("Invalid pack directory path")?,
+        )?;
         crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())?)?;
         crate::quest_cache::put(project_id, &graph);
         eprintln!("[ModCanvas] Loaded quest graph from pack: {} nodes, {} edges", graph.nodes.len(), graph.edges.len());
@@ -95,8 +94,9 @@ pub(super) fn load_quest_from_pack(project_id: &str, pack_dir: &PathBuf) -> Resu
     // Fallback: try importing FTB Quests SNBT data
     if let Ok(result) = crate::imports::ftb_quests::import_ftb_quests(pack_dir) {
         if result.quest_count > 0 && result.chapter_count > 0 {
-            std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-            let graph_path = config_dir.join("quests.json");
+            let graph_path = crate::path_safety::quest_graph_path(
+                pack_dir.to_str().ok_or("Invalid pack directory path")?,
+            )?;
             crate::path_safety::atomic_write_str(
                 &graph_path,
                 &serde_json::to_string_pretty(&result.graph).map_err(|e| e.to_string())?,

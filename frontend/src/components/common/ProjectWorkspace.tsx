@@ -3,6 +3,7 @@ import { CanvasThemeProvider } from '../theme/theme-provider'
 import { TopBar } from './topbar'
 import { ModsTab, type ModsTabProps } from './ModsTab'
 import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
+import { HistoryDrawer } from '../history/HistoryDrawer'
 import ProgressionGraph from '../../ProgressionGraph'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
@@ -108,8 +109,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         </div>
       )}
 
-      <div className="workspace-tabs" role="tablist">
-        {(['mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
+            <div className="workspace-tabs" role="tablist">        {(['mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
           <button
             key={tab}
             id={`tab-${tab}`}
@@ -125,6 +125,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </button>
         ))}
       </div>
+
+      <HistoryDrawer />
 
       {!packLoaded && activeTab === 'mods' && (
         <div className="load-pack-prompt">

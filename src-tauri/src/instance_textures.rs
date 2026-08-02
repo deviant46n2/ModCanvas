@@ -12,6 +12,8 @@ mod models;
 mod pixels;
 mod tags;
 
+pub(crate) use cache::dirs_cache_dir;
+
 use cache::{cache_path, file_meta, CachedFile, InstanceTextureCache};
 use layers::{jars_under, resource_pack_order, vanilla_jars};
 pub use materialize::resolve_texture_urls;
