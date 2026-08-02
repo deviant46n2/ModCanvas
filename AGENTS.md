@@ -109,9 +109,9 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
 - After rebuilding, VERIFY the running binary is newer than the last edit (compare `src-tauri/target/debug/modcanvas` mtime against the newest changed source file). Never claim a fix/feature works against an unbuilt change.
 
 ### Testing & Verification
-- **Run Unit Tests:** `pnpm test`
-- **Run Parser Validation:** `pnpm test:parsers`
-- **Lint & Format Check:** `pnpm lint`
+- **Run Unit Tests:** `pnpm test` (in `frontend/` — includes frontend parser tests like smart-filter DSL)
+- **Run Rust Tests:** `cargo test` (in `src-tauri/` — includes SNBT/NBT/JSON5 parser + import/export round-trip tests)
+- **Lint & Format Check:** `pnpm lint` (in `frontend/`)
 
 ---
 
