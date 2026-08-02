@@ -5,3 +5,11 @@ target/
 .env
 .DS_Store
 src-tauri/target/
+
+# Gradle / build outputs (workbench-companion mods)
+workbench-companion*/.gradle/
+workbench-companion*/build/
+workbench-companion*/net/
+workbench-companion*/run/
+workbench-companion*/out/
+*.jar.backup
