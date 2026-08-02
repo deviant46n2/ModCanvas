@@ -268,6 +268,9 @@ pub struct QuestNode {
     pub repeat_max_delay: i64,
     #[serde(default)]
     pub repeat_time: i64,
+    /// FTB-canonical repeat cooldown in seconds (`repeat_cooldown`).
+    #[serde(default)]
+    pub repeat_cooldown: i64,
     #[serde(default)]
     pub hide_quest_until_deps_complete: bool,
     #[serde(default)]
@@ -280,6 +283,15 @@ pub struct QuestNode {
     pub pause_reward: bool,
     #[serde(default)]
     pub lock_icon: String,
+    /// FTB-canonical flag to hide the lock icon (`hide_lock_icon`).
+    #[serde(default)]
+    pub hide_lock_icon: bool,
+    /// Guide page for FTB's in-quest guide screen (`guide_page`).
+    #[serde(default)]
+    pub guide_page: String,
+    /// Max dependents that can complete before this quest locks (`max_completable_dependents`).
+    #[serde(default)]
+    pub max_completable_dependents: i32,
     #[serde(default)]
     pub subtitle: String,
     #[serde(default)]
@@ -346,12 +358,16 @@ impl Default for QuestNode {
             repeat_min_delay: 0,
             repeat_max_delay: 0,
             repeat_time: 0,
+            repeat_cooldown: 0,
             hide_quest_until_deps_complete: false,
             hide_quest_until_quest_complete: false,
             hide_quest_until_all_complete: false,
             disable_reward: false,
             pause_reward: false,
             lock_icon: String::new(),
+            hide_lock_icon: false,
+            guide_page: String::new(),
+            max_completable_dependents: 0,
             subtitle: String::new(),
             quest_background: String::new(),
             shape: QuestShape::Default,

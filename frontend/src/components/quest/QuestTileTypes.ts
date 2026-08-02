@@ -16,10 +16,11 @@ export interface QuestTileData {
   rewards: QuestRewardData[]
   can_be_repeatable: boolean
   silently_complete: boolean
-  repeat_time: number
-  repeat_min_delay: number
-  repeat_max_delay: number
+  repeat_cooldown: number
   lock_icon: string
+  hide_lock_icon: boolean
+  guide_page: string
+  max_completable_dependents: number
   quest_background: string
   tags: string[]
   progression_mode: string

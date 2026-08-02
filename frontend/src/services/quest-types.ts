@@ -134,15 +134,16 @@ export interface QuestNodeData {
   optional: boolean
   silently_complete: boolean
   can_be_repeatable: boolean
-  repeat_min_delay: number
-  repeat_max_delay: number
-  repeat_time: number
+  repeat_cooldown: number
   hide_quest_until_deps_complete: boolean
   hide_quest_until_quest_complete: boolean
   hide_quest_until_all_complete: boolean
   disable_reward: boolean
   pause_reward: boolean
   lock_icon: string
+  hide_lock_icon: boolean
+  guide_page: string
+  max_completable_dependents: number
   subtitle: string
   quest_background: string
   shape: string

@@ -924,10 +924,17 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
     let optional = m.get_bool("optional").unwrap_or(false);
     let default_enabled = m.get_bool("default_enabled").unwrap_or(chapter_default_enabled);
     let silently_complete = m.get_bool("silently_complete").unwrap_or(false);
-    let can_be_repeatable = m.get_bool("can_be_repeatable").unwrap_or(false) || m.get_i64("repeatability").unwrap_or(0) > 0;
+    let can_be_repeatable = m.get_bool("can_be_repeatable").unwrap_or(false)
+        || m.get_bool("can_repeat").unwrap_or(false)
+        || m.get_i64("repeatability").unwrap_or(0) > 0;
     let repeat_min_delay = m.get_i64("repeat_min_delay").unwrap_or(0);
     let repeat_max_delay = m.get_i64("repeat_max_delay").unwrap_or(0);
     let repeat_time = m.get_i64("repeat_time").unwrap_or(0);
+    // FTB writes a single seconds cooldown; keep legacy keys as a fallback.
+    let repeat_cooldown = m.get_i64("repeat_cooldown").unwrap_or(0);
+    let hide_lock_icon = m.get_bool("hide_lock_icon").unwrap_or(false);
+    let guide_page = m.get_str("guide_page").unwrap_or("").to_string();
+    let max_completable_dependents = m.get_i64("max_completable_dependents").unwrap_or(0) as i32;
     let hide_quest_until_deps_complete = m.get_bool("hide_quest_until_deps_complete").unwrap_or(false);
     let hide_quest_until_quest_complete = m.get_bool("hide_quest_until_quest_complete").unwrap_or(false);
     let hide_quest_until_all_complete = m.get_bool("hide_quest_until_all_complete").unwrap_or(false);
@@ -957,7 +964,6 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
     let hide_dependent_lines = m.get_bool("hide_dependent_lines").unwrap_or(false);
     let min_required_dependencies = m.get_i64("min_required_dependencies").unwrap_or(0) as i32;
     let dependency_requirement = m.get_str("dependency_requirement").unwrap_or("default").to_string();
-    let _max_completable_dependents = m.get_i64("max_completable_dependents").unwrap_or(0);
 
     // Parse size
     // Supports: list [width, height], compound { width, height }, or scalar multiplier (FlatChapters)
@@ -1051,12 +1057,16 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
         repeat_min_delay,
         repeat_max_delay,
         repeat_time,
+        repeat_cooldown,
         hide_quest_until_deps_complete,
         hide_quest_until_quest_complete,
         hide_quest_until_all_complete,
         disable_reward,
         pause_reward,
         lock_icon,
+        hide_lock_icon,
+        guide_page,
+        max_completable_dependents,
         subtitle,
         quest_background,
         shape: QuestShape::from_string(&shape),
@@ -1913,6 +1923,26 @@ fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id:
     let optional = m.get("optional").and_then(|v| v.as_bool()).unwrap_or(false);
     let default_enabled = m.get("default_enabled").and_then(|v| v.as_bool()).unwrap_or(chapter_default_enabled);
     let progression_mode = m.get("progression_mode").and_then(|v| v.as_str()).unwrap_or("default").to_string();
+    let can_be_repeatable = m.get("can_be_repeatable").and_then(|v| v.as_bool()).unwrap_or(false)
+        || m.get("can_repeat").and_then(|v| v.as_bool()).unwrap_or(false);
+    let repeat_cooldown = m.get("repeat_cooldown").and_then(|v| v.as_i64()).unwrap_or(0);
+    let hide_lock_icon = m.get("hide_lock_icon").and_then(|v| v.as_bool()).unwrap_or(false);
+    let guide_page = m.get("guide_page").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let max_completable_dependents = m.get("max_completable_dependents").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let invisible_until_completed = m.get("invisible").and_then(|v| v.as_bool()).unwrap_or(false);
+    let invisible_until_x_tasks = m.get("invisible_until_tasks").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let min_required_dependencies = m.get("min_required_dependencies").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let dependency_requirement = m.get("dependency_requirement").and_then(|v| v.as_str()).unwrap_or("default").to_string();
+    let hide_details_until_startable = m.get("hide_details_until_startable").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_text_until_completed = m.get("hide_text_until_complete").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_dependency_lines = m.get("hide_dependency_lines").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_dependent_lines = m.get("hide_dependent_lines").and_then(|v| v.as_bool()).unwrap_or(false);
+    let parsed_dependency_requirement = match dependency_requirement.as_str() {
+        "one" | "one_completed" => DependencyRequirement::OneCompleted,
+        "all_started" | "started" => DependencyRequirement::AllStarted,
+        "one_started" => DependencyRequirement::OneStarted,
+        _ => DependencyRequirement::AllCompleted,
+    };
 
     let mut data = HashMap::new();
     if let Some(deps) = m.get("dependencies").and_then(|v| v.as_array()) {
@@ -1974,6 +2004,19 @@ fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id:
         shape: QuestShape::from_string(&shape),
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
         link_target,
+        can_be_repeatable,
+        repeat_cooldown,
+        hide_lock_icon,
+        guide_page,
+        max_completable_dependents,
+        invisible_until_completed,
+        invisible_until_x_tasks,
+        min_required_dependencies,
+        dependency_requirement: parsed_dependency_requirement,
+        hide_details_until_startable,
+        hide_text_until_completed,
+        hide_dependency_lines,
+        hide_dependent_lines,
         ..Default::default()
     })
 }

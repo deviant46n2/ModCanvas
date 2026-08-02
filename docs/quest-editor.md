@@ -318,4 +318,38 @@ FTB `QuestLink` nodes reference another quest by id (`linked_quest` key in
 - Round-trip covered by `quest_link_roundtrips_through_export` and
   `quest_link_no_linked_target_stays_link` in `export_tests.rs`.
 
+## Per-quest advanced fields (inspector)
+
+The per-quest Advanced inspector tab mirrors the remaining `Quest.java`
+`fillConfigGroup` / `writeData` fields that were previously model-only:
+
+- **Repeat cooldown** — FTB-canonical `repeat_cooldown` (plain seconds cooldown)
+  + `can_repeat` tristate. Export emits `can_repeat: 1b` and
+  `repeat_cooldown: <int>`; legacy `repeatability` / `repeat_time` /
+  `repeat_min_delay` / `repeat_max_delay` are accepted on import as fallbacks
+  (`repeat_time` is promoted to `repeat_cooldown` on the next export) and are
+  never emitted.
+- **Hide lock icon** — `addBool("hide_lock_icon")`, exported as `1b`.
+- **Guide page** — `addString("guide_page")`, a page id string.
+- **Max completable dependents** — `addInt("max_completable_dependents")`, 0 = unlimited.
+
+- `src-tauri/src/quest/types.rs` — `QuestNode` carries `repeat_cooldown`,
+  `hide_lock_icon`, `guide_page`, `max_completable_dependents`.
+- `src-tauri/src/imports/ftb_quests/import.rs` — SNBT and JSON5 quest parsers
+  read all four keys.
+- `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes them
+  (booleans as SNBT `Byte(1)`, ints as SNBT `Int`).
+- `frontend/src/services/quest-types.ts` — `QuestNodeData` carries the four
+  fields; the legacy `repeat_time` / `repeat_min_delay` / `repeat_max_delay`
+  keys were removed from the frontend model.
+- `frontend/src/components/quest/inspector.tsx` — "Repeat Cooldown (s)",
+  "Hide Lock Icon", "Guide Page", "Max Completable Dependents" controls in the
+  Advanced tab; `useGraphUI.ts` holds the edit state and `liveSaveField`
+  persists each change.
+- `frontend/src/components/quest/QuestTileFooter.tsx` — repeatable tiles show
+  `🔄 <cooldown>s`.
+- Round-trip covered by
+  `per_quest_repeat_and_visibility_fields_roundtrip` and
+  `repeat_fields_export_uses_ftb_canonical_keys` in `export_tests.rs`.
+
 

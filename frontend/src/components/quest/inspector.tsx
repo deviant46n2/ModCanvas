@@ -19,14 +19,15 @@ interface EditState {
   icon: string; setIcon: (v: string) => void
   repeatable: boolean; setRepeatable: (v: boolean) => void
   silentComplete: boolean; setSilentComplete: (v: boolean) => void
-  repeatTime: number; setRepeatTime: (v: number) => void
-  repeatMinDelay: number; setRepeatMinDelay: (v: number) => void
-  repeatMaxDelay: number; setRepeatMaxDelay: (v: number) => void
+  repeatCooldown: number; setRepeatCooldown: (v: number) => void
   hideDeps: boolean; setHideDeps: (v: boolean) => void
   hideQuest: boolean; setHideQuest: (v: boolean) => void
   hideAll: boolean; setHideAll: (v: boolean) => void
   disableReward: boolean; setDisableReward: (v: boolean) => void
   pauseReward: boolean; setPauseReward: (v: boolean) => void
+  hideLockIcon: boolean; setHideLockIcon: (v: boolean) => void
+  guidePage: string; setGuidePage: (v: string) => void
+  maxCompletableDependents: number; setMaxCompletableDependents: (v: number) => void
   shape: string; setShape: (v: string) => void
   iconScaling: number; setIconScaling: (v: number) => void
   tags: string; setTags: (v: string) => void
@@ -193,9 +194,7 @@ export function InspectorSection({
             </label>
             {e.repeatable && (
               <div className="inspector-panel-row">
-                <div className="inspector-panel-field"><label>Repeat Time</label><input type="number" value={e.repeatTime} onChange={(v) => { e.setRepeatTime(Number(v.target.value)); liveSaveField('repeat_time', Number(v.target.value)) }} /></div>
-                <div className="inspector-panel-field"><label>Min Delay</label><input type="number" value={e.repeatMinDelay} onChange={(v) => { e.setRepeatMinDelay(Number(v.target.value)); liveSaveField('repeat_min_delay', Number(v.target.value)) }} /></div>
-                <div className="inspector-panel-field"><label>Max Delay</label><input type="number" value={e.repeatMaxDelay} onChange={(v) => { e.setRepeatMaxDelay(Number(v.target.value)); liveSaveField('repeat_max_delay', Number(v.target.value)) }} /></div>
+                <div className="inspector-panel-field"><label>Repeat Cooldown (s)</label><input type="number" min="0" value={e.repeatCooldown} onChange={(v) => { e.setRepeatCooldown(Number(v.target.value)); liveSaveField('repeat_cooldown', Number(v.target.value)) }} /></div>
               </div>
             )}
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.silentComplete} onChange={(v) => { e.setSilentComplete(v.target.checked); liveSaveField('silently_complete', v.target.checked) }} /> Silent Complete</label>
@@ -236,6 +235,11 @@ export function InspectorSection({
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.disableToast} onChange={(v) => { e.setDisableToast(v.target.checked); liveSaveField('disable_completion_toast', v.target.checked) }} /> Disable Completion Toast</label>
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.ignoreRewardBlocking} onChange={(v) => { e.setIgnoreRewardBlocking(v.target.checked); liveSaveField('ignore_reward_blocking', v.target.checked) }} /> Ignore Reward Blocking</label>
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.disableJei} onChange={(v) => { e.setDisableJei(v.target.checked); liveSaveField('disable_jei_recipe', v.target.checked) }} /> Disable JEI Recipe</label>
+            <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.hideLockIcon} onChange={(v) => { e.setHideLockIcon(v.target.checked); liveSaveField('hide_lock_icon', v.target.checked) }} /> Hide Lock Icon</label>
+            <div className="inspector-panel-field">
+              <label>Guide Page</label>
+              <input type="text" value={e.guidePage} onChange={(v) => { e.setGuidePage(v.target.value); liveSaveField('guide_page', v.target.value) }} placeholder="quests:guide/my_guide" />
+            </div>
 
             <div className="inspector-panel-section-title">Visibility Advanced</div>
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.hideDetailsUntilStartable} onChange={(v) => { e.setHideDetailsUntilStartable(v.target.checked); liveSaveField('hide_details_until_startable', v.target.checked) }} /> Hide Details Until Startable</label>
@@ -256,6 +260,10 @@ export function InspectorSection({
             <div className="inspector-panel-field">
               <label>Min Required Dependencies</label>
               <input type="number" min="0" value={e.minReqDeps} onChange={(v) => { e.setMinReqDeps(Number(v.target.value)); liveSaveField('min_required_dependencies', Number(v.target.value)) }} />
+            </div>
+            <div className="inspector-panel-field">
+              <label>Max Completable Dependents</label>
+              <input type="number" min="0" value={e.maxCompletableDependents} onChange={(v) => { e.setMaxCompletableDependents(Number(v.target.value)); liveSaveField('max_completable_dependents', Number(v.target.value)) }} />
             </div>
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.hideDepLines} onChange={(v) => { e.setHideDepLines(v.target.checked); liveSaveField('hide_dependency_lines', v.target.checked) }} /> Hide Dependency Lines</label>
             <label className="inspector-panel-checkbox"><input type="checkbox" checked={e.hideDeptLines} onChange={(v) => { e.setHideDeptLines(v.target.checked); liveSaveField('hide_dependent_lines', v.target.checked) }} /> Hide Dependent Lines</label>

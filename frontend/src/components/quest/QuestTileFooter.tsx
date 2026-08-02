@@ -1,19 +1,19 @@
 export interface QuestTileFooterProps {
   canBeRepeatable: boolean
   silentlyComplete: boolean
-  repeatTime: number
+  repeatCooldown: number
 }
 
 export function QuestTileFooter({
   canBeRepeatable,
   silentlyComplete,
-  repeatTime,
+  repeatCooldown,
 }: QuestTileFooterProps) {
   if (!canBeRepeatable) return null
 
   return (
     <div className="quest-tile-repeatable" title="Repeatable">
-      🔄 {silentlyComplete ? 'Silent' : `${repeatTime}t`}
+      🔄 {silentlyComplete ? 'Silent' : `${repeatCooldown}s`}
     </div>
   )
 }

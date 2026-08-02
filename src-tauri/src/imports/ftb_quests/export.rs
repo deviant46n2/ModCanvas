@@ -555,15 +555,16 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
     }
 
     if node.can_be_repeatable {
-        m.insert("repeatability".to_string(), ce(SnbtValue::Int(1)));
-        if node.repeat_time > 0 {
-            m.insert("repeat_time".to_string(), ce(SnbtValue::Long(node.repeat_time)));
-        }
-        if node.repeat_min_delay > 0 {
-            m.insert("repeat_min_delay".to_string(), ce(SnbtValue::Long(node.repeat_min_delay)));
-        }
-        if node.repeat_max_delay > 0 {
-            m.insert("repeat_max_delay".to_string(), ce(SnbtValue::Long(node.repeat_max_delay)));
+        m.insert("can_repeat".to_string(), ce(SnbtValue::Byte(1)));
+        let cooldown = if node.repeat_cooldown > 0 {
+            node.repeat_cooldown
+        } else if node.repeat_time > 0 {
+            node.repeat_time
+        } else {
+            0
+        };
+        if cooldown > 0 {
+            m.insert("repeat_cooldown".to_string(), ce(SnbtValue::Int(cooldown as i32)));
         }
     }
 
@@ -581,6 +582,18 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
         } else {
             m.insert("lock_icon".to_string(), ce(SnbtValue::String(node.lock_icon.clone())));
         }
+    }
+
+    if node.hide_lock_icon {
+        m.insert("hide_lock_icon".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if !node.guide_page.is_empty() {
+        m.insert("guide_page".to_string(), ce(SnbtValue::String(node.guide_page.clone())));
+    }
+
+    if node.max_completable_dependents > 0 {
+        m.insert("max_completable_dependents".to_string(), ce(SnbtValue::Int(node.max_completable_dependents)));
     }
 
     if !node.quest_background.is_empty() {

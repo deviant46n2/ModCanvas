@@ -43,15 +43,16 @@ export function useGraphUI(ctx: UIContext) {
   const [editOptional, setEditOptional] = useState(false)
   const [editRepeatable, setEditRepeatable] = useState(false)
   const [editSilentComplete, setEditSilentComplete] = useState(false)
-  const [editRepeatTime, setEditRepeatTime] = useState(0)
-  const [editRepeatMinDelay, setEditRepeatMinDelay] = useState(0)
-  const [editRepeatMaxDelay, setEditRepeatMaxDelay] = useState(0)
+  const [editRepeatCooldown, setEditRepeatCooldown] = useState(0)
   const [editIcon, setEditIcon] = useState('')
   const [editHideDeps, setEditHideDeps] = useState(false)
   const [editHideQuest, setEditHideQuest] = useState(false)
   const [editHideAll, setEditHideAll] = useState(false)
   const [editDisableReward, setEditDisableReward] = useState(false)
   const [editPauseReward, setEditPauseReward] = useState(false)
+  const [editHideLockIcon, setEditHideLockIcon] = useState(false)
+  const [editGuidePage, setEditGuidePage] = useState('')
+  const [editMaxCompletableDependents, setEditMaxCompletableDependents] = useState(0)
   const [editShape, setEditShape] = useState('Default')
   const [editIconScaling, setEditIconScaling] = useState(1.0)
   const [editTags, setEditTags] = useState('')
@@ -79,15 +80,16 @@ export function useGraphUI(ctx: UIContext) {
     setEditOptional((node.data?.optional as boolean) || false)
     setEditRepeatable((node.data?.can_be_repeatable as boolean) || false)
     setEditSilentComplete((node.data?.silently_complete as boolean) || false)
-    setEditRepeatTime((node.data?.repeat_time as number) || 0)
-    setEditRepeatMinDelay((node.data?.repeat_min_delay as number) || 0)
-    setEditRepeatMaxDelay((node.data?.repeat_max_delay as number) || 0)
+    setEditRepeatCooldown((node.data?.repeat_cooldown as number) || 0)
     setEditIcon((node.data?.icon as string) || '')
     setEditHideDeps((node.data?.hide_quest_until_deps_complete as boolean) || false)
     setEditHideQuest((node.data?.hide_quest_until_quest_complete as boolean) || false)
     setEditHideAll((node.data?.hide_quest_until_all_complete as boolean) || false)
     setEditDisableReward((node.data?.disable_reward as boolean) || false)
     setEditPauseReward((node.data?.pause_reward as boolean) || false)
+    setEditHideLockIcon((node.data?.hide_lock_icon as boolean) || false)
+    setEditGuidePage((node.data?.guide_page as string) || '')
+    setEditMaxCompletableDependents((node.data?.max_completable_dependents as number) || 0)
     setEditShape((node.data?.shape as string) || 'Default')
     setEditIconScaling((node.data?.icon_scaling as number) || 1.0)
     setEditTags(((node.data?.tags as string[]) || []).join(', '))
@@ -247,12 +249,14 @@ export function useGraphUI(ctx: UIContext) {
     visibility: [editVisibility, setEditVisibility] as const, optional: [editOptional, setEditOptional] as const,
     icon: [editIcon, setEditIcon] as const, repeatable: [editRepeatable, setEditRepeatable] as const,
     silentComplete: [editSilentComplete, setEditSilentComplete] as const,
-    repeatTime: [editRepeatTime, setEditRepeatTime] as const,
-    repeatMinDelay: [editRepeatMinDelay, setEditRepeatMinDelay] as const,
-    repeatMaxDelay: [editRepeatMaxDelay, setEditRepeatMaxDelay] as const,
+    repeatCooldown: [editRepeatCooldown, setEditRepeatCooldown] as const,
     hideDeps: [editHideDeps, setEditHideDeps] as const, hideQuest: [editHideQuest, setEditHideQuest] as const,
     hideAll: [editHideAll, setEditHideAll] as const, disableReward: [editDisableReward, setEditDisableReward] as const,
-    pauseReward: [editPauseReward, setEditPauseReward] as const, shape: [editShape, setEditShape] as const,
+    pauseReward: [editPauseReward, setEditPauseReward] as const,
+    hideLockIcon: [editHideLockIcon, setEditHideLockIcon] as const,
+    guidePage: [editGuidePage, setEditGuidePage] as const,
+    maxCompletableDependents: [editMaxCompletableDependents, setEditMaxCompletableDependents] as const,
+    shape: [editShape, setEditShape] as const,
     iconScaling: [editIconScaling, setEditIconScaling] as const, tags: [editTags, setEditTags] as const,
     progressionMode: [editProgressionMode, setEditProgressionMode] as const,
     sequentialTasks: [editSequentialTasks, setEditSequentialTasks] as const,

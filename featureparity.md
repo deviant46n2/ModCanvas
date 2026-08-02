@@ -60,17 +60,17 @@ Built from `QuestObjectBase.fillConfigGroup` + `Quest.fillConfigGroup` (`Quest.j
 | Invisible until X tasks | visibility | `addInt("invisible_until_tasks")` | 🟡 | Model + import/export only (`invisible_until_x_tasks`) |
 | Hide details until startable | visibility | `addTristate("hide_details_until_startable")` | 🟡 | Model + import/export only |
 | Hide text until complete | visibility | `addTristate("hide_text_until_complete")` | 🟡 | Model + import/export only |
-| Hide lock icon | visibility | `addBool("hide_lock_icon")` | 🟡 | `lock_icon` parsed/exported, no UI |
+| Hide lock icon | visibility | `addBool("hide_lock_icon")` | ✅ | Checkbox in editor; `hide_lock_icon` parsed/exported |
 | Dependencies (list) | dependencies | `addList("dependencies")` | ✅ | Drawn as edges; bulk dependency ops missing |
 | Dependency requirement (ALL / ONE) | dependencies | `addEnum("dependency_requirement")` | 🟡 | Model + import/export only |
 | Min required dependencies | dependencies | `addInt("min_required_dependencies")` | 🟡 | Model + import/export only |
 | Hide dependency lines | dependencies | `addTristate("hide_dependency_lines")` | ✅ | Checkbox |
 | Hide dependent lines | dependencies | `addBool("hide_dependent_lines")` | ✅ | Checkbox |
-| Max completable dependents | dependencies | `addInt("max_completable_dependents")` | ❌ | Not in model/import/export/UI |
-| Guide page | misc | `addString("guide_page")` | ❌ | Not supported |
+| Max completable dependents | dependencies | `addInt("max_completable_dependents")` | ✅ | Number input in editor; parsed/exported |
+| Guide page | misc | `addString("guide_page")` | ✅ | Text input in editor; parsed/exported |
 | Disable JEI / recipe mod | misc | `addEnum("disable_jei")` | ✅ | "Hide JEI Recipe" checkbox |
 | Repeatable | misc | `addTristate("can_repeat")` | ✅ | Checkbox (`can_be_repeatable`) |
-| Repeat cooldown | misc | `addInt("repeat_cooldown")` | 🟡 | `repeat_time`/`repeat_min_delay`/`repeat_max_delay` parsed/exported, no UI; FTB field is a plain seconds cooldown |
+| Repeat cooldown | misc | `addInt("repeat_cooldown")` | ✅ | Seconds input in editor; exports FTB-canonical `can_repeat` + `repeat_cooldown` (legacy `repeat_time`/`repeat_min_delay`/`repeat_max_delay` accepted on import, never emitted) |
 | Optional | misc | `addBool("optional")` | ✅ | Checkbox |
 | Ignore reward blocking | misc | `addBool("ignore_reward_blocking")` | ✅ | Checkbox |
 | Progression mode (linear/flexible) | misc | `addEnum("progression_mode")` | ✅ | Dropdown |
@@ -313,6 +313,6 @@ Highest-value gaps to close (in suggested order):
 5. ✅ **Quest-link support** (create link nodes, render, edit target).
 6. ✅ **Reward tables** — weighted table editing + wire `table_id`/`reward_chests` through import/export; make choice/all_table/random payloads editable.
 7. ✅ **Global `data.snbt` settings UI** (reward team, consume items, autoclaim, detection delay) + read them on import instead of hardcoding on export.
-8. **Remaining per-quest fields UI**: invisible-until, hide-details/text-until, min_required_dependencies, dependency_requirement, repeat cooldown, lock icon, guide page, max_completable_dependents.
+8. ✅ **Remaining per-quest fields UI**: invisible-until, hide-details/text-until, min_required_dependencies, dependency_requirement, repeat cooldown (FTB-canonical `repeat_cooldown`), hide lock icon, guide page, max_completable_dependents.
 9. **Task/reward field completion**: kill nbt_filter & custom_name & type tag, location W×H×D box, observation timer/type/target, item only_from_crafting & task_screen_only, reward permission_level/silent/random_bonus/only_one, per-task title/icon/description.
 10. **Canvas tools**: quest search bar, alignment/distribute, undo/redo, editing-mode toggle.

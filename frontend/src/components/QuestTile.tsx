@@ -217,7 +217,7 @@ export function QuestTileComponent({
       <QuestTileFooter
         canBeRepeatable={canBeRepeatable}
         silentlyComplete={silentlyComplete}
-        repeatTime={data.repeat_time || 0}
+        repeatCooldown={data.repeat_cooldown || 0}
       />
     </div>
   )
