@@ -37,7 +37,7 @@ export function defaultObjective(): QuestObjectiveData {
     target: '',
     target_count: 1,
     required: true,
-    item_tag: '', nbt_data: '', consume_items: false,
+    item_tag: '', nbt_data: '', smart_filter: '', consume_items: false,
     match_nbt: false, ignore_nbt: false, exact_match: false,
     fluid_id: '', fluid_amount: 0, energy_amount: 0, energy_unit: 'FE',
     xp_levels: 0, xp_points: 0, command: '', dimension: '',
@@ -55,7 +55,7 @@ export function defaultReward(): QuestRewardData {
     reward_type: 'item',
     items: [],
     description: '',
-    item_id: '', item_tag: '', item_count: 1, nbt_data: '',
+    item_id: '', item_tag: '', item_count: 1, nbt_data: '', smart_filter: '',
     xp_amount: 0, xp_levels: 0, command: '', loot_table: '',
     game_stage: '', weight: 1.0, reward_chests: [], team_reward: false,
     toast_message: '', table_id: '', choices: [], advancement_id: '',
@@ -109,6 +109,7 @@ export function defaultQuestNodeData(overrides?: Partial<QuestNodeData>): QuestN
     hide_dependent_lines: false,
     min_required_dependencies: 0,
     dependency_requirement: 'all_completed',
+    link_target: '',
     ...overrides,
   }
 }

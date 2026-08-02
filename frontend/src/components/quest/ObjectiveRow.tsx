@@ -1,6 +1,10 @@
 import React from 'react'
 import type { QuestObjectiveData, QuestTileData } from './QuestTileTypes'
 import { getIconUrl, getObjectiveIcon, getFallbackIcon, resolveIconKey } from './QuestTileTypes'
+import { isTexturePending } from '../../services/texture-loader'
+import { QuestIcon } from './QuestIcon'
+import { AnimatedSprite } from './AnimatedSprite'
+import { SmartFilterIcon } from './SmartFilterIcon'
 
 export interface ObjectiveRowProps {
   obj: QuestObjectiveData
@@ -26,8 +30,10 @@ export function ObjectiveRow({
   inputRef, onEditValueChange, onStartEditObjective,
   onSaveEdit, onCancelEdit, onKeyDown, onBlur,
 }: ObjectiveRowProps) {
-  const objIconKey = getObjectiveIcon(obj)
-  const objIconUrl = objIconKey ? getIconUrl(textureIndex, resolveIconKey(objIconKey)) : null
+  const objIconKeyRaw = getObjectiveIcon(obj)
+  const objIconKey = objIconKeyRaw ? resolveIconKey(objIconKeyRaw) : ''
+  const objIconUrl = objIconKey ? getIconUrl(textureIndex, objIconKey) : null
+  const objPending = objIconKey ? isTexturePending(textureIndex, objIconKey) : false
   const isItemObj = ['item', 'item_tag'].includes(obj.objective_type)
 
   const handleDoubleClick = (e: React.MouseEvent, field: string, value: string | number) => {
@@ -38,8 +44,17 @@ export function ObjectiveRow({
   return (
     <div key={obj.id} className="quest-tile-objective">
       <div className="quest-tile-objective-icon" onDoubleClick={(e) => isItemObj && handleDoubleClick(e, 'target', obj.target)}>
-        {objIconUrl ? (
-          <img src={objIconUrl} alt="" style={{ width: 20, height: 20, imageRendering: 'pixelated' }} />
+        {obj.smart_filter ? (
+          <SmartFilterIcon
+            dsl={obj.smart_filter}
+            textureIndex={textureIndex}
+            fallback={getFallbackIcon(obj.objective_type)}
+            size={20}
+          />
+        ) : objIconUrl ? (
+          <AnimatedSprite url={objIconUrl} textureKey={objIconKey} width={20} height={20} alt="" imageRendering="pixelated" />
+        ) : objPending ? (
+          <QuestIcon pending url={null} fallback="" size={20} />
         ) : (
           <span style={{ fontSize: 14 }}>{getFallbackIcon(obj.objective_type)}</span>
         )}

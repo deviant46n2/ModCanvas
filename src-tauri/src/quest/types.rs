@@ -33,6 +33,28 @@ pub struct QuestChapter {
     pub progression_mode: QuestProgressionMode,
     #[serde(default)]
     pub images: Vec<ChapterImage>,
+    #[serde(default)]
+    pub subtitle: String,
+    #[serde(default)]
+    pub default_min_width: i32,
+    #[serde(default)]
+    pub always_invisible: bool,
+    #[serde(default)]
+    pub default_hide_dependency_lines: bool,
+    #[serde(default)]
+    pub hide_quest_details_until_startable: bool,
+    #[serde(default)]
+    pub hide_quest_until_deps_visible: bool,
+    #[serde(default)]
+    pub hide_quest_until_deps_complete: bool,
+    #[serde(default)]
+    pub hide_text_until_complete: bool,
+    #[serde(default)]
+    pub autofocus_id: String,
+    #[serde(default)]
+    pub default_repeatable: bool,
+    #[serde(default)]
+    pub require_sequential_tasks: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -296,6 +318,9 @@ pub struct QuestNode {
     pub min_required_dependencies: i32,
     #[serde(default)]
     pub dependency_requirement: DependencyRequirement,
+    /// For QuestLink nodes: the id of the quest this link points to.
+    #[serde(default)]
+    pub link_target: String,
 }
 
 impl Default for QuestNode {
@@ -346,6 +371,7 @@ impl Default for QuestNode {
             hide_dependent_lines: false,
             min_required_dependencies: 0,
             dependency_requirement: DependencyRequirement::AllCompleted,
+            link_target: String::new(),
         }
     }
 }
@@ -386,7 +412,7 @@ impl QuestVisibility {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestNodeType {
     /// A chapter/group header
@@ -399,6 +425,8 @@ pub enum QuestNodeType {
     Gate,
     /// An optional side quest
     SideQuest,
+    /// A cross-chapter reference to another quest (FTB QuestLink)
+    QuestLink,
 }
 
 impl QuestNodeType {
@@ -409,6 +437,7 @@ impl QuestNodeType {
             QuestNodeType::Reward => "reward".to_string(),
             QuestNodeType::Gate => "gate".to_string(),
             QuestNodeType::SideQuest => "side_quest".to_string(),
+            QuestNodeType::QuestLink => "quest_link".to_string(),
         }
     }
 
@@ -419,6 +448,7 @@ impl QuestNodeType {
             "reward" => QuestNodeType::Reward,
             "gate" => QuestNodeType::Gate,
             "side_quest" | "side" => QuestNodeType::SideQuest,
+            "quest_link" | "link" => QuestNodeType::QuestLink,
             _ => QuestNodeType::Quest,
         }
     }
@@ -441,6 +471,8 @@ pub struct QuestObjective {
     pub item_tag: String,
     #[serde(default)]
     pub nbt_data: String,
+    #[serde(default)]
+    pub smart_filter: String,
     #[serde(default)]
     pub consume_items: bool,
     #[serde(default)]
@@ -504,6 +536,7 @@ impl Default for QuestObjective {
             required: true,
             item_tag: String::new(),
             nbt_data: String::new(),
+            smart_filter: String::new(),
             consume_items: false,
             match_nbt: false,
             ignore_nbt: false,
@@ -655,6 +688,8 @@ pub struct QuestReward {
     #[serde(default)]
     pub nbt_data: String,
     #[serde(default)]
+    pub smart_filter: String,
+    #[serde(default)]
     pub xp_amount: i32,
     #[serde(default)]
     pub xp_levels: i32,
@@ -696,6 +731,7 @@ impl Default for QuestReward {
             item_tag: String::new(),
             item_count: 1,
             nbt_data: String::new(),
+            smart_filter: String::new(),
             xp_amount: 0,
             xp_levels: 0,
             command: String::new(),
@@ -714,7 +750,7 @@ impl Default for QuestReward {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum RewardType {
     Item,
@@ -817,6 +853,57 @@ impl Default for QuestEdge {
     }
 }
 
+/// A weighted reward pool referenced by random/choice/all-table rewards.
+/// Serializes to an FTB `reward_tables/<hex_id>.snbt` file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RewardTable {
+    /// Hex code string id (16 uppercase hex chars), e.g. `"00E1FAFD0EF07752"`.
+    pub id: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub order_index: i32,
+    #[serde(default)]
+    pub loot_size: i32,
+    #[serde(default)]
+    pub empty_weight: f64,
+    #[serde(default)]
+    pub hide_tooltip: bool,
+    #[serde(default)]
+    pub use_title: bool,
+    /// Weighted rewards; each carries a `weight`.
+    #[serde(default)]
+    pub rewards: Vec<QuestReward>,
+}
+
+impl Default for RewardTable {
+    fn default() -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            title: String::new(),
+            order_index: 0,
+            loot_size: 0,
+            empty_weight: 0.0,
+            hide_tooltip: false,
+            use_title: true,
+            rewards: Vec::new(),
+        }
+    }
+}
+
+impl RewardTable {
+    /// Resolve a `table_id` reference. FTB writes the raw long into the quest
+    /// file; the reward table file is keyed by the 16-digit uppercase hex form
+    /// (`Long.toHexString(longId)` uppercased).
+    pub fn to_hex_id(raw_long: i64) -> String {
+        format!("{:016X}", raw_long)
+    }
+
+    pub fn to_long_id(hex_id: &str) -> i64 {
+        i64::from_str_radix(hex_id.trim_start_matches("#"), 16).unwrap_or(0)
+    }
+}
+
 /// The complete quest graph
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestGraph {
@@ -826,6 +913,8 @@ pub struct QuestGraph {
     pub description: String,
     pub nodes: Vec<QuestNode>,
     pub edges: Vec<QuestEdge>,
+    #[serde(default)]
+    pub reward_tables: Vec<RewardTable>,
     #[serde(default)]
     pub chapters: Vec<QuestChapter>,
     #[serde(default)]
@@ -842,6 +931,29 @@ pub struct QuestGraph {
     pub default_quest_size: QuestSize,
     #[serde(default)]
     pub default_quest_shape: QuestShape,
+    /// FTB quest grid snap scale (`grid_scale` from data.snbt). Positions snap to
+    /// multiples of `grid_scale × minSize`; default 0.5 matches in-game.
+    #[serde(default)]
+    pub grid_scale: f64,
+    /// `default_reward_team` from data.snbt — rewards go to the whole team.
+    #[serde(default)]
+    pub default_reward_team: bool,
+    /// `default_consume_items` from data.snbt — tasks consume items on completion.
+    #[serde(default)]
+    pub default_consume_items: bool,
+    /// `default_autoclaim_rewards` from data.snbt — one of "disabled", "enabled",
+    /// "no_toast", "invisible" (RewardAutoClaim id, FTB default "disabled").
+    #[serde(default)]
+    pub default_autoclaim_rewards: String,
+    /// `detection_delay` from data.snbt — quest-completion scan ticks; FTB default 20.
+    #[serde(default)]
+    pub detection_delay: i32,
+}
+
+impl Default for QuestGraph {
+    fn default() -> Self {
+        Self::new("", "")
+    }
 }
 
 impl QuestGraph {
@@ -853,6 +965,7 @@ impl QuestGraph {
             description: String::new(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            reward_tables: Vec::new(),
             chapters: Vec::new(),
             chapter_groups: Vec::new(),
             book_progression_mode: QuestProgressionMode::Default,
@@ -861,6 +974,11 @@ impl QuestGraph {
             quest_color: String::new(),
             default_quest_size: QuestSize::default(),
             default_quest_shape: QuestShape::Default,
+            grid_scale: 0.5,
+            default_reward_team: false,
+            default_consume_items: false,
+            default_autoclaim_rewards: "disabled".to_string(),
+            detection_delay: 20,
         }
     }
 }

@@ -11,6 +11,57 @@ export const SHAPES = [
   { value: 'gear', label: 'Gear' },
 ]
 
+// Canonicalize any shape string (old/new FTB dialects, empty, default) to the
+// frontend's canonical shape keys: circle, square, rounded_square, diamond,
+// pentagon, hexagon, octagon, heart, gear. FTB's built-in default shape is
+// "circle" (QuestShape.DEF_SHAPE), so empty/"default" resolve to circle.
+export function normalizeShape(shape?: string | null): string {
+  const s = (shape || '').trim().toLowerCase()
+  if (!s || s === 'default' || s === 'none') return 'circle'
+  if (s === 'rsquare' || s === 'rounded' || s === 'roundedsquare') return 'rounded_square'
+  return s
+}
+
+// FTB Quests stores node size in grid units where a 1.0x node is 24x24 units.
+// `questScaleFromSize` returns the uniform multiplier for a given size (useful
+// for scalar-style packs where width == height), rounded to 1 decimal.
+export function questScaleFromSize(size?: { width?: number; height?: number } | null): number {
+  const w = size?.width || 24
+  return Math.round((w / 24) * 10) / 10
+}
+
+// Convert a node's FTB size (grid units, default 24x24) into canvas pixel
+// dimensions. `basePx` is the pixel size of a 1.0x node; the result is clamped
+// so pathological sizes cannot blow up the canvas.
+export function questSizeToPixels(
+  size?: { width?: number; height?: number } | null,
+  basePx = 28
+): { width: number; height: number } {
+  const w = size?.width || 24
+  const h = size?.height || 24
+  return {
+    width: Math.min(224, Math.max(14, Math.round((w / 24) * basePx))),
+    height: Math.min(224, Math.max(14, Math.round((h / 24) * basePx))),
+  }
+}
+
+export function setQuestScale(scale: number): { width: number; height: number } {
+  const q = Math.max(0.5, scale)
+  return { width: Math.round(q * 24), height: Math.round(q * 24) }
+}
+
+// Mirror in-game FTB grid snapping (QuestPanel.draw). The snap grain is
+// `gridScale × minSize` FTB grid units, where minSize is the smallest selected
+// item's width (24 units = 1.0x) and gridScale is data.snbt's `grid_scale`
+// (default 0.5). Shift disables snapping entirely. Values are snapped to the
+// nearest grid line; the group anchor (min corner) is snapped and offsets are
+// preserved by the caller.
+export function snapToGridStep(value: number, gridScale: number, minSize: number): number {
+  const step = gridScale * Math.max(0.25, minSize)
+  if (step <= 0) return value
+  return Math.round(value / step) * step
+}
+
 export const OBJECTIVE_TYPES = [
   { value: 'item_acquisition', label: 'Item Detection' },
   { value: 'item_retrieval', label: 'Item Retrieval' },
@@ -61,6 +112,12 @@ export const VISIBILITY_OPTIONS = [
 
 export const PROGRESSION_MODES = [
   { value: 'default', label: 'Inherit from Chapter' },
+  { value: 'linear', label: 'Linear' },
+  { value: 'flexible', label: 'Flexible' },
+]
+
+export const CHAPTER_PROGRESSION_MODES = [
+  { value: 'default', label: 'Inherit from File' },
   { value: 'linear', label: 'Linear' },
   { value: 'flexible', label: 'Flexible' },
 ]

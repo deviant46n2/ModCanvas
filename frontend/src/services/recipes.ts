@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { SearchResult, TagInfo, GeneratedScripts } from './types'
+import type { IngestResult, ItemRegistryEntry } from './quest-types'
 
 export async function searchItems(
   query: string,
@@ -44,4 +45,45 @@ export async function writeScriptFiles(
 
 export async function scanModJarTextures(modsDir: string): Promise<Record<string, string>> {
   return invoke<Record<string, string>>('scan_mod_jar_textures', { modsDir })
+}
+
+export async function scanInstanceTextures(instancePath: string): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>('scan_instance_textures_cmd', { instancePath })
+}
+
+export async function scanInstanceAnimations(instancePath: string): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>('scan_instance_animations_cmd', { instancePath })
+}
+
+export async function reindexTextures(modsDir: string): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>('reindex_textures', { modsDir })
+}
+
+export async function getQuestThemeBackground(
+  instancePath: string,
+  chapterId: string,
+): Promise<string | null> {
+  return invoke<string | null>('get_quest_theme_background', { instancePath, chapterId })
+}
+
+export async function logDebug(message: string): Promise<void> {
+  return invoke('log_debug', { message })
+}
+
+export async function ingestActiveInstance(instancePath: string): Promise<IngestResult> {
+  return invoke<IngestResult>('ingest_active_instance_cmd', { instancePath })
+}
+
+export async function getTextureFiles(
+  textureKeys: string[],
+  instancePath: string,
+): Promise<Record<string, string | null>> {
+  return invoke<Record<string, string | null>>('get_texture_files', {
+    textureKeys,
+    instancePath,
+  })
+}
+
+export async function scanInstanceItems(instancePath: string): Promise<ItemRegistryEntry[]> {
+  return invoke<ItemRegistryEntry[]>('scan_instance_items_cmd', { instancePath })
 }

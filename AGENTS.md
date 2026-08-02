@@ -32,6 +32,13 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
    - POSIX file writes can occur directly on Linux environments.
    - Windows writes MUST account for JVM file locks (`EBUSY`). Always use a two-tier pipeline (Local IPC Socket bridge to the in-game mod -> Staged `.tmp` disk sync fallback).
 
+6. **No Bundling of Game Assets (Minecraft/Jar Images):**
+   - The application bundle (the Rust binary AND `frontend/dist`) MUST NEVER contain image bytes extracted from `.jar` archives or Minecraft instance files — vanilla assets, mod assets, resource packs, or mod UI textures (e.g. FTB Quests theme icons).
+   - All game-derived imagery MUST be served at runtime via lazy materialization: the compact index stores source descriptors only (`jar:<abs_path>!<zip_internal_path>` or absolute paths), PNG bytes are read on demand and returned as in-memory data URLs (e.g. `resolve_texture_urls`). Never copy, commit, or generate those images into `frontend/public/`, `frontend/src/assets/`, or `tauri.conf.json` `bundle.resources`.
+   - `frontend/public/` and `frontend/src/assets/` may only contain original, self-authored branding/UI assets (e.g. `hero.png`).
+   - The on-disk texture cache (`~/.cache/modcanvas/instance_textures_*.json`) stores index metadata + descriptors only — never image bytes.
+   - Any existing assets copied out of an instance (e.g. the FTB Quests theme pack under `frontend/public/theme/ftbquests/`) are banned from the bundle and MUST be resolved from the instance's own jars/resource packs at runtime instead.
+
 ---
 
 ## Modular Architecture & Code Organization Rules
@@ -70,6 +77,17 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
   - Keep canvas state management strictly decoupled from visual node rendering pipelines.
   - NEVER dispatch state mutations directly inside node render hooks or canvas frame loops (prevent infinite re-renders).
 
+- **Texture Indexing & Caching (`src-tauri/src/instance_textures/`):**
+  - The texture index MUST stay compact: values are source descriptors (`jar:<abs_path>!<zip_internal_path>` or an absolute kubejs file path), NOT base64 data URLs. Data URLs are materialized lazily on demand via `resolve_texture_urls` (batch per jar, capped at `BATCH_SIZE` keys from the frontend).
+  - Bump `CACHE_VERSION` whenever the index shape, key forms, or layer semantics change; the disk cache (`~/.cache/modcanvas/instance_textures_<hash>.json`) is validated against current jar/kubejs layer metadata on every load so reloads never rescan.
+  - The in-process `INDEX_MEMO` memo is for batch materialization only — `scan_instance_textures` must ALWAYS validate layer metadata so edits to kubejs/jars are picked up (tests `kubejs_model_change_invalidates_cache` enforce this).
+  - Block/hand-modeled 3D items resolve to `bake:<ns>:<kind>/<path>` descriptors in the index (never image bytes) and are rasterized to isometric PNGs lazily by `bake_icon` (`materialize.rs`) via the software rasterizer in `instance_textures/models/` (parent-chain merge in `baker.rs`, quad rasterization in `raster.rs`, parsing helpers in `merge.rs`). Cross-model plants use the `cross`/`fan` texture slots.
+  - Do not add new versions of the old data-URL index format; keep scans enumeration-only (no PNG byte reads) and keep the frontend's lazy materialization path (`texture-loader.ts` + `QuestBookEditor.tsx`) as the sole way to obtain displayable URLs.
+  - Item tag resolution (`instance_textures/tags.rs`, command `resolve_item_tags`) is a separate index: it scans `data/*/tags/item/*.json` (1.21+) and `data/*/tags/items/*.json` (pre-1.20.5) across vanilla jars, mods, resource packs, instance `data/`, and `kubejs/data/`, expanding `#tag` references cycle-safely. It has its own `TAG_INDEX_MEMO` (do not share the texture `INDEX_MEMO`).
+  - `.mcmeta` animation metadata (`scan_instance_animations_cmd`) is a parallel map stored in the same `InstanceTextureCache` under `animations`, keyed by the same texture-key forms as the texture index. It is collected in the same single scan pass (`merge_archive_ex`/`merge_dir_ex`) and shares the texture cache's `CACHE_VERSION` and layer-metadata validation. The editor animates icons/decorations via `frontend/src/components/quest/AnimatedSprite.tsx` (CSS `steps()` strip animation; reordered/interpolated sheets are baked on a canvas by `frontend/src/services/sprite-sheet.ts` using the pure parser `frontend/src/core/quest/animated-texture.ts`).
+  - FTB Filter System smart filters serialize their DSL in nested item Data Components (`item.components."ftbfiltersystem:filter"`) and the item id is always `ftbfiltersystem:smart_filter`. The export MUST emit that nested form whenever the DSL is present — regardless of flat vs subdirs chapter layout — because the plain-string `item` field cannot carry it. The DSL grammar (`item/item_tag/tag/mod` calls wrapped in `or/and/xor/not`) is parsed by `frontend/src/core/quest/smart-filter.ts`; `not(...)` members are excluded from icon candidates.
+  - SNBT serializer MUST quote compound keys containing a colon (e.g. `"ftbfiltersystem:filter"`), matching FTB's own output — the tokenizer splits unquoted keys at `:` so unquoted namespaced keys break import/export round-trips.
+
 - **Path Security:**
   - All workspace file operations MUST be scoped strictly within the project/instance root directory.
   - Validate and sanitize all file paths to prevent directory traversal (`../`) or symlink escapes.
@@ -82,6 +100,13 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
 - **Install Dependencies:** `pnpm install` (or `cargo check` depending on native bindings)
 - **Start Local UI Dev:** `pnpm dev`
 - **Build Release Binaries:** `pnpm build`
+
+### Rebuild After Code Changes (Mandatory)
+- The app binary embeds both the Rust backend (`src-tauri/**`) and the frontend bundle (`frontend/**`). A stale binary silently serves old behavior — the UI cannot tell you the backend changed.
+- ANY edit that affects the app MUST be followed by a rebuild before the change is reported as done or "working":
+  - During active development, run the app through `pnpm dev` — Rust changes trigger an automatic rebuild, and frontend edits hot-reload.
+  - For a standalone/release binary, run `pnpm build`.
+- After rebuilding, VERIFY the running binary is newer than the last edit (compare `src-tauri/target/debug/modcanvas` mtime against the newest changed source file). Never claim a fix/feature works against an unbuilt change.
 
 ### Testing & Verification
 - **Run Unit Tests:** `pnpm test`
@@ -99,3 +124,4 @@ Before finalizing any PR, commit, or file edit, ensure:
 4. No network requests are added to critical local UI path execution.
 5. Windows file-handle access includes error handling or retry loops for `EBUSY`.
 6. The change does not introduce forced online login or cloud-gated UI states.
+7. **Binary is rebuilt:** Any change to `src-tauri/**` or `frontend/**` was rebuilt and verified (run the app via `pnpm dev`, or `pnpm build` for a release binary) before being marked complete.

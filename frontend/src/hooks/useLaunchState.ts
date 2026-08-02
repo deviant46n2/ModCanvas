@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { testProject, deployCompanionMod, wsIpcGetStatus, type WsConnectionStatus } from '../services/api'
+import { testProject, deployCompanionMod, wsIpcGetStatus, wsIpcRestart, type WsConnectionStatus } from '../services/api'
 import { globalAssetCache } from '../core/theme'
 import type { Project } from './useProjectState'
 
@@ -49,6 +49,24 @@ export function useLaunchState(selectedProject: Project | null) {
     }
   }, [])
 
+  const refreshWsStatus = useCallback(async () => {
+    try {
+      setWsStatus(await wsIpcGetStatus())
+    } catch (e) {
+      console.error('[ModCanvas] ws_ipc_get_status failed:', e)
+    }
+  }, [])
+
+  const restartWebSocket = useCallback(async () => {
+    try {
+      await wsIpcRestart()
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      await refreshWsStatus()
+    } catch (e) {
+      console.error('[ModCanvas] ws_ipc_restart failed:', e)
+    }
+  }, [refreshWsStatus])
+
   async function handleTestProject() {
     if (!selectedProject) return
     setTestError('')
@@ -87,5 +105,7 @@ export function useLaunchState(selectedProject: Project | null) {
     deployCompanionMessage,
     handleTestProject,
     handleDeployCompanion,
+    refreshWsStatus,
+    restartWebSocket,
   }
 }

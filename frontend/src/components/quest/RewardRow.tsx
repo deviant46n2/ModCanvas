@@ -1,6 +1,10 @@
 import React from 'react'
 import type { QuestRewardData, QuestTileData } from './QuestTileTypes'
 import { getIconUrl, getRewardIcon, getFallbackIcon, resolveIconKey } from './QuestTileTypes'
+import { isTexturePending } from '../../services/texture-loader'
+import { QuestIcon } from './QuestIcon'
+import { AnimatedSprite } from './AnimatedSprite'
+import { SmartFilterIcon } from './SmartFilterIcon'
 
 export interface RewardRowProps {
   rew: QuestRewardData
@@ -25,8 +29,10 @@ export function RewardRow({
   inputRef, onEditValueChange, onStartEditReward,
   onSaveEdit, onCancelEdit, onKeyDown, onBlur,
 }: RewardRowProps) {
-  const rewIconKey = getRewardIcon(rew)
-  const rewIconUrl = rewIconKey ? getIconUrl(textureIndex, resolveIconKey(rewIconKey)) : null
+  const rewIconKeyRaw = getRewardIcon(rew)
+  const rewIconKey = rewIconKeyRaw ? resolveIconKey(rewIconKeyRaw) : ''
+  const rewIconUrl = rewIconKey ? getIconUrl(textureIndex, rewIconKey) : null
+  const rewPending = rewIconKey ? isTexturePending(textureIndex, rewIconKey) : false
   const isItemRew = ['item', 'item_tag'].includes(rew.reward_type)
 
   const handleDoubleClick = (e: React.MouseEvent, field: string, value: string | number) => {
@@ -37,8 +43,17 @@ export function RewardRow({
   return (
     <div key={rew.id} className="quest-tile-reward">
       <div className="quest-tile-reward-icon" onDoubleClick={(e) => isItemRew && handleDoubleClick(e, 'item_id', rew.item_id || rew.items[0] || '')}>
-        {rewIconUrl ? (
-          <img src={rewIconUrl} alt="" style={{ width: 20, height: 20, imageRendering: 'pixelated' }} />
+        {rew.smart_filter ? (
+          <SmartFilterIcon
+            dsl={rew.smart_filter}
+            textureIndex={textureIndex}
+            fallback={getFallbackIcon(rew.reward_type)}
+            size={20}
+          />
+        ) : rewIconUrl ? (
+          <AnimatedSprite url={rewIconUrl} textureKey={rewIconKey} width={20} height={20} alt="" imageRendering="pixelated" />
+        ) : rewPending ? (
+          <QuestIcon pending url={null} fallback="" size={20} />
         ) : (
           <span style={{ fontSize: 14 }}>{getFallbackIcon(rew.reward_type)}</span>
         )}

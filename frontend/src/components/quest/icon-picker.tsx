@@ -1,17 +1,20 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { QuestGraphData } from '../../services/api'
+import { isUsableTextureValue, textureDisplayUrl, requestMaterialize } from '../../services/texture-loader'
+import { AnimatedSprite } from './AnimatedSprite'
 
 interface IconPickerProps {
   open: boolean
   target: { type: 'quest' | 'objective' | 'reward' | 'chapter' | 'book'; nodeId?: string } | null
   textureIndex: Record<string, string>
   graph: QuestGraphData
+  instancePath: string
   onGraphChange: (g: QuestGraphData) => void
   onClose: () => void
   scheduleAutoSave: () => void
 }
 
-export function IconPicker({ open, target, textureIndex, graph, onGraphChange, onClose, scheduleAutoSave }: IconPickerProps) {
+export function IconPicker({ open, target, textureIndex, graph, instancePath, onGraphChange, onClose, scheduleAutoSave }: IconPickerProps) {
   const [search, setSearch] = useState('')
 
   const filteredIcons = useMemo(() => {
@@ -21,6 +24,14 @@ export function IconPicker({ open, target, textureIndex, graph, onGraphChange, o
     const s = search.toLowerCase()
     return entries.filter(([key]) => key.toLowerCase().includes(s)).slice(0, 200)
   }, [textureIndex, search])
+
+  useEffect(() => {
+    if (!open || !instancePath || filteredIcons.length === 0) return
+    const pending = filteredIcons
+      .filter(([, dataUrl]) => !isUsableTextureValue(dataUrl))
+      .map(([key]) => key)
+    if (pending.length > 0) requestMaterialize(pending, instancePath)
+  }, [open, instancePath, filteredIcons])
 
   const selectIcon = useCallback((itemId: string) => {
     if (!target || !graph) return
@@ -37,7 +48,7 @@ export function IconPicker({ open, target, textureIndex, graph, onGraphChange, o
     } else if (nodeId) {
       const updatedNodes = graph.nodes.map(n =>
         n.id === nodeId
-          ? { ...n, icon: itemId, iconDataUrl: textureIndex[itemId] || '' }
+          ? { ...n, icon: itemId, iconDataUrl: textureDisplayUrl(textureIndex, itemId) || '' }
           : n
       )
       onGraphChange({ ...graph, nodes: updatedNodes })
@@ -74,7 +85,7 @@ export function IconPicker({ open, target, textureIndex, graph, onGraphChange, o
                 onClick={() => selectIcon(itemId)}
                 style={{ aspectRatio: '1/1', padding: '8px', minHeight: 0 }}
               >
-                <img src={dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', imageRendering: 'pixelated', borderRadius: '3px' }} />
+                <AnimatedSprite url={textureDisplayUrl(textureIndex, itemId) || dataUrl} textureKey={itemId} width={40} height={40} alt="" imageRendering="pixelated" className="icon-picker-img" />
                 <span className="icon-picker-label">{itemId}</span>
               </button>
             ))}

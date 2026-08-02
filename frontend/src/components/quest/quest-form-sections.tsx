@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import type { QuestObjectiveData, QuestRewardData } from '../../services/api'
-import { questIconUrl } from './questIcons'
+import { questIconUrl, resolveIconKey } from './questIcons'
+import { getFallbackIcon } from './QuestTileTypes'
+import { isTexturePending } from '../../services/texture-loader'
+import { QuestIcon } from './QuestIcon'
+import { AnimatedSprite } from './AnimatedSprite'
+import { SmartFilterIcon } from './SmartFilterIcon'
 import {
   OBJECTIVE_TYPES,
   REWARD_TYPES,
@@ -12,22 +17,41 @@ export function ObjectiveCard({
   textureIndex,
   onRemove,
   onUpdate,
+  onOpenItemPicker,
 }: {
   obj: QuestObjectiveData
   index: number
   textureIndex: Record<string, string>
   onRemove: () => void
   onUpdate: (field: string, value: unknown) => void
+  onOpenItemPicker?: () => void
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const iconUrl = questIconUrl(obj.target, textureIndex)
+  const iconUrl = questIconUrl(obj.target || obj.fluid_id, textureIndex)
+  const iconPending = isTexturePending(textureIndex, resolveIconKey(obj.target || obj.fluid_id))
 
   return (
     <div className="quest-detail-card">
       <div className="quest-detail-card-header">
         <div className="quest-detail-card-title">
-          <div className="quest-detail-task-icon">
-            {iconUrl ? <img src={iconUrl} alt="" /> : <span className="quest-detail-item-fallback">i</span>}
+          <div
+            className="quest-detail-task-icon"
+            onClick={onOpenItemPicker}
+            style={{ cursor: onOpenItemPicker ? 'pointer' : 'default' }}
+            title={onOpenItemPicker ? 'Click to pick item' : undefined}
+          >
+            {obj.smart_filter ? (
+              <SmartFilterIcon
+                dsl={obj.smart_filter}
+                textureIndex={textureIndex}
+                fallback={getFallbackIcon(obj.objective_type)}
+                size={24}
+              />
+            ) : iconUrl ? <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(obj.target || obj.fluid_id)} width={24} height={24} alt="" /> : iconPending ? (
+              <QuestIcon pending url={null} fallback="" size={24} />
+            ) : (
+              <span className="quest-detail-item-fallback">{getFallbackIcon(obj.objective_type)}</span>
+            )}
           </div>
           <span className="quest-detail-card-index">#{index + 1}</span>
           <select value={obj.objective_type} onChange={(e) => onUpdate('objective_type', e.target.value)}>
@@ -40,7 +64,10 @@ export function ObjectiveCard({
         <div className="quest-detail-field-row">
           <div className="quest-detail-field" style={{ flex: 1 }}>
             <label>Target</label>
-            <input type="text" value={obj.target} onChange={(e) => onUpdate('target', e.target.value)} placeholder="e.g. minecraft:diamond" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input type="text" value={obj.target} onChange={(e) => onUpdate('target', e.target.value)} placeholder="e.g. minecraft:diamond" style={{ flex: 1 }} />
+              <button className="quest-detail-small-btn" onClick={onOpenItemPicker} title="Pick item" style={onOpenItemPicker ? {} : { display: 'none' }}>📦</button>
+            </div>
           </div>
           <div className="quest-detail-field" style={{ width: 80 }}>
             <label>Count</label>
@@ -201,22 +228,41 @@ export function RewardCard({
   textureIndex,
   onRemove,
   onUpdate,
+  onOpenItemPicker,
 }: {
   rew: QuestRewardData
   index: number
   textureIndex: Record<string, string>
   onRemove: () => void
   onUpdate: (field: string, value: unknown) => void
+  onOpenItemPicker?: () => void
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const iconUrl = questIconUrl(rew.item_id || rew.items[0] || '', textureIndex)
+  const iconPending = isTexturePending(textureIndex, resolveIconKey(rew.item_id || rew.items[0] || ''))
 
   return (
     <div className="quest-detail-card">
       <div className="quest-detail-card-header">
         <div className="quest-detail-card-title">
-          <div className="quest-detail-task-icon">
-            {iconUrl ? <img src={iconUrl} alt="" /> : <span className="quest-detail-item-fallback">r</span>}
+          <div
+            className="quest-detail-task-icon"
+            onClick={onOpenItemPicker}
+            style={{ cursor: onOpenItemPicker ? 'pointer' : 'default' }}
+            title={onOpenItemPicker ? 'Click to pick item' : undefined}
+          >
+            {rew.smart_filter ? (
+              <SmartFilterIcon
+                dsl={rew.smart_filter}
+                textureIndex={textureIndex}
+                fallback={getFallbackIcon(rew.reward_type)}
+                size={24}
+              />
+            ) : iconUrl ? <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(rew.item_id || rew.items[0] || '')} width={24} height={24} alt="" /> : iconPending ? (
+              <QuestIcon pending url={null} fallback="" size={24} />
+            ) : (
+              <span className="quest-detail-item-fallback">{getFallbackIcon(rew.reward_type)}</span>
+            )}
           </div>
           <span className="quest-detail-card-index">#{index + 1}</span>
           <select value={rew.reward_type} onChange={(e) => onUpdate('reward_type', e.target.value)}>
@@ -229,7 +275,10 @@ export function RewardCard({
         <div className="quest-detail-field-row">
           <div className="quest-detail-field" style={{ flex: 1 }}>
             <label>Item ID</label>
-            <input type="text" value={rew.item_id || rew.items[0] || ''} onChange={(e) => onUpdate('item_id', e.target.value)} placeholder="e.g. minecraft:diamond" />
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input type="text" value={rew.item_id || rew.items[0] || ''} onChange={(e) => onUpdate('item_id', e.target.value)} placeholder="e.g. minecraft:diamond" style={{ flex: 1 }} />
+              <button className="quest-detail-small-btn" onClick={onOpenItemPicker} title="Pick item" style={onOpenItemPicker ? {} : { display: 'none' }}>📦</button>
+            </div>
           </div>
           <div className="quest-detail-field" style={{ width: 80 }}>
             <label>Count</label>

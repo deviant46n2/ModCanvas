@@ -756,6 +756,7 @@ host = "0.0.0.0"
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_toml_parse_float_comment() {
         let toml = r#"rate = 3.14 # pi-ish
 "#;

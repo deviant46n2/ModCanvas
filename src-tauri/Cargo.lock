@@ -2119,6 +2119,7 @@ dependencies = [
  "dotenvy",
  "futures-util",
  "json5",
+ "png 0.17.16",
  "rayon",
  "regex",
  "reqwest 0.12.28",

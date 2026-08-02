@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMcFormatted, renderMcFormattedToHtml } from './font-formatter';
+import { parseMcFormatted, renderMcFormattedToHtml, stripMcFormatting } from './font-formatter';
 
 describe('parseMcFormatted — Minecraft Formatting Code Parser', () => {
   it('should parse plain text without codes', () => {
@@ -51,6 +51,49 @@ describe('parseMcFormatted — Minecraft Formatting Code Parser', () => {
     expect(result[0].color).toBe('#FF5555');
     expect(result[0].bold).toBe(true);
     expect(result[0].text).toBe('Red Bold');
+  });
+
+  it('should parse ampersand color codes (FTB Quests style)', () => {
+    const result = parseMcFormatted('&fChapter 1: Starting out');
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('Chapter 1: Starting out');
+    expect(result[0].color).toBe('#FFFFFF');
+  });
+
+  it('should parse ampersand bold codes (FTB Quests style)', () => {
+    const result = parseMcFormatted('&f&lThe Basics');
+    expect(result[0].text).toBe('The Basics');
+    expect(result[0].color).toBe('#FFFFFF');
+    expect(result[0].bold).toBe(true);
+  });
+
+  it('should leave non-format ampersands intact', () => {
+    const result = parseMcFormatted('Tom & Jerry');
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('Tom & Jerry');
+  });
+});
+
+describe('stripMcFormatting — Plain Text Extractor', () => {
+  it('should strip section sign codes', () => {
+    expect(stripMcFormatting('§cRed Text')).toBe('Red Text');
+  });
+
+  it('should strip ampersand codes (FTB Quests style)', () => {
+    expect(stripMcFormatting('&fChapter 1: Starting out')).toBe('Chapter 1: Starting out');
+    expect(stripMcFormatting('&f&lThe Basics')).toBe('The Basics');
+  });
+
+  it('should strip mixed codes anywhere in the string', () => {
+    expect(stripMcFormatting('&aGreen §lBold &rPlain')).toBe('Green Bold Plain');
+  });
+
+  it('should keep text with no codes unchanged', () => {
+    expect(stripMcFormatting('Apothic Spawners')).toBe('Apothic Spawners');
+  });
+
+  it('should handle empty string', () => {
+    expect(stripMcFormatting('')).toBe('');
   });
 });
 

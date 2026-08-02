@@ -56,18 +56,14 @@
 .quest-tile.gate-tile { border-left-color: #f87171; }
 .quest-tile.side_quest-tile { border-left-color: #a78bfa; }
 
-/* Handles */
+/* Handles — invisible, for edge routing only */
 .quest-tile-handle {
-  width: 8px;
-  height: 8px;
-  background: #2d3748;
-  border: 1.5px solid #4a5568;
-  border-radius: 50%;
-}
-
-.quest-tile-handle:hover {
-  background: #4a90d9;
-  border-color: #4a90d9;
+  width: 4px !important;
+  height: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0;
+  pointer-events: none !important;
 }
 
 /* Header */

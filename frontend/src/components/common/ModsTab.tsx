@@ -16,6 +16,7 @@ interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  source: 'modrinth' | 'curseforge'
 }
 
 interface CompatibilityIssue {
@@ -47,7 +48,7 @@ export interface ModsTabProps {
   onCheckCompat: () => void
   searchQuery: string
   onSearchQueryChange: (q: string) => void
-  onSearchMods: () => void
+  onSearchMods: (source?: 'modrinth' | 'curseforge') => void
   searchResults: ModMetadata[]
   onAddMod: (mod: any) => Promise<void>
   onToggleMod: (mod: any) => Promise<void>
@@ -56,9 +57,14 @@ export interface ModsTabProps {
   projectModsForDeps: any[]
   getMissingDependencies: (modId: string) => Array<{ mod_id: string; dependency_type: string }>
   getModNameById: (modId: string) => string
+  searchSource: 'modrinth' | 'curseforge'
+  onSearchSourceChange: (source: 'modrinth' | 'curseforge') => void
 }
 
 export function ModsTab(props: ModsTabProps) {
+  const handleSearchMods = () => {
+    props.onSearchMods(props.searchSource)
+  }
   return (
     <ErrorBoundary>
       <div className="mods-panel" id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods">
@@ -160,18 +166,40 @@ export function ModsTab(props: ModsTabProps) {
 
         <div className="mods-section">
           <div className="section-header">
-            <h3>Add Mods from Modrinth</h3>
+            <h3>Add Mods</h3>
+            <div className="source-tabs" role="tablist" aria-label="Mod source">
+              <button
+                role="tab"
+                aria-selected={props.searchSource === 'modrinth'}
+                aria-controls="modrinth-panel"
+                id="modrinth-tab"
+                className={`source-tab ${props.searchSource === 'modrinth' ? 'active' : ''}`}
+                onClick={() => props.onSearchSourceChange('modrinth')}
+              >
+                Modrinth
+              </button>
+              <button
+                role="tab"
+                aria-selected={props.searchSource === 'curseforge'}
+                aria-controls="curseforge-panel"
+                id="curseforge-tab"
+                className={`source-tab ${props.searchSource === 'curseforge' ? 'active' : ''}`}
+                onClick={() => props.onSearchSourceChange('curseforge')}
+              >
+                CurseForge
+              </button>
+            </div>
           </div>
           <div className="search-bar">
             <input
               type="text"
-              placeholder="Search mods on Modrinth..."
+              placeholder={`Search mods on ${props.searchSource === 'modrinth' ? 'Modrinth' : 'CurseForge'}...`}
               value={props.searchQuery}
               onChange={(e) => props.onSearchQueryChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && props.onSearchMods()}
-              aria-label="Search mods on Modrinth"
+              onKeyDown={(e) => e.key === 'Enter' && props.onSearchMods(props.searchSource)}
+              aria-label={`Search mods on ${props.searchSource}`}
             />
-            <button onClick={props.onSearchMods} aria-label="Search">Search</button>
+            <button onClick={handleSearchMods} aria-label="Search">Search</button>
           </div>
           <div className="search-results" style={{ height: 'calc(100vh - 480px)' }}>
             {props.searchResults.length > 0 && (

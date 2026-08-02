@@ -130,10 +130,13 @@ impl SnbtValue {
             return true;
         }
         for ch in chars {
-            if !ch.is_alphanumeric() && ch != '_' && ch != '-' && ch != '.' && ch != '+' && ch != ':' && ch != '/' {
+            if !ch.is_alphanumeric() && ch != '_' && ch != '-' && ch != '.' && ch != '+' && ch != '/' {
                 return true;
             }
         }
+        // Keys containing a colon (namespaced, e.g. "ftbfiltersystem:filter") must be
+        // quoted: the tokenizer splits unquoted keys at ':' so they would not round-trip.
+        if s.contains(':') { return true; }
         // Check for reserved words
         matches!(s, "true" | "false" | "NaN" | "Infinity" | "-Infinity")
     }

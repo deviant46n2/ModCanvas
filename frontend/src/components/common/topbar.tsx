@@ -6,6 +6,8 @@ interface TopBarProps {
   modLoader: string
   packVersion: string
   wsStatus: WsConnectionStatus
+  onRefreshWsStatus: () => void
+  onRestartWebSocket: () => void
   deployCompanionMessage: string
   isTesting: boolean
   onSave: () => void
@@ -13,6 +15,9 @@ interface TopBarProps {
   onDeployCompanion: () => void
   onExport: () => void
   onDelete: () => void
+  packLoaded: boolean
+  onLoadPack: () => void
+  onClosePack: () => void
 }
 
 export function TopBar({
@@ -21,6 +26,8 @@ export function TopBar({
   modLoader,
   packVersion,
   wsStatus,
+  onRefreshWsStatus,
+  onRestartWebSocket,
   deployCompanionMessage,
   isTesting,
   onSave,
@@ -28,6 +35,9 @@ export function TopBar({
   onDeployCompanion,
   onExport,
   onDelete,
+  packLoaded,
+  onLoadPack,
+  onClosePack,
 }: TopBarProps) {
   return (
     <div className="workspace-header">
@@ -43,8 +53,31 @@ export function TopBar({
           {wsStatus.connected ? '\uD83D\uDFE2' : '\u26AA'}
           <span>{wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'}</span>
         </span>
+        <button
+          className="ws-action-btn"
+          onClick={onRefreshWsStatus}
+          title="Check connection status"
+        >
+          {'\u21BB'}
+        </button>
+        <button
+          className="ws-action-btn"
+          onClick={onRestartWebSocket}
+          title="Restart WebSocket &amp; refresh status"
+        >
+          {'\uD83D\uDD0C'}
+        </button>
       </div>
       <div className="instance-actions">
+        {packLoaded ? (
+          <button className="btn-danger" onClick={onClosePack}>
+            Close Pack
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={onLoadPack}>
+            Load Pack
+          </button>
+        )}
         <button className="btn-secondary" onClick={onSave}>Save</button>
         <button className="btn-success" onClick={onTest} disabled={isTesting}>
           {isTesting ? 'Testing...' : 'Test'}

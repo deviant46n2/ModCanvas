@@ -502,14 +502,13 @@ pub async fn get_texture_files(
     instance_path: String,
 ) -> HashMap<String, Option<String>> {
     let instance_path = Path::new(&instance_path);
-    let cache = load_ingest_cache(&instance_path.join("mods"));
-    let mut out: HashMap<String, Option<String>> = HashMap::new();
-    for key in texture_keys {
-        let url = cache
-            .as_ref()
-            .and_then(|c| texture_data_url_for_key(c, &key))
-            .or_else(|| fallback_kubejs_texture(&key, instance_path));
-        out.insert(key, url);
+    let mut out = crate::instance_textures::resolve_texture_urls(instance_path, &texture_keys);
+    for key in &texture_keys {
+        if out.get(key).map_or(true, |u| u.is_none()) {
+            if let Some(url) = fallback_kubejs_texture(key, instance_path) {
+                out.insert(key.clone(), Some(url));
+            }
+        }
     }
     out
 }
@@ -671,6 +670,6 @@ mod tests {
 
         assert!(out.get("testmod:textures/item/test_item.png").unwrap().is_some());
         assert!(out.get("atm:questpics/chap3/creative_star").unwrap().is_some());
-        assert!(out.get("testmod:item/missing").unwrap().is_none());
+        assert!(out.get("testmod:item/missing").is_none());
     }
 }

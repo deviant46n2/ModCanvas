@@ -15,13 +15,73 @@ fn icon_to_snbt(icon: &str) -> SnbtValue {
     SnbtValue::Compound(icon_map)
 }
 
-fn item_compound(item_id: &str, count: i32) -> SnbtValue {
+fn item_compound(item_id: &str, count: i32, smart_filter: &str) -> SnbtValue {
+    // FTB Filter System smart filter: emit nested item Data Components form
+    if !smart_filter.is_empty() {
+        let mut components: HashMap<String, CommentedSnbt> = HashMap::new();
+        components.insert("ftbfiltersystem:filter".to_string(), ce(SnbtValue::String(smart_filter.to_string())));
+        let mut m: HashMap<String, CommentedSnbt> = HashMap::new();
+        m.insert("components".to_string(), ce(SnbtValue::Compound(components)));
+        m.insert("count".to_string(), ce(SnbtValue::Int(count)));
+        m.insert("id".to_string(), ce(SnbtValue::String("ftbfiltersystem:smart_filter".to_string())));
+        return SnbtValue::Compound(m);
+    }
     let mut m: HashMap<String, CommentedSnbt> = HashMap::new();
     m.insert("id".to_string(), ce(SnbtValue::String(item_id.to_string())));
     if count > 1 {
         m.insert("count".to_string(), ce(SnbtValue::Int(count)));
     }
     SnbtValue::Compound(m)
+}
+
+/// Item value for a task/reward `item` field. Flat-chapter layouts use the
+/// compound form; subdirs layouts use a plain string — except smart filters,
+/// which must always keep the nested Data Components form.
+fn item_value(item_id: &str, count: i32, smart_filter: &str, flat_chapters: bool) -> SnbtValue {
+    if !smart_filter.is_empty() {
+        return item_compound(item_id, count, smart_filter);
+    }
+    if flat_chapters {
+        item_compound(item_id, count, "")
+    } else {
+        SnbtValue::String(item_id.to_string())
+    }
+}
+
+fn chapter_image_to_snbt(img: &ChapterImage) -> SnbtValue {
+    let mut m: HashMap<String, CommentedSnbt> = HashMap::new();
+    m.insert("image".to_string(), ce(SnbtValue::String(img.image.clone())));
+    m.insert("x".to_string(), ce(SnbtValue::Double(img.x)));
+    m.insert("y".to_string(), ce(SnbtValue::Double(img.y)));
+    m.insert("width".to_string(), ce(SnbtValue::Double(img.width)));
+    m.insert("height".to_string(), ce(SnbtValue::Double(img.height)));
+    if img.rotation != 0.0 {
+        m.insert("rotation".to_string(), ce(SnbtValue::Double(img.rotation)));
+    }
+    if img.scale != 1.0 {
+        m.insert("scale".to_string(), ce(SnbtValue::Double(img.scale)));
+    }
+    if img.order != 0 {
+        m.insert("order".to_string(), ce(SnbtValue::Int(img.order)));
+    }
+    if img.alpha != 255 {
+        m.insert("alpha".to_string(), ce(SnbtValue::Int(img.alpha as i32)));
+    }
+    if img.color != 0 {
+        m.insert("color".to_string(), ce(SnbtValue::Int(img.color)));
+    }
+    if !img.click.is_empty() {
+        m.insert("click".to_string(), ce(SnbtValue::String(img.click.clone())));
+    }
+    if !img.hover.is_empty() {
+        let hover: Vec<SnbtValue> = img.hover.iter().map(|h| SnbtValue::String(h.clone())).collect();
+        m.insert("hover".to_string(), ce(SnbtValue::List(hover)));
+    }
+    SnbtValue::Compound(m)
+}
+
+fn chapter_images_to_snbt(images: &[ChapterImage]) -> SnbtValue {
+    SnbtValue::List(images.iter().map(chapter_image_to_snbt).collect())
 }
 
 /// Export a QuestGraph as FTB Quests SNBT files to a directory (both Subdirs and FlatChapters formats)
@@ -32,19 +92,33 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<(
     // Write data.snbt
     let mut data_map = HashMap::new();
     data_map.insert("version".to_string(), ce(SnbtValue::Int(13)));
-    data_map.insert("default_reward_team".to_string(), ce(SnbtValue::Byte(0)));
-    data_map.insert("default_consume_items".to_string(), ce(SnbtValue::Byte(0)));
-    data_map.insert("default_autoclaim_rewards".to_string(), ce(SnbtValue::String("disabled".to_string())));
+    if graph.default_reward_team {
+        data_map.insert("default_reward_team".to_string(), ce(SnbtValue::Byte(1)));
+    } else {
+        data_map.insert("default_reward_team".to_string(), ce(SnbtValue::Byte(0)));
+    }
+    if graph.default_consume_items {
+        data_map.insert("default_consume_items".to_string(), ce(SnbtValue::Byte(1)));
+    } else {
+        data_map.insert("default_consume_items".to_string(), ce(SnbtValue::Byte(0)));
+    }
+    let autoclaim = if graph.default_autoclaim_rewards.is_empty() {
+        "disabled".to_string()
+    } else {
+        graph.default_autoclaim_rewards.clone()
+    };
+    data_map.insert("default_autoclaim_rewards".to_string(), ce(SnbtValue::String(autoclaim)));
     data_map.insert("default_quest_shape".to_string(), ce(SnbtValue::String(graph.default_quest_shape.to_string())));
     data_map.insert("progression_mode".to_string(), ce(SnbtValue::String(graph.book_progression_mode.to_string())));
-    data_map.insert("detection_delay".to_string(), ce(SnbtValue::Int(20)));
+    data_map.insert("grid_scale".to_string(), ce(SnbtValue::Double(graph.grid_scale)));
+    data_map.insert("detection_delay".to_string(), ce(SnbtValue::Int(graph.detection_delay)));
     crate::path_safety::atomic_write_str(&quests_dir.join("data.snbt"), &compound_to_snbt(&data_map))
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     // Group quests by chapter
     let mut chapter_quests: HashMap<String, Vec<&QuestNode>> = HashMap::new();
     for node in &graph.nodes {
-        if matches!(node.node_type, QuestNodeType::Quest | QuestNodeType::SideQuest | QuestNodeType::Reward | QuestNodeType::Gate) {
+        if matches!(node.node_type, QuestNodeType::Quest | QuestNodeType::SideQuest | QuestNodeType::Reward | QuestNodeType::Gate | QuestNodeType::QuestLink) {
             if let Some(ch_id) = &node.chapter_id {
                 chapter_quests.entry(ch_id.clone()).or_default().push(node);
             }
@@ -117,10 +191,86 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<(
             if !meta.default_enabled {
                 chapter_compound.insert("default_enabled".to_string(), ce(SnbtValue::Byte(0)));
             }
+            // Write the decorations array from the graph, overriding whatever was
+            // preserved from the existing file so placement edits persist.
+            if !meta.images.is_empty() || chapter_compound.contains_key("images") {
+                chapter_compound.insert("images".to_string(), ce(chapter_images_to_snbt(&meta.images)));
+            }
         }
 
         crate::path_safety::atomic_write_str(&chapter_path, &compound_to_snbt(&chapter_compound))
             .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    // Export chapter groups (quests_dir/chapter_groups.snbt). FTB reads group
+    // membership either from this file or from the per-chapter `group` key; we
+    // write both so the ordering and titles round-trip cleanly.
+    if !graph.chapter_groups.is_empty() {
+        let mut groups = graph.chapter_groups.clone();
+        groups.sort_by_key(|g| g.order_index);
+        let group_values: Vec<SnbtValue> = groups
+            .iter()
+            .map(|g| {
+                let mut m: HashMap<String, CommentedSnbt> = HashMap::new();
+                m.insert("id".to_string(), ce(SnbtValue::String(g.id.clone())));
+                if !g.title.is_empty() {
+                    m.insert("title".to_string(), ce(SnbtValue::String(g.title.clone())));
+                }
+                SnbtValue::Compound(m)
+            })
+            .collect();
+        let mut groups_compound: HashMap<String, CommentedSnbt> = HashMap::new();
+        groups_compound.insert("chapter_groups".to_string(), ce(SnbtValue::List(group_values)));
+        crate::path_safety::atomic_write_str(
+            &quests_dir.join("chapter_groups.snbt"),
+            &compound_to_snbt(&groups_compound),
+        )
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    // Export reward tables (quests_dir/reward_tables/<hex_id>.snbt). Random/choice
+    // rewards reference these by `table_id`; FTB keys the file by the 16-digit
+    // uppercase hex form of the id.
+    if !graph.reward_tables.is_empty() {
+        let reward_tables_dir = quests_dir.join("reward_tables");
+        std::fs::create_dir_all(&reward_tables_dir)?;
+        let mut tables = graph.reward_tables.clone();
+        tables.sort_by_key(|t| t.order_index);
+        for (order_index, table) in tables.iter().enumerate() {
+            let hex_id = if table.id.len() == 16 {
+                table.id.clone()
+            } else {
+                RewardTable::to_hex_id(RewardTable::to_long_id(&table.id))
+            };
+            let mut m: HashMap<String, CommentedSnbt> = HashMap::new();
+            m.insert("id".to_string(), ce(SnbtValue::String(hex_id.clone())));
+            m.insert("order_index".to_string(), ce(SnbtValue::Int(order_index as i32)));
+            if !table.title.is_empty() {
+                m.insert("title".to_string(), ce(SnbtValue::String(table.title.clone())));
+            }
+            if table.loot_size > 0 {
+                m.insert("loot_size".to_string(), ce(SnbtValue::Int(table.loot_size)));
+            }
+            if table.empty_weight > 0.0 {
+                m.insert("empty_weight".to_string(), ce(SnbtValue::Float(table.empty_weight as f32)));
+            }
+            if table.hide_tooltip {
+                m.insert("hide_tooltip".to_string(), ce(SnbtValue::Byte(1)));
+            }
+            if table.use_title {
+                m.insert("use_title".to_string(), ce(SnbtValue::Byte(1)));
+            }
+            let reward_list: Vec<SnbtValue> = table.rewards.iter()
+                .filter_map(|r| reward_to_snbt(r, true).ok())
+                .collect();
+            m.insert("rewards".to_string(), ce(SnbtValue::List(reward_list)));
+
+            crate::path_safety::atomic_write_str(
+                &reward_tables_dir.join(format!("{hex_id}.snbt")),
+                &compound_to_snbt(&m),
+            )
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        }
     }
 
     Ok(())
@@ -148,6 +298,50 @@ fn build_subdirs_chapter<'a>(
         chapter_map.insert("order_index".to_string(), ce(SnbtValue::Int(meta.order_index)));
         if !meta.default_enabled {
             chapter_map.insert("default_enabled".to_string(), ce(SnbtValue::Byte(0)));
+        }
+        if !meta.images.is_empty() {
+            chapter_map.insert("images".to_string(), ce(chapter_images_to_snbt(&meta.images)));
+        }
+        // Visibility & layout defaults (mirrors Chapter.java:178-196)
+        if !meta.subtitle.is_empty() {
+            chapter_map.insert("subtitle".to_string(), ce(SnbtValue::String(meta.subtitle.clone())));
+        }
+        if meta.always_invisible {
+            chapter_map.insert("always_invisible".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.default_min_width > 0 {
+            chapter_map.insert("default_min_width".to_string(), ce(SnbtValue::Int(meta.default_min_width)));
+        }
+        let default_size_scalar = meta.default_quest_size.width / 24.0;
+        if (default_size_scalar - 1.0).abs() > f64::EPSILON {
+            chapter_map.insert("default_quest_size".to_string(), ce(SnbtValue::Double(default_size_scalar)));
+        }
+        if meta.default_hide_dependency_lines {
+            chapter_map.insert("default_hide_dependency_lines".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.hide_quest_details_until_startable {
+            chapter_map.insert("hide_quest_details_until_startable".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.hide_quest_until_deps_visible {
+            chapter_map.insert("hide_quest_until_deps_visible".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.hide_quest_until_deps_complete {
+            chapter_map.insert("hide_quest_until_deps_complete".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.hide_text_until_complete {
+            chapter_map.insert("hide_text_until_complete".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if !meta.autofocus_id.is_empty() {
+            chapter_map.insert("autofocus_id".to_string(), ce(SnbtValue::String(meta.autofocus_id.clone())));
+        }
+        if meta.default_repeatable {
+            chapter_map.insert("default_repeatable_quest".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.require_sequential_tasks {
+            chapter_map.insert("require_sequential_tasks".to_string(), ce(SnbtValue::Byte(1)));
+        }
+        if meta.progression_mode.to_string() != "default" {
+            chapter_map.insert("progression_mode".to_string(), ce(SnbtValue::String(meta.progression_mode.to_string())));
         }
     }
 
@@ -182,6 +376,28 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
     m.insert("id".to_string(), ce(SnbtValue::String(node.id.clone())));
     m.insert("x".to_string(), ce(SnbtValue::Double(node.position.x)));
     m.insert("y".to_string(), ce(SnbtValue::Double(node.position.y)));
+
+    // QuestLink nodes serialize as a reference to another quest — no tasks,
+    // no rewards, no dependency/default_enabled fields (FTB QuestLink.writeData).
+    if matches!(node.node_type, QuestNodeType::QuestLink) {
+        if !node.link_target.is_empty() {
+            m.insert("linked_quest".to_string(), ce(SnbtValue::String(node.link_target.clone())));
+        }
+        if !node.label.is_empty() {
+            m.insert("title".to_string(), ce(SnbtValue::String(node.label.clone())));
+        }
+        if node.size.width != 24.0 || node.size.height != 24.0 {
+            if flat_chapters {
+                m.insert("size".to_string(), ce(SnbtValue::Double((node.size.width / 24.0).max(node.size.height / 24.0))));
+            } else {
+                m.insert("size".to_string(), ce(SnbtValue::List(vec![
+                    SnbtValue::Double(node.size.width),
+                    SnbtValue::Double(node.size.height),
+                ])));
+            }
+        }
+        return Ok(SnbtValue::Compound(m));
+    }
 
     // default_enabled: SideQuests have 0, regular Quests have 1 (explicit to override chapter default)
     if matches!(node.node_type, QuestNodeType::SideQuest) {
@@ -281,11 +497,9 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
     }
 
     if (node.icon_scaling - 1.0).abs() > f64::EPSILON {
-        if flat_chapters {
-            m.insert("icon_scale".to_string(), ce(SnbtValue::Double(node.icon_scaling)));
-        } else {
-            m.insert("icon_scaling".to_string(), ce(SnbtValue::Double(node.icon_scaling)));
-        }
+        // FTB reads `icon_scale` in both flat and subdirs layouts
+        // (Quest.java writeData: json.addProperty("icon_scale", iconScale)).
+        m.insert("icon_scale".to_string(), ce(SnbtValue::Double(node.icon_scaling)));
     }
 
     if node.min_window_width > 0 {
@@ -419,25 +633,13 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
 
     let (ftb_type, extra_fields) = match &obj.objective_type {
         ObjectiveType::ItemAcquisition => ("item", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&obj.target, obj.target_count))
-            } else {
-                ce(SnbtValue::String(obj.target.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&obj.target, obj.target_count, &obj.smart_filter, flat_chapters))),
         ]),
         ObjectiveType::ItemRetrieval => ("item", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&obj.target, obj.target_count))
-            } else {
-                ce(SnbtValue::String(obj.target.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&obj.target, obj.target_count, &obj.smart_filter, flat_chapters))),
         ]),
         ObjectiveType::ItemCrafting => ("item", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&obj.target, obj.target_count))
-            } else {
-                ce(SnbtValue::String(obj.target.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&obj.target, obj.target_count, &obj.smart_filter, flat_chapters))),
         ]),
         ObjectiveType::EntityKill => ("kill", vec![
             ("entity".to_string(), ce(SnbtValue::String(obj.target.clone()))),
@@ -499,18 +701,10 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
             ("stage".to_string(), ce(SnbtValue::String(obj.advancement_id.clone()))),
         ]),
         ObjectiveType::BlockBreak => ("block_break", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&obj.target, 1))
-            } else {
-                ce(SnbtValue::String(obj.target.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&obj.target, 1, &obj.smart_filter, flat_chapters))),
         ]),
         ObjectiveType::BlockPlace => ("block_place", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&obj.target, 1))
-            } else {
-                ce(SnbtValue::String(obj.target.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&obj.target, 1, &obj.smart_filter, flat_chapters))),
         ]),
         ObjectiveType::Command => ("custom", vec![
             ("command".to_string(), ce(SnbtValue::String(obj.command.clone()))),
@@ -524,7 +718,7 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
 
     m.insert("type".to_string(), ce(SnbtValue::String(ftb_type.to_string())));
 
-    if obj.target_count > 1 && !matches!(obj.objective_type, ObjectiveType::Xp | ObjectiveType::Fluid | ObjectiveType::Energy | ObjectiveType::Stat | ObjectiveType::Observation | ObjectiveType::ItemAcquisition | ObjectiveType::ItemRetrieval | ObjectiveType::ItemCrafting) {
+    if obj.target_count > 1 && !matches!(obj.objective_type, ObjectiveType::Xp | ObjectiveType::Fluid | ObjectiveType::Energy | ObjectiveType::Stat | ObjectiveType::Observation) {
         m.insert("count".to_string(), ce(SnbtValue::Long(obj.target_count as i64)));
     }
 
@@ -578,18 +772,10 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
 
     let (ftb_type, extra_fields) = match &reward.reward_type {
         RewardType::Item => ("item", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&reward.item_id, reward.item_count))
-            } else {
-                ce(SnbtValue::String(reward.item_id.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&reward.item_id, reward.item_count, &reward.smart_filter, flat_chapters))),
         ]),
         RewardType::ItemWithWeight => ("item", vec![
-            ("item".to_string(), if flat_chapters {
-                ce(item_compound(&reward.item_id, reward.item_count))
-            } else {
-                ce(SnbtValue::String(reward.item_id.clone()))
-            }),
+            ("item".to_string(), ce(item_value(&reward.item_id, reward.item_count, &reward.smart_filter, flat_chapters))),
             ("weight".to_string(), ce(SnbtValue::Double(reward.weight))),
         ]),
         RewardType::Experience => ("xp", vec![
@@ -604,9 +790,19 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
         RewardType::LootTable => ("loot", vec![
             ("loot_table".to_string(), ce(SnbtValue::String(reward.loot_table.clone()))),
         ]),
-        RewardType::Choice => ("choice", vec![]),
-        RewardType::Random => ("random", vec![]),
-        RewardType::AllTable => ("all", vec![]),
+        RewardType::Choice | RewardType::Random | RewardType::AllTable => {
+            let ftb_type = match reward.reward_type {
+                RewardType::Choice => "choice",
+                RewardType::Random => "random",
+                _ => "all",
+            };
+            let mut fields = Vec::new();
+            if !reward.table_id.is_empty() {
+                // FTB writes the raw long; reward-table files are keyed by hex.
+                fields.push(("table_id".to_string(), ce(SnbtValue::Long(RewardTable::to_long_id(&reward.table_id)))));
+            }
+            (ftb_type, fields)
+        }
         RewardType::Advancement => ("advancement", vec![
             ("advancement".to_string(), ce(SnbtValue::String(reward.item_id.clone()))),
         ]),
@@ -628,20 +824,24 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
         m.insert(key, val);
     }
 
-    // Items list for choice/random/all rewards
-    if !reward.items.is_empty() {
-        let items_map: HashMap<String, CommentedSnbt> = reward.items.iter().enumerate()
-            .map(|(i, item)| {
+    // Choice/random/all rewards reference a reward table by id. When the reward
+    // carries inline items but no resolved table, embed the pool as an internal
+    // table (`table_data`) — FTB treats it as an embedded pool (`RewardTable.writeData`).
+    if matches!(reward.reward_type, RewardType::Choice | RewardType::Random | RewardType::AllTable)
+        && reward.table_id.is_empty()
+        && !reward.items.is_empty() {
+        let reward_list: Vec<SnbtValue> = reward.items.iter()
+            .map(|item| {
                 let mut item_m: HashMap<String, CommentedSnbt> = HashMap::new();
-                item_m.insert("item".to_string(), if flat_chapters {
-                    ce(item_compound(item, 1))
-                } else {
-                    ce(SnbtValue::String(item.clone()))
-                });
-                (i.to_string(), ce(SnbtValue::Compound(item_m)))
+                item_m.insert("id".to_string(), ce(SnbtValue::String(format!("{:016X}", item.len() as i64 + 1))));
+                item_m.insert("item".to_string(), ce(item_compound(item, 1, "")));
+                item_m.insert("weight".to_string(), ce(SnbtValue::Float(1.0)));
+                SnbtValue::Compound(item_m)
             })
             .collect();
-        m.insert("items".to_string(), ce(SnbtValue::Compound(items_map)));
+        let mut table_data: HashMap<String, CommentedSnbt> = HashMap::new();
+        table_data.insert("rewards".to_string(), ce(SnbtValue::List(reward_list)));
+        m.insert("table_data".to_string(), ce(SnbtValue::Compound(table_data)));
     }
 
     if reward.item_count > 1 {

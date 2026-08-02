@@ -76,6 +76,10 @@ export function useProjectState() {
     setConfirmCloseProject(false)
   }
 
+  function handleCloseProject() {
+    setSelectedProject(null)
+  }
+
   return {
     projects,
     selectedProject,
@@ -90,5 +94,6 @@ export function useProjectState() {
     handleSaveProject,
     handleConfirmDelete,
     handleCloseDelete,
+    handleCloseProject,
   }
 }

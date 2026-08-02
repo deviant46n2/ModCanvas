@@ -80,6 +80,36 @@ export function BookSettings({
               <input type="number" value={graph.default_quest_size?.height || 24} onChange={(e) => onGraphChange({ ...graph, default_quest_size: { ...graph.default_quest_size, height: parseInt(e.target.value) || 24 } })} />
             </div>
             <div className="ftb-popup-field">
+              <label>Grid Scale (snap)</label>
+              <input type="number" step="0.1" value={graph.grid_scale ?? 0.5} onChange={(e) => onGraphChange({ ...graph, grid_scale: parseFloat(e.target.value) || 0.5 })} />
+            </div>
+          </div>
+          <div className="ftb-popup-section">
+            <div className="ftb-popup-section-title">Global Defaults (data.snbt)</div>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.default_reward_team || false} onChange={(e) => onGraphChange({ ...graph, default_reward_team: e.target.checked })} />
+              <span>Rewards go to the whole team</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.default_consume_items || false} onChange={(e) => onGraphChange({ ...graph, default_consume_items: e.target.checked })} />
+              <span>Consume items on task completion</span>
+            </label>
+            <div className="ftb-popup-field">
+              <label>Autoclaim Rewards</label>
+              <select value={graph.default_autoclaim_rewards || 'disabled'} onChange={(e) => onGraphChange({ ...graph, default_autoclaim_rewards: e.target.value })}>
+                <option value="disabled">Disabled</option>
+                <option value="enabled">Enabled</option>
+                <option value="no_toast">No Toast</option>
+                <option value="invisible">Invisible</option>
+              </select>
+            </div>
+            <div className="ftb-popup-field">
+              <label>Detection Delay (ticks)</label>
+              <input type="number" min="0" max="200" value={graph.detection_delay ?? 20} onChange={(e) => onGraphChange({ ...graph, detection_delay: parseInt(e.target.value) || 20 })} />
+            </div>
+          </div>
+          <div className="ftb-popup-section">
+            <div className="ftb-popup-field">
               <label>Mods Directory</label>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input type="text" value={modsDirInput} onChange={(e) => setModsDirInput(e.target.value)} placeholder="e.g. /home/user/instances/MyPack/mods" style={{ flex: 1 }} />

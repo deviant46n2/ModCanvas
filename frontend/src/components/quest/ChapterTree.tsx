@@ -8,6 +8,8 @@ import {
 import type { Node, Edge, NodeProps } from '@xyflow/react';
 import type { QuestChapter, QuestChapterGroup } from '../../services/api';
 import { GroupNodeComponent, GROUP_HEIGHT } from './chapter-groups';
+import { stripMcFormatting } from '../../core/theme/font-formatter';
+import { AnimatedSprite } from './AnimatedSprite';
 
 interface ChapterTreeProps {
   chapters: QuestChapter[];
@@ -15,25 +17,34 @@ interface ChapterTreeProps {
   activeChapter: string | null;
   questCounts: Record<string, number>;
   chapterIcons: Record<string, string | undefined>;
+  chapterIconKeys: Record<string, string | undefined>;
   collapsedGroups: Record<string, boolean>;
   onSelectChapter: (id: string) => void;
   onToggleGroup: (id: string) => void;
   onAddChapter: () => void;
+  onEditChapter?: (id: string) => void;
+  onAddGroup?: () => void;
+  onEditGroup?: (id: string) => void;
 }
 
 const NODE_HEIGHT = 40;
 const INDENT = 20;
+const HEADER_HEIGHT = 36;
+const PADDING = 4;
 
 function ChapterNodeComponent({ data }: NodeProps) {
   const d = data as any;
   const label = d.label || 'Untitled';
   const iconUrl = d.iconUrl as string | undefined;
+  const iconKey = d.iconKey as string | undefined;
   const questCount = d.questCount as number;
   const isActive = d.isActive as boolean;
+  const isAddButton = d.isAddButton as boolean;
 
   return (
     <div
       className={`ch-tree-chapter ${isActive ? 'active' : ''}`}
+      title={isAddButton ? undefined : 'Double-click to edit chapter settings'}
       style={{
         height: NODE_HEIGHT,
         display: 'flex',
@@ -62,7 +73,7 @@ function ChapterNodeComponent({ data }: NodeProps) {
         }}
       >
         {iconUrl ? (
-          <img src={iconUrl} alt="" style={{ width: 16, height: 16, objectFit: 'contain', imageRendering: 'pixelated' }} />
+          <AnimatedSprite url={iconUrl} textureKey={iconKey} width={16} height={16} alt="" style={{ objectFit: 'contain' }} />
         ) : (
           <span style={{ fontSize: 12 }}>📖</span>
         )}
@@ -112,24 +123,45 @@ function ChapterTreeInner({
   questCounts,
   collapsedGroups,
   chapterIcons,
+  chapterIconKeys,
   onSelectChapter,
   onToggleGroup,
   onAddChapter,
+  onEditChapter,
+  onAddGroup,
+  onEditGroup,
 }: ChapterTreeProps) {
 
-  console.log('[ChapterTree] rendering with chapters:', chapters.map((c: any) => ({ id: c.id, title: c.title, group_id: c.group_id, order_index: c.order_index })));
-
-  const { nodes: layoutNodes, edges: layoutEdges } = useMemo(() => {
+  const { nodes: layoutNodes, edges: layoutEdges, totalHeight } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    let y = 4;
+    let y = PADDING;
 
     const groupedChapters = chapters.filter(c => c.group_id);
     const ungroupedChapters = chapters.filter(c => !c.group_id);
+    const sortedGroups = [...chapterGroups].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const byOrder = (a: QuestChapter, b: QuestChapter) => (a.order_index || 0) - (b.order_index || 0);
 
-    for (const group of chapterGroups) {
+    for (const ch of [...ungroupedChapters].sort(byOrder)) {
+      nodes.push({
+        id: ch.id,
+        type: 'chapter',
+        position: { x: 0, y },
+        data: {
+          label: stripMcFormatting(ch.title) || 'Untitled',
+          iconUrl: chapterIcons[ch.id],
+          iconKey: chapterIconKeys[ch.id],
+          questCount: questCounts[ch.id] || 0,
+          isActive: activeChapter === ch.id,
+        },
+        style: { width: 220, height: NODE_HEIGHT },
+      });
+      y += NODE_HEIGHT;
+    }
+
+    for (const group of sortedGroups) {
       const groupId = `group:${group.id}`;
-      const members = groupedChapters.filter(c => c.group_id === group.id);
+      const members = groupedChapters.filter(c => c.group_id === group.id).sort(byOrder);
       const isCollapsed = collapsedGroups[group.id] === true;
 
       nodes.push({
@@ -137,7 +169,7 @@ function ChapterTreeInner({
         type: 'group',
         position: { x: 0, y },
         data: {
-          label: group.title,
+          label: stripMcFormatting(group.title) || 'Group',
           isCollapsed,
           memberCount: members.length,
         },
@@ -152,8 +184,9 @@ function ChapterTreeInner({
             type: 'chapter',
             position: { x: INDENT, y },
             data: {
-              label: ch.title || 'Untitled',
+              label: stripMcFormatting(ch.title) || 'Untitled',
               iconUrl: chapterIcons[ch.id],
+              iconKey: chapterIconKeys[ch.id],
               questCount: questCounts[ch.id] || 0,
               isActive: activeChapter === ch.id,
             },
@@ -171,22 +204,6 @@ function ChapterTreeInner({
       }
     }
 
-    for (const ch of ungroupedChapters) {
-      nodes.push({
-        id: ch.id,
-        type: 'chapter',
-        position: { x: 0, y },
-        data: {
-          label: ch.title || 'Untitled',
-          iconUrl: chapterIcons[ch.id],
-          questCount: questCounts[ch.id] || 0,
-          isActive: activeChapter === ch.id,
-        },
-        style: { width: 220, height: NODE_HEIGHT },
-      });
-      y += NODE_HEIGHT;
-    }
-
     nodes.push({
       id: '__add_chapter__',
       type: 'chapter',
@@ -194,9 +211,19 @@ function ChapterTreeInner({
       data: { label: '+ Add Chapter', isAddButton: true, isActive: false },
       style: { width: 220, height: NODE_HEIGHT },
     });
+    y += NODE_HEIGHT;
 
-    return { nodes, edges };
-  }, [chapters, chapterGroups, activeChapter, questCounts, collapsedGroups]);
+    nodes.push({
+      id: '__add_group__',
+      type: 'chapter',
+      position: { x: 0, y },
+      data: { label: '+ Add Group', isAddButton: true, isAddGroupButton: true, isActive: false },
+      style: { width: 220, height: NODE_HEIGHT },
+    });
+    y += NODE_HEIGHT + PADDING;
+
+    return { nodes, edges, totalHeight: y };
+  }, [chapters, chapterGroups, activeChapter, questCounts, collapsedGroups, chapterIcons, chapterIconKeys]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
@@ -212,6 +239,10 @@ function ChapterTreeInner({
         onAddChapter();
         return;
       }
+      if (node.id === '__add_group__') {
+        onAddGroup?.();
+        return;
+      }
       if (node.type === 'group') {
         const groupId = node.id.replace('group:', '');
         onToggleGroup(groupId);
@@ -219,15 +250,29 @@ function ChapterTreeInner({
       }
       onSelectChapter(node.id);
     },
-    [onSelectChapter, onToggleGroup, onAddChapter]
+    [onSelectChapter, onToggleGroup, onAddChapter, onAddGroup]
+  );
+
+  const handleNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (node.type === 'group') {
+        const groupId = node.id.replace('group:', '');
+        onEditGroup?.(groupId);
+        return;
+      }
+      if (node.type === 'chapter' && node.id !== '__add_chapter__' && node.id !== '__add_group__') {
+        onEditChapter?.(node.id);
+      }
+    },
+    [onEditChapter, onEditGroup]
   );
 
   return (
-    <div style={{ width: 250, height: '100%', background: 'var(--ftb-surface)' }}>
+    <div style={{ width: 250, height: '100%', background: 'var(--ftb-surface)', display: 'flex', flexDirection: 'column' }}>
       <div
         className="ch-tree-header"
         style={{
-          height: 36,
+          height: HEADER_HEIGHT,
           display: 'flex',
           alignItems: 'center',
           padding: '0 12px',
@@ -238,32 +283,36 @@ function ChapterTreeInner({
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '1px',
+          flexShrink: 0,
         }}
       >
         Chapters ({chapters.length})
       </div>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
-        fitView={false}
-        panOnDrag={false}
-        panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        minZoom={1}
-        maxZoom={1}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        style={{ height: 'calc(100% - 36px)' }}
-        proOptions={{ hideAttribution: true }}
-      >
-      </ReactFlow>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          fitView={false}
+          panOnDrag={false}
+          panOnScroll={false}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          minZoom={1}
+          maxZoom={1}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+          style={{ minHeight: totalHeight, overflow: 'visible' }}
+          proOptions={{ hideAttribution: true }}
+        >
+        </ReactFlow>
+      </div>
     </div>
   );
 }

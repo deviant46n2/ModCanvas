@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
   getCurseforgeApiKey,
@@ -7,14 +7,21 @@ import {
   exportModrinthMrpack,
   exportCurseforgeZip,
   openPrismLauncher,
+  ingestActiveInstance as apiIngestActiveInstance,
+  scanInstanceMods as apiScanInstanceMods,
+  importFtbQuestsFromDir as apiImportFtbQuests,
+  saveQuestGraph as apiSaveQuestGraph,
 } from '../services/api'
 import { useProjectState, type Project } from './useProjectState'
 import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
+import type { IngestResult } from '../services/quest-types'
+import type { LoadPackProgress } from '../services/types'
 
 export type { Project } from './useProjectState'
 export type { ModDependency, ModMetadata, CompatibilityIssue, CompatibilityResult } from './useModState'
+export type { LoadPackProgress } from '../services/types'
 
 export interface ImportResult {
   project: Project
@@ -47,6 +54,100 @@ export function useAppState() {
   const [curseforgeApiKey, setCurseforgeApiKey] = useState('')
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState('')
+
+  const [ingestResult, setIngestResult] = useState<IngestResult | null>(null)
+  const [ingesting, setIngesting] = useState(false)
+  const [ingestError, setIngestError] = useState('')
+
+  const [showLoadPack, setShowLoadPack] = useState(false)
+  const [loadPackProgress, setLoadPackProgress] = useState<LoadPackProgress>({
+    stage: 'idle',
+    message: '',
+    progress: 0,
+  })
+  const [packLoaded, setPackLoaded] = useState(false)
+
+  const runIngestion = useCallback(async (instancePath: string) => {
+    if (!instancePath) return
+    setIngesting(true)
+    setIngestError('')
+    try {
+      console.log('[Frontend] Starting ingestion for:', instancePath)
+      const result = await apiIngestActiveInstance(instancePath)
+      console.log('[Frontend] Ingestion result:', result)
+      setIngestResult(result)
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || String(e)
+      console.error('[Frontend] Ingestion failed:', msg)
+      setIngestError(msg)
+    } finally {
+      setIngesting(false)
+    }
+  }, [])
+
+  async function loadPack(project: Project) {
+    if (!project.path) return
+    setPackLoaded(false)
+    setShowLoadPack(true)
+    setLoadPackProgress({ stage: 'textures', message: 'Preparing to scan textures...', progress: 5 })
+    
+    // Yield to let modal render first
+    await new Promise(r => setTimeout(r, 0))
+
+    try {
+      // Stage 1: Ingest textures
+      setLoadPackProgress({ stage: 'textures', message: 'Scanning JAR files...', progress: 10 })
+      console.log('[Frontend] Load Pack - calling ingest for path:', project.path)
+      const ingestResult = await apiIngestActiveInstance(project.path)
+      console.log('[Frontend] Ingest result:', {
+        textures_indexed: ingestResult.textures_indexed,
+        jars_scanned: ingestResult.jars_scanned,
+      })
+      setIngestResult(ingestResult)
+      setLoadPackProgress({ stage: 'textures', message: `Indexed ${ingestResult.textures_indexed} textures from ${ingestResult.jars_scanned} mods`, progress: 30 })
+
+      // Stage 2: Import FTB Quests
+      setLoadPackProgress({ stage: 'quests', message: 'Reading FTB Quests data...', progress: 40 })
+      const importResult = await apiImportFtbQuests(project.path)
+      setLoadPackProgress({ stage: 'quests', message: `Found ${importResult.chapter_count} chapters, ${importResult.quest_count} quests`, progress: 55 })
+      
+      // Save quest graph to database
+      if (importResult.graph && importResult.graph.chapters.length > 0) {
+        setLoadPackProgress({ stage: 'quests', message: 'Saving quest graph to database...', progress: 65 })
+        await apiSaveQuestGraph(project.id, importResult.graph)
+      }
+
+      // Stage 3: Load mods
+      setLoadPackProgress({ stage: 'mods', message: 'Scanning instance mods folder...', progress: 70 })
+      await apiScanInstanceMods(project.id)
+      setLoadPackProgress({ stage: 'mods', message: 'Loading mod metadata...', progress: 80 })
+      await modState.loadProjectMods(project.id)
+
+      // Stage 4: Load configs
+      setLoadPackProgress({ stage: 'mods', message: 'Loading config files...', progress: 90 })
+      await configState.loadConfigFiles()
+
+      // Complete
+      setLoadPackProgress({ stage: 'complete', message: 'Pack loaded successfully!', progress: 100 })
+      setPackLoaded(true)
+      
+      // Auto-close modal after brief delay
+      setTimeout(() => setShowLoadPack(false), 1500)
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || String(e)
+      console.error('[Frontend] Load pack failed:', msg)
+      setLoadPackProgress({ stage: 'error', message: 'Failed to load pack', progress: 0, error: msg })
+    }
+  }
+
+  function closePack() {
+    setPackLoaded(false)
+    setIngestResult(null)
+    setIngestError('')
+    projectState.handleCloseProject()
+    modState.setSearchQuery('')
+    modState.setSearchResults([])
+  }
 
   useEffect(() => {
     projectState.loadProjects()
@@ -232,5 +333,15 @@ export function useAppState() {
     exportMrpack,
     exportCurseforge,
     openPrismLauncher,
+    runIngestion,
+    ingestResult,
+    ingesting,
+    ingestError,
+    showLoadPack,
+    setShowLoadPack,
+    loadPackProgress,
+    packLoaded,
+    loadPack,
+    closePack,
   }
 }

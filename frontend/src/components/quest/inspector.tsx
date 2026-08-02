@@ -1,9 +1,11 @@
 
 import type { Node } from '@xyflow/react'
-import type { QuestObjectiveData, QuestRewardData } from '../../services/api'
+import type { QuestObjectiveData, QuestRewardData, RewardTableData } from '../../services/api'
 import {
   VISIBILITY_OPTIONS, SHAPES, PROGRESSION_MODES, DEPENDENCY_REQUIREMENTS,
 } from './nodes'
+import { resolveIconKey } from './nodes'
+import { AnimatedSprite } from './AnimatedSprite'
 import { ObjectivesTab } from './ObjectivesTab'
 import { RewardsTab } from './RewardsTab'
 
@@ -65,6 +67,7 @@ interface InspectorSectionProps {
   updateInspectorReward: (idx: number, field: string, value: unknown) => void
   removeInspectorReward: (idx: number) => void
   addInspectorReward: () => void
+  rewardTables: RewardTableData[]
   textureIndex: Record<string, string>
 }
 
@@ -75,6 +78,7 @@ export function InspectorSection({
   edit: e, inspectorObjectives, inspectorRewards,
   updateInspectorObjective, removeInspectorObjective, addInspectorObjective,
   updateInspectorReward, removeInspectorReward, addInspectorReward,
+  rewardTables,
   textureIndex,
 }: InspectorSectionProps) {
   if (!selectedNode) {
@@ -95,7 +99,7 @@ export function InspectorSection({
         <div className="inspector-panel-header-left">
           <div className="inspector-panel-icon">
             {selectedIconDataUrl ? (
-              <img src={selectedIconDataUrl} alt="" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
+              <AnimatedSprite url={selectedIconDataUrl} textureKey={resolveIconKey((selectedNode.data as any)?.icon)} width={24} height={24} alt="" />
             ) : (
               <span style={{ fontSize: 16 }}>{selectedFallbackIcon}</span>
             )}
@@ -143,7 +147,7 @@ export function InspectorSection({
                 </div>
                 {e.icon && textureIndex[e.icon] && (
                   <div style={{ marginTop: 4 }}>
-                    <img src={textureIndex[e.icon]} alt={e.icon} style={{ width: 32, height: 32, imageRendering: 'pixelated', borderRadius: 4, background: '#11111b', padding: 2 }} />
+                    <AnimatedSprite url={textureIndex[e.icon]} textureKey={resolveIconKey(e.icon)} width={32} height={32} alt="" imageRendering="pixelated" className="inspector-icon-preview" />
                   </div>
                 )}
               </div>
@@ -176,6 +180,7 @@ export function InspectorSection({
             onUpdate={updateInspectorReward}
             onRemove={removeInspectorReward}
             onAdd={addInspectorReward}
+            rewardTables={rewardTables}
           />
         )}
 
@@ -210,7 +215,7 @@ export function InspectorSection({
               </div>
               <div className="inspector-panel-field">
                 <label>Icon Scaling</label>
-                <input type="number" step="0.1" min="0.1" max="10" value={e.iconScaling} onChange={(v) => { e.setIconScaling(Number(v.target.value)); liveSaveField('icon_scaling', Number(v.target.value)) }} />
+                <input type="number" step="0.1" min="0.1" max="2.0" value={e.iconScaling} onChange={(v) => { e.setIconScaling(Number(v.target.value)); liveSaveField('icon_scaling', Number(v.target.value)) }} />
               </div>
             </div>
             <div className="inspector-panel-field">

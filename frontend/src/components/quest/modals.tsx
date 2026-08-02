@@ -1,6 +1,7 @@
 
 import type { QuestAnalysis, QuestChapterGroup, QuestGraphData } from '../../services/api'
 import { PROGRESSION_MODES, SHAPES } from './nodes'
+import { AnimatedSprite } from './AnimatedSprite'
 
 interface ModalsSectionProps {
   showAnalysis: boolean; analysis: QuestAnalysis | null; setShowAnalysis: (v: boolean) => void
@@ -184,7 +185,7 @@ export function ModalsSection({
                       onClick={() => { setEditIcon(itemId); setShowIconPicker(false) }}
                       title={itemId}
                     >
-                      <img src={dataUrl} alt={itemId} style={{ width: 32, height: 32, imageRendering: 'pixelated' }} />
+                      <AnimatedSprite url={dataUrl} textureKey={itemId} width={32} height={32} alt={itemId} imageRendering="pixelated" />
                       <span className="icon-picker-label">{itemId.split(':').pop()}</span>
                     </button>
                   ))}

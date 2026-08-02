@@ -56,6 +56,7 @@ export interface QuestObjectiveData {
   required: boolean
   item_tag: string
   nbt_data: string
+  smart_filter: string
   consume_items: boolean
   match_nbt: boolean
   ignore_nbt: boolean
@@ -93,6 +94,7 @@ export interface QuestRewardData {
   item_tag: string
   item_count: number
   nbt_data: string
+  smart_filter: string
   xp_amount: number
   xp_levels: number
   command: string
@@ -110,10 +112,11 @@ export interface QuestRewardData {
 export const TILE_WIDTH = 200
 export const ICON_SIZE = 32
 
+import { resolveAssetUrl } from '../../services/asset-resolver'
+
 export function getIconUrl(textureIndex: Record<string, string>, itemId: string): string | null {
   if (!itemId) return null
-  const key = itemId.replace(/^minecraft:/, '').replace(/^textures\/(item|block)\//, '').replace(/\.png$/, '')
-  return textureIndex[key] || textureIndex[itemId] || null
+  return resolveAssetUrl(itemId, textureIndex) || null
 }
 
 export function getObjectiveIcon(obj: QuestObjectiveData): string | null {

@@ -37,6 +37,7 @@ export interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  source: 'modrinth' | 'curseforge'
 }
 
 export interface CompatibilityIssue {
@@ -111,4 +112,11 @@ export interface TagInfo {
 export interface GeneratedScripts {
   kubejsScript: string;
   crafttweakerScript: string;
+}
+
+export interface LoadPackProgress {
+  stage: 'idle' | 'textures' | 'quests' | 'mods' | 'complete' | 'error'
+  message: string
+  progress: number
+  error?: string
 }

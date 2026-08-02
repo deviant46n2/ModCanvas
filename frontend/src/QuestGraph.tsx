@@ -165,6 +165,7 @@ export default function QuestGraph({ projectId, projectPath }: QuestGraphProps) 
           updateInspectorReward={ui.updateInspectorReward}
           removeInspectorReward={ui.removeInspectorReward}
           addInspectorReward={ui.addInspectorReward}
+          rewardTables={data.graph?.reward_tables || []}
           textureIndex={data.textureIndex}
         />
       </div>

@@ -3,6 +3,9 @@ import { ReactFlow, Controls, Background, MiniMap } from '@xyflow/react';
 import type { Node, Edge, Connection } from '@xyflow/react';
 import type { QuestGraphData } from '../../services/api';
 import { resolveIconKey } from './nodes';
+import { stripMcFormatting } from '../../core/theme/font-formatter';
+import { textureDisplayUrl, isTexturePending } from '../../services/texture-loader';
+import { QuestIcon } from './QuestIcon';
 
 interface CanvasSectionProps {
   filteredNodes: Node[];
@@ -81,7 +84,8 @@ export function CanvasSection({
             }
             const renderChapter = (ch: typeof graph.chapters[0]) => {
               const resolvedIcon = resolveIconKey(ch.icon);
-              const iconUrl = ch.icon ? textureIndex[resolvedIcon] : '';
+              const iconUrl = ch.icon ? textureDisplayUrl(textureIndex, resolvedIcon) : '';
+              const iconPending = ch.icon ? isTexturePending(textureIndex, resolvedIcon) : false;
               console.log(`[QuestGraph] Chapter "${ch.title}": icon="${ch.icon}" resolved="${resolvedIcon}" url="${iconUrl ? 'FOUND' : 'MISSING'}"`);
               return (
                 <button
@@ -90,25 +94,22 @@ export function CanvasSection({
                   onClick={() => setActiveChapter(ch.id)}
                 >
                   <span className="ch-icon">
-                    {iconUrl ? (
-                      <img src={iconUrl} alt="" style={{ width: 18, height: 18, imageRendering: 'pixelated' }} />
-                    ) : (
-                      ch.icon || '\u{1F4D6}'
-                    )}
+                    <QuestIcon url={iconUrl || null} pending={iconPending} fallback={ch.icon || '\u{1F4D6}'} size={18} imgSize={18} fallbackFontSize={12} textureKey={resolvedIcon} />
                   </span>
-                  <span className="ch-title">{ch.title}</span>
+                  <span className="ch-title">{stripMcFormatting(ch.title)}</span>
                   <span className="ch-count">{chapterQuestCounts[ch.id] || 0}</span>
                 </button>
               );
             };
-            for (const ch of ungrouped) {
+            const byOrder = (a: typeof graph.chapters[0], b: typeof graph.chapters[0]) => (a.order_index || 0) - (b.order_index || 0);
+            for (const ch of [...ungrouped].sort(byOrder)) {
               items.push(renderChapter(ch));
             }
             for (const group of groups.sort((a, b) => (a.order_index || 0) - (b.order_index || 0))) {
-              const groupChapters = chaptersByGroup[group.id] || [];
+              const groupChapters = [...(chaptersByGroup[group.id] || [])].sort(byOrder);
               if (groupChapters.length === 0) continue;
               const isCollapsed = !!collapsedGroups[group.id];
-              const groupTitle = group.title || `Group ${groups.indexOf(group) + 1}`;
+              const groupTitle = stripMcFormatting(group.title) || `Group ${groups.indexOf(group) + 1}`;
               items.push(
                 <div key={`group-${group.id}`} className="ftb-chapter-group">
                   <button
@@ -143,7 +144,11 @@ export function CanvasSection({
           nodeTypes={nodeTypes}
           fitView
           snapToGrid
-          snapGrid={[15, 15]}
+          snapGrid={[1, 1]}
+          zoomOnScroll
+          panOnScroll={false}
+          minZoom={0.1}
+          maxZoom={64}
           onMove={(_, vp) => setViewportPos(vp)}
           onEdgeDoubleClick={onEdgeDoubleClick}
         >
@@ -172,11 +177,11 @@ export function CanvasSection({
           <span className="quest-editor-statusbar-item">
             {filteredNodes.length} quests
           </span>
-          {activeChapter && (
+          {activeChapter && graph && (
             <>
               <span className="quest-editor-statusbar-separator" />
               <span className="quest-editor-statusbar-item">
-                {chapterQuestCounts[activeChapter] || 0} in chapter
+                {stripMcFormatting(graph.chapters.find(c => c.id === activeChapter)?.title || 'Untitled')} — {chapterQuestCounts[activeChapter] || 0} quests
               </span>
             </>
           )}

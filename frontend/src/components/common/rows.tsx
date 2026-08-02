@@ -14,6 +14,7 @@ interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  source: 'modrinth' | 'curseforge'
 }
 
 interface ModDependency {

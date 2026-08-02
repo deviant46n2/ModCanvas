@@ -6,6 +6,7 @@ pub mod imports;
 pub mod indexer;
 pub mod ingest;
 pub mod instance_textures;
+pub mod ftb_theme;
 pub mod launcher;
 pub mod models;
 pub mod mod_intelligence;
@@ -222,6 +223,9 @@ pub fn run() {
             crate::ingest::get_texture_file,
             crate::ingest::get_texture_files,
             crate::instance_textures::scan_instance_textures_cmd,
+            crate::instance_textures::scan_instance_animations_cmd,
+            crate::instance_textures::resolve_item_tags_cmd,
+            crate::ftb_theme::get_quest_theme_background,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Minecraft Modpack Maker");

@@ -1,7 +1,7 @@
 import type { McFormattedSegment } from './types';
 import { MC_COLOR_MAP } from './types';
 
-const FORMAT_CODE_REGEX = /§([0-9a-fklmnor])/gi;
+const FORMAT_CODE_REGEX = /[§&]([0-9a-fklmnor])/gi;
 
 export function parseMcFormatted(input: string): McFormattedSegment[] {
   const segments: McFormattedSegment[] = [];
@@ -51,7 +51,7 @@ export function parseMcFormatted(input: string): McFormattedSegment[] {
   }
 
   if (current.text) segments.push(current);
-  if (segments.length === 0 && input.length > 0 && /[^§0-9a-fklmnor]/i.test(input)) {
+  if (segments.length === 0 && input.length > 0 && /[^§&0-9a-fklmnor]/i.test(input)) {
     segments.push({
       text: input, color: null, bold: false, italic: false,
       underline: false, strikethrough: false, obfuscated: false,
@@ -59,6 +59,11 @@ export function parseMcFormatted(input: string): McFormattedSegment[] {
   }
 
   return segments;
+}
+
+export function stripMcFormatting(input: string): string {
+  if (!input) return '';
+  return input.replace(/[§&][0-9a-fklmnor]/gi, '');
 }
 
 export function renderMcFormattedToHtml(input: string): string {

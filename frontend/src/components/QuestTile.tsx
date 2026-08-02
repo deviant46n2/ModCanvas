@@ -5,6 +5,8 @@ import { resolveIconKey, getIconUrl } from './quest/QuestTileTypes'
 import QuestTileHeader from './quest/QuestTileHeader'
 import QuestTileBody from './quest/QuestTileBody'
 import QuestTileFooter from './quest/QuestTileFooter'
+import { QuestIcon } from './quest/QuestIcon'
+import { isTexturePending } from '../services/texture-loader'
 
 export type { QuestTileData, QuestObjectiveData, QuestRewardData }
 
@@ -54,6 +56,7 @@ export function QuestTileComponent({
 
   const iconKey = resolveIconKey(icon)
   const questIconUrl = iconDataUrl || getIconUrl(textureIndex, iconKey) || null
+  const iconPending = isTexturePending(textureIndex, iconKey)
 
   const visIcon = visibility === 'NeverVisible' ? '👻' :
     visibility === 'AlwaysVisible' ? '👁️' :
@@ -99,11 +102,15 @@ export function QuestTileComponent({
         {visIcon && <div className="node-vis-badge" title={visibility}>{visIcon}</div>}
         {optional && <div className="node-optional-badge">○</div>}
         <div className="node-icon-large" style={{ width: iconSize, height: iconSize }}>
-          {questIconUrl ? (
-            <img src={questIconUrl} alt="" style={{ width: iconSize - 2, height: iconSize - 2, imageRendering: 'pixelated' }} />
-          ) : (
-            <span style={{ fontSize: Math.max(16, Math.round(iconSize * 0.6)) }}>{fallbackIcon}</span>
-          )}
+          <QuestIcon
+            url={questIconUrl}
+            pending={iconPending}
+            fallback={fallbackIcon}
+            size={iconSize}
+            imgSize={iconSize - 2}
+            fallbackFontSize={Math.max(16, Math.round(iconSize * 0.6))}
+            textureKey={iconKey}
+          />
         </div>
         <div className="node-label">{label}</div>
         {(objectives.length > 0 || rewards.length > 0) && (
@@ -113,7 +120,11 @@ export function QuestTileComponent({
           </div>
         )}
         <Handle type="target" position={Position.Top} className="quest-tile-handle" />
+        <Handle type="target" position={Position.Left} className="quest-tile-handle" />
+        <Handle type="target" position={Position.Right} className="quest-tile-handle" />
         <Handle type="source" position={Position.Bottom} className="quest-tile-handle" />
+        <Handle type="source" position={Position.Right} className="quest-tile-handle" />
+        <Handle type="source" position={Position.Left} className="quest-tile-handle" />
       </div>
     )
   }
@@ -163,7 +174,11 @@ export function QuestTileComponent({
       style={{ width: 200, borderLeftColor: borderColor }}
     >
       <Handle type="target" position={Position.Top} className="quest-tile-handle" />
+      <Handle type="target" position={Position.Left} className="quest-tile-handle" />
+      <Handle type="target" position={Position.Right} className="quest-tile-handle" />
       <Handle type="source" position={Position.Bottom} className="quest-tile-handle" />
+      <Handle type="source" position={Position.Right} className="quest-tile-handle" />
+      <Handle type="source" position={Position.Left} className="quest-tile-handle" />
 
       <QuestTileHeader
         data={data}
@@ -173,7 +188,6 @@ export function QuestTileComponent({
         inputRef={inputRef}
         onEditValueChange={setEditValue}
         onStartEdit={startEdit}
-        onSaveEdit={saveEdit}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />

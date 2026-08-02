@@ -3,6 +3,21 @@ export interface QuestSize {
   height: number
 }
 
+export interface ChapterImage {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  image: string
+  scale: number
+  order: number
+  alpha: number
+  color: number
+  click: string
+  hover: string[]
+}
+
 export interface QuestChapter {
   id: string
   title: string
@@ -17,6 +32,18 @@ export interface QuestChapter {
   default_quest_shape: string
   default_enabled: boolean
   progression_mode: string
+  images: ChapterImage[]
+  subtitle: string
+  default_min_width: number
+  always_invisible: boolean
+  default_hide_dependency_lines: boolean
+  hide_quest_details_until_startable: boolean
+  hide_quest_until_deps_visible: boolean
+  hide_quest_until_deps_complete: boolean
+  hide_text_until_complete: boolean
+  autofocus_id: string
+  default_repeatable: boolean
+  require_sequential_tasks: boolean
 }
 
 export interface QuestChapterGroup {
@@ -36,6 +63,7 @@ export interface QuestObjectiveData {
   required: boolean
   item_tag: string
   nbt_data: string
+  smart_filter: string
   consume_items: boolean
   match_nbt: boolean
   ignore_nbt: boolean
@@ -73,6 +101,7 @@ export interface QuestRewardData {
   item_tag: string
   item_count: number
   nbt_data: string
+  smart_filter: string
   xp_amount: number
   xp_levels: number
   command: string
@@ -133,6 +162,7 @@ export interface QuestNodeData {
   hide_dependent_lines: boolean
   min_required_dependencies: number
   dependency_requirement: string
+  link_target?: string
 }
 
 export interface QuestEdgeData {
@@ -144,6 +174,17 @@ export interface QuestEdgeData {
   inverted: boolean
 }
 
+export interface RewardTableData {
+  id: string
+  title: string
+  order_index: number
+  loot_size: number
+  empty_weight: number
+  hide_tooltip: boolean
+  use_title: boolean
+  rewards: QuestRewardData[]
+}
+
 export interface QuestGraphData {
   id: string
   project_id: string
@@ -151,6 +192,7 @@ export interface QuestGraphData {
   description: string
   chapters: QuestChapter[]
   chapter_groups: QuestChapterGroup[]
+  reward_tables: RewardTableData[]
   nodes: QuestNodeData[]
   edges: QuestEdgeData[]
   book_progression_mode: string
@@ -159,6 +201,11 @@ export interface QuestGraphData {
   quest_color: string
   default_quest_size: QuestSize
   default_quest_shape: string
+  grid_scale: number
+  default_reward_team?: boolean
+  default_consume_items?: boolean
+  default_autoclaim_rewards?: string
+  detection_delay?: number
 }
 
 export interface QuestAnalysis {
@@ -172,10 +219,72 @@ export interface QuestAnalysis {
   issues: Array<{ severity: string; message: string; node_id: string | null }>
 }
 
+export interface PrismInstance {
+  name: string
+  path: string
+}
+
+export interface ImportIssue {
+  severity: string
+  category: string
+  message: string
+  file: string | null
+  node_id: string | null
+}
+
+export interface ImportStats {
+  quests_parsed: number
+  chapters_parsed: number
+  chapter_groups_parsed: number
+  tasks_parsed: number
+  rewards_parsed: number
+  dependencies_resolved: number
+  dependencies_missing: number
+  unknown_task_types: string[]
+  unknown_reward_types: string[]
+  files_processed: number
+  files_failed: number
+  title_from_task: number
+  icon_from_task: number
+  chapter_images_total: number
+}
+
 export interface FtbQuestsImportResult {
   graph: QuestGraphData
   format: string
   layout: string
   quest_count: number
   chapter_count: number
+  stats: ImportStats
+  issues?: ImportIssue[]
+}
+
+export interface ItemRegistryEntry {
+  id: string
+  name: string
+  mod_id: string
+  texture_data_url: string | null
+}
+
+export interface IngestTextureEntry {
+  namespace: string
+  path: string
+  raw_key: string
+  canonical_key: string
+  clean_key: string
+  data_url: string
+}
+
+export interface VirtualAssetRegistry {
+  by_id: Record<string, string>
+  all_textures: IngestTextureEntry[]
+  jars_scanned: number
+  textures_indexed: number
+}
+
+export interface IngestResult {
+  asset_registry: VirtualAssetRegistry
+  jars_scanned: number
+  textures_indexed: number
+  active_instance: string
 }

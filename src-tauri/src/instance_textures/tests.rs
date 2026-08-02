@@ -24,6 +24,11 @@ fn decoded(url: &str) -> Vec<u8> {
     STANDARD.decode(url.strip_prefix("data:image/png;base64,").unwrap()).unwrap()
 }
 
+fn materialized(instance: &Path, key: &str) -> Vec<u8> {
+    let out = resolve_texture_urls(instance, &[key.to_string()]);
+    decoded(out.get(key).and_then(|u| u.as_deref()).expect("texture resolves"))
+}
+
 /// mods/ supplies the base texture, resourcepacks/ overrides it.
 #[test]
 fn resource_pack_overrides_mod() {
@@ -38,8 +43,11 @@ fn resource_pack_overrides_mod() {
 
     let idx = scan_instance_textures(dir.path());
     let winner = idx.get("minecraft:item/diamond").unwrap();
-    assert_eq!(decoded(winner), fake_png(2));
-    assert_ne!(decoded(winner), fake_png(1));
+    // Winner source points at the higher-priority pack archive.
+    assert!(winner.contains("retro_pack.zip"), "got {winner}");
+    // Materialization yields the pack's bytes, not the mod's.
+    assert_eq!(materialized(dir.path(), "minecraft:item/diamond"), fake_png(2));
+    assert_ne!(materialized(dir.path(), "minecraft:item/diamond"), fake_png(1));
     // Short and full keys stay consistent with the pack winner.
     assert_eq!(idx.get("minecraft:diamond").unwrap(), winner);
     assert_eq!(idx.get("minecraft:textures/item/diamond").unwrap(), winner);
@@ -61,6 +69,9 @@ fn vanilla_jar_textures_are_indexed() {
     let idx = scan_instance_textures(dir.path());
     assert!(idx.contains_key("minecraft:block/stone"));
     assert!(idx.contains_key("minecraft:stone"));
+    // Block items with 3D geometry in their chain bake; the texture key stays flat.
+    assert!(idx.get("minecraft:stone").unwrap().starts_with("bake:"));
+    assert_eq!(materialized(dir.path(), "minecraft:block/stone"), fake_png(3));
 }
 
 /// KubeJS generated assets are highest priority.
@@ -78,8 +89,11 @@ fn kubejs_assets_override_packs() {
 
     let idx = scan_instance_textures(dir.path());
     let winner = idx.get("atm:questpics/star").unwrap();
-    assert_eq!(decoded(winner), fake_png(5));
-    assert_ne!(decoded(winner), fake_png(4));
+    // Winner is the filesystem source under kubejs/assets.
+    assert!(winner.contains("kubejs"), "got {winner}");
+    assert!(winner.ends_with("star.png"), "got {winner}");
+    assert_eq!(materialized(dir.path(), "atm:questpics/star"), fake_png(5));
+    assert_ne!(materialized(dir.path(), "atm:questpics/star"), fake_png(4));
 }
 
 /// Result is stable across calls via the disk cache.
@@ -130,3 +144,43 @@ fn item_short_key_beats_block() {
     assert_eq!(idx.get("minecraft:cobblestone").unwrap(), idx.get("minecraft:item/cobblestone").unwrap());
     assert_ne!(idx.get("minecraft:cobblestone").unwrap(), idx.get("minecraft:block/cobblestone").unwrap());
 }
+
+/// Batch materialization opens each jar once and returns all requested keys.
+#[test]
+fn resolve_texture_urls_batches_by_jar() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("mods")).unwrap();
+    fs::create_dir_all(dir.path().join("resourcepacks")).unwrap();
+    fs::create_dir_all(dir.path().join("kubejs").join("assets")).unwrap();
+    fs::create_dir_all(dir.path().join("versions")).unwrap();
+
+    {
+        use std::io::Write;
+        use zip::write::FileOptions;
+        use zip::CompressionMethod;
+        let file = fs::File::create(dir.path().join("mods").join("a.jar")).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("assets/a/textures/item/one.png", options).unwrap();
+        zip.write_all(&fake_png(10)).unwrap();
+        zip.start_file("assets/a/textures/item/two.png", options).unwrap();
+        zip.write_all(&fake_png(11)).unwrap();
+        zip.finish().unwrap();
+    }
+    write_jar(&dir.path().join("mods").join("b.jar"), "b", "item/three", &fake_png(12));
+
+    let keys = vec![
+        "a:item/one".to_string(),
+        "a:item/two".to_string(),
+        "b:item/three".to_string(),
+        "nope:missing".to_string(),
+    ];
+    let out = resolve_texture_urls(dir.path(), &keys);
+    assert_eq!(decoded(out.get("a:item/one").unwrap().as_deref().unwrap()), fake_png(10));
+    assert_eq!(decoded(out.get("a:item/two").unwrap().as_deref().unwrap()), fake_png(11));
+    assert_eq!(decoded(out.get("b:item/three").unwrap().as_deref().unwrap()), fake_png(12));
+    assert!(out.get("nope:missing").is_none());
+}
+
+mod animations;
+mod tags;

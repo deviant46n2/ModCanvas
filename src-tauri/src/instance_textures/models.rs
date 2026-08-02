@@ -9,8 +9,6 @@
 
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::io::Read;
 use std::path::Path;
 
 /// Item model texture slots, preferred in order.
@@ -24,13 +22,37 @@ const ITEM_FALLBACK: [&str; 18] = [
 ];
 
 /// Block model texture slots that double as icon sources, preferred in order.
-const BLOCK_SLOTS: [&str; 6] = ["all", "top", "up", "north", "side", "particle"];
+const BLOCK_SLOTS: [&str; 8] = [
+    "all", "top", "up", "north", "side", "particle", "cross", "fan",
+];
 
 /// Block slots tried when the preferred ones are absent.
 const BLOCK_FALLBACK: [&str; 12] = [
     "bottom", "down", "front", "back", "left", "right", "inner", "outer", "base",
     "texture", "stem", "planks",
 ];
+
+pub(super) mod baker;
+pub(super) mod merge;
+pub(super) mod raster;
+pub(super) mod scan;
+
+/// Result of resolving one item id against its model chain.
+enum Resolved {
+    /// A flat texture source descriptor (jar:… or an absolute path).
+    Texture(String),
+    /// A model reference (`ns:item/…` or `ns:block/…`) to bake in 3D.
+    Bake(String),
+}
+
+impl Resolved {
+    fn into_index_value(self) -> String {
+        match self {
+            Resolved::Texture(url) => url,
+            Resolved::Bake(model) => format!("bake:{}", model),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Models {
@@ -56,8 +78,10 @@ impl Models {
         m
     }
 
-    /// Resolve every indexable item model to a texture and return new bare
-    /// keys (`ns:id`) not already covered by the PNG scan.
+    /// Resolve every indexable item model to either a flat texture or a 3D
+    /// bake descriptor and return new bare keys (`ns:id`) not already covered
+    /// by the PNG scan. Bake descriptors are `bake:<ns>:<kind>/<path>` and are
+    /// materialized lazily by the rasterizer at resolve time.
     pub fn resolve_bare_keys(&self, by_id: &HashMap<String, String>) -> HashMap<String, String> {
         let mut out: HashMap<String, String> = HashMap::new();
         let mut ids: Vec<&(String, String)> = self.item.keys().collect();
@@ -67,22 +91,38 @@ impl Models {
                 continue;
             }
             let mut seen: HashSet<(u8, String, String)> = HashSet::new();
-            if let Some(url) = self.resolve_item(ns, id, by_id, &mut seen, 0) {
-                out.insert(format!("{}:{}", ns, id), url);
+            if let Some(resolved) = self.resolve_item(ns, id, by_id, &mut seen, 0) {
+                out.insert(format!("{}:{}", ns, id), resolved.into_index_value());
             }
         }
         out
     }
 
-    fn resolve_item(&self, ns: &str, path: &str, by_id: &HashMap<String, String>, seen: &mut HashSet<(u8, String, String)>, depth: u32) -> Option<String> {
+    /// Parse the stored model JSON for a (kind, ns, path) model id.
+    pub fn lookup(&self, kind: &str, ns: &str, path: &str) -> Option<Value> {
+        match kind {
+            "item" => self.item.get(&(ns.to_string(), path.to_string())).cloned(),
+            "block" => self
+                .block
+                .get(&(ns.to_string(), path.to_string()))
+                .and_then(|b| serde_json::from_slice(b).ok()),
+            _ => None,
+        }
+    }
+
+    fn resolve_item(&self, ns: &str, path: &str, by_id: &HashMap<String, String>, seen: &mut HashSet<(u8, String, String)>, depth: u32) -> Option<Resolved> {
         if depth > 64 || !seen.insert((0, ns.to_string(), path.to_string())) {
             return None;
         }
         let model = self.item.get(&(ns.to_string(), path.to_string()))?;
+        // Hand-modeled 3D items (elements) render 3D in-game too.
+        if model_has_elements(model) {
+            return Some(Resolved::Bake(format!("{}:item/{}", ns, path)));
+        }
         if let Some(url) = model_texture(model, ns, by_id, &ITEM_SLOTS)
             .or_else(|| model_texture(model, ns, by_id, &ITEM_FALLBACK))
         {
-            return Some(url);
+            return Some(Resolved::Texture(url));
         }
         let parent = model.get("parent").and_then(|v| v.as_str())?;
         if parent.starts_with("builtin/") || parent == "none" {
@@ -97,8 +137,64 @@ impl Models {
         }
     }
 
-    fn resolve_block(&self, ns: &str, path: &str, by_id: &HashMap<String, String>, seen: &mut HashSet<(u8, String, String)>, depth: u32) -> Option<String> {
+    fn resolve_block(&self, ns: &str, path: &str, by_id: &HashMap<String, String>, seen: &mut HashSet<(u8, String, String)>, depth: u32) -> Option<Resolved> {
         if depth > 64 || !seen.insert((1, ns.to_string(), path.to_string())) {
+            return None;
+        }
+        // Block items with 3D geometry (in this model or any ancestor) bake
+        // into isometric renders instead of a single flat face texture.
+        if self.chain_has_elements("block", ns, path) {
+            let mut tseen: HashSet<(u8, String, String)> = HashSet::new();
+            if self.block_texture_in_chain(ns, path, by_id, &mut tseen, 0).is_some() {
+                return Some(Resolved::Bake(format!("{}:block/{}", ns, path)));
+            }
+        }
+        let raw = self.block.get(&(ns.to_string(), path.to_string()))?;
+        let model: Value = serde_json::from_slice(raw).ok()?;
+        if let Some(url) = model_texture(&model, ns, by_id, &BLOCK_SLOTS)
+            .or_else(|| model_texture(&model, ns, by_id, &BLOCK_FALLBACK))
+        {
+            return Some(Resolved::Texture(url));
+        }
+        let parent = model.get("parent").and_then(|v| v.as_str())?;
+        if parent.starts_with("builtin/") || parent == "none" {
+            return None;
+        }
+        let (pns, ppath) = split_ref(ns, parent);
+        let p = ppath.strip_prefix("block/").unwrap_or(&ppath);
+        self.resolve_block(&pns, p, by_id, seen, depth + 1)
+    }
+
+    /// True when the model (or any ancestor, following the parent chain)
+    /// defines a non-empty `elements` list — i.e. it renders as 3D geometry.
+    fn chain_has_elements(&self, kind: &str, ns: &str, path: &str) -> bool {
+        let mut seen: HashSet<(String, String, String)> = HashSet::new();
+        let mut cur = (kind.to_string(), ns.to_string(), path.to_string());
+        let mut depth = 0;
+        loop {
+            if depth > 64 || !seen.insert(cur.clone()) {
+                return false;
+            }
+            let Some(m) = self.lookup(&cur.0, &cur.1, &cur.2) else { return false };
+            if model_has_elements(&m) {
+                return true;
+            }
+            let Some(parent) = m.get("parent").and_then(|v| v.as_str()) else { return false };
+            if parent.starts_with("builtin/") || parent == "none" {
+                return false;
+            }
+            let (pns, p) = split_ref(&cur.1, parent);
+            let (pkind, ppath) = parent_kind_path(&cur.0, &p);
+            cur = (pkind, pns, ppath);
+            depth += 1;
+        }
+    }
+
+    /// Find any resolvable texture in the block chain, mirroring the bake's
+    /// own texture needs so a `bake:` descriptor is only emitted when the
+    /// icon can actually be materialized.
+    fn block_texture_in_chain(&self, ns: &str, path: &str, by_id: &HashMap<String, String>, seen: &mut HashSet<(u8, String, String)>, depth: u32) -> Option<String> {
+        if depth > 64 || !seen.insert((2, ns.to_string(), path.to_string())) {
             return None;
         }
         let raw = self.block.get(&(ns.to_string(), path.to_string()))?;
@@ -113,74 +209,42 @@ impl Models {
             return None;
         }
         let (pns, ppath) = split_ref(ns, parent);
-        let p = ppath.strip_prefix("block/").unwrap_or(&ppath);
-        self.resolve_block(&pns, p, by_id, seen, depth + 1)
-    }
-
-    fn merge_archive(&mut self, path: &Path) {
-        let file = match fs::File::open(path) {
-            Ok(f) => f,
-            Err(_) => return,
-        };
-        let mut archive = match zip::ZipArchive::new(file) {
-            Ok(a) => a,
-            Err(_) => return,
-        };
-        for i in 0..archive.len() {
-            let Ok(mut entry) = archive.by_index(i) else { continue };
-            if !entry.name().ends_with(".json") {
-                continue;
-            }
-            let name = entry.name().to_string();
-            let Some((ns, kind, mpath)) = model_relative(&name) else { continue };
-            let mut bytes = Vec::new();
-            if entry.read_to_end(&mut bytes).is_err() {
-                continue;
-            }
-            match kind.as_str() {
-                "item" => {
-                    if let Ok(v) = serde_json::from_slice(&bytes) {
-                        self.item.insert((ns, mpath), v);
-                    }
-                }
-                "block" => {
-                    self.block.insert((ns, mpath), bytes);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    fn merge_dir(&mut self, assets: &Path) {
-        for entry in walkdir::WalkDir::new(assets).into_iter().flatten() {
-            let path = entry.path();
-            if !path.extension().map_or(false, |e| e == "json") {
-                continue;
-            }
-            let rel = path.strip_prefix(assets).unwrap_or(path).to_string_lossy().replace('\\', "/");
-            let Some((ns, kind, mpath)) = model_relative(&rel) else { continue };
-            let Ok(bytes) = fs::read(path) else { continue };
-            match kind.as_str() {
-                "item" => {
-                    if let Ok(v) = serde_json::from_slice(&bytes) {
-                        self.item.insert((ns, mpath), v);
-                    }
-                }
-                "block" => {
-                    self.block.insert((ns, mpath), bytes);
-                }
-                _ => {}
-            }
+        let (pkind, p) = parent_kind_path("block", &ppath);
+        if pkind == "block" {
+            self.block_texture_in_chain(&pns, &p, by_id, seen, depth + 1)
+        } else {
+            None
         }
     }
 }
 
 /// Split a model path or texture reference into (namespace, rest).
-fn split_ref(ns: &str, value: &str) -> (String, String) {
+pub(super) fn split_ref(ns: &str, value: &str) -> (String, String) {
     match value.split_once(':') {
         Some((a, b)) => (a.to_string(), b.to_string()),
         None => (ns.to_string(), value.to_string()),
     }
+}
+
+/// Derive the (kind, path) of a parent reference from the child's kind.
+/// Parent references like `block/foo` or `item/foo` switch kind; bare paths
+/// inherit the child's kind.
+pub(super) fn parent_kind_path(child_kind: &str, parent_path: &str) -> (String, String) {
+    if let Some(r) = parent_path.strip_prefix("block/") {
+        ("block".to_string(), r.to_string())
+    } else if let Some(r) = parent_path.strip_prefix("item/") {
+        ("item".to_string(), r.to_string())
+    } else {
+        (child_kind.to_string(), parent_path.to_string())
+    }
+}
+
+/// True when a model JSON defines a non-empty `elements` list.
+fn model_has_elements(model: &Value) -> bool {
+    model
+        .get("elements")
+        .and_then(|v| v.as_array())
+        .map_or(false, |a| !a.is_empty())
 }
 
 /// Resolve a texture reference to an indexed key and return its URL.
@@ -200,27 +264,6 @@ fn model_texture(model: &Value, ns: &str, by_id: &HashMap<String, String>, slots
         }
     }
     None
-}
-
-/// Turn an archive-relative path like `assets/ns/models/item/foo.json` (or the
-/// kubejs filesystem form `ns/models/item/foo.json`) into (namespace, kind,
-/// model path without extension).
-fn model_relative(name: &str) -> Option<(String, String, String)> {
-    let trimmed = name.strip_suffix(".json")?;
-    let trimmed = trimmed.strip_prefix("assets/").unwrap_or(trimmed);
-    let parts: Vec<&str> = trimmed.split('/').collect();
-    if parts.len() < 4 || parts[1] != "models" {
-        return None;
-    }
-    let kind = parts[2].to_string();
-    if kind != "item" && kind != "block" {
-        return None;
-    }
-    let path = parts[3..].join("/");
-    if path.is_empty() {
-        return None;
-    }
-    Some((parts[0].to_string(), kind, path))
 }
 
 #[cfg(test)]

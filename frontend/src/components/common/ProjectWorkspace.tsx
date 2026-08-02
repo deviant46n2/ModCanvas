@@ -6,7 +6,9 @@ import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
 import ProgressionGraph from '../../ProgressionGraph'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
-import type { WsConnectionStatus } from '../../services/api'
+import { LoadPackModal } from './LoadPackModal'
+import type { WsConnectionStatus, IngestResult } from '../../services/api'
+import type { LoadPackProgress } from '../../services/types'
 
 
 export interface ProjectWorkspaceProps {
@@ -25,6 +27,8 @@ export interface ProjectWorkspaceProps {
   wsStatus: WsConnectionStatus
   activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes'
   onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes') => void
+  onRefreshWsStatus: () => void
+  onRestartWebSocket: () => void
   deployCompanionMessage: string
   isTesting: boolean
   testProgress: string
@@ -37,10 +41,34 @@ export interface ProjectWorkspaceProps {
 
   modsTab: ModsTabProps
   configsTab: ConfigsTabProps
+
+  ingestResult: IngestResult | null
+  ingesting: boolean
+  ingestError: string
+
+  packLoaded: boolean
+  loadPackProgress: LoadPackProgress
+  showLoadPack: boolean
+  setShowLoadPack: (show: boolean) => void
+  onLoadPack: () => void
+  onClosePack: () => void
 }
 
 export function ProjectWorkspace(props: ProjectWorkspaceProps) {
-  const { activeTab, onTabChange, project } = props
+  const { 
+    activeTab, 
+    onTabChange, 
+    project, 
+    ingestResult,
+    packLoaded,
+    loadPackProgress,
+    showLoadPack,
+    setShowLoadPack,
+    onLoadPack,
+    onClosePack,
+  } = props
+
+  const tabsDisabled = !packLoaded && activeTab !== 'mods'
 
   return (
     <div className="project-workspace">
@@ -50,6 +78,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         modLoader={project.mod_loader}
         packVersion={project.pack_version}
         wsStatus={props.wsStatus}
+        onRefreshWsStatus={props.onRefreshWsStatus}
+        onRestartWebSocket={props.onRestartWebSocket}
         deployCompanionMessage={props.deployCompanionMessage}
         isTesting={props.isTesting}
         onSave={props.onSave}
@@ -57,6 +87,9 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onDeployCompanion={props.onDeployCompanion}
         onExport={props.onExport}
         onDelete={props.onDelete}
+        packLoaded={packLoaded}
+        onLoadPack={onLoadPack}
+        onClosePack={onClosePack}
       />
 
       {props.testProgress && (
@@ -83,41 +116,72 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
             role="tab"
             aria-selected={activeTab === tab}
             aria-controls={`tabpanel-${tab}`}
-            className={`tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => onTabChange(tab)}
+            className={`tab ${activeTab === tab ? 'active' : ''} ${tabsDisabled ? 'disabled' : ''}`}
+            onClick={() => !tabsDisabled && onTabChange(tab)}
+            disabled={tabsDisabled}
+            title={tabsDisabled ? 'Load the pack first' : ''}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
 
+      {!packLoaded && activeTab === 'mods' && (
+        <div className="load-pack-prompt">
+          <div className="prompt-content">
+            <h3>Load Modpack</h3>
+            <p>Click "Load Pack" to scan textures, import FTB Quests, and load mods from the instance.</p>
+            <button className="btn-primary" onClick={onLoadPack} disabled={props.ingesting}>
+              {props.ingesting ? 'Loading...' : 'Load Pack'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="workspace-content">
         {activeTab === 'mods' && <ModsTab {...props.modsTab} />}
-        {activeTab === 'configs' && <ConfigsTab {...props.configsTab} />}
-        {activeTab === 'progression' && (
+        {activeTab === 'configs' && packLoaded && <ConfigsTab {...props.configsTab} />}
+        {activeTab === 'progression' && packLoaded && (
           <ErrorBoundary>
             <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression">
               <ProgressionGraph projectId={project.id} />
             </div>
           </ErrorBoundary>
         )}
-        {activeTab === 'quests' && (
+        {activeTab === 'quests' && packLoaded && (
           <ErrorBoundary>
             <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests">
               <CanvasThemeProvider>
-                <QuestBookEditor projectId={project.id} projectPath={project.path} wsConnected={props.wsStatus.connected} />
+                <QuestBookEditor 
+                  projectId={project.id} 
+                  projectPath={project.path} 
+                  wsConnected={props.wsStatus.connected}
+                  ingestResult={ingestResult}
+                  packLoaded={packLoaded}
+                />
               </CanvasThemeProvider>
             </div>
           </ErrorBoundary>
         )}
-        {activeTab === 'recipes' && (
+        {activeTab === 'recipes' && packLoaded && (
           <ErrorBoundary>
             <div id="tabpanel-recipes" role="tabpanel" aria-labelledby="tab-recipes">
               <RecipeEditor projectId={project.id} projectPath={project.path} />
             </div>
           </ErrorBoundary>
         )}
+        {(!packLoaded && activeTab !== 'mods') && (
+          <div className="workspace-placeholder">
+            <p>Load the pack first to access this tab</p>
+          </div>
+        )}
       </div>
+
+      <LoadPackModal
+        show={showLoadPack}
+        onClose={() => setShowLoadPack(false)}
+        progress={loadPackProgress}
+      />
     </div>
   )
 }

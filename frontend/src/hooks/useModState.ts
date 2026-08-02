@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, searchMods, addMod, removeMod, scanInstanceMods } from '../services/api'
 import { debounce } from '../core/utils/debounce'
 import type { Project } from './useProjectState'
@@ -22,6 +22,7 @@ export interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  source: 'modrinth' | 'curseforge'
 }
 
 export interface CompatibilityIssue {
@@ -39,19 +40,20 @@ export interface CompatibilityResult {
 
 export function useModState(selectedProject: Project | null) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<ModMetadata[]>([])
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchSource, setSearchSource] = useState<'modrinth' | 'curseforge'>('modrinth')
   const [projectMods, setProjectMods] = useState<any[]>([])
   const [modFilter, setModFilter] = useState('')
   const [modFilterInput, setModFilterInput] = useState('')
-  const [modMetadata, setModMetadata] = useState<Map<string, ModMetadata>>(new Map())
+  const [modMetadata, setModMetadata] = useState<Map<string, any>>(new Map())
   const [depNameMap, setDepNameMap] = useState<Map<string, string>>(new Map())
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
-  const [compatResult, setCompatResult] = useState<CompatibilityResult | null>(null)
+  const [compatResult, setCompatResult] = useState<any | null>(null)
   const [isCheckingCompat, setIsCheckingCompat] = useState(false)
 
-  const debouncedSetModFilter = useMemo(
-    () => debounce((value: string) => setModFilter(value), 300),
-    [],
+  const debouncedSetModFilter = useCallback(
+    debounce((value: string) => setModFilter(value), 300),
+    []
   )
   const filteredMods = useMemo(() => {
     return projectMods.filter(mod =>
@@ -88,7 +90,7 @@ export function useModState(selectedProject: Project | null) {
     setIsLoadingMetadata(true)
     try {
       const metadata = await getProjectModMetadata(selectedProject.id)
-      const map = new Map<string, ModMetadata>()
+      const map = new Map<string, any>()
       for (const m of metadata) {
         map.set(m.mod_id, m)
       }
@@ -140,10 +142,11 @@ export function useModState(selectedProject: Project | null) {
         mod.mod_id,
         mod.slug,
         mod.name,
-        mod.version || '',
-        mod.description || '',
-        mod.author || '',
-        'Modrinth',
+        mod.version,
+        mod.description,
+        mod.author,
+        mod.source || 'Modrinth',
+        true,
       )
       await loadProjectMods(selectedProject.id)
     } catch (e) {
@@ -164,15 +167,14 @@ export function useModState(selectedProject: Project | null) {
   async function toggleModEnabled(mod: any) {
     if (!selectedProject) return
     try {
-      await removeMod(selectedProject.id, mod.mod_id)
       await addMod(
         selectedProject.id,
         mod.mod_id,
         mod.slug,
         mod.name,
-        mod.version || '',
-        mod.description || '',
-        mod.author || '',
+        mod.version,
+        mod.description,
+        mod.author,
         mod.source || 'Modrinth',
         !mod.enabled,
       )
@@ -189,6 +191,7 @@ export function useModState(selectedProject: Project | null) {
         searchQuery,
         selectedProject.mod_loader,
         selectedProject.minecraft_version,
+        searchSource,
       )
       setSearchResults(results)
     } catch (e) {
@@ -196,10 +199,10 @@ export function useModState(selectedProject: Project | null) {
     }
   }
 
-  function getMissingDependencies(modId: string): ModDependency[] {
+  function getMissingDependencies(modId: string) {
     const meta = modMetadata.get(modId)
     if (!meta) return []
-    return meta.dependencies.filter(dep => {
+    return meta.dependencies.filter((dep: ModDependency) => {
       if (dep.dependency_type !== 'required') return false
       return !projectMods.some(m => m.mod_id === dep.mod_id)
     })
@@ -229,6 +232,7 @@ export function useModState(selectedProject: Project | null) {
     projectMods,
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
+    searchSource, setSearchSource,
     modFilterInput, setModFilterInput,
     modMetadata,
     isLoadingMetadata,

@@ -1,6 +1,6 @@
 use super::types::{SnbtMapHelper, FtBQuestsFormat, FtBQuestsLayout, FtBQuestsImportResult, ImportStats, ImportIssue, IssueSeverity, IssueCategory};
 use super::detect::{detect_format, detect_layout};
-use crate::imports::snbt::{SnbtValue, parse_snbt};
+use crate::imports::snbt::{SnbtValue, CommentedSnbt, parse_snbt};
 use crate::quest::*;
 use anyhow::{Result, Context};
 use std::collections::HashMap;
@@ -230,6 +230,10 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
         }
     }
 
+    // Parse reward tables (weighted pools referenced by random/choice/all-table rewards)
+    // Must run before dependency edges so table_id references can resolve to graph nodes.
+    parse_reward_tables(&quests_dir, format, &mut graph, &mut result);
+
     // Build dependency edges from quest dependency fields
     let deps_resolved = build_dependency_edges(&mut graph, &mut result);
 
@@ -372,6 +376,21 @@ fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut
             if let Some(mode) = snbt.get_str("progression_mode") {
                 graph.book_progression_mode = QuestProgressionMode::from_string(mode);
             }
+            if let Some(gs) = snbt.get_f64("grid_scale") {
+                graph.grid_scale = gs;
+            }
+            if let Some(v) = snbt.get_bool("default_reward_team") {
+                graph.default_reward_team = v;
+            }
+            if let Some(v) = snbt.get_bool("default_consume_items") {
+                graph.default_consume_items = v;
+            }
+            if let Some(v) = snbt.get_str("default_autoclaim_rewards") {
+                graph.default_autoclaim_rewards = v.to_string();
+            }
+            if let Some(v) = snbt.get_i64("detection_delay") {
+                graph.detection_delay = v as i32;
+            }
             // Try to get version
             let version = snbt.get_str("version")
                 .or_else(|| snbt.get_str("Version"))
@@ -394,6 +413,21 @@ fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut
             }
             if let Some(mode) = val.get("progression_mode").and_then(|v| v.as_str()) {
                 graph.book_progression_mode = QuestProgressionMode::from_string(mode);
+            }
+            if let Some(v) = val.get("grid_scale").and_then(|v| v.as_f64()) {
+                graph.grid_scale = v;
+            }
+            if let Some(v) = val.get("default_reward_team").and_then(|v| v.as_bool()) {
+                graph.default_reward_team = v;
+            }
+            if let Some(v) = val.get("default_consume_items").and_then(|v| v.as_bool()) {
+                graph.default_consume_items = v;
+            }
+            if let Some(v) = val.get("default_autoclaim_rewards").and_then(|v| v.as_str()) {
+                graph.default_autoclaim_rewards = v.to_string();
+            }
+            if let Some(v) = val.get("detection_delay").and_then(|v| v.as_i64()) {
+                graph.detection_delay = v as i32;
             }
             let version = val.get("version")
                 .or_else(|| val.get("Version"))
@@ -700,6 +734,21 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     let order_index = m.get_i64("order_index").unwrap_or(0) as i32;
     let hide_dep_lines = m.get_bool("default_hide_dependency_lines").unwrap_or(false);
     let chapter_default_enabled = m.get_bool("default_enabled").unwrap_or(true);
+    let subtitle = m.get_str("subtitle").unwrap_or("").to_string();
+    let default_min_width = m.get_i64("default_min_width").unwrap_or(0) as i32;
+    let default_size_scalar = m.get_f64("default_quest_size").unwrap_or(1.0);
+    let default_quest_size = QuestSize {
+        width: (default_size_scalar * 24.0).round(),
+        height: (default_size_scalar * 24.0).round(),
+    };
+    let always_invisible = m.get_bool("always_invisible").unwrap_or(false);
+    let hide_details_until_startable = m.get_bool("hide_quest_details_until_startable").unwrap_or(false);
+    let hide_until_deps_visible = m.get_bool("hide_quest_until_deps_visible").unwrap_or(false);
+    let hide_until_deps_complete = m.get_bool("hide_quest_until_deps_complete").unwrap_or(false);
+    let hide_text_until_complete = m.get_bool("hide_text_until_complete").unwrap_or(false);
+    let autofocus_id = m.get_str("autofocus_id").unwrap_or("").to_string();
+    let default_repeatable = m.get_bool("default_repeatable_quest").unwrap_or(false);
+    let require_sequential_tasks = m.get_bool("require_sequential_tasks").unwrap_or(false);
 
     // Chapter groups
     if !group.is_empty() {
@@ -739,18 +788,29 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     graph.chapters.push(QuestChapter {
         id: chapter_id.clone(),
         title,
+        subtitle,
         description: String::new(),
         icon: resolve_ftbquests_icon(&extract_icon_str(&m.value)),
         background_image: String::new(),
         order_index,
         hide_until_first_quest_complete: false,
-        default_quest_size: QuestSize { width: 24.0, height: 24.0 },
+        default_quest_size,
+        default_min_width,
         quest_color: String::new(),
         group_id: if group.is_empty() { None } else { Some(group) },
         default_quest_shape: QuestShape::from_string(&default_shape),
         default_enabled: chapter_default_enabled,
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
         images,
+        always_invisible,
+        default_hide_dependency_lines: hide_dep_lines,
+        hide_quest_details_until_startable: hide_details_until_startable,
+        hide_quest_until_deps_visible: hide_until_deps_visible,
+        hide_quest_until_deps_complete: hide_until_deps_complete,
+        hide_text_until_complete,
+        autofocus_id,
+        default_repeatable,
+        require_sequential_tasks,
     });
 
     // Parse quests array
@@ -789,6 +849,20 @@ fn extract_first_task_item(m: &SnbtValue) -> Option<String> {
         return Some(item_str.to_string());
     }
     None
+}
+
+/// True if the first task is a `checkmark`-type task (the FTB checkmark, not a
+/// shaped node). Checkmark tasks carry no item id, so quests whose only task is a
+/// checkmark would otherwise fall back to an unresolvable icon.
+fn first_task_is_checkmark(m: &SnbtValue) -> bool {
+    let tasks_val = m.get("tasks");
+    let tasks_list = tasks_val.and_then(|v| v.as_list());
+    if let Some(first) = tasks_list.and_then(|l| l.first()) {
+        let task_type = first.get_str("type").unwrap_or("");
+        return task_type == "checkmark" || task_type == "ftbquests:checkmark"
+            || task_type == "minecraft:checkmark";
+    }
+    false
 }
 
 /// Format an item ID like "minecraft:diamond" or "allthemodium:allthemodium_ingot"
@@ -830,10 +904,15 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
     let y = m.get_f64("y").unwrap_or(0.0);
     let icon = extract_icon_str(m);
     let icon = if icon.is_empty() || icon == "minecraft:" {
-        if first_task_item.is_some() {
+        if let Some(item) = first_task_item.as_deref() {
             result.stats.icon_from_task += 1;
+            resolve_ftbquests_icon(item)
+        } else if first_task_is_checkmark(m) {
+            // In-game FTB uses Icons.ACCEPT_GRAY as the checkmark task icon.
+            "ftblibrary:textures/icons/accept_gray.png".to_string()
+        } else {
+            resolve_ftbquests_icon("")
         }
-        resolve_ftbquests_icon(first_task_item.as_deref().unwrap_or(""))
     } else {
         resolve_ftbquests_icon(&icon)
     };
@@ -856,7 +935,14 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
     let pause_reward = m.get_bool("pause_reward").unwrap_or(false);
     let lock_icon = m.get_str("lock_icon").unwrap_or("").to_string();
     let quest_background = m.get_str("quest_background").unwrap_or("").to_string();
-    let icon_scaling = m.get_f64("icon_scaling").unwrap_or(1.0);
+    // FTB writes `icon_scale` (Quest.java writeData). Also accept the legacy
+    // `icon_scaling` key the app once emitted for subdirs layouts, and clamp to
+    // FTB's editor range (0.1 – 2.0).
+    let icon_scaling = m
+        .get_f64("icon_scale")
+        .or_else(|| m.get_f64("icon_scaling"))
+        .unwrap_or(1.0)
+        .clamp(0.1, 2.0);
     let progression_mode = m.get_str("progression_mode").unwrap_or("default").to_string();
     let sequential_tasks = m.get_bool("sequential_tasks").unwrap_or(false);
     let disable_completion_toast = m.get_bool("disable_completion_toast").unwrap_or(false);
@@ -916,10 +1002,16 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
         }
     }
 
-    let node_type = if !default_enabled {
-        QuestNodeType::SideQuest
+    let (node_type, link_target) = if let Some(link) = m.get_str("linked_quest") {
+        let target = link.to_string();
+        if !target.is_empty() {
+            data.insert("_link_target".to_string(), target.clone());
+        }
+        (QuestNodeType::QuestLink, target)
+    } else if !default_enabled {
+        (QuestNodeType::SideQuest, String::new())
     } else {
-        QuestNodeType::Quest
+        (QuestNodeType::Quest, String::new())
     };
 
     let parsed_visibility = match visibility.as_str() {
@@ -984,6 +1076,7 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
         hide_dependent_lines,
         min_required_dependencies,
         dependency_requirement: parsed_dependency_requirement,
+        link_target,
     })
 }
 
@@ -1170,6 +1263,8 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
             obj.nbt_data = crate::imports::snbt::compound_to_snbt(&comp_m);
         }
     }
+    // FTB Filter System smart filter DSL (nested item components)
+    obj.smart_filter = extract_smart_filter(m);
     if let Some(tag) = m.get_str("tag") {
         obj.item_tag = tag.to_string();
     }
@@ -1286,6 +1381,31 @@ fn parse_item_task(m: &SnbtValue) -> (String, i32) {
     (String::new(), count)
 }
 
+/// Extract the FTB Filter System smart filter DSL from a task/reward compound.
+/// The DSL lives in nested 1.20.5+ Data Components, e.g.
+/// `item: { components: { "ftbfiltersystem:filter": "or(item(...)item(...))" }, count: 1, id: "ftbfiltersystem:smart_filter" }`
+fn extract_smart_filter(m: &SnbtValue) -> String {
+    fn extract(components: &HashMap<String, CommentedSnbt>) -> Option<&str> {
+        components.get("ftbfiltersystem:filter").and_then(|c| c.value.as_str())
+    }
+
+    if let Some(item_m) = m.get("item").and_then(|v| v.as_compound()) {
+        if let Some(components) = item_m.get("components").and_then(|v| v.as_compound()) {
+            if let Some(dsl) = extract(components) {
+                return dsl.to_string();
+            }
+        }
+    }
+
+    if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
+        if let Some(dsl) = extract(components) {
+            return dsl.to_string();
+        }
+    }
+
+    String::new()
+}
+
 // ─── SNBT Reward Parser ────────────────────────────────────────────────────
 
 fn parse_snbt_rewards(m: &SnbtValue) -> Result<Vec<QuestReward>> {
@@ -1322,6 +1442,7 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
         item_count: 1,
         item_tag: String::new(),
         nbt_data: String::new(),
+        smart_filter: String::new(),
         xp_amount: 0,
         xp_levels: 0,
         command: String::new(),
@@ -1378,14 +1499,23 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
         "choice" | "ftbquests:choice" | "minecraft:choice" => {
             reward.reward_type = RewardType::Choice;
             reward.items = parse_reward_items(m);
+            if let Some(table_id) = m.get_i64("table_id") {
+                reward.table_id = RewardTable::to_hex_id(table_id);
+            }
         }
         "random" | "ftbquests:random" | "minecraft:random" => {
             reward.reward_type = RewardType::Random;
             reward.items = parse_reward_items(m);
+            if let Some(table_id) = m.get_i64("table_id") {
+                reward.table_id = RewardTable::to_hex_id(table_id);
+            }
         }
         "all" | "ftbquests:all" | "minecraft:all" => {
             reward.reward_type = RewardType::AllTable;
             reward.items = parse_reward_items(m);
+            if let Some(table_id) = m.get_i64("table_id") {
+                reward.table_id = RewardTable::to_hex_id(table_id);
+            }
         }
         "advancement" | "ftbquests:advancement" | "minecraft:advancement" => {
             reward.reward_type = RewardType::Advancement;
@@ -1413,12 +1543,19 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
     if let Some(nbt) = m.get_str("nbt") {
         reward.nbt_data = nbt.to_string();
     }
+    // Table entries always carry a weight even when the type is plain "item".
+    if reward.reward_type != RewardType::ItemWithWeight {
+        if let Some(w) = m.get_f64("weight") {
+            reward.weight = w;
+        }
+    }
     if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
         reward.nbt_data = crate::imports::snbt::compound_to_snbt(&components);
     }
     if let Some(tag) = m.get_str("tag") {
         reward.item_tag = tag.to_string();
     }
+    reward.smart_filter = extract_smart_filter(m);
     reward.consume_items = m.get_bool("consume_items").unwrap_or(false);
     reward.match_nbt = m.get_bool("match_nbt").unwrap_or(false);
     reward.ignore_nbt = m.get_bool("ignore_nbt").unwrap_or(false);
@@ -1456,6 +1593,139 @@ fn parse_reward_items(m: &SnbtValue) -> Vec<String> {
     }
 
     items
+}
+
+// ─── Reward Tables ──────────────────────────────────────────────────────────
+
+/// Parse `quests_dir/reward_tables/*.snbt|json5` weighted pools into the graph,
+/// then resolve `table_id` references on random/choice/all_table rewards so the
+/// table's item list is available to the editor.
+fn parse_reward_tables(quests_dir: &Path, format: FtBQuestsFormat, graph: &mut QuestGraph, result: &mut FtBQuestsImportResult) {
+    let tables_dir = quests_dir.join("reward_tables");
+    if !tables_dir.is_dir() {
+        return;
+    }
+
+    let mut tables: Vec<RewardTable> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&tables_dir) {
+        for entry in entries.flatten() {
+            let file_path = entry.path();
+            if !file_path.is_file() { continue; }
+            let ext = file_path.extension().unwrap_or_default();
+            let parsed = match format {
+                FtBQuestsFormat::Snbt if ext == "snbt" => parse_snbt_reward_table_file(&file_path),
+                FtBQuestsFormat::Json5 if ext == "json5" || ext == "json" => parse_json5_reward_table_file(&file_path),
+                _ => continue,
+            };
+            match parsed {
+                Ok(Some(table)) => tables.push(table),
+                Ok(None) => {}
+                Err(e) => {
+                    result.issues.push(ImportIssue {
+                        severity: IssueSeverity::Warning,
+                        category: IssueCategory::ParseError,
+                        message: format!("Failed to parse reward table: {e}"),
+                        file: Some(file_path.display().to_string()),
+                        node_id: None,
+                    });
+                }
+            }
+        }
+    }
+
+    tables.sort_by_key(|t| t.order_index);
+    // Preserve stable ids for existing tables by name, then add new ones.
+    for table in tables {
+        if !graph.reward_tables.iter().any(|t| t.id == table.id) {
+            graph.reward_tables.push(table);
+        }
+    }
+
+    // Resolve table_id references on rewards across all quest nodes.
+    for node in graph.nodes.iter_mut() {
+        if !matches!(node.node_type, QuestNodeType::Quest | QuestNodeType::SideQuest) {
+            continue;
+        }
+        for reward in node.rewards.iter_mut() {
+            match reward.reward_type {
+                RewardType::Random | RewardType::Choice | RewardType::AllTable => {
+                    if reward.table_id.is_empty() {
+                        continue;
+                    }
+                    let long_id = RewardTable::to_long_id(&reward.table_id);
+                    if let Some(table) = graph.reward_tables.iter().find(|t| RewardTable::to_long_id(&t.id) == long_id) {
+                        if reward.items.is_empty() {
+                            reward.items = table.rewards.iter()
+                                .map(|r| r.item_id.clone())
+                                .filter(|i| !i.is_empty())
+                                .collect();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Parse a single `reward_tables/<hex_id>.snbt` file into a `RewardTable`.
+fn parse_snbt_reward_table_file(path: &Path) -> Result<Option<RewardTable>> {
+    let content = std::fs::read_to_string(path)?;
+    let snbt = parse_snbt(&content)?;
+    let map = snbt.as_compound().ok_or_else(|| anyhow::anyhow!("reward table root is not a compound"))?;
+    let table = parse_snbt_reward_table(map)?;
+    Ok(Some(table))
+}
+
+fn parse_snbt_reward_table(map: &HashMap<String, CommentedSnbt>) -> Result<RewardTable> {
+    let id = map.get("id").and_then(|v| v.value.as_str()).unwrap_or("").to_string();
+    let mut rewards = Vec::new();
+    if let Some(list) = map.get("rewards").and_then(|v| v.value.as_list()) {
+        for reward_val in list {
+            if let Ok(r) = parse_snbt_single_reward(reward_val) {
+                rewards.push(r);
+            }
+        }
+    }
+    Ok(RewardTable {
+        id,
+        title: map.get("title").and_then(|v| v.value.as_str()).unwrap_or("").to_string(),
+        order_index: map.get("order_index").and_then(|v| v.value.as_i64()).unwrap_or(0) as i32,
+        loot_size: map.get("loot_size").and_then(|v| v.value.as_i64()).unwrap_or(0) as i32,
+        empty_weight: map.get("empty_weight").and_then(|v| v.value.as_f64()).unwrap_or(0.0),
+        hide_tooltip: map.get("hide_tooltip").and_then(|v| v.value.as_bool()).unwrap_or(false),
+        use_title: map.get("use_title").and_then(|v| v.value.as_bool()).unwrap_or(true),
+        rewards,
+    })
+}
+
+/// Parse a single `reward_tables/<hex_id>.json5` file into a `RewardTable`.
+fn parse_json5_reward_table_file(path: &Path) -> Result<Option<RewardTable>> {
+    let content = std::fs::read_to_string(path)?;
+    let val: serde_json::Value = serde_json::from_str(&content)?;
+    let obj = val.as_object().ok_or_else(|| anyhow::anyhow!("reward table root is not an object"))?;
+
+    let mut rewards = Vec::new();
+    if let Some(serde_json::Value::Array(list)) = obj.get("rewards") {
+        for reward_val in list {
+            if let Some(reward_obj) = reward_val.as_object() {
+                if let Ok(r) = parse_json5_reward(reward_obj) {
+                    rewards.push(r);
+                }
+            }
+        }
+    }
+
+    Ok(Some(RewardTable {
+        id: obj.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        title: obj.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        order_index: obj.get("order_index").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+        loot_size: obj.get("loot_size").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+        empty_weight: obj.get("empty_weight").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        hide_tooltip: obj.get("hide_tooltip").and_then(|v| v.as_bool()).unwrap_or(false),
+        use_title: obj.get("use_title").and_then(|v| v.as_bool()).unwrap_or(true),
+        rewards,
+    }))
 }
 
 // ─── Standalone Quest Files (SNBT) ─────────────────────────────────────────
@@ -1520,6 +1790,22 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
     let group = val.get("group").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let order_index = val.get("order_index").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
     let chapter_default_enabled = val.get("default_enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+    let subtitle = val.get("subtitle").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let default_min_width = val.get("default_min_width").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let default_size_scalar = val.get("default_quest_size").and_then(|v| v.as_f64()).unwrap_or(1.0);
+    let default_quest_size = QuestSize {
+        width: (default_size_scalar * 24.0).round(),
+        height: (default_size_scalar * 24.0).round(),
+    };
+    let always_invisible = val.get("always_invisible").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_dep_lines = val.get("default_hide_dependency_lines").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_details_until_startable = val.get("hide_quest_details_until_startable").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_until_deps_visible = val.get("hide_quest_until_deps_visible").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_until_deps_complete = val.get("hide_quest_until_deps_complete").and_then(|v| v.as_bool()).unwrap_or(false);
+    let hide_text_until_complete = val.get("hide_text_until_complete").and_then(|v| v.as_bool()).unwrap_or(false);
+    let autofocus_id = val.get("autofocus_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let default_repeatable = val.get("default_repeatable_quest").and_then(|v| v.as_bool()).unwrap_or(false);
+    let require_sequential_tasks = val.get("require_sequential_tasks").and_then(|v| v.as_bool()).unwrap_or(false);
     result.stats.files_processed += 1;
 
     if !group.is_empty() && !graph.chapter_groups.iter().any(|cg| cg.id == group || cg.title == group) {
@@ -1570,18 +1856,29 @@ fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut Ft
     graph.chapters.push(QuestChapter {
         id: chapter_id.clone(),
         title,
+        subtitle,
         description: String::new(),
         icon: val.get("icon").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         background_image: String::new(),
         order_index,
         hide_until_first_quest_complete: false,
-        default_quest_size: QuestSize { width: 24.0, height: 24.0 },
+        default_quest_size,
+        default_min_width,
         quest_color: String::new(),
         group_id: if group.is_empty() { None } else { Some(group) },
         default_quest_shape: QuestShape::from_string(&default_shape),
         default_enabled: chapter_default_enabled,
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
         images,
+        always_invisible,
+        default_hide_dependency_lines: hide_dep_lines,
+        hide_quest_details_until_startable: hide_details_until_startable,
+        hide_quest_until_deps_visible: hide_until_deps_visible,
+        hide_quest_until_deps_complete: hide_until_deps_complete,
+        hide_text_until_complete,
+        autofocus_id,
+        default_repeatable,
+        require_sequential_tasks,
     });
 
     let mut quest_count = 0usize;
@@ -1624,6 +1921,10 @@ fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id:
             data.insert("_dependencies".to_string(), dep_ids.join(","));
         }
     }
+    let link_target = m.get("linked_quest").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    if !link_target.is_empty() {
+        data.insert("_link_target".to_string(), link_target.clone());
+    }
 
     let parsed_visibility = match visibility.as_str() {
         "always" | "always_visible" => QuestVisibility::AlwaysVisible,
@@ -1650,7 +1951,13 @@ fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id:
 
     Ok(QuestNode {
         id,
-        node_type: if !default_enabled { QuestNodeType::SideQuest } else { QuestNodeType::Quest },
+        node_type: if !link_target.is_empty() {
+            QuestNodeType::QuestLink
+        } else if !default_enabled {
+            QuestNodeType::SideQuest
+        } else {
+            QuestNodeType::Quest
+        },
         label: title,
         description,
         position: Position { x, y },
@@ -1666,6 +1973,7 @@ fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, chapter_id:
         optional,
         shape: QuestShape::from_string(&shape),
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
+        link_target,
         ..Default::default()
     })
 }
@@ -1765,8 +2073,21 @@ fn parse_json5_reward(m: &serde_json::Map<String, serde_json::Value>) -> Result<
             let table = m.get("loot_table").and_then(|v| v.as_str()).unwrap_or("").to_string();
             (RewardType::LootTable, table)
         }
-        "choice" | "ftbquests:choice" => (RewardType::Choice, String::new()),
-        "random" | "ftbquests:random" => (RewardType::Random, String::new()),
+        "choice" | "ftbquests:choice" => {
+            let table_id = m.get("table_id").and_then(|v| v.as_i64());
+            let table_hex = table_id.map(|t| RewardTable::to_hex_id(t)).unwrap_or_default();
+            (RewardType::Choice, table_hex)
+        }
+        "random" | "ftbquests:random" => {
+            let table_id = m.get("table_id").and_then(|v| v.as_i64());
+            let table_hex = table_id.map(|t| RewardTable::to_hex_id(t)).unwrap_or_default();
+            (RewardType::Random, table_hex)
+        }
+        "all" | "ftbquests:all" | "all_table" | "ftbquests:all_table" => {
+            let table_id = m.get("table_id").and_then(|v| v.as_i64());
+            let table_hex = table_id.map(|t| RewardTable::to_hex_id(t)).unwrap_or_default();
+            (RewardType::AllTable, table_hex)
+        }
         "advancement" | "ftbquests:advancement" => {
             let adv = m.get("advancement").and_then(|v| v.as_str()).unwrap_or("").to_string();
             (RewardType::Advancement, adv)
@@ -1779,11 +2100,13 @@ fn parse_json5_reward(m: &serde_json::Map<String, serde_json::Value>) -> Result<
         _ => (RewardType::Custom, reward_type_str),
     };
 
+    let is_table_type = matches!(reward_type, RewardType::Choice | RewardType::Random | RewardType::AllTable);
     Ok(QuestReward {
         id,
         label: if title.is_empty() { reward_type.display_name().to_string() } else { title },
         reward_type,
-        item_id,
+        item_id: if is_table_type { String::new() } else { item_id.clone() },
+        table_id: if is_table_type { item_id } else { String::new() },
         ..Default::default()
     })
 }

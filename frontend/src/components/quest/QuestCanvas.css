@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 100%;
   background: var(--ftb-bg, #1e1e1e);
-  border: 1px solid var(--ftb-border, #8b7355);
+  border: 1px solid var(--ftb-border);
   border-radius: 0;
   overflow: hidden;
 }
@@ -14,7 +14,7 @@
   justify-content: space-between;
   padding: 8px 16px;
   background: var(--ftb-surface, #25252a);
-  border-bottom: 2px solid var(--ftb-border, #8b7355);
+  border-bottom: 2px solid var(--ftb-border);
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -29,9 +29,9 @@
   padding: 6px 12px;
   font-size: 12px;
   background: var(--ftb-input-bg, #1e1e22);
-  border: 2px solid var(--ftb-border, #8b7355);
+  border: 2px solid var(--ftb-border);
   border-radius: 0;
-  color: var(--ftb-text, #c8c8c8);
+  color: var(--ftb-text);
   cursor: pointer;
   text-transform: uppercase;
   font-family: 'JetBrains Mono', monospace;
@@ -41,8 +41,8 @@
 
 .toolbar-btn:hover {
   background: var(--ftb-surface-alt, #2d2d33);
-  border-color: var(--ftb-accent, #d4a843);
-  color: var(--ftb-accent, #d4a843);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
 }
 
 .toolbar-group label {
@@ -50,27 +50,27 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--ftb-text-dim, #8a8a8a);
+  color: var(--ftb-text-dim);
   cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
 }
 
 .toolbar-group input[type="checkbox"] {
-  accent-color: var(--ftb-accent, #d4a843);
+  accent-color: var(--ftb-accent);
 }
 
 .canvas-stats {
   font-size: 11px;
-  color: var(--ftb-text-dim, #8a8a8a);
+  color: var(--ftb-text-dim);
   padding: 4px 8px;
   background: var(--ftb-input-bg, #1e1e22);
-  border: 1px solid var(--ftb-border, #8b7355);
+  border: 1px solid var(--ftb-border);
   font-family: 'JetBrains Mono', monospace;
 }
 
 .cycle-warning {
-  color: var(--ftb-danger, #cc4444);
+  color: var(--ftb-danger);
   margin-left: 8px;
   font-weight: 700;
 }
@@ -79,6 +79,16 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+}
+
+.quest-canvas-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .quest-canvas-wrapper .react-flow {
@@ -92,13 +102,28 @@
   left: 16px;
   pointer-events: none;
   z-index: 10;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.chapter-add-link-button {
+  background: rgba(56, 130, 246, 0.25);
+  border-color: rgba(56, 130, 246, 0.8);
+  color: #93c5fd;
+}
+
+.chapter-add-link-button:hover {
+  background: rgba(56, 130, 246, 0.4);
+  color: #fff;
 }
 
 .chapter-add-button {
   padding: 6px 14px;
-  background: var(--ftb-accent, #d4a843);
+  background: var(--ftb-accent);
   color: var(--ftb-bg, #1a1a1e);
-  border: 2px solid var(--ftb-accent-hover, #e8bc5e);
+  border: 2px solid var(--ftb-accent-hover);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -114,7 +139,7 @@
 
 .chapter-add-button:hover {
   opacity: 1;
-  background: var(--ftb-accent-hover, #e8bc5e);
+  background: var(--ftb-accent-hover);
 }
 
 /* FTB Quest Node - in-game style */
@@ -135,12 +160,67 @@
 }
 
 .ftb-quest-node.selected .ftb-quest-shape-wrap {
-  box-shadow: 0 0 0 3px var(--ftb-accent, #d4a843), 0 0 16px rgba(212, 168, 67, 0.35);
+  box-shadow: 0 0 0 3px var(--ftb-accent), 0 0 16px rgba(91, 155, 213, 0.35);
 }
 
 .ftb-quest-node.optional .ftb-quest-shape-wrap {
   opacity: 0.7;
   border-style: dashed;
+}
+
+/* Progress simulation overlays ("Simulate" mode) */
+.ftb-quest-node.sim-hidden {
+  opacity: 0.25;
+  filter: grayscale(0.9);
+}
+.ftb-quest-node.sim-locked .ftb-quest-shape-wrap {
+  filter: saturate(0.45) brightness(0.8);
+}
+.ftb-quest-node.sim-complete .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.6), 0 0 12px rgba(74, 222, 128, 0.35);
+}
+.ftb-quest-sim-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #fff;
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.ftb-quest-sim-hidden {
+  background: rgba(148, 163, 184, 0.9);
+}
+.ftb-quest-sim-locked {
+  background: rgba(251, 146, 60, 0.92);
+}
+.ftb-quest-sim-done {
+  background: rgba(74, 222, 128, 0.95);
+  font-size: 12px;
+  padding: 2px 5px;
+}
+
+/* Quest link (cross-chapter reference) badge */
+.ftb-quest-node.quest-link .ftb-quest-shape-wrap {
+  border-style: dashed;
+}
+.ftb-quest-link-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(56, 130, 246, 0.92);
+  color: #fff;
+  z-index: 3;
+  pointer-events: none;
 }
 
 /* Shape wrapper: the colored shape tile */
@@ -161,6 +241,8 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
 .ftb-quest-node-icon-img {
@@ -181,7 +263,7 @@
 .ftb-quest-node-title {
   font-size: 10px;
   font-weight: 600;
-  color: var(--ftb-text-bright, #f0e6c0);
+  color: var(--ftb-text-bright);
   line-height: 1.2;
   text-align: center;
   overflow: hidden;
@@ -196,20 +278,14 @@
   pointer-events: none;
 }
 
-/* Node handles */
+/* Node handles — invisible, only exist for edge routing */
 .ftb-node-handle {
-  width: 8px !important;
-  height: 8px !important;
-  background: var(--ftb-accent, #d4a843) !important;
-  border: 2px solid var(--ftb-bg, #1a1a1e) !important;
-  border-radius: 0 !important;
-  opacity: 0.7;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.ftb-node-handle:hover {
-  opacity: 1;
-  transform: scale(1.3);
+  width: 4px !important;
+  height: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* FTB shape clip-paths */
@@ -229,20 +305,28 @@
   border-radius: 8px;
 }
 
+.shape-rounded_square {
+  border-radius: 8px;
+}
+
 .shape-diamond {
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 
 .shape-pentagon {
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 
 .shape-hexagon {
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 
 .shape-octagon {
   clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 
 .shape-heart {
@@ -251,13 +335,118 @@
 
 .shape-gear {
   clip-path: polygon(35% 0%, 65% 0%, 70% 20%, 80% 30%, 100% 35%, 100% 65%, 80% 70%, 70% 80%, 65% 100%, 35% 100%, 30% 80%, 20% 70%, 0% 65%, 0% 35%, 20% 30%, 30% 20%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 
-/* Edge styles */
+/* When the instance's real FTB shape textures are available, the whole tile
+   (grey fill + tinted/white outline) is baked once into a single square PNG by
+   `bakeShapeTile` (shape-textures.ts) at the node's display size, then shown as
+   a plain <img>. Baking avoids all CSS stretching (`background-size`,
+   `object-fit`, `image-rendering: pixelated`), which distorted the shape
+   geometry and painted a grey plate box under WebKit. The texture's own alpha
+   defines the silhouette, so only the shape shows — no box behind it. */
+.ftb-quest-shape-wrap.has-texture {
+  clip-path: none;
+  border: none;
+  border-radius: 0;
+  filter: none;
+}
+
+.ftb-quest-shape-tile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Chapter images layer */
+/* No overflow: hidden here: the layer box is anchored at flow origin and moves
+   with pan, so clipping at its boundary would slice images whose flow coords are
+   negative (FTB chapters commonly place art above/left of origin). The containing
+   .quest-canvas-wrapper clips at the true screen edge instead. */
+.chapter-images-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  /* Must paint BELOW quest nodes. This layer is portaled into
+     .react-flow__viewport-portal, which ReactFlow mounts AFTER the node layer in
+     the DOM; with z-index:0 it stacked above the nodes (which use z-index:auto).
+     A negative value keeps the art behind quests/edges while still above the
+     canvas background. */
+  z-index: -1;
+}
+
+.chapter-image {
+  position: absolute;
+  /* FTB renders chapter images stretched to fill their box (ImageIconRenderer
+     blits the full texture rect), so mirror that with 100% 100% instead of
+     `contain`, which letterboxes and shifts decorations out of alignment. */
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: opacity 0.2s ease;
+}
+
+.chapter-image:hover {
+  opacity: 1 !important;
+}
+
+.chapter-image[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--ftb-text-bright);
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  border: 1px solid var(--ftb-accent);
+  pointer-events: none;
+  z-index: 999;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Edge styles.
+   Dependency arrows are rendered by the `dependency` edge component as a dark
+   casing stroke under a bright core (see quest-edges.tsx) so they read over any
+   chapter background; the CSS here only covers fallbacks and interaction. */
 .react-flow__edge-path {
-  stroke: #8b7355;
   stroke-width: 2;
   fill: none;
+}
+
+.quest-edge-casing {
+  fill: none;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55));
+}
+
+.quest-edge-label {
+  fill: var(--ftb-text-bright);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  paint-order: stroke;
+  stroke: var(--ftb-bg);
+  stroke-width: 3px;
+}
+
+.quest-edge-chevron {
+  pointer-events: none;
+}
+
+.quest-edge-source-dot {
+  pointer-events: none;
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
@@ -271,63 +460,172 @@
   }
 }
 
+/* Connect mode: reveal the quest connection ports so dependencies can be
+   created by dragging between quests. Only the source handles are made
+   interactive: with the loose connection mode the start node becomes the edge
+   source, so allowing grabs from target handles would silently invert the
+   dependency direction. */
+.connect-mode-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--ftb-accent);
+  color: var(--ftb-bg, #1a1a1e);
+  border: 2px solid var(--ftb-accent-hover);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.connect-mode-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.connect-mode-close:hover {
+  color: #fff;
+}
+
+/* React Flow v12 renders source handles with a bare `source` class (the
+   old `react-flow__handle-source` selector was removed in v12), so match on
+   `.react-flow__handle.source` to reveal the connection ports in connect mode. */
+.quest-canvas-wrapper.connect-mode .react-flow__handle.source {
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--ftb-accent) !important;
+  border: 2px solid #f4f4f5 !important;
+  border-radius: 50% !important;
+  cursor: crosshair;
+  z-index: 5;
+}
+
+.quest-canvas-wrapper.connect-mode .react-flow__handle.source:hover {
+  background: var(--ftb-accent-hover) !important;
+  transform: translate(-50%, -50%) scale(1.35) !important;
+}
+
+/* Floating action chip for the currently selected dependency arrow. */
+.edge-action-chip {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(13, 14, 19, 0.96);
+  border: 1px solid var(--ftb-accent);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.edge-action-label {
+  color: var(--ftb-text);
+  white-space: nowrap;
+}
+
+.edge-action-delete {
+  background: var(--ftb-surface-alt, #2d2d33);
+  border: 1px solid var(--ftb-danger, #e74c3c);
+  color: var(--ftb-danger, #ff8a8a);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edge-action-delete:hover {
+  background: var(--ftb-danger, #e74c3c);
+  color: #fff;
+}
+
 /* MiniMap customization */
 .react-flow__minimap {
   background: var(--ftb-surface, #25252a);
-  border: 2px solid var(--ftb-border, #8b7355);
+  border: 2px solid var(--ftb-border);
   border-radius: 0;
 }
 
 /* Controls */
 .react-flow__controls {
   background: var(--ftb-surface, #25252a);
-  border: 2px solid var(--ftb-border, #8b7355);
+  border: 2px solid var(--ftb-border);
   border-radius: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .react-flow__controls-button {
   background: var(--ftb-surface-alt, #2d2d33);
-  border: 1px solid var(--ftb-border, #8b7355);
+  border: 1px solid var(--ftb-border);
   border-radius: 0;
-  color: var(--ftb-text, #c8c8c8);
-  fill: var(--ftb-text, #c8c8c8);
+  color: var(--ftb-text);
+  fill: var(--ftb-text);
   width: 28px;
   height: 28px;
 }
 
 .react-flow__controls-button:hover {
   background: var(--ftb-input-bg, #1e1e22);
-  border-color: var(--ftb-accent, #d4a843);
+  border-color: var(--ftb-accent);
 }
 
 .react-flow__controls-button svg {
-  stroke: var(--ftb-text, #c8c8c8);
-  fill: var(--ftb-text, #c8c8c8);
+  stroke: var(--ftb-text);
+  fill: var(--ftb-text);
 }
 
 /* Attribution */
 .react-flow__attribution {
   background: var(--ftb-surface, #25252a);
-  border-top: 2px solid var(--ftb-border, #8b7355);
-  color: var(--ftb-text-dim, #8a8a8a);
+  border-top: 2px solid var(--ftb-border);
+  color: var(--ftb-text-dim);
   font-size: 10px;
   opacity: 0.5;
 }
 
 .react-flow__attribution a {
-  color: var(--ftb-text-dim, #8a8a8a);
+  color: var(--ftb-text-dim);
 }
 
 /* Selection box */
 .react-flow__selection {
-  background: rgba(212, 168, 67, 0.08);
-  border: 2px solid var(--ftb-accent, #d4a843);
+  background: rgba(91, 155, 213, 0.08);
+  border: 2px solid var(--ftb-accent);
 }
 
 /* Background grid pattern override */
 .react-flow__background {
   background-color: var(--ftb-bg, #1e1e1e);
+}
+
+/* When an in-game quest background backdrop is active, keep the editor grid dots
+   but drop the opaque fill so the theme texture shows through behind them. */
+.quest-canvas-wrapper.has-backdrop .react-flow__background {
+  background-color: transparent !important;
 }
 
 /* === Quest Detail Modal === */
@@ -343,14 +641,16 @@
 }
 
 .quest-detail-modal {
-  background: #2b2b30;
-  border: 2px solid #d4a843;
+  background: var(--ftb-surface, #12131a);
+  border: 2px solid var(--ftb-border);
+  border-radius: 8px;
+  outline: 1px solid rgba(91, 155, 213, 0.3);
   width: 560px;
   max-width: 90vw;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
 }
 
 .quest-detail-header {
@@ -359,7 +659,7 @@
   gap: 12px;
   padding: 16px;
   background: #222226;
-  border-bottom: 2px solid #d4a843;
+  border-bottom: 2px solid var(--ftb-accent);
 }
 
 .quest-detail-icon {
@@ -396,7 +696,7 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid transparent;
-  color: #f0e6c0;
+  color: var(--ftb-text-bright);
   font-size: 16px;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
@@ -406,13 +706,13 @@
 }
 
 .quest-detail-title-input:focus {
-  border-bottom-color: #d4a843;
+  border-bottom-color: var(--ftb-accent);
 }
 
 .quest-detail-subtitle-input {
   background: transparent;
   border: none;
-  color: #8a8a8a;
+  color: var(--ftb-text-dim);
   font-size: 12px;
   font-family: 'JetBrains Mono', monospace;
   padding: 2px 4px;
@@ -420,13 +720,13 @@
 }
 
 .quest-detail-subtitle-input:focus {
-  color: #c8c8c8;
+  color: var(--ftb-text);
 }
 
 .quest-detail-close {
   background: transparent;
   border: none;
-  color: #8a8a8a;
+  color: var(--ftb-text-dim);
   font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
@@ -434,7 +734,7 @@
 }
 
 .quest-detail-close:hover {
-  color: #f0e6c0;
+  color: var(--ftb-text-bright);
 }
 
 .quest-detail-body {
@@ -458,7 +758,7 @@
   gap: 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #d4a843;
+  color: var(--ftb-accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-family: 'JetBrains Mono', monospace;
@@ -476,7 +776,7 @@
   margin-left: auto;
   background: #3d3d44;
   border: 1px solid #5a5a62;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   font-size: 16px;
   cursor: pointer;
   width: 24px;
@@ -489,9 +789,9 @@
 }
 
 .quest-detail-add-btn:hover {
-  background: #d4a843;
+  background: var(--ftb-accent);
   color: #1a1a1e;
-  border-color: #d4a843;
+  border-color: var(--ftb-accent);
 }
 
 .quest-detail-empty {
@@ -505,7 +805,7 @@
 .quest-detail-textarea {
   background: #1e1e22;
   border: 1px solid #3d3d44;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   font-size: 12px;
   font-family: 'JetBrains Mono', monospace;
   padding: 8px;
@@ -516,7 +816,7 @@
 }
 
 .quest-detail-textarea:focus {
-  border-color: #d4a843;
+  border-color: var(--ftb-accent);
 }
 
 /* Cards for tasks/rewards */
@@ -545,7 +845,7 @@
 .quest-detail-card-title select {
   background: #1e1e22;
   border: 1px solid #3d3d44;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   padding: 2px 4px;
@@ -617,7 +917,7 @@
 }
 
 .quest-detail-ghost-btn:hover {
-  color: #d4a843;
+  color: var(--ftb-accent);
 }
 
 .quest-detail-card-advanced {
@@ -653,7 +953,7 @@
 .quest-detail-field select {
   background: #18181c;
   border: 1px solid #3d3d44;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   font-size: 12px;
   font-family: 'JetBrains Mono', monospace;
   padding: 4px 6px;
@@ -662,7 +962,7 @@
 
 .quest-detail-field input:focus,
 .quest-detail-field select:focus {
-  border-color: #d4a843;
+  border-color: var(--ftb-accent);
 }
 
 .quest-detail-field input[type="color"] {
@@ -674,6 +974,34 @@
 
 .quest-detail-field input[type="number"] {
   width: 100%;
+}
+
+/* Scale slider row */
+.quest-detail-field-scale {
+  flex: 1;
+}
+
+.quest-detail-scale-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.quest-detail-scale-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--ftb-accent);
+  cursor: pointer;
+  background: transparent;
+}
+
+.quest-detail-scale-value {
+  min-width: 92px;
+  font-size: 11px;
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* Checkboxes row */
@@ -688,14 +1016,14 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
   user-select: none;
 }
 
 .quest-detail-checkbox input[type="checkbox"] {
-  accent-color: #d4a843;
+  accent-color: var(--ftb-accent);
 }
 
 /* Icon picker styling */
@@ -729,7 +1057,7 @@
 .quest-detail-small-btn {
   background: #3d3d44;
   border: 1px solid #5a5a62;
-  color: #c8c8c8;
+  color: var(--ftb-text);
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   padding: 3px 8px;
@@ -737,9 +1065,9 @@
 }
 
 .quest-detail-small-btn:hover {
-  background: #d4a843;
+  background: var(--ftb-accent);
   color: #1a1a1e;
-  border-color: #d4a843;
+  border-color: var(--ftb-accent);
 }
 
 /* Advanced toggle */
@@ -747,7 +1075,7 @@
   margin-left: auto;
   background: transparent;
   border: 1px solid #3d3d44;
-  color: #8a8a8a;
+  color: var(--ftb-text-dim);
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   padding: 2px 8px;
@@ -755,8 +1083,8 @@
 }
 
 .quest-detail-toggle-btn:hover {
-  color: #d4a843;
-  border-color: #d4a843;
+  color: var(--ftb-accent);
+  border-color: var(--ftb-accent);
 }
 
 .quest-detail-advanced {
@@ -777,12 +1105,287 @@
   font-family: 'JetBrains Mono', monospace;
   padding: 6px 12px;
   cursor: pointer;
-  align-self: flex-start;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .quest-detail-delete-btn:hover {
+  background: #e74c3c;
+  color: #fff;
+}
+
+/* Footer bar */
+.quest-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #0d0e13;
+  border-top: 2px solid var(--ftb-border);
+}
+
+.quest-detail-footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+.quest-detail-footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.quest-detail-sim-btn {
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.6);
+  color: #4ade80;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-detail-sim-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+}
+
+.quest-detail-save-btn {
+  background: var(--ftb-accent);
+  border: 1px solid var(--ftb-accent-hover);
+  color: #fff;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  padding: 6px 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-detail-save-btn:hover {
+  background: var(--ftb-accent-hover);
+}
+
+/* ─── Chapter decoration editor ─────────────────────────────────── */
+
+.toolbar-btn-active {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent-hover);
+  color: #fff;
+}
+
+.chapter-decorations-canvas {
+  pointer-events: none;
+}
+
+.quest-deco {
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+/* Decoration artwork box: in-game FTB stretches chapter image textures to
+   fill their box (ImageIconRenderer), mirror that here to keep edit-mode
+   previews aligned with view mode and the game. */
+.quest-deco-bg {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.quest-deco-selected {
+  outline: 2px dashed var(--ftb-accent);
+  outline-offset: 2px;
+  background-color: rgba(91, 155, 213, 0.08);
+}
+
+.quest-deco-handle {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.quest-deco-handle-rotate {
+  top: -18px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--ftb-accent);
+  cursor: crosshair;
+  border: 1px solid var(--ftb-accent-hover);
+}
+
+.quest-deco-handle-rotate::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 9px;
+  width: 1px;
+  height: 10px;
+  background: var(--ftb-accent);
+}
+
+.quest-deco-handle-resize {
+  right: -8px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ftb-accent);
+  background: #0d0e13;
+  cursor: nwse-resize;
+}
+
+.quest-deco-handle-delete {
+  top: -10px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.quest-deco-panel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 30;
+  width: 260px;
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(13, 14, 19, 0.96);
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 10px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.quest-deco-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ftb-accent);
+}
+
+.quest-deco-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quest-deco-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  background: #17181f;
+  border: 1px solid #3a3a3a;
+  color: #e6e6e6;
+  font-size: 12px;
+}
+
+.quest-deco-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.quest-deco-thumb {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #17181f;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.quest-deco-thumb:hover {
+  border-color: var(--ftb-accent);
+}
+
+.quest-deco-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.quest-deco-empty {
+  color: #888;
+  font-size: 11px;
+  padding: 6px 2px;
+}
+
+.quest-deco-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #3a3a3a;
+  padding-top: 8px;
+}
+
+.quest-deco-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #bbb;
+}
+
+.quest-deco-field-wide {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.quest-deco-field span {
+  min-width: 34px;
+}
+
+.quest-deco-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  background: #17181f;
+  border: 1px solid #3a3a3a;
+  color: #e6e6e6;
+  font-size: 12px;
+}
+
+.quest-deco-field-row {
+  display: flex;
+  gap: 6px;
+}
+
+.quest-deco-field-row .quest-deco-field {
+  flex: 1;
+}
+
+.quest-deco-remove {
+  margin-top: 4px;
+  padding: 5px;
+  background: #2a1b1b;
+  border: 1px solid #a33;
+  color: #ff8a8a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.quest-deco-remove:hover {
   background: #e74c3c;
   color: #fff;
 }

@@ -228,7 +228,12 @@ export function useGraphUI(ctx: UIContext) {
       id: crypto.randomUUID(), title: `Chapter ${graph.chapters.length + 1}`, description: '',
       icon: '\u{1F4D6}', background_image: '', order_index: graph.chapters.length,
       hide_until_first_quest_complete: false, default_quest_size: { width: 24, height: 24 },
-      quest_color: '', group_id: null, default_quest_shape: 'Default', default_enabled: true, progression_mode: 'Default',
+      quest_color: '', group_id: null, default_quest_shape: 'Default', default_enabled: true, progression_mode: 'Default', images: [],
+      subtitle: '', default_min_width: 0, always_invisible: false,
+      default_hide_dependency_lines: false, hide_quest_details_until_startable: false,
+      hide_quest_until_deps_visible: false, hide_quest_until_deps_complete: false,
+      hide_text_until_complete: false, autofocus_id: '', default_repeatable: false,
+      require_sequential_tasks: false,
     }
     const updatedGraph: QuestGraphData = { ...graph, chapters: [...graph.chapters, newChapter] }
     try {

@@ -1,6 +1,10 @@
 import React from 'react'
 import type { QuestTileData } from './QuestTileTypes'
-import { ICON_SIZE } from './QuestTileTypes'
+import { ICON_SIZE, resolveIconKey } from './QuestTileTypes'
+import { isTexturePending } from '../../services/texture-loader'
+import { QuestIcon } from './QuestIcon'
+import { AnimatedSprite } from './AnimatedSprite'
+import { SmartFilterIcon } from './SmartFilterIcon'
 import ObjectiveRow from './ObjectiveRow'
 import RewardRow from './RewardRow'
 
@@ -52,6 +56,9 @@ export function QuestTileBody({
   const textureIndex = data.textureIndex || {}
   const description = data.description || ''
   const icon = data.icon || ''
+  const iconKey = resolveIconKey(icon)
+  const iconPending = isTexturePending(textureIndex, iconKey)
+  const smartFilterDsl = !icon && objectives[0]?.smart_filter ? objectives[0].smart_filter : ''
 
   const handleDoubleClick = (e: React.MouseEvent, field: string, value: string) => {
     e.stopPropagation()
@@ -66,8 +73,17 @@ export function QuestTileBody({
           onDoubleClick={(e) => handleDoubleClick(e, 'icon', icon)}
           title="Double-click to change icon"
         >
-          {questIconUrl ? (
-            <img src={questIconUrl} alt="" style={{ width: ICON_SIZE, height: ICON_SIZE, imageRendering: 'pixelated' }} />
+          {smartFilterDsl ? (
+            <SmartFilterIcon
+              dsl={smartFilterDsl}
+              textureIndex={textureIndex}
+              fallback={fallbackIcon}
+              size={ICON_SIZE}
+            />
+          ) : questIconUrl ? (
+            <AnimatedSprite url={questIconUrl} textureKey={iconKey} width={ICON_SIZE} height={ICON_SIZE} alt="" imageRendering="pixelated" />
+          ) : iconPending ? (
+            <QuestIcon pending url={null} fallback="" size={ICON_SIZE} />
           ) : (
             <span style={{ fontSize: ICON_SIZE * 0.7 }}>{fallbackIcon}</span>
           )}

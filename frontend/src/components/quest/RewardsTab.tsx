@@ -1,8 +1,8 @@
 
-import type { QuestRewardData } from '../../services/api'
+import type { QuestRewardData, RewardTableData } from '../../services/api'
 import {
   REWARD_TYPES,
-  isItemReward, isTableReward,
+  isItemReward,
 } from './nodes'
 
 interface RewardsTabProps {
@@ -10,9 +10,10 @@ interface RewardsTabProps {
   onUpdate: (idx: number, field: string, value: unknown) => void
   onRemove: (idx: number) => void
   onAdd: () => void
+  rewardTables?: RewardTableData[]
 }
 
-export function RewardsTab({ rewards, onUpdate, onRemove, onAdd }: RewardsTabProps) {
+export function RewardsTab({ rewards, onUpdate, onRemove, onAdd, rewardTables }: RewardsTabProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="inspector-panel-section-title">Rewards ({rewards.length})</div>
@@ -102,7 +103,23 @@ export function RewardsTab({ rewards, onUpdate, onRemove, onAdd }: RewardsTabPro
               <input type="text" value={rew.toast_message || ''} onChange={(v) => onUpdate(idx, 'toast_message', v.target.value)} />
             </div>
           )}
-          {isTableReward(rew.reward_type) && (
+          {['random', 'choice', 'all_table'].includes(rew.reward_type) && (
+            <div className="inspector-panel-field" style={{ marginBottom: 6 }}>
+              <label>Reward Table</label>
+              {rewardTables && rewardTables.length > 0 ? (
+                <select value={rew.table_id || ''} onChange={(v) => onUpdate(idx, 'table_id', v.target.value)}>
+                  <option value="">(none)</option>
+                  {rewardTables.map((t) => (
+                    <option key={t.id} value={t.id}>{t.id}{t.title ? ` — ${t.title}` : ''}</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={rew.table_id || ''} onChange={(v) => onUpdate(idx, 'table_id', v.target.value)}
+                  placeholder="00E1FAFD0EF07752" />
+              )}
+            </div>
+          )}
+          {rew.reward_type === 'loot_table' && (
             <div className="inspector-panel-field" style={{ marginBottom: 6 }}>
               <label>Loot Table</label>
               <input type="text" value={rew.table_id || ''} onChange={(v) => onUpdate(idx, 'table_id', v.target.value)} placeholder="minecraft:gameplay/simple_loot_table" />

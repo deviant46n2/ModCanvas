@@ -1,165 +1,117 @@
-use pixels::{merge_archive, merge_dir};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
 
-const CACHE_VERSION: u32 = 4;
+const CACHE_VERSION: u32 = 7;
 
+mod cache;
+mod layers;
+mod materialize;
 mod models;
 mod pixels;
+mod tags;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct CachedFile {
-    name: String,
-    size: u64,
-    modified: u64,
+use cache::{cache_path, file_meta, CachedFile, InstanceTextureCache};
+use layers::{jars_under, resource_pack_order, vanilla_jars};
+pub use materialize::resolve_texture_urls;
+
+/// In-memory memo of the compact per-instance index so repeated scan/materialize
+/// commands don't re-read the disk cache (10-20 MB) on every call.
+static INDEX_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashMap<String, String>>>>> = OnceLock::new();
+
+/// Same-purpose memo for the per-instance animation metadata map. Kept
+/// separate from [`INDEX_MEMO`] (like the tag index) so batch materialization
+/// never has to re-scan for animation data.
+static ANIM_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashMap<String, String>>>>> = OnceLock::new();
+
+/// Memo of the per-instance merged item/block model set, used to bake 3D
+/// icons at materialization time. Populated either by the cache-miss scan or
+/// lazily on first `bake:` request.
+static MODEL_MEMO: OnceLock<Mutex<HashMap<String, Arc<models::Models>>>> = OnceLock::new();
+
+fn memo_cache() -> &'static Mutex<HashMap<String, Arc<HashMap<String, String>>>> {
+    INDEX_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct InstanceTextureCache {
-    version: u32,
-    layers: Vec<Vec<CachedFile>>,
-    by_id: HashMap<String, String>,
+fn anim_memo_cache() -> &'static Mutex<HashMap<String, Arc<HashMap<String, String>>>> {
+    ANIM_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn file_meta(path: &Path) -> Option<CachedFile> {
-    let meta = fs::metadata(path).ok()?;
-    let modified = meta
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    Some(CachedFile {
-        name: path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
-        size: meta.len(),
-        modified,
-    })
-}
-
-fn dirs_cache_dir() -> Option<PathBuf> {
-    if let Ok(data) = std::env::var("XDG_CACHE_HOME") {
-        return Some(PathBuf::from(data).join("modcanvas"));
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        return Some(PathBuf::from(home).join(".cache").join("modcanvas"));
-    }
-    None
-}
-
-fn cache_path(instance_path: &Path) -> PathBuf {
-    let hash = {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut h = DefaultHasher::new();
-        let canonical = fs::canonicalize(instance_path).unwrap_or_else(|_| instance_path.to_path_buf());
-        canonical.to_string_lossy().replace('\\', "/").hash(&mut h);
-        format!("{:016x}", h.finish())
-    };
-    let cache_dir = dirs_cache_dir().unwrap_or_else(|| std::env::temp_dir().join("modcanvas_cache"));
-    let _ = fs::create_dir_all(&cache_dir);
-    cache_dir.join(format!("instance_textures_{}.json", hash))
-}
-
-fn jars_under(dir: &Path) -> Vec<PathBuf> {
-    let mut out: Vec<PathBuf> = Vec::new();
-    let mut stack: Vec<PathBuf> = vec![dir.to_path_buf()];
-    while let Some(d) = stack.pop() {
-        for entry in fs::read_dir(&d).ok().into_iter().flatten().flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else if path.extension().map_or(false, |e| e == "jar") {
-                out.push(path);
-            }
-        }
-    }
-    out.sort();
-    out
-}
-
-/// Locate the vanilla client jar for this instance. Prefers a jar matching the
-/// instance's Minecraft version (from `version.json`), falling back to the
-/// sorted set of candidate jars.
-fn vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
-    let candidates = {
-        let mut jars = jars_under(&instance_path.join("versions"));
-        if let Ok(home) = std::env::var("HOME") {
-            jars.extend(jars_under(&Path::new(&home).join(".ftba").join("bin").join("versions")));
-        }
-        jars.sort();
-        jars
-    };
-    if candidates.is_empty() {
-        return candidates;
-    }
-    let mc_version = fs::read_to_string(instance_path.join("version.json"))
-        .ok()
-        .and_then(|txt| txt.find("\"id\"").map(|i| {
-            let after = &txt[i + 5..];
-            let start = after.find('"').map(|s| s + 1).unwrap_or(0);
-            let rest = &after[start..];
-            rest.find('"').map(|e| rest[..e].to_string()).unwrap_or_default()
-        }))
-        .filter(|v| !v.is_empty());
-    if let Some(ver) = mc_version {
-        let matched: Vec<PathBuf> = candidates
-            .iter()
-            .filter(|p| p.to_string_lossy().contains(&format!("/{}/", ver)))
-            .cloned()
-            .collect();
-        if !matched.is_empty() {
-            return matched;
-        }
-    }
-    candidates
-}
-
-/// Resource pack load order from `options.txt` (last listed = highest
-/// priority). Falls back to sorted filenames when absent.
-fn resource_pack_order(instance_path: &Path) -> Vec<String> {
-    let mut names: Vec<String> = Vec::new();
-    if let Ok(txt) = fs::read_to_string(instance_path.join("options.txt")) {
-        if let Some(start) = txt.find("resourcePacks:") {
-            let after = &txt[start + "resourcePacks:".len()..];
-            let bytes: Vec<char> = after.lines().next().unwrap_or("").trim().chars().collect();
-            let mut i = 0;
-            while i < bytes.len() {
-                if bytes[i] == ']' {
-                    break;
-                }
-                if bytes[i] == '"' {
-                    let mut s = String::new();
-                    i += 1;
-                    while i < bytes.len() && bytes[i] != '"' {
-                        s.push(bytes[i]);
-                        i += 1;
-                    }
-                    if !s.is_empty() {
-                        names.push(s);
-                    }
-                }
-                i += 1;
-            }
-        }
-    }
-    if names.is_empty() {
-        let mut dirs: Vec<String> = fs::read_dir(instance_path.join("resourcepacks"))
-            .ok()
-            .into_iter()
-            .flatten()
-            .flatten()
-            .filter(|e| e.path().extension().map_or(false, |e| e == "zip" || e == "jar"))
-            .map(|e| e.file_name().to_string_lossy().to_string())
-            .collect();
-        dirs.sort();
-        return dirs;
-    }
-    names.into_iter().filter(|n| n != "vanilla").map(|n| n.trim_start_matches("file/").to_string()).collect()
+fn model_memo_cache() -> &'static Mutex<HashMap<String, Arc<models::Models>>> {
+    MODEL_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub fn scan_instance_textures(instance_path: &Path) -> HashMap<String, String> {
+    // Always validate the on-disk cache (jar/kubejs changes must be picked up);
+    // memoize afterwards so batch materialization reuses the same index.
+    let (by_id, _) = build_index_maps(instance_path);
+    let arc = Arc::new(by_id);
+    let key = instance_path.to_string_lossy().to_string();
+    if let Ok(mut g) = memo_cache().lock() {
+        g.insert(key, arc.clone());
+    }
+    arc.as_ref().clone()
+}
+
+/// Compact per-instance texture index: key → source descriptor (`jar:<path>!<zip>`
+/// or an absolute kubejs file path). Loaded from the on-disk cache when valid,
+/// otherwise built by enumerating archive entries (no bytes read) and cached.
+fn compact_index(instance_path: &Path) -> Arc<HashMap<String, String>> {
+    let key = instance_path.to_string_lossy().to_string();
+    if let Some(arc) = memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
+        return arc;
+    }
+    let (by_id, _) = build_index_maps(instance_path);
+    let arc = Arc::new(by_id);
+    if let Ok(mut g) = memo_cache().lock() {
+        g.insert(key, arc.clone());
+    }
+    arc
+}
+
+/// Per-instance merged item/block model set (memoized per instance path).
+/// Used by the 3D icon baker; scanned once per process per instance.
+fn models_for(instance_path: &Path) -> Arc<models::Models> {
+    let key = instance_path.to_string_lossy().to_string();
+    if let Some(arc) = model_memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
+        return arc;
+    }
+    let vanilla = vanilla_jars(instance_path);
+    let mods = jars_under(&instance_path.join("mods"));
+    let packs: Vec<PathBuf> = resource_pack_order(instance_path)
+        .iter()
+        .filter_map(|name| {
+            let p = instance_path.join("resourcepacks").join(name);
+            if p.exists() { Some(p) } else { None }
+        })
+        .collect();
+    let m = models::Models::scan(instance_path, &vanilla, &mods, &packs);
+    let arc = Arc::new(m);
+    if let Ok(mut g) = model_memo_cache().lock() {
+        g.insert(key, arc.clone());
+    }
+    arc
+}
+
+/// Per-instance animation metadata index (texture key → `.mcmeta` JSON).
+fn build_animation_index(instance_path: &Path) -> Arc<HashMap<String, String>> {
+    let key = instance_path.to_string_lossy().to_string();
+    if let Some(arc) = anim_memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
+        return arc;
+    }
+    let (_, animations) = build_index_maps(instance_path);
+    let arc = Arc::new(animations);
+    if let Ok(mut g) = anim_memo_cache().lock() {
+        g.insert(key, arc.clone());
+    }
+    arc
+}
+
+/// Build (texture index, animation metadata map) for an instance in one scan.
+/// The two share the same on-disk cache file and layer validation, so they are
+/// always produced from the same archive state.
+fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<String, String>) {
     let mut layers: Vec<Vec<CachedFile>> = Vec::new();
 
     let vanilla: Vec<PathBuf> = vanilla_jars(instance_path);
@@ -219,40 +171,92 @@ pub fn scan_instance_textures(instance_path: &Path) -> HashMap<String, String> {
         if let Ok(data) = fs::read_to_string(&cp) {
             if let Ok(cached) = serde_json::from_str::<InstanceTextureCache>(&data) {
                 if cached.version == CACHE_VERSION && cached.layers == layers {
-                    return cached.by_id;
+                    return (cached.by_id, cached.animations);
                 }
             }
         }
     }
 
-    let mut by_id: HashMap<String, pixels::Winner> = HashMap::new();
-    for jar in &vanilla {
-        merge_archive(&mut by_id, 0, jar);
-    }
-    for jar in &mods {
-        merge_archive(&mut by_id, 1, jar);
-    }
-    for pack in &packs {
-        merge_archive(&mut by_id, 2, pack);
-    }
-    if kubejs.exists() {
-        merge_dir(&mut by_id, 3, &kubejs);
+    // Cache miss: drop any memoized model set for this instance so the fresh
+    // scan below re-resolves model files (a stale MODEL_MEMO would keep baking
+    // with pre-edit model JSON after a kubejs/jar model change).
+    let memo_key = instance_path.to_string_lossy().to_string();
+    if let Ok(mut g) = model_memo_cache().lock() {
+        g.remove(&memo_key);
     }
 
-    let mut out: HashMap<String, String> = by_id.into_iter().map(|(k, w)| (k, w.url)).collect();
+    let mut by_id: HashMap<String, pixels::Winner> = HashMap::new();
+    let mut mcmeta: HashMap<String, String> = HashMap::new();
+    for jar in &vanilla {
+        pixels::merge_archive_ex(&mut by_id, 0, jar, Some(&mut mcmeta));
+    }
+    for jar in &mods {
+        pixels::merge_archive_ex(&mut by_id, 1, jar, Some(&mut mcmeta));
+    }
+    for pack in &packs {
+        pixels::merge_archive_ex(&mut by_id, 2, pack, Some(&mut mcmeta));
+    }
+    if kubejs.exists() {
+        pixels::merge_dir_ex(&mut by_id, 3, &kubejs, Some(&mut mcmeta));
+    }
+
+    let mut out: HashMap<String, String> = by_id.into_iter().map(|(k, w)| (k, w.source)).collect();
 
     // Resolve item ids that only exist as JSON models (apotheosis gems, seeds,
     // tools, block-parented items) into bare keys so direct lookups hit.
-    let models = models::Models::scan(instance_path, &vanilla, &mods, &packs);
+    // Block items resolve to `bake:` descriptors that materialize lazily.
+    let models = models_for(instance_path);
     for (key, url) in models.resolve_bare_keys(&out) {
         out.insert(key, url);
     }
 
-    let cache = InstanceTextureCache { version: CACHE_VERSION, layers, by_id: out.clone() };
+    // Attach animation metadata to every texture key whose winning source has
+    // an adjacent `.png.mcmeta` (the mcmeta from the same archive that won the
+    // PNG, so layer priority is respected automatically).
+    let animations = attach_animations(&out, &mcmeta);
+
+    let cache = InstanceTextureCache {
+        version: CACHE_VERSION,
+        layers,
+        by_id: out.clone(),
+        animations: animations.clone(),
+    };
     if let Ok(data) = serde_json::to_string(&cache) {
         let _ = crate::path_safety::atomic_write_str(&cp, &data);
     }
-    out
+    (out, animations)
+}
+
+/// For each indexed texture key, look up the adjacent `.mcmeta` animation file
+/// in the same archive/kubejs dir that provided the winning PNG source.
+fn attach_animations(
+    out: &HashMap<String, String>,
+    mcmeta: &HashMap<String, String>,
+) -> HashMap<String, String> {
+    let mut animations: HashMap<String, String> = HashMap::new();
+    for (key, src) in out {
+        if src.starts_with("bake:") {
+            continue;
+        }
+        let png_path = if let Some(rest) = src.strip_prefix("jar:") {
+            rest.split_once('!').map(|(_, internal)| internal).unwrap_or("")
+        } else {
+            src.as_str()
+        };
+        let Some(json) = mcmeta.get(png_path) else { continue };
+        if json_has_animation(json) {
+            animations.insert(key.clone(), json.clone());
+        }
+    }
+    animations
+}
+
+/// True when the `.mcmeta` JSON carries a Minecraft `animation` section.
+fn json_has_animation(json: &str) -> bool {
+    match serde_json::from_str::<serde_json::Value>(json) {
+        Ok(v) => v.get("animation").is_some_and(serde_json::Value::is_object),
+        Err(_) => false,
+    }
 }
 
 #[tauri::command]
@@ -260,6 +264,23 @@ pub fn scan_instance_textures_cmd(instance_path: String) -> Result<HashMap<Strin
     let path = std::path::Path::new(&instance_path);
     let by_id = scan_instance_textures(path);
     Ok(by_id)
+}
+
+/// Return the per-instance animation metadata map: texture key → raw `.mcmeta`
+/// JSON for every animated texture (adjacent `<texture>.png.mcmeta` files).
+#[tauri::command]
+pub fn scan_instance_animations_cmd(instance_path: String) -> Result<HashMap<String, String>, String> {
+    let path = std::path::Path::new(&instance_path);
+    Ok(build_animation_index(path).as_ref().clone())
+}
+
+#[tauri::command]
+pub fn resolve_item_tags_cmd(
+    instance_path: String,
+    tags: Vec<String>,
+) -> Result<HashMap<String, Vec<String>>, String> {
+    let path = std::path::Path::new(&instance_path);
+    Ok(tags::resolve_item_tags(path, &tags))
 }
 
 #[cfg(test)]

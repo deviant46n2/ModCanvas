@@ -1,3 +1,5 @@
+import { resolveAssetUrl } from '../../services/asset-resolver';
+
 export function resolveIconKey(icon: string): string {
   if (!icon) return ''
   if (icon.includes(':') && !icon.includes('/')) {
@@ -10,9 +12,11 @@ export function resolveIconKey(icon: string): string {
   if (parts.length === 2) {
     const namespace = parts[0];
     let path = parts[1];
-    path = path
-      .replace(/^textures\/(item|block)\//, '')
-      .replace(/\.png$/, '');
+    // Strip leading textures/ prefix
+    path = path.replace(/^textures\//, '');
+    // Strip .png extension
+    path = path.replace(/\.png$/, '');
+    // Strip item/, block/, model/ prefixes
     if (path.startsWith('block/')) {
       return `${namespace}:${path.substring(6)}`;
     }
@@ -26,23 +30,11 @@ export function resolveIconKey(icon: string): string {
 
 export function getIconUrl(textureIndex: Record<string, string>, itemId: string): string | undefined {
   if (!itemId) return undefined
-  const key = itemId.replace(/^minecraft:/, '').replace(/^textures\/(item|block)\//, '').replace(/\.png$/, '')
-  const result = textureIndex[key] || textureIndex[itemId] || undefined
-  if (itemId && !result) {
-    console.warn('[getIconUrl] No texture for', itemId, '- key:', key, '- has key?', key in textureIndex, '- has itemId?', itemId in textureIndex);
-  }
-  return result
+  return resolveAssetUrl(itemId, textureIndex)
 }
 
 export function questIconUrl(icon: string, textureIndex: Record<string, string>): string | undefined {
   const key = resolveIconKey(icon)
-  if (!key) {
-    console.warn('[questIconUrl] empty key from icon:', icon);
-    return undefined
-  }
-  const result = getIconUrl(textureIndex, key)
-  if (icon && !result) {
-    console.warn('[questIconUrl] No iconUrl for icon:', icon, 'key:', key);
-  }
-  return result
+  if (!key) return undefined
+  return getIconUrl(textureIndex, key)
 }

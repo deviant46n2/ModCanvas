@@ -1,12 +1,21 @@
 import { useState } from 'react'
 import type { QuestNodeData } from '../../services/api'
 import { questIconUrl } from './questIcons'
+import { resolveIconKey } from './questIcons'
+import { isTexturePending } from '../../services/texture-loader'
+import { QuestIcon } from './QuestIcon'
+import { AnimatedSprite } from './AnimatedSprite'
+import { SmartFilterIcon } from './SmartFilterIcon'
 import {
   SHAPES,
   VISIBILITY_OPTIONS,
   PROGRESSION_MODES,
+  questScaleFromSize,
+  questSizeToPixels,
+  setQuestScale,
 } from './quest-form-constants'
 import { ObjectiveCard, RewardCard } from './quest-form-sections'
+import type { ProgressState } from '../../core/quest/progress'
 
 interface QuestDetailModalProps {
   node: QuestNodeData
@@ -20,7 +29,11 @@ interface QuestDetailModalProps {
   onRemoveReward: (nodeId: string, rewardId: string) => void
   onUpdateReward: (nodeId: string, rewardId: string, field: string, value: unknown) => void
   openIconPicker: (target: { type: 'quest'; nodeId: string }) => void
+  onOpenItemPicker?: (target: { type: 'objective' | 'reward'; id: string; nodeId: string }) => void
   onClose: () => void
+  simProgress?: ProgressState
+  onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void
+  quests?: Array<{ id: string; label: string }>
 }
 
 export function QuestDetailModal({
@@ -35,18 +48,34 @@ export function QuestDetailModal({
   onRemoveReward,
   onUpdateReward,
   openIconPicker,
+  onOpenItemPicker,
   onClose,
+  simProgress,
+  onSetQuestProgress,
+  quests,
 }: QuestDetailModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const iconUrl = questIconUrl(node.icon, textureIndex)
+  const iconPending = isTexturePending(textureIndex, resolveIconKey(node.icon))
 
   return (
     <div className="quest-detail-overlay" onClick={onClose}>
       <div className="quest-detail-modal" onClick={(e) => e.stopPropagation()}>
         <div className="quest-detail-header">
-          <div className="quest-detail-icon" style={{ backgroundColor: node.color || '#d4a843' }}>
-            {iconUrl ? <img src={iconUrl} alt="" /> : <span className="quest-detail-icon-fallback">?</span>}
+          <div className="quest-detail-icon" style={{ backgroundColor: node.color || 'var(--color-accent)' }}>
+            {!node.icon && node.objectives?.[0]?.smart_filter ? (
+              <SmartFilterIcon
+                dsl={node.objectives[0].smart_filter}
+                textureIndex={textureIndex}
+                fallback="?"
+                size={28}
+              />
+            ) : iconUrl ? <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(node.icon)} width={28} height={28} alt="" /> : iconPending ? (
+              <QuestIcon pending url={null} fallback="" size={28} />
+            ) : (
+              <span className="quest-detail-icon-fallback">?</span>
+            )}
           </div>
           <div className="quest-detail-title-area">
             <input
@@ -66,6 +95,30 @@ export function QuestDetailModal({
         </div>
 
         <div className="quest-detail-body">
+          {node.node_type === 'quest_link' && (
+            <section className="quest-detail-section quest-link-section">
+              <div className="quest-detail-section-header">
+                <span className="quest-detail-section-icon">🔗</span>
+                <span>Quest Link</span>
+              </div>
+              <div className="quest-detail-field">
+                <label>Linked Quest</label>
+                <select
+                  value={node.link_target || ''}
+                  onChange={(e) => onUpdateNode(node.id, { link_target: e.target.value })}
+                >
+                  <option value="">— Unlinked —</option>
+                  {(quests || [])
+                    .filter(q => q.id !== node.id)
+                    .map(q => (
+                      <option key={q.id} value={q.id}>{q.label}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="quest-detail-empty">A link references a quest in another chapter; the icon and visibility follow the target quest in-game.</div>
+            </section>
+          )}
+
           <section className="quest-detail-section">
             <div className="quest-detail-section-header">
               <span className="quest-detail-section-icon">
@@ -99,6 +152,7 @@ export function QuestDetailModal({
                 textureIndex={textureIndex}
                 onRemove={() => onRemoveObjective(node.id, obj.id)}
                 onUpdate={(field, value) => onUpdateObjective(node.id, obj.id, field, value)}
+                onOpenItemPicker={onOpenItemPicker ? () => onOpenItemPicker!({ type: 'objective', id: obj.id, nodeId: node.id }) : undefined}
               />
             ))}
           </section>
@@ -120,6 +174,7 @@ export function QuestDetailModal({
                 textureIndex={textureIndex}
                 onRemove={() => onRemoveReward(node.id, rew.id)}
                 onUpdate={(field, value) => onUpdateReward(node.id, rew.id, field, value)}
+                onOpenItemPicker={onOpenItemPicker ? () => onOpenItemPicker!({ type: 'reward', id: rew.id, nodeId: node.id }) : undefined}
               />
             ))}
           </section>
@@ -140,11 +195,41 @@ export function QuestDetailModal({
             {showAdvanced && (
               <div className="quest-detail-advanced">
                 <div className="quest-detail-field-row">
+                  <div className="quest-detail-field quest-detail-field-scale">
+                    <label>Scale</label>
+                    <div className="quest-detail-scale-control">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="4"
+                        step="0.1"
+                        value={questScaleFromSize(node.size)}
+                        onChange={(e) => onUpdateNode(node.id, { size: setQuestScale(parseFloat(e.target.value)) })}
+                      />
+                      <span className="quest-detail-scale-value">
+                        {questScaleFromSize(node.size)}x · {questSizeToPixels(node.size).width}×{questSizeToPixels(node.size).height}px
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="quest-detail-field-row">
+                  <div className="quest-detail-field">
+                    <label>Width</label>
+                    <input type="number" min="12" value={node.size?.width || 24} onChange={(e) => onUpdateNode(node.id, { size: { width: parseInt(e.target.value) || 24, height: node.size?.height || 24 } })} />
+                  </div>
+                  <div className="quest-detail-field">
+                    <label>Height</label>
+                    <input type="number" min="12" value={node.size?.height || 24} onChange={(e) => onUpdateNode(node.id, { size: { width: node.size?.width || 24, height: parseInt(e.target.value) || 24 } })} />
+                  </div>
                   <div className="quest-detail-field">
                     <label>Icon</label>
                     <div className="quest-detail-icon-select">
                       <div className="quest-detail-icon-preview">
-                        {iconUrl ? <img src={iconUrl} alt="" /> : <span>📜</span>}
+                        {iconUrl ? <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(node.icon)} width={28} height={28} alt="" /> : iconPending ? (
+                          <QuestIcon pending url={null} fallback="" size={28} />
+                        ) : (
+                          <span>📜</span>
+                        )}
                       </div>
                       <button className="quest-detail-small-btn" onClick={() => openIconPicker({ type: 'quest', nodeId: node.id })}>Change</button>
                     </div>
@@ -166,6 +251,17 @@ export function QuestDetailModal({
                     <select value={node.visibility} onChange={(e) => onUpdateNode(node.id, { visibility: e.target.value })}>
                       {VISIBILITY_OPTIONS.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
                     </select>
+                  </div>
+                  <div className="quest-detail-field">
+                    <label>Icon Scale</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="2.0"
+                      value={node.icon_scaling ?? 1.0}
+                      onChange={(e) => onUpdateNode(node.id, { icon_scaling: parseFloat(e.target.value) || 1.0 })}
+                    />
                   </div>
                 </div>
                 <div className="quest-detail-field-row">
@@ -222,10 +318,26 @@ export function QuestDetailModal({
                     <span>Hide JEI Recipe</span>
                   </label>
                 </div>
-                <button className="quest-detail-delete-btn" onClick={() => { onDeleteNode(node.id); onClose() }}>Delete Quest</button>
               </div>
             )}
           </section>
+        </div>
+
+        <div className="quest-detail-footer">
+          <div className="quest-detail-footer-left">
+            <button
+              className="quest-detail-sim-btn"
+              onClick={() => onSetQuestProgress?.(node.id, simProgress?.[node.id] === 'complete' ? null : 'complete')}
+              title="Toggle this quest's completion in the progress simulation (Simulate mode)"
+            >
+              {simProgress?.[node.id] === 'complete' ? '↺ Reset' : '✓ Complete'}
+            </button>
+          </div>
+          <div className="quest-detail-footer-right">
+            <button className="quest-detail-delete-btn" onClick={() => { onDeleteNode(node.id); onClose() }}>Delete Quest</button>
+            <button className="quest-detail-ghost-btn" onClick={onClose}>Cancel</button>
+            <button className="quest-detail-save-btn" onClick={onClose}>Save</button>
+          </div>
         </div>
       </div>
     </div>

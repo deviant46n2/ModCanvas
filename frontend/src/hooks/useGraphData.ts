@@ -4,6 +4,7 @@ import type { Node, Edge, Connection } from '@xyflow/react'
 import {
   getQuestGraph, saveQuestGraph,
   importFtbQuestsFromDir, exportFtbQuestsToDir, scanModJarTextures,
+  ingestActiveInstance, logDebug,
 } from '../services/api'
 import type { QuestGraphData, QuestObjectiveData, QuestRewardData } from '../services/api'
 import type { QuestTileData } from '../components/QuestTile'
@@ -46,13 +47,27 @@ export function useGraphData(projectId: string, projectPath?: string) {
   useEffect(() => { importedRef.current = false }, [projectId])
 
   useEffect(() => {
-    if (modsDir) {
-      scanModJarTextures(modsDir).then((idx: Record<string, string>) => {
-        setTextureIndex(idx)
-        console.log(`[ModCanvas] Loaded ${Object.keys(idx).length} textures`)
-      }).catch((e: unknown) => console.error('Failed to scan textures:', e))
+    if (!modsDir && projectPath) {
+      const inferred = `${projectPath}/mods`
+      setModsDir(inferred)
+      return
     }
-  }, [modsDir])
+    if (modsDir) {
+      const instancePath = modsDir.replace(/\/mods$/, '')
+      ingestActiveInstance(instancePath).then((result) => {
+        setTextureIndex(result.asset_registry.by_id)
+        const msg = `[Ingestion Engine] Indexed ${result.textures_indexed} textures for instance ${result.active_instance} (${result.jars_scanned} jars scanned)`
+        console.log(msg)
+        logDebug(msg)
+      }).catch((e: unknown) => {
+        console.error('Ingestion failed, falling back to scanModJarTextures:', e)
+        scanModJarTextures(modsDir).then((idx: Record<string, string>) => {
+          setTextureIndex(idx)
+          console.log(`[ModCanvas] Loaded ${Object.keys(idx).length} textures from ${modsDir}`)
+        }).catch((e2: unknown) => console.error('Failed to scan textures:', e2))
+      })
+    }
+  }, [modsDir, projectPath])
 
   const saveGraphRef = useRef<(() => Promise<void>) | null>(null)
   saveGraphRef.current = async () => {
@@ -181,7 +196,11 @@ export function useGraphData(projectId: string, projectPath?: string) {
         const mp = packDir ? `${packDir}/mods` : ''
         if (mp && Object.keys(textureIndex).length === 0) {
           try {
-            const idx = await scanModJarTextures(mp); setTextureIndex(idx)
+            const ingestResult = await ingestActiveInstance(packDir)
+            const idx = ingestResult.asset_registry.by_id
+            setTextureIndex(idx)
+            const msg = `[Ingestion Engine] Indexed ${ingestResult.textures_indexed} textures for ${packDir}`
+            console.log(msg); logDebug(msg)
             if (Object.keys(idx).length > 0) {
               setModsDirPersisted(mp); setNodes(toRfNodesCb(result.graph, idx))
               setNodes(nds => autoLayoutNodes(nds, result.graph.chapters))

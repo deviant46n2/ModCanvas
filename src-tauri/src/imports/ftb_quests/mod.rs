@@ -9,6 +9,9 @@ pub use import::*;
 pub use export::*;
 
 #[cfg(test)]
+mod export_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use super::*;
@@ -435,8 +438,97 @@ mod tests {
     }
 
     #[test]
-    fn test_real_ftb_skies_2() {
-        let pack_dir = std::path::PathBuf::from(
+    fn test_checkmark_quest_uses_accept_icon() {
+        let tmp = tempfile::tempdir().unwrap();
+        let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+        std::fs::create_dir_all(quests_dir.join("chapter_1")).unwrap();
+
+        std::fs::write(quests_dir.join("data.snbt"), r#"{
+    version: 13
+    default_quest_shape: "circle"
+}"#).unwrap();
+
+        // One checkmark-only quest (no icon field) and one item quest
+        std::fs::write(quests_dir.join("chapter_1").join("chapter.snbt"), r#"{
+    id = "ch1"
+    filename = "chapter_1"
+    title = "Start"
+    quests = [
+        {
+            id = "q1"
+            x = 0.0d
+            y = 0.0d
+            title = "Click Me"
+            tasks = [
+                { id = "t1", type = "checkmark", title = "Begin" }
+            ]
+        }
+    ]
+}"#).unwrap();
+
+        let result = import_ftb_quests(tmp.path()).unwrap();
+        let checkmark_node = result.graph.nodes.iter()
+            .find(|n| n.id.contains("q1"))
+            .expect("checkmark quest node present");
+        // In-game FTB shows Icons.ACCEPT_GRAY for checkmark tasks, so the
+        // imported icon must be the resolvable accept_gray texture rather than
+        // the unresolvable "minecraft:" fallback.
+        assert!(
+            checkmark_node.icon.contains("accept"),
+            "expected accept icon, got {:?}",
+            checkmark_node.icon
+        );
+        assert!(
+            !checkmark_node.icon.is_empty() && checkmark_node.icon != "minecraft:",
+            "icon should not be the empty minecraft: fallback"
+        );
+    }
+
+    #[test]
+    fn test_grid_scale_roundtrip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+        std::fs::create_dir_all(quests_dir.join("chapter_1")).unwrap();
+
+        std::fs::write(quests_dir.join("data.snbt"), r#"{
+    version: 13
+    default_quest_shape: "circle"
+    grid_scale: 0.5d
+}"#).unwrap();
+        std::fs::write(quests_dir.join("chapter_1").join("chapter.snbt"), r#"{
+    id = "ch1"
+    filename = "chapter_1"
+    title = "Start"
+    quests = []
+}"#).unwrap();
+
+        let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+        assert_eq!(graph.grid_scale, 0.5, "grid_scale should be imported from data.snbt");
+
+        // Mutate to a different grain and confirm it round-trips.
+        graph.grid_scale = 1.0;
+        let export_dir = tempfile::tempdir().unwrap();
+        export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+        let result2 = import_ftb_quests(export_dir.path()).unwrap();
+        assert_eq!(result2.graph.grid_scale, 1.0, "grid_scale should survive export/import");
+
+        // Default (no grid_scale key) is 0.5, matching in-game.
+        let bare = tempfile::tempdir().unwrap();
+        let bare_q = bare.path().join("config").join("ftbquests").join("quests");
+        std::fs::create_dir_all(bare_q.join("chapter_1")).unwrap();
+        std::fs::write(bare_q.join("data.snbt"), "{version: 13}").unwrap();
+        std::fs::write(bare_q.join("chapter_1").join("chapter.snbt"), r#"{
+    id = "ch1"
+    filename = "chapter_1"
+    title = "Start"
+    quests = []
+}"#).unwrap();
+        let graph3 = import_ftb_quests(bare.path()).unwrap().graph;
+        assert_eq!(graph3.grid_scale, 0.5, "default grid_scale should be 0.5");
+    }
+
+    #[test]
+    fn test_real_ftb_skies_2() {        let pack_dir = std::path::PathBuf::from(
             std::env::var("HOME").unwrap_or_default()
         ).join(".local/share/PrismLauncher/instances/FTB Skies 2/minecraft");
         if !pack_dir.exists() {

@@ -44,6 +44,8 @@ function App() {
                 wsStatus={s.wsStatus}
                 activeTab={s.activeTab}
                 onTabChange={s.handleTabChange}
+                onRefreshWsStatus={s.refreshWsStatus}
+                onRestartWebSocket={s.restartWebSocket}
                 deployCompanionMessage={s.deployCompanionMessage}
                 isTesting={s.isTesting}
                 testProgress={s.testProgress}
@@ -78,6 +80,8 @@ function App() {
                   projectModsForDeps: s.projectMods,
                   getMissingDependencies: s.getMissingDependencies,
                   getModNameById: s.getModNameById,
+                  searchSource: s.searchSource,
+                  onSearchSourceChange: s.setSearchSource,
                 }}
                 configsTab={{
                   configFiles: s.configFiles,
@@ -94,6 +98,15 @@ function App() {
                   configUndoStack: s.configUndoStack,
                   onUndoConfig: s.undoConfigChange,
                 }}
+                ingestResult={s.ingestResult}
+                ingesting={s.ingesting}
+                ingestError={s.ingestError}
+                packLoaded={s.packLoaded}
+                loadPackProgress={s.loadPackProgress}
+                showLoadPack={s.showLoadPack}
+                setShowLoadPack={s.setShowLoadPack}
+                onLoadPack={() => s.loadPack(s.selectedProject!)}
+                onClosePack={s.closePack}
               />
             ) : (
               <div className="welcome">
