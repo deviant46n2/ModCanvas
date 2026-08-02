@@ -698,3 +698,242 @@ fn reward_table_id_long_hex_mapping() {
     assert_eq!(RewardTable::to_long_id("37F7F856288632A7"), 4032965040264327847);
 }
 
+#[test]
+fn kill_task_and_reward_bonus_fields_roundtrip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+
+    std::fs::write(chapters_dir.join("bonus.snbt"), r#"{
+    id = "ch_bonus"
+    filename = "bonus"
+    title = "Bonus"
+    quests = [
+        {
+            id = "q1"
+            x = 0.0d
+            y = 0.0d
+            title = "Kill Tagged"
+            tasks = [
+                {
+                    id = "t0"
+                    type = "item"
+                    item = "minecraft:iron_ingot"
+                    count = 4L
+                    consume_items = 1b
+                    task_screen_only = 1b
+                    only_from_crafting = 1b
+                    match_components = 1b
+                }
+                {
+                    id = "t1"
+                    type = "kill"
+                    entity = "minecraft:zombie"
+                    entityTypeTag = "minecraft:undead"
+                    custom_name = "Wither Warden"
+                    nbt_filter = "{Damage: 3}"
+                    value = 5L
+                }
+            ]
+            rewards = [
+                { id = "r1", type = "item", item = { id = "minecraft:diamond", count = 1 }, random_bonus = 1.5d, only_one = 1b }
+                { id = "r2", type = "command", command = "give @p minecraft:stick 1", permission_level = 2, silent = 1b, feedback_message = "Granted!" }
+            ]
+        }
+    ]
+}"#).unwrap();
+
+    let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+    let node = graph.nodes.iter().find(|n| n.id == "q1").expect("quest imported");
+    let item_task = node.objectives.iter().find(|o| o.id == "t0").expect("item task imported");
+    assert_eq!(item_task.target, "minecraft:iron_ingot");
+    assert_eq!(item_task.target_count, 4, "item task count imported");
+    assert!(item_task.consume_items, "consume_items imported");
+    assert!(item_task.task_screen_only, "task_screen_only imported");
+    assert!(item_task.only_from_crafting, "only_from_crafting imported");
+    assert!(item_task.match_components, "match_components imported");
+    let kill = node.objectives.iter().find(|o| o.id == "t1").expect("kill task imported");
+    assert_eq!(kill.entity_id, "minecraft:zombie");
+    assert_eq!(kill.entity_type_tag, "minecraft:undead", "kill tag imported");
+    assert_eq!(kill.custom_name, "Wither Warden", "kill custom_name imported");
+    assert_eq!(kill.nbt_filter, "{Damage: 3}", "kill nbt_filter imported");
+    assert_eq!(kill.target_count, 5, "kill count imported from value");
+
+    let item = node.rewards.iter().find(|r| r.id == "r1").expect("item reward imported");
+    assert!((item.random_bonus - 1.5).abs() < 1e-9, "random_bonus imported");
+    assert!(item.only_one, "only_one imported");
+    let cmd = node.rewards.iter().find(|r| r.id == "r2").expect("command reward imported");
+    assert_eq!(cmd.permission_level, 2, "permission_level imported");
+    assert!(cmd.silent, "silent imported");
+    assert_eq!(cmd.feedback_message, "Granted!", "feedback_message imported");
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+    let exported = std::fs::read_to_string(
+        export_dir.path().join("config").join("ftbquests").join("quests").join("chapters").join("Bonus.snbt")
+    ).unwrap();
+    assert!(exported.contains("entityTypeTag: \"minecraft:undead\""), "kill entityTypeTag exported");
+    assert!(exported.contains("custom_name: \"Wither Warden\""), "kill custom_name exported");
+    assert!(exported.contains("nbt_filter: \"{Damage: 3}\""), "kill nbt_filter exported");
+    assert!(exported.contains("value: 5"), "kill value exported");
+    assert!(!exported.contains("count: 5"), "kill must not write generic count");
+    assert!(exported.contains("task_screen_only: 1b"), "task_screen_only exported");
+    assert!(exported.contains("only_from_crafting: 1b"), "only_from_crafting exported");
+    assert!(exported.contains("match_components: 1b"), "match_components exported");
+    assert!(exported.contains("random_bonus: 1.5"), "random_bonus exported");
+    assert!(exported.contains("only_one: 1b"), "only_one exported");
+    assert!(exported.contains("permission_level: 2"), "permission_level exported");
+    assert!(exported.contains("silent: 1b"), "silent exported");
+    assert!(exported.contains("feedback_message: \"Granted!\""), "feedback_message exported");
+
+    let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
+    let node2 = graph2.nodes.iter().find(|n| n.id == "q1").expect("quest re-imported");
+    let item_task2 = node2.objectives.iter().find(|o| o.id == "t0").expect("item task re-imported");
+    assert!(item_task2.task_screen_only, "task_screen_only round-tripped");
+    assert!(item_task2.only_from_crafting, "only_from_crafting round-tripped");
+    assert!(item_task2.match_components, "match_components round-tripped");
+    let kill2 = node2.objectives.iter().find(|o| o.id == "t1").expect("kill task re-imported");
+    assert_eq!(kill2.entity_type_tag, "minecraft:undead", "kill tag round-tripped");
+    assert_eq!(kill2.custom_name, "Wither Warden", "kill custom_name round-tripped");
+    assert_eq!(kill2.nbt_filter, "{Damage: 3}", "kill nbt_filter round-tripped");
+    assert_eq!(kill2.target_count, 5, "kill count round-tripped");
+    let item2 = node2.rewards.iter().find(|r| r.id == "r1").expect("item reward re-imported");
+    assert!((item2.random_bonus - 1.5).abs() < 1e-9, "random_bonus round-tripped");
+    assert!(item2.only_one, "only_one round-tripped");
+    let cmd2 = node2.rewards.iter().find(|r| r.id == "r2").expect("command reward re-imported");
+    assert_eq!(cmd2.permission_level, 2, "permission_level round-tripped");
+    assert!(cmd2.silent, "silent round-tripped");
+    assert_eq!(cmd2.feedback_message, "Granted!", "feedback_message round-tripped");
+}
+
+#[test]
+fn location_box_stage_advancement_and_reward_common_fields_roundtrip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+
+    // Subdirs layout: quests_dir/<chapter_dir>/chapter.snbt (location keeps its real `location` type).
+    let chapter_dir = quests_dir.join("Loc");
+    std::fs::create_dir_all(&chapter_dir).unwrap();
+    std::fs::write(chapter_dir.join("chapter.snbt"), r#"{
+    id = "ch_loc"
+    filename = "Loc"
+    title = "Loc"
+    quests = [
+        {
+            id = "q1"
+            x = 0.0d
+            y = 0.0d
+            tasks = [
+                {
+                    id = "t_loc"
+                    type = "location"
+                    dimension = "minecraft:overworld"
+                    ignore_dimension = 1b
+                    position = [I; 12, 64, -30]
+                    size = [I; 5, 3, 4]
+                }
+                {
+                    id = "t_stage"
+                    type = "stage"
+                    stage = "midgame"
+                    team_stage = 1b
+                }
+                {
+                    id = "t_adv"
+                    type = "advancement"
+                    advancement = "minecraft:story/iron_tools"
+                    criterion = "iron_pickaxe"
+                }
+                {
+                    id = "t_opt"
+                    type = "checkmark"
+                    optional_task = 1b
+                }
+            ]
+            rewards = [
+                {
+                    id = "r1"
+                    type = "item"
+                    item = { id = "minecraft:diamond", count = 1 }
+                    team_reward = 1b
+                    auto = "enabled"
+                    exclude_from_claim_all = 1b
+                    ignore_reward_blocking = 1b
+                    disable_reward_screen_blur = 1b
+                }
+            ]
+        }
+    ]
+}"#).unwrap();
+
+    let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+    let node = graph.nodes.iter().find(|n| n.id == "q1").expect("quest imported");
+
+    let loc = node.objectives.iter().find(|o| o.id == "t_loc").expect("location task imported");
+    assert_eq!(loc.dimension, "minecraft:overworld");
+    assert!(loc.ignore_dim, "ignore_dim imported from ignore_dimension");
+    assert_eq!(loc.x, 12.0, "position[0] imported");
+    assert_eq!(loc.y, 64.0, "position[1] imported");
+    assert_eq!(loc.z, -30.0, "position[2] imported");
+    assert_eq!(loc.box_w, 5.0, "size[0] imported");
+    assert_eq!(loc.box_h, 3.0, "size[1] imported");
+    assert_eq!(loc.box_d, 4.0, "size[2] imported");
+
+    let stage = node.objectives.iter().find(|o| o.id == "t_stage").expect("stage task imported");
+    assert_eq!(stage.advancement_id, "midgame", "stage name imported");
+    assert!(stage.team_stage, "team_stage imported");
+
+    let adv = node.objectives.iter().find(|o| o.id == "t_adv").expect("advancement task imported");
+    assert_eq!(adv.advancement_id, "minecraft:story/iron_tools");
+    assert_eq!(adv.criterion, "iron_pickaxe", "criterion imported");
+
+    let opt = node.objectives.iter().find(|o| o.id == "t_opt").expect("checkmark task imported");
+    assert!(!opt.required, "optional_task makes task optional");
+
+    let reward = node.rewards.iter().find(|r| r.id == "r1").expect("item reward imported");
+    assert!(reward.team_reward, "team_reward imported");
+    assert_eq!(reward.autoclaim, "enabled", "auto imported");
+    assert!(reward.exclude_from_claim_all, "exclude_from_claim_all imported");
+    assert!(reward.ignore_reward_blocking, "ignore_reward_blocking imported");
+    assert!(reward.disable_reward_screen_blur, "disable_reward_screen_blur imported");
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+    let exported = std::fs::read_to_string(
+        export_dir.path().join("config").join("ftbquests").join("quests").join("Loc").join("chapter.snbt")
+    ).unwrap();
+    assert!(exported.contains("position: [I; 12, 64, -30]"), "position array exported: {exported}");
+    assert!(exported.contains("size: [I; 5, 3, 4]"), "size array exported");
+    assert!(exported.contains("ignore_dimension: 1b"), "ignore_dimension exported");
+    assert!(exported.contains("team_stage: 1b"), "team_stage exported");
+    assert!(exported.contains("criterion: \"iron_pickaxe\""), "criterion exported");
+    assert!(exported.contains("optional_task: 1b"), "optional_task exported");
+    assert!(!exported.contains("count:"), "checkmark must not write a count");
+    assert!(exported.contains("team_reward: 1b"), "reward team_reward exported");
+    assert!(exported.contains("auto: \"enabled\""), "reward auto exported");
+    assert!(exported.contains("exclude_from_claim_all: 1b"), "reward exclude_from_claim_all exported");
+    assert!(exported.contains("ignore_reward_blocking: 1b"), "reward ignore_reward_blocking exported");
+    assert!(exported.contains("disable_reward_screen_blur: 1b"), "reward disable_reward_screen_blur exported");
+
+    let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
+    let node2 = graph2.nodes.iter().find(|n| n.id == "q1").expect("quest re-imported");
+    let loc2 = node2.objectives.iter().find(|o| o.id == "t_loc").expect("location re-imported");
+    assert_eq!(loc2.x, 12.0, "x round-tripped");
+    assert_eq!(loc2.box_w, 5.0, "box_w round-tripped");
+    assert!(loc2.ignore_dim, "ignore_dim round-tripped");
+    let stage2 = node2.objectives.iter().find(|o| o.id == "t_stage").expect("stage re-imported");
+    assert!(stage2.team_stage, "team_stage round-tripped");
+    let adv2 = node2.objectives.iter().find(|o| o.id == "t_adv").expect("advancement re-imported");
+    assert_eq!(adv2.criterion, "iron_pickaxe", "criterion round-tripped");
+    let reward2 = node2.rewards.iter().find(|r| r.id == "r1").expect("reward re-imported");
+    assert_eq!(reward2.autoclaim, "enabled", "auto round-tripped");
+    assert!(reward2.exclude_from_claim_all, "exclude_from_claim_all round-tripped");
+    assert!(reward2.ignore_reward_blocking, "ignore_reward_blocking round-tripped");
+    assert!(reward2.disable_reward_screen_blur, "disable_reward_screen_blur round-tripped");
+}
+

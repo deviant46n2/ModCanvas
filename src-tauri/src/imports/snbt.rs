@@ -26,6 +26,13 @@ impl SnbtValue {
         }
     }
 
+    pub fn as_int_array(&self) -> Option<&Vec<i32>> {
+        match self {
+            SnbtValue::IntArray(arr) => Some(arr),
+            _ => None,
+        }
+    }
+
     pub fn as_i64(&self) -> Option<i64> {
         match self {
             SnbtValue::Byte(v) => Some(*v as i64),
@@ -95,6 +102,10 @@ impl SnbtValue {
 
     pub fn get_list(&self, key: &str) -> Option<&Vec<SnbtValue>> {
         self.get(key).and_then(|v| v.as_list())
+    }
+
+    pub fn get_int_array(&self, key: &str) -> Option<&Vec<i32>> {
+        self.get(key).and_then(|v| v.as_int_array())
     }
 
     /// Helper for FTB-style position arrays [x, y] or {x: ..., y: ...}
@@ -291,6 +302,7 @@ impl CommentedSnbt {
     pub fn get_bool(&self, key: &str) -> Option<bool> { self.value.get_bool(key) }
     pub fn get_compound(&self, key: &str) -> Option<&HashMap<String, CommentedSnbt>> { self.value.get_compound(key) }
     pub fn get_list(&self, key: &str) -> Option<&Vec<SnbtValue>> { self.value.get_list(key) }
+    pub fn get_int_array(&self, key: &str) -> Option<&Vec<i32>> { self.value.get_int_array(key) }
     pub fn get_position_xy(&self) -> Option<(f64, f64)> { self.value.get_position_xy() }
     pub fn to_snbt_string(&self) -> String { self.value.to_snbt_string() }
 }

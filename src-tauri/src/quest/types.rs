@@ -498,6 +498,12 @@ pub struct QuestObjective {
     #[serde(default)]
     pub exact_match: bool,
     #[serde(default)]
+    pub task_screen_only: bool,
+    #[serde(default)]
+    pub only_from_crafting: bool,
+    #[serde(default)]
+    pub match_components: bool,
+    #[serde(default)]
     pub fluid_id: String,
     #[serde(default)]
     pub fluid_amount: f64,
@@ -522,6 +528,14 @@ pub struct QuestObjective {
     #[serde(default)]
     pub radius: f64,
     #[serde(default)]
+    pub box_w: f64,
+    #[serde(default)]
+    pub box_h: f64,
+    #[serde(default)]
+    pub box_d: f64,
+    #[serde(default)]
+    pub ignore_dim: bool,
+    #[serde(default)]
     pub entity_id: String,
     #[serde(default)]
     pub advancement_id: String,
@@ -539,6 +553,16 @@ pub struct QuestObjective {
     pub structure_id: String,
     #[serde(default)]
     pub observation_range: f64,
+    #[serde(default)]
+    pub custom_name: String,
+    #[serde(default)]
+    pub entity_type_tag: String,
+    #[serde(default)]
+    pub nbt_filter: String,
+    #[serde(default)]
+    pub team_stage: bool,
+    #[serde(default)]
+    pub criterion: String,
 }
 
 impl Default for QuestObjective {
@@ -557,6 +581,9 @@ impl Default for QuestObjective {
             match_nbt: false,
             ignore_nbt: false,
             exact_match: false,
+            task_screen_only: false,
+            only_from_crafting: false,
+            match_components: false,
             fluid_id: String::new(),
             fluid_amount: 0.0,
             energy_amount: 0.0,
@@ -569,6 +596,10 @@ impl Default for QuestObjective {
             y: 0.0,
             z: 0.0,
             radius: 0.0,
+            box_w: 0.0,
+            box_h: 0.0,
+            box_d: 0.0,
+            ignore_dim: false,
             entity_id: String::new(),
             advancement_id: String::new(),
             custom_json: String::new(),
@@ -578,6 +609,11 @@ impl Default for QuestObjective {
             biome_id: String::new(),
             structure_id: String::new(),
             observation_range: 4.0,
+            custom_name: String::new(),
+            entity_type_tag: String::new(),
+            nbt_filter: String::new(),
+            team_stage: false,
+            criterion: String::new(),
         }
     }
 }
@@ -733,6 +769,24 @@ pub struct QuestReward {
     pub match_nbt: bool,
     #[serde(default)]
     pub ignore_nbt: bool,
+    #[serde(default)]
+    pub random_bonus: f64,
+    #[serde(default)]
+    pub only_one: bool,
+    #[serde(default)]
+    pub permission_level: i32,
+    #[serde(default)]
+    pub silent: bool,
+    #[serde(default)]
+    pub feedback_message: String,
+    #[serde(default)]
+    pub autoclaim: String,
+    #[serde(default)]
+    pub exclude_from_claim_all: bool,
+    #[serde(default)]
+    pub ignore_reward_blocking: bool,
+    #[serde(default)]
+    pub disable_reward_screen_blur: bool,
 }
 
 impl Default for QuestReward {
@@ -762,6 +816,15 @@ impl Default for QuestReward {
             consume_items: false,
             match_nbt: false,
             ignore_nbt: false,
+            random_bonus: 0.0,
+            only_one: false,
+            permission_level: 0,
+            silent: false,
+            feedback_message: String::new(),
+            autoclaim: String::new(),
+            exclude_from_claim_all: false,
+            ignore_reward_blocking: false,
+            disable_reward_screen_blur: false,
         }
     }
 }
@@ -854,6 +917,22 @@ pub struct QuestEdge {
     pub edge_type: EdgeType,
     #[serde(default)]
     pub inverted: bool,
+    /// Optional manual curvature, editor-only (not exported to SNBT). Control
+    /// points are offsets relative to the source/target handle anchors in flow
+    /// pixels so a curve tracks its quests. `sourceControl`/`targetControl`
+    /// are `[x, y]` pairs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bezier: Option<EdgeBezier>,
+}
+
+/// Manual bezier control-point offsets for a curved dependency edge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EdgeBezier {
+    #[serde(default)]
+    pub source_control: [f64; 2],
+    #[serde(default)]
+    pub target_control: [f64; 2],
 }
 
 impl Default for QuestEdge {
@@ -865,6 +944,7 @@ impl Default for QuestEdge {
             label: None,
             edge_type: EdgeType::Prerequisite,
             inverted: false,
+            bezier: None,
         }
     }
 }
@@ -964,6 +1044,13 @@ pub struct QuestGraph {
     /// `detection_delay` from data.snbt — quest-completion scan ticks; FTB default 20.
     #[serde(default)]
     pub detection_delay: i32,
+    /// Book-level visual preset palette, editor-only (not exported to SNBT).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edge_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edge_cycle_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_theme: Option<String>,
 }
 
 impl Default for QuestGraph {
@@ -995,6 +1082,9 @@ impl QuestGraph {
             default_consume_items: false,
             default_autoclaim_rewards: "disabled".to_string(),
             detection_delay: 20,
+            edge_color: None,
+            edge_cycle_color: None,
+            active_theme: None,
         }
     }
 }

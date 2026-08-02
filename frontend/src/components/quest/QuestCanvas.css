@@ -45,6 +45,171 @@
   color: var(--ftb-accent);
 }
 
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolbar-btn:disabled:hover {
+  background: var(--ftb-input-bg, #1e1e22);
+  border-color: var(--ftb-border);
+  color: var(--ftb-text);
+}
+
+/* ─── Canvas search bar ─────────────────────────────────────────── */
+.canvas-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-search-input {
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 5px 26px 5px 8px;
+  width: 170px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.canvas-search-input:focus {
+  border-color: var(--ftb-accent);
+}
+
+.canvas-search-count {
+  position: absolute;
+  right: 22px;
+  font-size: 10px;
+  color: var(--ftb-accent);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.canvas-search-clear {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.canvas-search-clear:hover {
+  color: var(--ftb-text-bright);
+}
+
+/* Search-result highlighting on quest nodes */
+.ftb-quest-node.search-dim {
+  opacity: 0.18;
+  filter: grayscale(0.85);
+}
+
+.ftb-quest-node.search-match .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 3px var(--ftb-accent), 0 0 18px rgba(91, 155, 213, 0.55);
+}
+
+.ftb-quest-node.search-match .ftb-quest-node-title {
+  color: var(--ftb-accent);
+}
+
+/* ─── Align / distribute buttons ────────────────────────────────── */
+.align-distribute-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.align-btn {
+  min-width: 30px;
+  padding: 6px 7px;
+  text-align: center;
+}
+
+.align-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ftb-border);
+  margin: 0 4px;
+}
+
+/* ─── Book theme preset picker ──────────────────────────────────── */
+.canvas-theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--ftb-text-dim);
+}
+
+.canvas-theme-label {
+  white-space: nowrap;
+}
+
+.canvas-theme-picker select {
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 6px;
+  outline: none;
+  max-width: 220px;
+}
+
+.canvas-theme-picker select:focus {
+  border-color: var(--ftb-accent);
+}
+
+/* ─── Bezier control-point editor ───────────────────────────────── */
+.edge-bezier-editor {
+  z-index: 15;
+}
+
+.edge-bezier-guides line {
+  stroke: var(--ftb-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.8;
+}
+
+.edge-bezier-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--ftb-accent);
+  border: 2px solid var(--ftb-accent-hover);
+  color: #1a1a1e;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.edge-bezier-handle:active {
+  cursor: grabbing;
+}
+
+.edge-bezier-handle:hover {
+  background: var(--ftb-accent-hover);
+}
+
 .toolbar-group label {
   display: flex;
   align-items: center;
@@ -561,6 +726,30 @@
 .edge-action-delete:hover {
   background: var(--ftb-danger, #e74c3c);
   color: #fff;
+}
+
+.edge-action-ghost {
+  background: transparent;
+  border: 1px solid var(--ftb-border, #3d3d44);
+  color: var(--ftb-text);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edge-action-ghost:hover {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.edge-action-ghost.edge-action-active {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent-hover);
+  color: #1a1a1e;
 }
 
 /* MiniMap customization */
@@ -1388,4 +1577,68 @@
 .quest-deco-remove:hover {
   background: #e74c3c;
   color: #fff;
+}
+
+/* Right-click context menu */
+.ctx-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 190px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--bg-surface, #1b1f27);
+  border: 1px solid var(--border-muted, #333a45);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+.ctx-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 9px;
+  font-size: 13px;
+  color: var(--text-normal, #d7dce5);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ctx-menu-item:hover {
+  background: var(--bg-hover, #262d38);
+}
+.ctx-menu-item-danger {
+  color: #ff8a8a;
+}
+.ctx-menu-item-danger:hover {
+  background: #e74c3c;
+  color: #fff;
+}
+.ctx-menu-item-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ctx-menu-item-disabled:hover {
+  background: none;
+}
+.ctx-menu-divider {
+  height: 1px;
+  background: var(--border-muted, #333a45);
+  margin: 4px 0;
+}
+.ctx-menu-group-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.6;
+  padding: 3px 9px 1px;
+  margin-top: 2px;
+}
+.ctx-menu-multi {
+  font-size: 11px;
+  opacity: 0.7;
+  padding: 4px 9px;
 }

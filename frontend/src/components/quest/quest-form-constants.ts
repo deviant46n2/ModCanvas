@@ -1,3 +1,13 @@
+// Quest dependency-requirement modes. Values are the canonical SNBT keys used
+// by the quest format and match src-tauri/src/quest/types.rs as_lower.
+// `all_completed` is the in-game default.
+export const DEPENDENCY_REQUIREMENTS = [
+  { value: 'all_completed', label: 'All completed' },
+  { value: 'one_completed', label: 'One completed' },
+  { value: 'all_started', label: 'All started' },
+  { value: 'one_started', label: 'One started' },
+]
+
 export const SHAPES = [
   { value: 'default', label: 'Default' },
   { value: 'circle', label: 'Circle' },
@@ -50,8 +60,8 @@ export function setQuestScale(scale: number): { width: number; height: number } 
   return { width: Math.round(q * 24), height: Math.round(q * 24) }
 }
 
-// Mirror in-game FTB grid snapping (QuestPanel.draw). The snap grain is
-// `gridScale × minSize` FTB grid units, where minSize is the smallest selected
+// Mirror in-game quest grid snapping. The snap grain is `gridScale × minSize`
+// grid units, where minSize is the smallest selected
 // item's width (24 units = 1.0x) and gridScale is data.snbt's `grid_scale`
 // (default 0.5). Shift disables snapping entirely. Values are snapped to the
 // nearest grid line; the group anchor (min corner) is snapped and offsets are

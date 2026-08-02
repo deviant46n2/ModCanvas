@@ -43,7 +43,8 @@ Edges are rendered by `DependencyEdge` (`frontend/src/components/quest/quest-edg
 - A dark casing (`rgba(10,12,18,0.92)`, core width + 4) provides the outline.
 - A bright gold core (`#f2c94c`) carries the actual line.
 - A **source dot** (`r≈4.5`, same color as the core) marks the prerequisite end.
-- A **direction chevron** sits at the bezier midpoint and is rotated to point along the path tangent (source → target), so arrow direction stays readable over busy chapter artwork. Its control-point math replicates React Flow's `getBezierPath` (curvature `0.25`) via `bezierMidpoint`.
+- A **direction chevron** sits at the bezier midpoint and is rotated to point along the path tangent (source → target), so arrow direction stays readable over busy chapter artwork. Its control-point math replicates React Flow's `getBezierPath` (curvature `0.25`) via `computeEdgeGeometry` (`src/core/quest/edge-geometry.ts`), which the edge renderer and the bezier editor share.
+- When an edge has manual bezier control points (`EdgeBezierData.bezier`, see "Canvas tools"), the whole path — including the chevron midpoint/tangent — is recomputed from them so curve and arrow stay in agreement.
 - Edges participating in a dependency loop are drawn in bright red (`#ff6b6b`) with a red arrowhead and a "Circular dependency" tooltip.
 
 Cycle detection (`detectCycles`) flags any edge that is part of a strongly-connected component, so users can find loops before export.
@@ -104,13 +105,13 @@ Assets").
    `image-rendering` stretching can distort the geometry (gear teeth, octagon
    sides, hexagon orientation) — this is what kept circles round under WebKit
    and avoids a grey plate box behind each shape. The node adds a    `has-texture`
-    modifier that disables the CSS clip-path/border fallback. The quest icon is
-    sized to **2/3 of the shape**, matching in-game (`QuestButton.java`:
-    `s = w * (2F / 3F) * iconScale`) — the old 85% rendered texels ~28% larger
-    than in-game. The quest's per-quest `icon_scale` (0.1 – 2.0, the FTB editor
-    "Icon Scale" Appearance field) multiplies the icon size too, so a 1.5× quest
-    renders a 150%-sized icon exactly as it does in-game; the factor is clamped
-    to FTB's 0.1 – 2.0 range in `quest-nodes.tsx`.
+     modifier that disables the CSS clip-path/border fallback. The quest icon is
+     sized to **2/3 of the shape**, matching the in-game icon-to-tile ratio
+     (2/3 scaled by the quest's `icon_scale`) — the old 85% rendered texels
+     ~28% larger than in-game. The quest's per-quest `icon_scale` (0.1 – 2.0,
+     the "Icon Scale" Appearance field) multiplies the icon size too, so a 1.5× quest
+     renders a 150%-sized icon exactly as it does in-game; the factor is clamped
+     to the 0.1 – 2.0 range in `quest-nodes.tsx`.
  4. **Fallback (no instance textures)** — the tile uses a CSS `clip-path` per shape
     plus a `drop-shadow(0 0 0 var(--shape-color))` outline, which follows the
     clipped silhouette so the border stays visible on every side (a plain box
@@ -203,7 +204,7 @@ rotations support single-axis `angle` and multi-axis `x/y/z` forms, including th
 ## Behavior
 
 Quest placement snaps to a grid matching FTB Quests in-game. The editor mirrors
-`QuestPanel.draw` + `QuestPanel.mousePressed`:
+the in-game quest editor's placement behavior:
 
 - **Snap grain** = `grid_scale × minSize` FTB grid units, where `grid_scale`
   comes from the pack's `data.snbt` (`grid_scale`, default `0.5`) and `minSize`
@@ -234,9 +235,9 @@ Quest placement snaps to a grid matching FTB Quests in-game. The editor mirrors
 
 ## Icon scale (`icon_scale`) import/export
 
-- FTB writes the per-quest appearance field as `icon_scale` (`Quest.java`
-  `writeData`) in both flat-chapter and subdirs layouts, with the editor
-  allowing 0.1 – 2.0 (default 1.0).
+- The quest format stores the per-quest appearance field as `icon_scale` in
+  both flat-chapter and subdirs layouts, with the editor allowing 0.1 – 2.0
+  (default 1.0).
 - `src-tauri/src/imports/ftb_quests/import.rs` reads `icon_scale`, falling back
   to the legacy `icon_scaling` key the app once emitted for subdirs layouts,
   and clamps to 0.1 – 2.0.
@@ -247,8 +248,7 @@ Quest placement snaps to a grid matching FTB Quests in-game. The editor mirrors
 
 ## Chapter editing
 
-Chapter-level settings mirror FTB's in-game chapter editor
-(`Chapter.java` `fillConfigGroup` / `writeData`):
+Chapter-level settings mirror the in-game chapter editor:
 
 - Title, subtitle, icon, default quest shape, default quest size multiplier,
   default min width, progression mode, and the visibility/misc toggles
@@ -320,8 +320,8 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
 
 ## Quest links (cross-chapter references)
 
-FTB `QuestLink` nodes reference another quest by id (`linked_quest` key in
-`QuestLink.java:writeData`). ModCanvas stores them as quest nodes with
+Quest link nodes reference another quest by id (the `linked_quest` key).
+ModCanvas stores them as quest nodes with
 `node_type: quest_link` and a `link_target` id.
 
 - `src-tauri/src/quest/types.rs` — `QuestNodeType::QuestLink` variant and
@@ -340,10 +340,12 @@ FTB `QuestLink` nodes reference another quest by id (`linked_quest` key in
 - Round-trip covered by `quest_link_roundtrips_through_export` and
   `quest_link_no_linked_target_stays_link` in `export_tests.rs`.
 
-## Per-quest advanced fields (inspector)
+## Per-quest advanced fields
 
-The per-quest Advanced inspector tab mirrors the remaining `Quest.java`
-`fillConfigGroup` / `writeData` fields that were previously model-only:
+The per-quest Advanced section in the live `QuestDetailModal.tsx` exposes the
+remaining per-quest settings that were previously model-only (and only surfaced
+in the dead `inspector.tsx` legacy stack — that inspector is not
+imported/bundled):
 
 - **Repeat cooldown** — FTB-canonical `repeat_cooldown` (plain seconds cooldown)
   + `can_repeat` tristate. Export emits `can_repeat: 1b` and
@@ -354,24 +356,168 @@ The per-quest Advanced inspector tab mirrors the remaining `Quest.java`
 - **Hide lock icon** — `addBool("hide_lock_icon")`, exported as `1b`.
 - **Guide page** — `addString("guide_page")`, a page id string.
 - **Max completable dependents** — `addInt("max_completable_dependents")`, 0 = unlimited.
+- **Dependency requirement** — selector for FTB `DependencyRequirement`
+  (`all_completed` / `one_completed` / `all_started` / `one_started`; default
+  `all_completed`), from `DEPENDENCY_REQUIREMENTS` in `quest-form-constants.ts`.
+- **Min required dependencies** — `addInt("min_required_dependencies")` (0 = none).
+- **Hide lock icon / repeat cooldown / guide page / max dependents** shown in
+  the Advanced section of `QuestDetailModal.tsx`, behind the "Advanced ▸" toggle.
 
 - `src-tauri/src/quest/types.rs` — `QuestNode` carries `repeat_cooldown`,
-  `hide_lock_icon`, `guide_page`, `max_completable_dependents`.
+  `hide_lock_icon`, `guide_page`, `max_completable_dependents`,
+  `min_required_dependencies`, `dependency_requirement`.
 - `src-tauri/src/imports/ftb_quests/import.rs` — SNBT and JSON5 quest parsers
-  read all four keys.
+  read the keys above (including `dependency_requirement` dialect mapping
+  `one`→`one_completed`, `started`→`all_started`).
 - `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes them
-  (booleans as SNBT `Byte(1)`, ints as SNBT `Int`).
-- `frontend/src/services/quest-types.ts` — `QuestNodeData` carries the four
+  (booleans as SNBT `Byte(1)`, ints as SNBT `Int`, strings as SNBT `String`).
+- `frontend/src/services/quest-types.ts` — `QuestNodeData` carries all six
   fields; the legacy `repeat_time` / `repeat_min_delay` / `repeat_max_delay`
   keys were removed from the frontend model.
-- `frontend/src/components/quest/inspector.tsx` — "Repeat Cooldown (s)",
-  "Hide Lock Icon", "Guide Page", "Max Completable Dependents" controls in the
-  Advanced tab; `useGraphUI.ts` holds the edit state and `liveSaveField`
-  persists each change.
+- `frontend/src/components/quest/QuestDetailModal.tsx` — Advanced section
+  inputs for repeat cooldown (s), Hide Lock Icon checkbox, Guide Page,
+  Dependency Requirement select, Min Required Deps, Max Completable Dependents.
 - `frontend/src/components/quest/QuestTileFooter.tsx` — repeatable tiles show
   `🔄 <cooldown>s`.
 - Round-trip covered by
   `per_quest_repeat_and_visibility_fields_roundtrip` and
   `repeat_fields_export_uses_ftb_canonical_keys` in `export_tests.rs`.
 
+## Reward tables
 
+FTB `RewardTable` weighted pools can be edited in-app from a 🎁 **Tables**
+toolbar button (`RewardTablesModal.tsx`): create/rename/delete tables,
+set loot_size / empty_weight / hide_tooltip / use_title, manage weighted item
+entries (add/remove, reorder, per-entry item id, count, weight), and see how
+many quest rewards reference each table. Changes autosave like the rest of the
+graph.
+
+- `frontend/src/components/quest/RewardTablesModal.tsx` — the editor modal.
+- `frontend/src/components/quest/import-export.tsx` — 🎁 Tables button opens it
+  and wraps graph mutations in `scheduleAutoSave`. (Old dead `RewardsTab.tsx`
+  had a read-only table picker and is not imported.)
+- Table-backed reward types (`choice`, `random`, `all_table`) show a "Reward
+  Table" `<select>` in `RewardCard` (`quest-form-sections.tsx`) instead of the
+  item field row; `table_id` is written to the reward and is a fallback text
+  input when no tables exist yet. `QuestDetailModal` threads `graph.reward_tables`
+  into `RewardCard`.
+- `reward_tables` on `QuestGraphData` round-trip import/export in the Rust
+  backend (weighted pools, loot_size, empty_weight, hide_tooltip, use_title).
+
+## Task / reward field completion
+
+Per-objective and per-reward fields that FTB's in-game editor exposes are now
+editable in the live quest form (`quest-form-sections.tsx`), with matching
+SNBT/JSON5 import + export in the Rust backend:
+
+- **Item task** — `task_screen_only`, `only_from_crafting` and
+  `match_components` checkboxes (exported `task_screen_only: 1b` /
+  `only_from_crafting: 1b` / `match_components: 1b`) alongside the existing
+  Consume Items / Match NBT / Ignore NBT flags.
+- **Kill task** — `entity_type_tag` (Entity Type Tag, FTB key `entityTypeTag`),
+  `custom_name`, `nbt_filter`, and the kill count as FTB `value` (long, only
+  when > 1). Legacy `tag` / `count` keys are still read on import.
+- **Location task** — x/y/z + W×H×D box (`box_w`/`box_h`/`box_d`) + Ignore
+  Dimension checkbox. Exports FTB-canonical `position: [I;x,y,z]` +
+  `size: [I;w,h,d]` int arrays and `ignore_dimension: 1b`; legacy
+  `x`/`y`/`z`/`w`/`h`/`d`/`radius` keys are read on import. Flat-chapter
+  dimension-only checks still export as the `dimension` task type.
+- **Advancement task** — `advancement` + `criterion` (FTB `criterion` key).
+- **Stage task** — `stage` + `team_stage` (FTB `team_stage: 1b`). FTB has no
+  task-level `remove` flag.
+- **Task optional** — optional tasks serialize as FTB `optional_task: 1b`
+  (quest-level `optional` is separate). Both `optional_task` and legacy
+  `optional` are read on import.
+- **Item reward** — `random_bonus` (decimal, exported `random_bonus: <f64>`)
+  and `only_one` (checkbox, exported `only_one: 1b`) on the `item` reward card.
+- **Command reward** — `permission_level` (int 0–4), `silent` (checkbox,
+  exported `silent: 1b`) and `feedback_message` (string) on the `command`
+  reward card.
+- **Common reward fields** — every reward card gains Auto-Claim (`auto`
+  select: enabled / disabled / no_toast / invisible) plus Team Reward,
+  Exclude From Claim All, Ignore Reward Blocking and Disable Screen Blur
+  checkboxes, exported as FTB `auto: "..."` / `team_reward: 1b` /
+  `exclude_from_claim_all: 1b` / `ignore_reward_blocking: 1b` /
+  `disable_reward_screen_blur: 1b`.
+
+Backend: `src-tauri/src/quest/types.rs` (new `QuestObjective` / `QuestReward`
+fields), `import.rs` (SNBT reads for kill tag/custom_name, item task
+task_screen_only/only_from_crafting/match_components, item reward
+random_bonus/only_one, command permission_level/silent/feedback_message,
+common reward fields via SNBT + JSON5 struct literal), `export.rs` (kill
+`entityTypeTag`/`value`/`nbt_filter`, location `position`/`size` arrays +
+`ignore_dimension`, stage `team_stage`, advancement `criterion`, task
+`optional_task`, item `random_bonus`/`only_one`, command
+`permission_level`/`silent`/`feedback_message`, reward
+`team_reward`/`auto`/`exclude_from_claim_all`/`ignore_reward_blocking`/
+`disable_reward_screen_blur`). Frontend typing/defaults in `quest-types.ts`,
+`quest-helpers.ts`, `nodes.tsx`. Round-trip covered by
+`kill_task_and_reward_bonus_fields_roundtrip` and
+`location_box_stage_advancement_and_reward_common_fields_roundtrip` in
+`export_tests.rs`.
+
+
+## Right-click canvas context menus
+
+Right-clicking a quest node or the empty pane opens a context menu
+(`QuestContextMenu.tsx`, rendered by `QuestCanvas`), mirroring FTB's in-game
+editing UX:
+
+- **Node context menu** — Edit Quest, Duplicate (copy+paste in place), Copy
+  Quest ID, and Delete; in Simulate mode also Complete Selected / Reset Selected.
+  A multi-selection supports bulk duplicate/delete/complete/reset. Right-clicking
+  a node not currently in the selection makes it the sole operand.
+- **Empty-pane context menu** — Add Quest, Add Quest Link, a "New Quest with
+  Task" submenu listing every objective type, and Paste Quest (disabled until a
+  clipboard/selection exists). Placement is at the right-click cursor.
+- Wire-up: `QuestBookEditor` `onAddQuest`/`onAddQuestLink` gained an optional
+  `position`, plus a new `onAddQuestWithTask(chapterId, type, position)` that
+  creates a quest pre-populated with one objective of the chosen type.
+  `screenToFlowPosition` converts the cursor to an FTB grid center.
+
+## Undo / redo
+
+Edits are undoable via **Ctrl+Z** (undo) / **Ctrl+Y** (redo), and the canvas
+toolbar's **↩ Undo / ↪ Redo** buttons (disabled when no history exists). Every
+mutating graph change goes through `QuestBookEditor.commitGraph`, which pushes
+the pre-mutation graph onto an undo stack (bounded to 120 entries) and clears
+the redo stack; `undo`/`redo` swap snapshots. The initial graph load and autosave
+sync are intentionally not recorded as undoable steps.
+
+## Canvas tools
+
+The canvas toolbar hosts a set of editing aids (`canvas-tools.tsx` presentational
+components + pure logic in `src/core/quest/`):
+
+- **Search / filter bar** — `QuestSearchBar` matches quest **label, id, subtitle
+  and every objective's label/target** (`search.ts`, case-insensitive substring).
+  Non-matching quests dim (`search-dim`), matches glow (`search-match`), and
+  **Enter** selects the first match and flies to it (`fitView({ nodes })`).
+- **Align / distribute** — `AlignDistributeControls` + `align.ts`. Buttons snap
+  the selected quests' **FTB grid centers** (left/center-X/right/top/center-Y/
+  bottom align; horizontal/vertical distribute). Align needs ≥2 selected,
+  distribute ≥3. Results go through `onUpdateNodes` → one undoable commit.
+- **Cut / duplicate** — **Ctrl+X** cuts (copies to the internal clipboard then
+  deletes the selection); **Ctrl+D** duplicates (copy+paste in place). Both
+  respect the read-only lock.
+- **Editing-mode (read-only) toggle** — **🔒 View / ✏️ Edit**. Locking disables
+  node drag, connect, edge reconnect, delete, and all add/context-menu
+  mutations while leaving selection, pan, zoom, search, and Simulate available.
+  It is enforced at both the React Flow prop level (`nodesDraggable`,
+  `nodesConnectable`, `edgesReconnectable`) and the key/context handlers.
+- **Bezier control points per edge** — selecting an arrow shows a **🎀 Curve**
+  button in the action chip. `EdgeBezierEditor` (rendered in the viewport
+  portal) exposes two draggable handles. Control points are stored as offsets
+  relative to the **handle anchors** (`QuestEdgeData.bezier` /
+  `Rust QuestEdge.bezier`, anchored via `pickEdgeHandles`/`handleAnchor` in
+  `edge-geometry.ts`), so a curve keeps tracking its quests when nodes move.
+  Dragging streams a live preview through React Flow's local edge state and
+  commits **once on pointer-up** — every drag is a single undoable step. The
+  bezier is editor-only: FTB's quest format has no field for it, so it is not
+  written to SNBT (and is absent after a fresh import).
+- **Book-level visual presets** — the **Theme** dropdown applies a self-authored
+  `BOOK_THEME_PRESETS` palette (clean-room; no FTB theme data is bundled or
+  parsed). Applying one repaints every quest node's color/shape plus each
+  chapter's and the book's defaults, and drives edge colors through the graph's
+  `edge_color` / `edge_cycle_color` (falling back to the built-in gold/red
+  constants). "Editor default" clears the overrides.

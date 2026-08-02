@@ -1,5 +1,5 @@
-import { getBezierPath, Position } from '@xyflow/react';
 import type { EdgeTypes, EdgeProps } from '@xyflow/react';
+import { computeEdgeGeometry, type EdgeBezierRel } from '../../core/quest/edge-geometry';
 
 // Dependency-arrow palette.
 //
@@ -60,57 +60,51 @@ export function detectCycles(edgeList: { source: string; target: string }[]): Se
   return cycleEdges;
 }
 
-// Replicates @xyflow/react's getBezierPath control-point math (curvature 0.25)
-// so we can position a direction chevron at the bezier midpoint and orient it
-// along the path's tangent (from source toward target).
-function bezierMidpoint(
-  sourceX: number,
-  sourceY: number,
-  sourcePosition: Position | undefined,
-  targetX: number,
-  targetY: number,
-  targetPosition: Position | undefined
-): { mx: number; my: number; tx: number; ty: number } {
-  const curvature = 0.25;
-  const controlOffset = (distance: number) => (distance >= 0 ? 0.5 * distance : curvature * 25 * Math.sqrt(-distance));
+// Direction cue: a dot on the prerequisite end plus a chevron on the bezier
+// midpoint pointing at the dependent quest. When an edge has manual bezier
+// control points (`data.bezierRel`), the whole path — including the midpoint
+// and tangent used by the chevron — is recomputed from them so the curve and
+// its arrow stay in agreement.
+function DependencyEdgeBody({
+  sourceX,
+  sourceY,
+  sourcePosition,
+  targetX,
+  targetY,
+  targetPosition,
+  bezier,
+}: {
+  sourceX: number;
+  sourceY: number;
+  sourcePosition: any;
+  targetX: number;
+  targetY: number;
+  targetPosition: any;
+  bezier?: EdgeBezierRel | null;
+}) {
+  const geom = computeEdgeGeometry(sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, bezier);
+  const tangentLength = Math.hypot(geom.tx, geom.ty);
+  const chevronLength = 10;
+  const chevronWidth = 6.4;
+  const chevron = tangentLength > 1e-4
+    ? (() => {
+        const ux = geom.tx / tangentLength;
+        const uy = geom.ty / tangentLength;
+        const nx = -uy;
+        const ny = ux;
+        const tipX = geom.mx + ux * chevronLength * 0.45;
+        const tipY = geom.my + uy * chevronLength * 0.45;
+        const backX = geom.mx - ux * chevronLength * 0.55;
+        const backY = geom.my - uy * chevronLength * 0.55;
+        const b1x = backX + nx * chevronWidth * 0.5;
+        const b1y = backY + ny * chevronWidth * 0.5;
+        const b2x = backX - nx * chevronWidth * 0.5;
+        const b2y = backY - ny * chevronWidth * 0.5;
+        return `M ${tipX} ${tipY} L ${b1x} ${b1y} L ${b2x} ${b2y} Z`;
+      })()
+    : null;
 
-  const sourceControlX =
-    sourcePosition === Position.Left
-      ? sourceX - controlOffset(sourceX - targetX)
-      : sourcePosition === Position.Right
-        ? sourceX + controlOffset(targetX - sourceX)
-        : sourceX;
-  const sourceControlY =
-    sourcePosition === Position.Top
-      ? sourceY - controlOffset(sourceY - targetY)
-      : sourcePosition === Position.Bottom
-        ? sourceY + controlOffset(targetY - sourceY)
-        : sourceY;
-  const targetControlX =
-    targetPosition === Position.Left
-      ? targetX - controlOffset(targetX - sourceX)
-      : targetPosition === Position.Right
-        ? targetX + controlOffset(sourceX - targetX)
-        : targetX;
-  const targetControlY =
-    targetPosition === Position.Top
-      ? targetY - controlOffset(targetY - sourceY)
-      : targetPosition === Position.Bottom
-        ? targetY + controlOffset(sourceY - targetY)
-        : targetY;
-
-  const mx = sourceX * 0.125 + sourceControlX * 0.375 + targetControlX * 0.375 + targetX * 0.125;
-  const my = sourceY * 0.125 + sourceControlY * 0.375 + targetControlY * 0.375 + targetY * 0.125;
-  const tx =
-    0.75 * (sourceControlX - sourceX) +
-    1.5 * (targetControlX - sourceControlX) +
-    0.75 * (targetX - targetControlX);
-  const ty =
-    0.75 * (sourceControlY - sourceY) +
-    1.5 * (targetControlY - sourceControlY) +
-    0.75 * (targetY - targetControlY);
-
-  return { mx, my, tx, ty };
+  return { path: geom.path, chevron, labelX: geom.mx, labelY: geom.my };
 }
 
 export function DependencyEdge({
@@ -127,37 +121,22 @@ export function DependencyEdge({
   markerEnd,
   label,
   interactionWidth,
+  data,
 }: EdgeProps) {
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const stroke = (style?.stroke as string) || NORMAL_COLOR;
+  const bezier = (data as any)?.bezierRel as EdgeBezierRel | null | undefined;
+  const { path, chevron, labelX, labelY } = DependencyEdgeBody({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    bezier,
+  });
   const isCycle = stroke === CYCLE_COLOR;
   const strokeWidth = isCycle ? 3.5 : Math.max(1.5, Number(style?.strokeWidth) || 2);
   const opacity = isCycle ? 1 : (style?.opacity as number) ?? 0.85;
-
-  // Direction cue: a dot on the prerequisite end plus a chevron on the bezier
-  // midpoint pointing at the dependent quest. The two together make the arrow
-  // direction readable even on busy chapter artwork.
-  const { mx, my, tx, ty } = bezierMidpoint(sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition);
-  const tangentLength = Math.hypot(tx, ty);
-  const chevronLength = 10;
-  const chevronWidth = 6.4;
-  const chevron = tangentLength > 1e-4
-    ? (() => {
-        const ux = tx / tangentLength;
-        const uy = ty / tangentLength;
-        const nx = -uy;
-        const ny = ux;
-        const tipX = mx + ux * chevronLength * 0.45;
-        const tipY = my + uy * chevronLength * 0.45;
-        const backX = mx - ux * chevronLength * 0.55;
-        const backY = my - uy * chevronLength * 0.55;
-        const b1x = backX + nx * chevronWidth * 0.5;
-        const b1y = backY + ny * chevronWidth * 0.5;
-        const b2x = backX - nx * chevronWidth * 0.5;
-        const b2y = backY - ny * chevronWidth * 0.5;
-        return `M ${tipX} ${tipY} L ${b1x} ${b1y} L ${b2x} ${b2y} Z`;
-      })()
-    : null;
 
   return (
     <g>

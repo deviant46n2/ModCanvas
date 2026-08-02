@@ -378,7 +378,7 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
     m.insert("y".to_string(), ce(SnbtValue::Double(node.position.y)));
 
     // QuestLink nodes serialize as a reference to another quest — no tasks,
-    // no rewards, no dependency/default_enabled fields (FTB QuestLink.writeData).
+    // no rewards, no dependency/default_enabled fields.
     if matches!(node.node_type, QuestNodeType::QuestLink) {
         if !node.link_target.is_empty() {
             m.insert("linked_quest".to_string(), ce(SnbtValue::String(node.link_target.clone())));
@@ -497,8 +497,7 @@ fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_chapters: bo
     }
 
     if (node.icon_scaling - 1.0).abs() > f64::EPSILON {
-        // FTB reads `icon_scale` in both flat and subdirs layouts
-        // (Quest.java writeData: json.addProperty("icon_scale", iconScale)).
+        // `icon_scale` is read by the game in both flat and subdirs layouts.
         m.insert("icon_scale".to_string(), ce(SnbtValue::Double(node.icon_scaling)));
     }
 
@@ -654,36 +653,54 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
         ObjectiveType::ItemCrafting => ("item", vec![
             ("item".to_string(), ce(item_value(&obj.target, obj.target_count, &obj.smart_filter, flat_chapters))),
         ]),
-        ObjectiveType::EntityKill => ("kill", vec![
-            ("entity".to_string(), ce(SnbtValue::String(obj.target.clone()))),
-        ]),
-        ObjectiveType::LocationVisit => if flat_chapters {
-            // FlatChapters uses 'dimension' type for dimension-only checks
-            if obj.x == 0.0 && obj.y == 0.0 && obj.z == 0.0 && !obj.dimension.is_empty() {
+        ObjectiveType::EntityKill => {
+            let mut fields = vec![
+                ("entity".to_string(), ce(SnbtValue::String(obj.target.clone()))),
+            ];
+            if !obj.entity_type_tag.is_empty() {
+                fields.push(("entityTypeTag".to_string(), ce(SnbtValue::String(obj.entity_type_tag.clone()))));
+            }
+            if obj.target_count > 1 {
+                fields.push(("value".to_string(), ce(SnbtValue::Long(obj.target_count as i64))));
+            }
+            if !obj.custom_name.is_empty() {
+                fields.push(("custom_name".to_string(), ce(SnbtValue::String(obj.custom_name.clone()))));
+            }
+            if !obj.nbt_filter.is_empty() {
+                fields.push(("nbt_filter".to_string(), ce(SnbtValue::String(obj.nbt_filter.clone()))));
+            }
+            ("kill", fields)
+        }
+        ObjectiveType::LocationVisit => {
+            let (w, h, d) = if obj.box_w > 0.0 || obj.box_h > 0.0 || obj.box_d > 0.0 {
+                (obj.box_w.max(1.0), obj.box_h.max(1.0), obj.box_d.max(1.0))
+            } else {
+                (1.0, 1.0, 1.0)
+            };
+            let is_dimension_only = obj.x == 0.0 && obj.y == 0.0 && obj.z == 0.0 && w == 1.0 && h == 1.0 && d == 1.0;
+            if flat_chapters && is_dimension_only && !obj.dimension.is_empty() {
+                // FlatChapters uses the 'dimension' type for dimension-only checks
                 ("dimension", vec![
                     ("dimension".to_string(), ce(SnbtValue::String(obj.dimension.clone()))),
                 ])
             } else {
                 ("location", vec![
                     ("dimension".to_string(), ce(SnbtValue::String(obj.dimension.clone()))),
-                    ("x".to_string(), ce(SnbtValue::Double(obj.x))),
-                    ("y".to_string(), ce(SnbtValue::Double(obj.y))),
-                    ("z".to_string(), ce(SnbtValue::Double(obj.z))),
-                    ("radius".to_string(), ce(SnbtValue::Double(obj.radius))),
+                    ("ignore_dimension".to_string(), ce(SnbtValue::Byte(obj.ignore_dim as i8))),
+                    ("position".to_string(), ce(SnbtValue::IntArray(vec![obj.x as i32, obj.y as i32, obj.z as i32]))),
+                    ("size".to_string(), ce(SnbtValue::IntArray(vec![w as i32, h as i32, d as i32]))),
                 ])
             }
-        } else {
-            ("location", vec![
-                ("dimension".to_string(), ce(SnbtValue::String(obj.dimension.clone()))),
-                ("x".to_string(), ce(SnbtValue::Double(obj.x))),
-                ("y".to_string(), ce(SnbtValue::Double(obj.y))),
-                ("z".to_string(), ce(SnbtValue::Double(obj.z))),
-                ("radius".to_string(), ce(SnbtValue::Double(obj.radius))),
-            ])
-        },
-        ObjectiveType::Advancement => ("advancement", vec![
-            ("advancement".to_string(), ce(SnbtValue::String(obj.advancement_id.clone()))),
-        ]),
+        }
+        ObjectiveType::Advancement => {
+            let mut fields = vec![
+                ("advancement".to_string(), ce(SnbtValue::String(obj.advancement_id.clone()))),
+            ];
+            if !obj.criterion.is_empty() {
+                fields.push(("criterion".to_string(), ce(SnbtValue::String(obj.criterion.clone()))));
+            }
+            ("advancement", fields)
+        }
         ObjectiveType::Checkmark => ("checkmark", vec![]),
         ObjectiveType::Xp => ("xp", vec![
             ("xp".to_string(), ce(SnbtValue::Int(obj.xp_points))),
@@ -710,9 +727,15 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
         ObjectiveType::FindStructure => ("structure", vec![
             ("structure".to_string(), ce(SnbtValue::String(obj.structure_id.clone()))),
         ]),
-        ObjectiveType::GameStage => ("stage", vec![
-            ("stage".to_string(), ce(SnbtValue::String(obj.advancement_id.clone()))),
-        ]),
+        ObjectiveType::GameStage => {
+            let mut fields = vec![
+                ("stage".to_string(), ce(SnbtValue::String(obj.advancement_id.clone()))),
+            ];
+            if obj.team_stage {
+                fields.push(("team_stage".to_string(), ce(SnbtValue::Byte(1))));
+            }
+            ("stage", fields)
+        }
         ObjectiveType::BlockBreak => ("block_break", vec![
             ("item".to_string(), ce(item_value(&obj.target, 1, &obj.smart_filter, flat_chapters))),
         ]),
@@ -731,7 +754,7 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
 
     m.insert("type".to_string(), ce(SnbtValue::String(ftb_type.to_string())));
 
-    if obj.target_count > 1 && !matches!(obj.objective_type, ObjectiveType::Xp | ObjectiveType::Fluid | ObjectiveType::Energy | ObjectiveType::Stat | ObjectiveType::Observation) {
+    if obj.target_count > 1 && !matches!(obj.objective_type, ObjectiveType::Xp | ObjectiveType::Fluid | ObjectiveType::Energy | ObjectiveType::Stat | ObjectiveType::Observation | ObjectiveType::EntityKill) {
         m.insert("count".to_string(), ce(SnbtValue::Long(obj.target_count as i64)));
     }
 
@@ -740,7 +763,8 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
     }
 
     if !obj.required {
-        m.insert("optional".to_string(), ce(SnbtValue::Byte(1)));
+        // FTB tasks serialize the optional flag under `optional_task` (quests use `optional`).
+        m.insert("optional_task".to_string(), ce(SnbtValue::Byte(1)));
     }
 
     if !obj.nbt_data.is_empty() {
@@ -771,6 +795,18 @@ fn objective_to_snbt_task(obj: &QuestObjective, flat_chapters: bool) -> Result<S
         m.insert("ignore_nbt".to_string(), ce(SnbtValue::Byte(1)));
     }
 
+    if obj.task_screen_only {
+        m.insert("task_screen_only".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if obj.only_from_crafting {
+        m.insert("only_from_crafting".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if obj.match_components {
+        m.insert("match_components".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
     Ok(SnbtValue::Compound(m))
 }
 
@@ -784,9 +820,18 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
     }
 
     let (ftb_type, extra_fields) = match &reward.reward_type {
-        RewardType::Item => ("item", vec![
-            ("item".to_string(), ce(item_value(&reward.item_id, reward.item_count, &reward.smart_filter, flat_chapters))),
-        ]),
+        RewardType::Item => {
+            let mut fields = vec![
+                ("item".to_string(), ce(item_value(&reward.item_id, reward.item_count, &reward.smart_filter, flat_chapters))),
+            ];
+            if reward.random_bonus != 0.0 {
+                fields.push(("random_bonus".to_string(), ce(SnbtValue::Double(reward.random_bonus))));
+            }
+            if reward.only_one {
+                fields.push(("only_one".to_string(), ce(SnbtValue::Byte(1))));
+            }
+            ("item", fields)
+        }
         RewardType::ItemWithWeight => ("item", vec![
             ("item".to_string(), ce(item_value(&reward.item_id, reward.item_count, &reward.smart_filter, flat_chapters))),
             ("weight".to_string(), ce(SnbtValue::Double(reward.weight))),
@@ -797,9 +842,21 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
         RewardType::XpLevels => ("levels", vec![
             ("levels".to_string(), ce(SnbtValue::Int(reward.xp_levels))),
         ]),
-        RewardType::Command => ("command", vec![
-            ("command".to_string(), ce(SnbtValue::String(reward.command.clone()))),
-        ]),
+        RewardType::Command => {
+            let mut fields = vec![
+                ("command".to_string(), ce(SnbtValue::String(reward.command.clone()))),
+            ];
+            if reward.permission_level > 0 {
+                fields.push(("permission_level".to_string(), ce(SnbtValue::Int(reward.permission_level))));
+            }
+            if reward.silent {
+                fields.push(("silent".to_string(), ce(SnbtValue::Byte(1))));
+            }
+            if !reward.feedback_message.is_empty() {
+                fields.push(("feedback_message".to_string(), ce(SnbtValue::String(reward.feedback_message.clone()))));
+            }
+            ("command", fields)
+        }
         RewardType::LootTable => ("loot", vec![
             ("loot_table".to_string(), ce(SnbtValue::String(reward.loot_table.clone()))),
         ]),
@@ -839,7 +896,7 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
 
     // Choice/random/all rewards reference a reward table by id. When the reward
     // carries inline items but no resolved table, embed the pool as an internal
-    // table (`table_data`) — FTB treats it as an embedded pool (`RewardTable.writeData`).
+    // table (`table_data`), which the game treats as an embedded pool.
     if matches!(reward.reward_type, RewardType::Choice | RewardType::Random | RewardType::AllTable)
         && reward.table_id.is_empty()
         && !reward.items.is_empty() {
@@ -903,6 +960,28 @@ fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Result<SnbtValue
 
     if reward.ignore_nbt {
         m.insert("ignore_nbt".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    // `team_reward` is a tristate in the format: TRUE writes 1b, FALSE writes
+    // 0b, and the default omits the key. We omit when false to match that.
+    if reward.team_reward {
+        m.insert("team_reward".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if !reward.autoclaim.is_empty() {
+        m.insert("auto".to_string(), ce(SnbtValue::String(reward.autoclaim.clone())));
+    }
+
+    if reward.exclude_from_claim_all {
+        m.insert("exclude_from_claim_all".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if reward.ignore_reward_blocking {
+        m.insert("ignore_reward_blocking".to_string(), ce(SnbtValue::Byte(1)));
+    }
+
+    if reward.disable_reward_screen_blur {
+        m.insert("disable_reward_screen_blur".to_string(), ce(SnbtValue::Byte(1)));
     }
 
     Ok(SnbtValue::Compound(m))

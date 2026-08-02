@@ -38,13 +38,15 @@ export function defaultObjective(): QuestObjectiveData {
     target_count: 1,
     required: true,
     item_tag: '', nbt_data: '', smart_filter: '', consume_items: false,
-    match_nbt: false, ignore_nbt: false, exact_match: false,
+    match_nbt: false, ignore_nbt: false, exact_match: false, task_screen_only: false, only_from_crafting: false, match_components: false,
     fluid_id: '', fluid_amount: 0, energy_amount: 0, energy_unit: 'FE',
     xp_levels: 0, xp_points: 0, command: '', dimension: '',
     x: 0, y: 0, z: 0, radius: 0,
+    box_w: 0, box_h: 0, box_d: 0, ignore_dim: false,
     entity_id: '', advancement_id: '', custom_json: '', description: '',
     stat_name: '', stat_value: 0, biome_id: '', structure_id: '',
-    observation_range: 4,
+    observation_range: 4, custom_name: '', entity_type_tag: '', nbt_filter: '',
+    team_stage: false, criterion: '',
   }
 }
 
@@ -59,6 +61,9 @@ export function defaultReward(): QuestRewardData {
     xp_amount: 0, xp_levels: 0, command: '', loot_table: '',
     game_stage: '', weight: 1.0, reward_chests: [], team_reward: false,
     toast_message: '', table_id: '', choices: [], advancement_id: '',
+    random_bonus: 0.0, only_one: false, permission_level: 0, silent: false,
+    feedback_message: '', autoclaim: '', exclude_from_claim_all: false,
+    ignore_reward_blocking: false, disable_reward_screen_blur: false,
   }
 }
 

@@ -10,12 +10,14 @@ import {
   SHAPES,
   VISIBILITY_OPTIONS,
   PROGRESSION_MODES,
+  DEPENDENCY_REQUIREMENTS,
   questScaleFromSize,
   questSizeToPixels,
   setQuestScale,
 } from './quest-form-constants'
 import { ObjectiveCard, RewardCard } from './quest-form-sections'
 import type { ProgressState } from '../../core/quest/progress'
+import type { RewardTableData } from '../../services/api'
 
 interface QuestDetailModalProps {
   node: QuestNodeData
@@ -34,6 +36,7 @@ interface QuestDetailModalProps {
   simProgress?: ProgressState
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void
   quests?: Array<{ id: string; label: string }>
+  rewardTables?: RewardTableData[]
 }
 
 export function QuestDetailModal({
@@ -53,6 +56,7 @@ export function QuestDetailModal({
   simProgress,
   onSetQuestProgress,
   quests,
+  rewardTables,
 }: QuestDetailModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -175,6 +179,7 @@ export function QuestDetailModal({
                 onRemove={() => onRemoveReward(node.id, rew.id)}
                 onUpdate={(field, value) => onUpdateReward(node.id, rew.id, field, value)}
                 onOpenItemPicker={onOpenItemPicker ? () => onOpenItemPicker!({ type: 'reward', id: rew.id, nodeId: node.id }) : undefined}
+                rewardTables={rewardTables}
               />
             ))}
           </section>
@@ -276,6 +281,32 @@ export function QuestDetailModal({
                     <input type="number" value={node.min_window_width} onChange={(e) => onUpdateNode(node.id, { min_window_width: parseInt(e.target.value) || 0 })} />
                   </div>
                 </div>
+                <div className="quest-detail-field-row">
+                  <div className="quest-detail-field">
+                    <label>Dependency Requirement</label>
+                    <select value={node.dependency_requirement || 'all_completed'} onChange={(e) => onUpdateNode(node.id, { dependency_requirement: e.target.value })}>
+                      {DEPENDENCY_REQUIREMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="quest-detail-field">
+                    <label>Min Required Deps</label>
+                    <input type="number" min="0" value={node.min_required_dependencies} onChange={(e) => onUpdateNode(node.id, { min_required_dependencies: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div className="quest-detail-field">
+                    <label>Max Completable Dependents</label>
+                    <input type="number" min="0" value={node.max_completable_dependents} onChange={(e) => onUpdateNode(node.id, { max_completable_dependents: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+                <div className="quest-detail-field-row">
+                  <div className="quest-detail-field">
+                    <label>Repeat Cooldown (s)</label>
+                    <input type="number" min="0" value={node.repeat_cooldown} onChange={(e) => onUpdateNode(node.id, { repeat_cooldown: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div className="quest-detail-field quest-detail-field-guide">
+                    <label>Guide Page</label>
+                    <input type="text" value={node.guide_page || ''} onChange={(e) => onUpdateNode(node.id, { guide_page: e.target.value })} placeholder="e.g. quests:guide/my_guide" />
+                  </div>
+                </div>
                 <div className="quest-detail-checkboxes">
                   <label className="quest-detail-checkbox">
                     <input type="checkbox" checked={node.optional} onChange={(e) => onUpdateNode(node.id, { optional: e.target.checked })} />
@@ -288,6 +319,10 @@ export function QuestDetailModal({
                   <label className="quest-detail-checkbox">
                     <input type="checkbox" checked={node.hide_dependency_lines} onChange={(e) => onUpdateNode(node.id, { hide_dependency_lines: e.target.checked })} />
                     <span>Hide Dep Lines</span>
+                  </label>
+                  <label className="quest-detail-checkbox">
+                    <input type="checkbox" checked={node.hide_lock_icon} onChange={(e) => onUpdateNode(node.id, { hide_lock_icon: e.target.checked })} />
+                    <span>Hide Lock Icon</span>
                   </label>
                   <label className="quest-detail-checkbox">
                     <input type="checkbox" checked={node.hide_dependent_lines} onChange={(e) => onUpdateNode(node.id, { hide_dependent_lines: e.target.checked })} />

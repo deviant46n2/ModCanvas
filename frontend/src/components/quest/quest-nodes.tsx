@@ -36,10 +36,10 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   // FTB shape tiles are always square, so size the tile off the node's smaller
   // dimension regardless of the node box.
   const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 0.8));
-  // In-game the quest icon is 2/3 of the quest tile scaled by the quest's
-  // `icon_scale` (`QuestButton.java`: `s = w * (2F / 3F) * iconScale`). The
-  // shape is the editor's tile analog, so size the icon to 2/3 of it, clamped
-  // to FTB's editor range (0.1 – 2.0), to match the in-game pixel proportion.
+  // In-game the quest icon renders at 2/3 of the quest tile's size, scaled by
+  // the quest's `icon_scale` (editor range 0.1 – 2.0). The shape is the
+  // editor's tile analog, so size the icon to 2/3 of it, applying the same
+  // clamp, to match the in-game pixel proportion.
   const iconScale =
     typeof d.icon_scaling === 'number' && Number.isFinite(d.icon_scaling)
       ? Math.min(2.0, Math.max(0.1, d.icon_scaling))
@@ -60,9 +60,9 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   // Bake the whole shape tile (grey fill + tinted/white outline) into a single
   // square data URL at the display size, so no CSS stretching / scaling can
   // distort the shape geometry (which rendered circles as ovals under WebKit).
-  // Explicit quest colors tint the outline exactly like FTB's
-  // `outline.withColor(...)`; quests without a color get FTB's default
-  // near-white outline at ~58% alpha (`quest_not_started_color`).
+  // Explicit quest colors tint the outline to that color; quests without an
+  // explicit color keep the in-game not-started default, a near-white outline
+  // at ~58% alpha.
   useEffect(() => {
     let cancelled = false;
     if (shapeBg && shapeOutline) {
@@ -92,6 +92,11 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const isSimHidden = simStatus?.hidden === true;
   const isSimLocked = !isSimHidden && simStatus?.locked === true;
 
+  // Search-filter dimming/highlighting (only present when the search bar is active).
+  const searchStatus = d.searchStatus as 'match' | 'dim' | undefined;
+  const isSearchDim = searchStatus === 'dim';
+  const isSearchMatch = searchStatus === 'match';
+
   const isLink = d.node_type === 'quest_link';
   const linkTarget = d.link_target as string | undefined;
 
@@ -103,7 +108,7 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
 
   return (
     <div
-      className={`ftb-quest-node${selected ? ' selected' : ''}${isOptional ? ' optional' : ''}${isSimHidden ? ' sim-hidden' : ''}${isSimLocked ? ' sim-locked' : ''}${simComplete ? ' sim-complete' : ''}${isLink ? ' quest-link' : ''}`}
+      className={`ftb-quest-node${selected ? ' selected' : ''}${isOptional ? ' optional' : ''}${isSimHidden ? ' sim-hidden' : ''}${isSimLocked ? ' sim-locked' : ''}${simComplete ? ' sim-complete' : ''}${isLink ? ' quest-link' : ''}${isSearchDim ? ' search-dim' : ''}${isSearchMatch ? ' search-match' : ''}`}
       style={{
         width: nodeWidth,
         height: nodeHeight,

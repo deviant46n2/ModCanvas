@@ -14,17 +14,23 @@ import {
   useViewport,
 } from '@xyflow/react';
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/react';
-import type { QuestGraphData, QuestChapter, QuestEdgeData, QuestNodeData, ChapterImage } from '../../services/quest-types';
+import type { QuestGraphData, QuestChapter, QuestEdgeData, QuestNodeData, ChapterImage, EdgeBezierRel } from '../../services/quest-types';
 import { questIconUrl } from './questIcons';
 import { textureDisplayUrl } from '../../services/texture-loader';
 import { shapeTextureKeys, type ShapeTextures } from '../../core/quest/quest-shapes';
 import { NORMAL_COLOR, CYCLE_COLOR, detectCycles } from './quest-edges';
-import { normalizeShape, questSizeToPixels, snapToGridStep } from './quest-form-constants';
+import { normalizeShape, questSizeToPixels, snapToGridStep, OBJECTIVE_TYPES } from './quest-form-constants';
 import { nodeTypes } from './quest-nodes';
 import { generateFtbHexId } from './quest-helpers';
+import { QuestContextMenu, type QuestCtxMenuState } from './QuestContextMenu';
 import { ChapterImagesLayer } from './ChapterImagesLayer';
 import { ChapterDecorationsCanvas } from './ChapterDecorationsCanvas';
 import { DecorationPanel } from './DecorationPanel';
+import { EdgeBezierEditor } from './EdgeBezierEditor';
+import { QuestSearchBar, AlignDistributeControls, EditLockButton, ThemePresetPicker } from './canvas-tools';
+import { alignPositions, distributePositions, type AlignMode, type DistributeMode } from '../../core/quest/align';
+import { searchQuestNodes } from '../../core/quest/search';
+import { pickEdgeHandles } from '../../core/quest/edge-geometry';
 import { defaultDecorationImage } from './decoration-picker';
 import { computeVisibility, isLocked, type ProgressState } from '../../core/quest/progress';
 import '@xyflow/react/dist/style.css';
@@ -38,12 +44,15 @@ interface QuestCanvasProps {
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void;
   onAddEdge: (edge: { source: string; target: string }) => void;
   onUpdateEdge: (edgeId: string, data: { source?: string; target?: string }) => void;
+  onUpdateEdgeBezier?: (edgeId: string, bezier: EdgeBezierRel | null) => void;
+  onApplyThemePreset?: (presetId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteNodes?: (nodeIds: string[]) => void;
   onPasteNodes?: (nodes: QuestNodeData[], edges: QuestEdgeData[]) => void;
   onDeleteEdge: (edgeId: string) => void;
-  onAddNode: (chapterId: string) => void;
-  onAddLink?: (chapterId: string) => void;
+  onAddNode: (chapterId: string, position?: { x: number; y: number }) => void;
+  onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void;
+  onAddQuestWithTask?: (chapterId: string, objectiveType: string, position?: { x: number; y: number }) => void;
   onUpdateChapterImages: (chapterId: string, images: ChapterImage[]) => void;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
@@ -55,6 +64,10 @@ interface QuestCanvasProps {
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void;
   onCompleteAll?: () => void;
   onResetAll?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 // FTB Quests coordinate spacing — display scale, not snap grain.
@@ -105,12 +118,15 @@ function QuestCanvasInner({
   onUpdateNodes,
   onAddEdge,
   onUpdateEdge,
+  onUpdateEdgeBezier,
+  onApplyThemePreset,
   onDeleteNode: _onDeleteNode,
   onDeleteNodes,
   onPasteNodes,
   onDeleteEdge,
   onAddNode,
   onAddLink,
+  onAddQuestWithTask,
   onUpdateChapterImages,
   selectedNodeId: _selectedNodeId,
   setSelectedNodeId,
@@ -122,6 +138,10 @@ function QuestCanvasInner({
   onSetQuestProgress,
   onCompleteAll,
   onResetAll,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: QuestCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -133,9 +153,24 @@ function QuestCanvasInner({
   const [decorEditMode, setDecorEditMode] = useState(false);
   const [selectedDecoIndex, setSelectedDecoIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [ctxMenu, setCtxMenu] = useState<QuestCtxMenuState | null>(null);
+  const cursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const clipboardRef = useRef<{ nodes: QuestNodeData[]; edges: QuestEdgeData[] } | null>(null);
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
   const { zoom } = useViewport();
+
+  // Book-level visual palette (theme presets) overrides the hardcoded defaults.
+  const edgeColor = questGraph.edge_color || NORMAL_COLOR;
+  const cycleColor = questGraph.edge_cycle_color || CYCLE_COLOR;
+
+  // Search-filter state. A non-empty query dims non-matching quests and
+  // highlights the matches; Enter focuses the first match.
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchActive = searchQuery.trim().length > 0;
+
+  // Read-only "View" lock: quests can be inspected/navigated but not mutated.
+  const [editLocked, setEditLocked] = useState(false);
+  const [bezierEditEdgeId, setBezierEditEdgeId] = useState<string | null>(null);
 
   const filteredNodeIds = useMemo(() => {
     if (!activeChapter) return new Set(questGraph.nodes.map((n: QuestNodeData) => n.id));
@@ -149,6 +184,14 @@ function QuestCanvasInner({
       (e: QuestEdgeData) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
     );
   }, [questGraph.edges, filteredNodeIds]);
+
+  const searchMatchIds = useMemo(() => {
+    if (!searchActive) return null;
+    const chapterNodes = questGraph.nodes.filter(
+      (n: QuestNodeData) => filteredNodeIds.has(n.id) && (n.node_type === 'quest' || n.node_type === 'side_quest')
+    );
+    return searchQuestNodes(chapterNodes, searchQuery);
+  }, [searchActive, searchQuery, questGraph.nodes, filteredNodeIds]);
 
   const cycleEdges = useMemo(() => detectCycles(filteredEdges), [filteredEdges]);
   const isCycleEdge = useCallback(
@@ -217,6 +260,7 @@ function QuestCanvasInner({
             shapeTextures: getShapeTextures(node.shape || 'square', textureIndex || {}),
             simStatus: simMode ? simStatusById[node.id] : undefined,
             simComplete: simMode ? simProgress[node.id] === 'complete' : false,
+            searchStatus: searchActive ? (searchMatchIds?.has(node.id) ? 'match' : 'dim') : undefined,
           },
           style: {
             width: pixelSize.width,
@@ -237,17 +281,9 @@ function QuestCanvasInner({
         const scy = srcNode.position.y + srcSize.height / 2;
         const tcx = tgtNode.position.x + tgtSize.width / 2;
         const tcy = tgtNode.position.y + tgtSize.height / 2;
-        const dx = tcx - scx;
-        const dy = tcy - scy;
-        const ax = Math.abs(dx);
-        const ay = Math.abs(dy);
-        if (ax > ay) {
-          sourceHandle = dx > 0 ? 'sr' : 'sl';
-          targetHandle = dx > 0 ? 'l' : 'r';
-        } else {
-          sourceHandle = dy > 0 ? 'sb' : 'st';
-          targetHandle = dy > 0 ? 't' : 'b';
-        }
+        const anchors = pickEdgeHandles(scx, scy, tcx, tcy);
+        sourceHandle = anchors.sourceHandle;
+        targetHandle = anchors.targetHandle;
       }
       const isCycle = cycleEdges.has(`${edge.source}->${edge.target}`);
       return {
@@ -257,16 +293,17 @@ function QuestCanvasInner({
         sourceHandle,
         targetHandle,
         // Cycle edges are always flagged red (survives the hover-dimming pass).
-        style: isCycle ? { stroke: CYCLE_COLOR, strokeWidth: 3.5, opacity: 1 } : undefined,
+        style: isCycle ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 } : undefined,
         markerEnd: isCycle
-          ? { type: MarkerType.ArrowClosed, width: 24, height: 24, color: CYCLE_COLOR }
+          ? { type: MarkerType.ArrowClosed, width: 24, height: 24, color: cycleColor }
           : undefined,
+        data: edge.bezier ? { bezierRel: edge.bezier } : undefined,
       };
     });
 
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, setNodes, setEdges]);
+  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, setNodes, setEdges]);
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -283,7 +320,7 @@ function QuestCanvasInner({
       if (!hoveredNodeId) {
         return {
           ...edge,
-          style: isCycle ? { stroke: CYCLE_COLOR, strokeWidth: 3.5, opacity: 1 } : undefined,
+          style: isCycle ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 } : undefined,
         };
       }
       const isConnected = edge.source === hoveredNodeId || edge.target === hoveredNodeId;
@@ -291,13 +328,13 @@ function QuestCanvasInner({
         return {
           ...edge,
           style: isCycle
-            ? { stroke: CYCLE_COLOR, strokeWidth: 3.5, opacity: 1 }
-            : { stroke: NORMAL_COLOR, strokeWidth: 2.5, opacity: 1 },
+            ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 }
+            : { stroke: edgeColor, strokeWidth: 2.5, opacity: 1 },
         };
       }
       return { ...edge, style: { stroke: '#444', strokeWidth: 1, opacity: 0.06 } };
     }));
-  }, [hoveredNodeId, isCycleEdge, setEdges]);
+  }, [hoveredNodeId, isCycleEdge, edgeColor, cycleColor, setEdges]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -359,15 +396,17 @@ function QuestCanvasInner({
   // Double-click a dependency arrow to remove it.
   const handleEdgeDoubleClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {
+      if (editLocked) return;
       onDeleteEdge(edge.id);
       setSelectedEdgeId(null);
+      setBezierEditEdgeId(null);
     },
-    [onDeleteEdge]
+    [onDeleteEdge, editLocked]
   );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdgeId) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdgeId && !editLocked) {
         const el = document.activeElement as HTMLElement | null;
         if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
         e.preventDefault();
@@ -377,7 +416,7 @@ function QuestCanvasInner({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedEdgeId, onDeleteEdge]);
+  }, [selectedEdgeId, onDeleteEdge, editLocked]);
 
   const copySelected = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -393,6 +432,7 @@ function QuestCanvasInner({
 
   const pasteClipboard = useCallback(() => {
     if (!clipboardRef.current || clipboardRef.current.nodes.length === 0) return;
+    if (editLocked) return;
     const oldToNew = new Map<string, string>();
     const newNodes: QuestNodeData[] = clipboardRef.current.nodes.map(n => {
       const newId = generateFtbHexId();
@@ -409,7 +449,7 @@ function QuestCanvasInner({
       }));
     onPasteNodes?.(newNodes, newEdges);
     setSelectedIds(new Set(newNodes.map(n => n.id)));
-  }, [onPasteNodes]);
+  }, [onPasteNodes, editLocked]);
 
   const selectAllNodes = useCallback(() => {
     setSelectedIds(new Set(filteredNodeIds));
@@ -427,6 +467,50 @@ function QuestCanvasInner({
     }
     onUpdateNodes(updates);
   }, [selectedIds, questGraph.nodes, onUpdateNodes]);
+
+  // Align the selected quests' grid-center coordinates along an axis.
+  const alignSelected = useCallback((mode: AlignMode) => {
+    if (selectedIds.size < 2) return;
+    const selected = questGraph.nodes.filter((n: QuestNodeData) => selectedIds.has(n.id));
+    const positions = alignPositions(
+      selected.map((n) => ({ id: n.id, position: n.position })),
+      mode
+    );
+    onUpdateNodes(selected.map((n) => ({ nodeId: n.id, data: { position: positions[n.id] } })));
+  }, [selectedIds, questGraph.nodes, onUpdateNodes]);
+
+  // Spread the selected quests evenly along an axis between the extremes.
+  const distributeSelected = useCallback((mode: DistributeMode) => {
+    if (selectedIds.size < 3) return;
+    const selected = questGraph.nodes.filter((n: QuestNodeData) => selectedIds.has(n.id));
+    const positions = distributePositions(
+      selected.map((n) => ({ id: n.id, position: n.position })),
+      mode
+    );
+    onUpdateNodes(selected.map((n) => ({ nodeId: n.id, data: { position: positions[n.id] } })));
+  }, [selectedIds, questGraph.nodes, onUpdateNodes]);
+
+  // Search: select + fly to the first matching quest (Enter in the search bar).
+  const focusFirstSearchMatch = useCallback(() => {
+    if (!searchMatchIds || searchMatchIds.size === 0) return;
+    const first = questGraph.nodes.find((n: QuestNodeData) => searchMatchIds.has(n.id));
+    if (!first) return;
+    setSelectedNodeId(first.id);
+    setSelectedIds(new Set([first.id]));
+    fitView({ nodes: [{ id: first.id }], duration: 400, maxZoom: 2.5, padding: 0.3 });
+  }, [searchMatchIds, questGraph.nodes, setSelectedNodeId, fitView]);
+
+  // Bezier curve editing: live preview only rewrites the local React Flow edge;
+  // the graph is committed once on pointer-up so history stays clean.
+  const previewEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel) => {
+    setEdges((eds) => eds.map((e) =>
+      e.id === edgeId ? { ...e, data: { ...(e.data as object | undefined), bezierRel: bezier } } : e
+    ));
+  }, [setEdges]);
+
+  const commitEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel | null) => {
+    onUpdateEdgeBezier?.(edgeId, bezier);
+  }, [onUpdateEdgeBezier]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -448,7 +532,23 @@ function QuestCanvasInner({
         pasteClipboard();
         return;
       }
-      if (selectedIds.size === 0) return;
+      if (mod && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        if (editLocked) return;
+        copySelected();
+        if (selectedIds.size === 0) return;
+        onDeleteNodes?.(Array.from(selectedIds));
+        setSelectedIds(new Set());
+        return;
+      }
+      if (mod && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        if (editLocked) return;
+        copySelected();
+        pasteClipboard();
+        return;
+      }
+      if (selectedIds.size === 0 || editLocked) return;
       const nudge = e.shiftKey ? 0.5 : 1.0;
       if (e.key === 'ArrowUp') { e.preventDefault(); nudgeSelected(0, -nudge); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); nudgeSelected(0, nudge); }
@@ -462,7 +562,7 @@ function QuestCanvasInner({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedIds, selectAllNodes, copySelected, pasteClipboard, nudgeSelected, onDeleteNodes]);
+  }, [selectedIds, selectAllNodes, copySelected, pasteClipboard, nudgeSelected, onDeleteNodes, editLocked]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -484,11 +584,115 @@ function QuestCanvasInner({
     setHoveredNodeId(null);
     setSelectedEdgeId(null);
     setSelectedDecoIndex(null);
+    setBezierEditEdgeId(null);
   }, [setSelectedNodeId]);
 
   const handleNodeMouseLeave = useCallback(() => {
     setHoveredNodeId(null);
   }, []);
+
+  // --- Right-click context menus (node + empty pane) ----------------------
+
+  const handleNodeContextMenu = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      e.preventDefault();
+      // Right-click makes the node the operand unless it's part of the current
+      // multi-selection already (so bulk actions still apply to that set).
+      if (!selectedIds.has(node.id)) {
+        setSelectedIds(new Set([node.id]));
+        setSelectedNodeId(node.id);
+      }
+      cursorRef.current = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setCtxMenu({ x: e.clientX, y: e.clientY, mode: 'node', nodeId: node.id });
+    },
+    [selectedIds, setSelectedNodeId, screenToFlowPosition]
+  );
+
+  const handlePaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      e.preventDefault();
+      cursorRef.current = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setCtxMenu({ x: e.clientX, y: e.clientY, mode: 'pane' });
+    },
+    [screenToFlowPosition]
+  );
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  // Convert the right-click cursor (stored in flow coords) into an FTB grid
+  // center position for the newly created node (nodes are center-anchored and
+  // render pixelPos = node pixel size, default 36px).
+  const gridPosFromCursor = useCallback(() => {
+    const c = cursorRef.current;
+    return {
+      x: (c.x + NODE_BASE_PX / 2) / GRID_SCALE,
+      y: (c.y + NODE_BASE_PX / 2) / GRID_SCALE,
+    };
+  }, []);
+
+  const handleCtxEdit = useCallback(
+    (nodeId: string) => {
+      setSelectedNodeId(nodeId);
+    },
+    [setSelectedNodeId]
+  );
+
+  const handleCtxDuplicate = useCallback(() => {
+    if (editLocked) return;
+    copySelected();
+    pasteClipboard();
+  }, [copySelected, pasteClipboard, editLocked]);
+
+  const handleCtxCopyId = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const target = questGraph.nodes.find((n: QuestNodeData) => selectedIds.has(n.id));
+    if (!target) return;
+    navigator.clipboard?.writeText(target.id).catch(() => {});
+  }, [selectedIds, questGraph.nodes]);
+
+  const handleCtxDelete = useCallback(() => {
+    if (editLocked) return;
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : (ctxMenu?.nodeId ? [ctxMenu.nodeId] : []);
+    if (ids.length === 0) return;
+    onDeleteNodes?.(ids);
+    setSelectedIds(new Set());
+  }, [selectedIds, ctxMenu?.nodeId, onDeleteNodes, editLocked]);
+
+  const applySimToSelection = useCallback(
+    (status: 'started' | 'complete' | null) => {
+      const ids = selectedIds.size > 0 ? Array.from(selectedIds) : (ctxMenu?.nodeId ? [ctxMenu.nodeId] : []);
+      for (const id of ids) onSetQuestProgress?.(id, status);
+    },
+    [selectedIds, ctxMenu?.nodeId, onSetQuestProgress]
+  );
+
+  const handleCtxAddQuest = useCallback(() => {
+    if (!activeChapter || editLocked) return;
+    onAddNode(activeChapter, gridPosFromCursor());
+  }, [activeChapter, onAddNode, gridPosFromCursor, editLocked]);
+
+  const handleCtxAddLink = useCallback(() => {
+    if (!activeChapter || editLocked) return;
+    onAddLink?.(activeChapter, gridPosFromCursor());
+  }, [activeChapter, onAddLink, gridPosFromCursor, editLocked]);
+
+  const handleCtxAddQuestWithTask = useCallback(
+    (objectiveType: string) => {
+      if (!activeChapter || editLocked) return;
+      onAddQuestWithTask?.(activeChapter, objectiveType, gridPosFromCursor());
+    },
+    [activeChapter, onAddQuestWithTask, gridPosFromCursor, editLocked]
+  );
+
+  // Clamp the menu so it never opens off the right/bottom viewport edge.
+  const viewportMenuPos = useMemo(() => {
+    if (!ctxMenu) return null;
+    const mw = 200;
+    const mh = Math.min(window.innerHeight - 16, 70 * window.innerHeight / 100);
+    const x = Math.min(ctxMenu.x, window.innerWidth - mw - 6);
+    const y = Math.max(4, Math.min(ctxMenu.y, window.innerHeight - mh - 6));
+    return { ...ctxMenu, x, y };
+  }, [ctxMenu]);
 
   // In Simulate mode, double-clicking a quest toggles its simulated completion.
   const handleNodeDoubleClick = useCallback(
@@ -502,7 +706,7 @@ function QuestCanvasInner({
 
   const handleNodeDragStop = useCallback(
     (_: any, node: Node, currentNodes?: Node[]) => {
-      // Mirror in-game FTB (QuestPanel.draw): grid snap grain is
+      // Mirror in-game quest grid snapping: grid snap grain is
       // gridScale × minSize of the selection, and Shift disables snapping.
       const shiftHeld = !!_?.shiftKey;
       const gridScale = questGraph.grid_scale || 0.5;
@@ -516,9 +720,9 @@ function QuestCanvasInner({
         minSize = Math.min(minSize, w);
       }
 
-      // Snap the group's min corner (in FTB grid units), preserving offsets —
-      // same as in-game QuestPanel.mousePressed placing objects at
-      // snapped anchor + (obj.pos - minCorner).
+      // Snap the group's min corner (in grid units), preserving offsets — the
+      // same anchoring the in-game editor uses when placing a dragged group:
+      // snapped anchor + (obj.pos − minCorner).
       let minX = Infinity, minY = Infinity;
       for (const n of dragged) {
         const size = (n.data as any)?.pixelSize || { width: NODE_BASE_PX, height: NODE_BASE_PX };
@@ -570,6 +774,16 @@ function QuestCanvasInner({
     ? filteredEdges.find((e: QuestEdgeData) => e.id === selectedEdgeId) || null
     : null;
 
+  const bezierEditEdge = bezierEditEdgeId
+    ? filteredEdges.find((e: QuestEdgeData) => e.id === bezierEditEdgeId) || null
+    : null;
+  const bezierSourceNode = bezierEditEdge
+    ? questGraph.nodes.find((n: QuestNodeData) => n.id === bezierEditEdge.source)
+    : undefined;
+  const bezierTargetNode = bezierEditEdge
+    ? questGraph.nodes.find((n: QuestNodeData) => n.id === bezierEditEdge.target)
+    : undefined;
+
   const nodeLabelById = useCallback(
     (id: string) => {
       const node = questGraph.nodes.find((n: QuestNodeData) => n.id === id);
@@ -585,16 +799,41 @@ function QuestCanvasInner({
           <button className="toolbar-btn" onClick={handleFitView} title="Fit View">
             🎯 Fit
           </button>
+          <button className="toolbar-btn" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+            ↩ Undo
+          </button>
+          <button className="toolbar-btn" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Y)">
+            ↪ Redo
+          </button>
           <button
             className={`toolbar-btn${connectMode ? ' toolbar-btn-active' : ''}`}
             onClick={() => {
               setConnectMode((m) => !m);
               setSelectedEdgeId(null);
+              setBezierEditEdgeId(null);
             }}
+            disabled={editLocked}
             title="Toggle dependency editing: drag between quest connection ports"
           >
             🔗 Connect
           </button>
+          <EditLockButton locked={editLocked} onToggle={() => setEditLocked((v) => !v)} />
+        </div>
+        <div className="toolbar-group">
+          <QuestSearchBar
+            query={searchQuery}
+            matchCount={searchMatchIds ? searchMatchIds.size : 0}
+            onQueryChange={setSearchQuery}
+            onFocusFirst={focusFirstSearchMatch}
+          />
+          <ThemePresetPicker value={questGraph.active_theme} onApply={(id) => onApplyThemePreset?.(id)} />
+        </div>
+        <div className="toolbar-group">
+          <AlignDistributeControls
+            selectedCount={selectedIds.size}
+            onAlign={alignSelected}
+            onDistribute={distributeSelected}
+          />
         </div>
         <div className="toolbar-group">
           <label>
@@ -619,6 +858,7 @@ function QuestCanvasInner({
               onClick={() => {
                 setDecorEditMode((m) => !m);
                 setSelectedDecoIndex(null);
+                setBezierEditEdgeId(null);
               }}
               title="Edit quest log decoration images for this chapter"
             >
@@ -685,6 +925,20 @@ function QuestCanvasInner({
             />
           )}
         </ViewportPortal>
+        <ViewportPortal>
+          {bezierEditEdge && bezierSourceNode && bezierTargetNode && !decorEditMode && (
+            <EdgeBezierEditor
+              edge={bezierEditEdge}
+              sourceNode={bezierSourceNode}
+              targetNode={bezierTargetNode}
+              gridScale={GRID_SCALE}
+              bodyScale={NODE_BASE_PX}
+              zoom={zoom}
+              onPreview={previewEdgeBezier}
+              onCommit={commitEdgeBezier}
+            />
+          )}
+        </ViewportPortal>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -697,15 +951,17 @@ function QuestCanvasInner({
           onNodeDoubleClick={handleNodeDoubleClick}
           onNodeMouseEnter={handleNodeMouseEnter}
           onNodeMouseLeave={handleNodeMouseLeave}
+          onNodeContextMenu={handleNodeContextMenu}
           onEdgeClick={handleEdgeClick}
           onEdgeDoubleClick={handleEdgeDoubleClick}
           onPaneClick={handlePaneClick}
+          onPaneContextMenu={handlePaneContextMenu}
           onNodeDragStop={handleNodeDragStop}
-          defaultEdgeOptions={{ type: 'dependency', animated: false, style: { stroke: NORMAL_COLOR, strokeWidth: 1.5, opacity: 0.5 }, markerEnd: { type: MarkerType.ArrowClosed, width: 24, height: 24, color: NORMAL_COLOR } }}
+          defaultEdgeOptions={{ type: 'dependency', animated: false, style: { stroke: edgeColor, strokeWidth: 1.5, opacity: 0.5 }, markerEnd: { type: MarkerType.ArrowClosed, width: 24, height: 24, color: edgeColor } }}
           connectionMode={ConnectionMode.Loose}
           connectionLineType={ConnectionLineType.Straight}
-          connectionLineStyle={{ stroke: NORMAL_COLOR, strokeWidth: 2, strokeDasharray: '6 4' }}
-          edgesReconnectable
+          connectionLineStyle={{ stroke: edgeColor, strokeWidth: 2, strokeDasharray: '6 4' }}
+          edgesReconnectable={!editLocked}
           reconnectRadius={28}
           fitView={false}
           panOnDrag
@@ -714,15 +970,36 @@ function QuestCanvasInner({
           minZoom={0.1}
           maxZoom={64}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-          nodesDraggable={!connectMode}
-          nodesConnectable={connectMode}
+          nodesDraggable={!connectMode && !editLocked}
+          nodesConnectable={connectMode && !editLocked}
         >
           {showBackground && <Background variant={BackgroundVariant.Dots} gap={GRID_SCALE} size={1} color="#3a3a3a" />}
           {showMiniMap && <MiniMap nodeColor={(node: any) => (node.data?.color as string) || '#89b4fa'} />}
           <Controls />
         </ReactFlow>
 
-        {activeChapter && !decorEditMode && !connectMode && (
+        {viewportMenuPos && (
+          <QuestContextMenu
+            menu={viewportMenuPos}
+            simMode={simMode}
+            selectedCount={selectedIds.size}
+            hasClipboard={!!clipboardRef.current}
+            onClose={closeCtxMenu}
+            onEdit={handleCtxEdit}
+            onDuplicate={handleCtxDuplicate}
+            onCopyId={handleCtxCopyId}
+            onDelete={handleCtxDelete}
+            onComplete={() => applySimToSelection('complete')}
+            onReset={() => applySimToSelection(null)}
+            onAddQuest={handleCtxAddQuest}
+            onAddLink={handleCtxAddLink}
+            onPaste={pasteClipboard}
+            onAddQuestWithTask={handleCtxAddQuestWithTask}
+            objectiveTypes={OBJECTIVE_TYPES}
+          />
+        )}
+
+        {activeChapter && !decorEditMode && !connectMode && !editLocked && (
           <div className="canvas-overlay">
             <div className="chapter-add-button" onClick={() => handleAddNode(activeChapter)}>
               + Add Quest
@@ -738,16 +1015,41 @@ function QuestCanvasInner({
             <span className="edge-action-label">
               {nodeLabelById(selectedEdge.source)} → {nodeLabelById(selectedEdge.target)}
             </span>
-            <button
-              className="edge-action-delete"
-              onClick={() => {
-                onDeleteEdge(selectedEdge.id);
-                setSelectedEdgeId(null);
-              }}
-              title="Remove this dependency arrow (Del)"
-            >
-              🗑 Remove connection
-            </button>
+            {!editLocked && (
+              <>
+                <button
+                  className={`edge-action-ghost${bezierEditEdgeId === selectedEdge.id ? ' edge-action-active' : ''}`}
+                  onClick={() => {
+                    setBezierEditEdgeId((cur) => (cur === selectedEdge.id ? null : selectedEdge.id));
+                  }}
+                  title={bezierEditEdgeId === selectedEdge.id ? 'Hide curve control points' : 'Edit bezier control points of this arrow'}
+                >
+                  {bezierEditEdgeId === selectedEdge.id ? '✓ Done' : '🎀 Curve'}
+                </button>
+                {bezierEditEdgeId === selectedEdge.id && selectedEdge.bezier && (
+                  <button
+                    className="edge-action-ghost"
+                    onClick={() => {
+                      onUpdateEdgeBezier?.(selectedEdge.id, null);
+                    }}
+                    title="Reset this arrow to the default curve"
+                  >
+                    ↺ Reset
+                  </button>
+                )}
+                <button
+                  className="edge-action-delete"
+                  onClick={() => {
+                    onDeleteEdge(selectedEdge.id);
+                    setSelectedEdgeId(null);
+                    setBezierEditEdgeId(null);
+                  }}
+                  title="Remove this dependency arrow (Del)"
+                >
+                  🗑 Remove connection
+                </button>
+              </>
+            )}
           </div>
         )}
 

@@ -1,8 +1,9 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import { getQuestGraph } from './services/api'
-import type { QuestGraphData, QuestChapter, QuestChapterGroup, QuestNodeData, QuestEdgeData, ChapterImage } from './services/api'
+import type { QuestGraphData, QuestChapter, QuestChapterGroup, QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel } from './services/api'
 import { QuestCanvas } from './components/quest/QuestCanvas'
 import { ChapterTree } from './components/quest/ChapterTree'
+import { getThemePreset, applyBookTheme } from './core/quest/theme-presets'
 import { QuestBookSkeleton } from './components/quest/QuestBookSkeleton'
 import { QuestDetailModal } from './components/quest/QuestDetailModal'
 import { ChapterSettings } from './components/quest/ChapterSettings'
@@ -66,12 +67,58 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
   const toolbarApiRef = useRef<ToolbarAPI | null>(null)
   const [simProgress, setSimProgress] = useState<ProgressState>({})
   const [simMode, setSimMode] = useState(false)
+  // Undo/redo history (Ctrl+Z / Ctrl+Y). Snapshots are capture of the whole
+  // graph before each mutating commit; bounded to avoid unbounded growth.
+  const undoHistory = useRef<QuestGraphData[]>([])
+  const redoHistory = useRef<QuestGraphData[]>([])
+  const [histVersion, setHistVersion] = useState(0)
 
   const setModsDir = useCallback((dir: string) => {
     setModsDirState(dir)
     if (dir) localStorage.setItem('modcanvas_mods_dir', dir)
     else localStorage.removeItem('modcanvas_mods_dir')
   }, [])
+
+  // Commit helper: pushes the current graph onto the undo stack (before any
+  // mutation) and clears redo, so every discrete edit is Ctrl+Z-able.
+  const commitGraph = useCallback((next: QuestGraphData) => {
+    if (graph) {
+      undoHistory.current.push(graph)
+      if (undoHistory.current.length > 120) undoHistory.current.shift()
+    }
+    redoHistory.current = []
+    setGraph(next)
+    setHistVersion(v => v + 1)
+  }, [graph])
+
+  const undo = useCallback(() => {
+    if (undoHistory.current.length === 0) return
+    const prev = undoHistory.current.pop()!
+    if (graph) redoHistory.current.push(graph)
+    setGraph(prev)
+    setHistVersion(v => v + 1)
+  }, [graph])
+
+  const redo = useCallback(() => {
+    if (redoHistory.current.length === 0) return
+    const next = redoHistory.current.pop()!
+    if (graph) undoHistory.current.push(graph)
+    setGraph(next)
+    setHistVersion(v => v + 1)
+  }, [graph])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null
+      if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return
+      const mod = e.ctrlKey || e.metaKey
+      if (!mod || e.shiftKey) return
+      if (e.key === 'y') { e.preventDefault(); redo(); return }
+      if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [undo, redo])
 
   const onReady = useCallback((api: ToolbarAPI) => {
     toolbarApiRef.current = api
@@ -175,14 +222,14 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onUpdateNode = useCallback((nodeId: string, data: Partial<QuestNodeData>) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n => n.id === nodeId ? { ...n, ...data } : n) })
+    commitGraph({ ...graph, nodes: graph.nodes.map(n => n.id === nodeId ? { ...n, ...data } : n) })
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
   const onUpdateNodes = useCallback((updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => {
     if (!graph) return
     const byId = new Map(updates.map(u => [u.nodeId, u.data]))
-    setGraph({
+    commitGraph({
       ...graph,
       nodes: graph.nodes.map(n => (byId.has(n.id) ? { ...n, ...byId.get(n.id) } : n)),
     })
@@ -191,7 +238,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onUpdateChapterImages = useCallback((chapterId: string, images: ChapterImage[]) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapters: graph.chapters.map(c => c.id === chapterId ? { ...c, images } : c),
     })
@@ -220,35 +267,50 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     const chapterNode = defaultQuestNodeData({
       id: newId, node_type: 'chapter', label: 'New Chapter', chapter_id: null,
     })
-    setGraph({ ...graph, chapters: [...graph.chapters, newChapter], nodes: [...graph.nodes, chapterNode] })
+    commitGraph({ ...graph, chapters: [...graph.chapters, newChapter], nodes: [...graph.nodes, chapterNode] })
     setActiveChapter(newChapter.id)
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
-  const onAddQuest = useCallback(() => {
+  const onAddQuest = useCallback((_chapterId?: string, position?: { x: number; y: number }) => {
     if (!graph || !activeChapter) return
-    const newNode = defaultQuestNodeData({ chapter_id: activeChapter, label: 'New Quest' })
-    setGraph({ ...graph, nodes: [...graph.nodes, newNode] })
+    const newNode = defaultQuestNodeData({ chapter_id: activeChapter, label: 'New Quest', position: position || { x: 0, y: 0 } })
+    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] })
     setSelectedNodeId(newNode.id)
     scheduleAutoSave()
   }, [graph, activeChapter, scheduleAutoSave])
 
-  const onAddQuestLink = useCallback(() => {
+  const onAddQuestWithTask = useCallback((_chapterId: string, objectiveType: string, position?: { x: number; y: number }) => {
+    if (!graph || !activeChapter) return
+    const node = defaultQuestNodeData({
+      chapter_id: activeChapter,
+      label: 'New Quest',
+      position: position || { x: 0, y: 0 },
+    })
+    const objective = { ...defaultObjective(), objective_type: objectiveType }
+    const newNode = { ...node, objectives: [objective] }
+    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] })
+    setSelectedNodeId(newNode.id)
+    scheduleAutoSave()
+  }, [graph, activeChapter, scheduleAutoSave])
+
+  const onAddQuestLink = useCallback((_chapterId?: string, position?: { x: number; y: number }) => {
     if (!graph || !activeChapter) return
     const newNode = defaultQuestNodeData({
       chapter_id: activeChapter,
       node_type: 'quest_link',
       label: 'New Link',
+      position: position || { x: 0, y: 0 },
       link_target: graph.nodes.find((n: QuestNodeData) => n.node_type === 'quest')?.id || '',
     })
-    setGraph({ ...graph, nodes: [...graph.nodes, newNode] })
+    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] })
     setSelectedNodeId(newNode.id)
     scheduleAutoSave()
   }, [graph, activeChapter, scheduleAutoSave])
 
   const onUpdateChapter = useCallback((chapterId: string, data: Partial<QuestChapter>) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapters: graph.chapters.map(c => c.id === chapterId ? { ...c, ...data } : c),
       nodes: graph.nodes.map(n =>
@@ -262,7 +324,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onDeleteChapter = useCallback((chapterId: string) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapters: graph.chapters.filter(c => c.id !== chapterId),
       nodes: graph.nodes.filter(n => n.id !== chapterId && n.chapter_id !== chapterId),
@@ -288,7 +350,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     swapped[idx] = swapped[target]
     swapped[target] = tmp
     const byId = new Map(swapped.map((c, i) => [c.id, i]))
-    setGraph({
+    commitGraph({
       ...graph,
       chapters: graph.chapters.map(c => ({ ...c, order_index: byId.get(c.id) ?? c.order_index })),
     })
@@ -304,13 +366,13 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
       icon: '',
       order_index: graph.chapter_groups.length,
     }
-    setGraph({ ...graph, chapter_groups: [...graph.chapter_groups, newGroup] })
+    commitGraph({ ...graph, chapter_groups: [...graph.chapter_groups, newGroup] })
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
   const onUpdateGroup = useCallback((groupId: string, data: Partial<QuestChapterGroup>) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapter_groups: graph.chapter_groups.map(g => g.id === groupId ? { ...g, ...data } : g),
     })
@@ -319,7 +381,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onDeleteGroup = useCallback((groupId: string) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapter_groups: graph.chapter_groups.filter(g => g.id !== groupId),
       chapters: graph.chapters.map(c => c.group_id === groupId ? { ...c, group_id: null } : c),
@@ -329,7 +391,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onAssignChapterToGroup = useCallback((chapterId: string, groupId: string | null) => {
     if (!graph) return
-    setGraph({
+    commitGraph({
       ...graph,
       chapters: graph.chapters.map(c => c.id === chapterId ? { ...c, group_id: groupId } : c),
     })
@@ -348,7 +410,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     swapped[idx] = swapped[target]
     swapped[target] = tmp
     const byId = new Map(swapped.map((g, i) => [g.id, i]))
-    setGraph({
+    commitGraph({
       ...graph,
       chapter_groups: graph.chapter_groups.map(g => ({ ...g, order_index: byId.get(g.id) ?? g.order_index })),
     })
@@ -357,7 +419,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onDeleteNode = useCallback((nodeId: string) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.filter(n => n.id !== nodeId) })
+    commitGraph({ ...graph, nodes: graph.nodes.filter(n => n.id !== nodeId) })
     if (selectedNodeId === nodeId) setSelectedNodeId(null)
     scheduleAutoSave()
   }, [graph, selectedNodeId, scheduleAutoSave])
@@ -365,7 +427,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
   const onDeleteNodes = useCallback((nodeIds: string[]) => {
     if (!graph || nodeIds.length === 0) return
     const dead = new Set(nodeIds)
-    setGraph({
+    commitGraph({
       ...graph,
       nodes: graph.nodes.filter(n => !dead.has(n.id)),
       edges: graph.edges.filter(e => !dead.has(e.source) && !dead.has(e.target)),
@@ -376,7 +438,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onPasteNodes = useCallback((newNodes: QuestNodeData[], newEdges: QuestEdgeData[]) => {
     if (!graph || newNodes.length === 0) return
-    setGraph({
+    commitGraph({
       ...graph,
       nodes: [...graph.nodes, ...newNodes],
       edges: [...graph.edges, ...newEdges],
@@ -435,7 +497,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
       edge_type: 'prerequisite',
       inverted: false,
     }
-    setGraph({ ...graph, edges: [...graph.edges, newEdge] })
+    commitGraph({ ...graph, edges: [...graph.edges, newEdge] })
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
@@ -448,7 +510,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
       e.id !== edgeId && e.source === source && e.target === target
     )
     if (duplicate) return
-    setGraph({
+    commitGraph({
       ...graph,
       edges: graph.edges.map(e => e.id === edgeId ? { ...e, ...data } : e),
     })
@@ -457,13 +519,38 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onDeleteEdge = useCallback((edgeId: string) => {
     if (!graph) return
-    setGraph({ ...graph, edges: graph.edges.filter(e => e.id !== edgeId) })
+    commitGraph({ ...graph, edges: graph.edges.filter(e => e.id !== edgeId) })
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
+  // Persist a dependency edge's manual bezier control points (editor-only; not
+  // written to SNBT). Null clears the curve back to the default.
+  const onUpdateEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel | null) => {
+    if (!graph) return
+    commitGraph({
+      ...graph,
+      edges: graph.edges.map(e => e.id === edgeId ? { ...e, bezier } : e),
+    })
+    scheduleAutoSave()
+  }, [graph, scheduleAutoSave])
+
+  // Apply a self-authored book-level visual preset across the whole graph.
+  const onApplyThemePreset = useCallback((presetId: string) => {
+    if (!graph) return
+    const preset = presetId ? getThemePreset(presetId) : undefined
+    const next = preset ? applyBookTheme(graph, preset) : {
+      ...graph,
+      active_theme: undefined,
+      edge_color: undefined,
+      edge_cycle_color: undefined,
+    }
+    commitGraph(next)
+    scheduleAutoSave()
+  }, [graph, scheduleAutoSave, commitGraph])
+
   const onAddObjective = useCallback((nodeId: string) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, objectives: [...(n.objectives || []), defaultObjective()] } : n
     )})
     scheduleAutoSave()
@@ -471,7 +558,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onAddReward = useCallback((nodeId: string) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, rewards: [...(n.rewards || []), defaultReward()] } : n
     )})
     scheduleAutoSave()
@@ -479,7 +566,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onRemoveObjective = useCallback((nodeId: string, objectiveId: string) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, objectives: (n.objectives || []).filter(o => o.id !== objectiveId) } : n
     )})
     scheduleAutoSave()
@@ -487,7 +574,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onRemoveReward = useCallback((nodeId: string, rewardId: string) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, rewards: (n.rewards || []).filter(r => r.id !== rewardId) } : n
     )})
     scheduleAutoSave()
@@ -495,7 +582,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onUpdateObjective = useCallback((nodeId: string, objectiveId: string, field: string, value: unknown) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, objectives: (n.objectives || []).map(o =>
         o.id === objectiveId ? { ...o, [field]: value } : o
       )} : n
@@ -505,7 +592,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
 
   const onUpdateReward = useCallback((nodeId: string, rewardId: string, field: string, value: unknown) => {
     if (!graph) return
-    setGraph({ ...graph, nodes: graph.nodes.map(n =>
+    commitGraph({ ...graph, nodes: graph.nodes.map(n =>
       n.id === nodeId ? { ...n, rewards: (n.rewards || []).map(r =>
         r.id === rewardId ? { ...r, [field]: value } : r
       )} : n
@@ -549,6 +636,11 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
   const selectedNode = selectedNodeId ? graph?.nodes.find(n => n.id === selectedNodeId) : null
   const editChapter = editChapterId ? graph?.chapters.find(c => c.id === editChapterId) : null
   const editGroup = editGroupId ? graph?.chapter_groups.find(g => g.id === editGroupId) : null
+
+  const histStatus = useMemo(() => ({
+    undo: undoHistory.current.length > 0,
+    redo: redoHistory.current.length > 0,
+  }), [histVersion])
 
   const ingestPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(ingestIndex)), [ingestIndex])
   const scanPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(textureIndex)), [textureIndex])
@@ -595,7 +687,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
       <div className="quest-editor">
         <ImportExportToolbar
         graph={graph}
-        setGraph={setGraph}
+        setGraph={commitGraph}
         projectId={projectId}
         projectPath={projectPath}
         textureIndex={textureIndex}
@@ -632,12 +724,15 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             onUpdateNodes={onUpdateNodes}
             onAddEdge={onAddEdge}
             onUpdateEdge={onUpdateEdge}
+            onUpdateEdgeBezier={onUpdateEdgeBezier}
+            onApplyThemePreset={onApplyThemePreset}
             onDeleteNode={onDeleteNode}
             onDeleteNodes={onDeleteNodes}
             onPasteNodes={onPasteNodes}
             onDeleteEdge={onDeleteEdge}
             onAddNode={onAddQuest}
             onAddLink={onAddQuestLink}
+            onAddQuestWithTask={onAddQuestWithTask}
             onUpdateChapterImages={onUpdateChapterImages}
             selectedNodeId={selectedNodeId}
             setSelectedNodeId={setSelectedNodeId}
@@ -648,6 +743,10 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             onSetQuestProgress={setQuestProgress}
             onCompleteAll={completeAllInChapter}
             onResetAll={resetAllInChapter}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={histStatus.undo}
+            canRedo={histStatus.redo}
           />
         </main>
         {selectedNode && (
@@ -670,6 +769,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             quests={graph.nodes
               .filter((n: QuestNodeData) => n.node_type === 'quest' || n.node_type === 'side_quest')
               .map((n: QuestNodeData) => ({ id: n.id, label: n.label || n.id }))}
+            rewardTables={graph.reward_tables || []}
           />
         )}
         {itemPickerTarget && (

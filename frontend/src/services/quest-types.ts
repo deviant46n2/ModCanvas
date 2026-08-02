@@ -68,6 +68,9 @@ export interface QuestObjectiveData {
   match_nbt: boolean
   ignore_nbt: boolean
   exact_match: boolean
+  task_screen_only: boolean
+  only_from_crafting: boolean
+  match_components: boolean
   fluid_id: string
   fluid_amount: number
   energy_amount: number
@@ -80,6 +83,10 @@ export interface QuestObjectiveData {
   y: number
   z: number
   radius: number
+  box_w: number
+  box_h: number
+  box_d: number
+  ignore_dim: boolean
   entity_id: string
   advancement_id: string
   custom_json: string
@@ -89,6 +96,11 @@ export interface QuestObjectiveData {
   biome_id: string
   structure_id: string
   observation_range: number
+  custom_name: string
+  entity_type_tag: string
+  nbt_filter: string
+  team_stage: boolean
+  criterion: string
 }
 
 export interface QuestRewardData {
@@ -114,6 +126,15 @@ export interface QuestRewardData {
   table_id: string
   choices: string[]
   advancement_id: string
+  random_bonus: number
+  only_one: boolean
+  permission_level: number
+  silent: boolean
+  feedback_message: string
+  autoclaim: string
+  exclude_from_claim_all: boolean
+  ignore_reward_blocking: boolean
+  disable_reward_screen_blur: boolean
 }
 
 export interface QuestNodeData {
@@ -166,6 +187,16 @@ export interface QuestNodeData {
   link_target?: string
 }
 
+export interface EdgeControlPoint {
+  x: number
+  y: number
+}
+
+export interface EdgeBezierRel {
+  sourceControl: EdgeControlPoint
+  targetControl: EdgeControlPoint
+}
+
 export interface QuestEdgeData {
   id: string
   source: string
@@ -173,6 +204,10 @@ export interface QuestEdgeData {
   label: string | null
   edge_type: string
   inverted: boolean
+  // Optional manual curvature. Control points are offsets relative to the
+  // source/target handle anchors so the curve tracks its quests. Editor-only:
+  // FTB's quest format has no field for them, so they are not exported to SNBT.
+  bezier?: EdgeBezierRel | null
 }
 
 export interface RewardTableData {
@@ -207,6 +242,10 @@ export interface QuestGraphData {
   default_consume_items?: boolean
   default_autoclaim_rewards?: string
   detection_delay?: number
+  // Book-level visual preset fields (editor-only, not exported to SNBT).
+  edge_color?: string
+  edge_cycle_color?: string
+  active_theme?: string
 }
 
 export interface QuestAnalysis {

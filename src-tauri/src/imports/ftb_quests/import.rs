@@ -942,9 +942,9 @@ fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep_lines: boo
     let pause_reward = m.get_bool("pause_reward").unwrap_or(false);
     let lock_icon = m.get_str("lock_icon").unwrap_or("").to_string();
     let quest_background = m.get_str("quest_background").unwrap_or("").to_string();
-    // FTB writes `icon_scale` (Quest.java writeData). Also accept the legacy
-    // `icon_scaling` key the app once emitted for subdirs layouts, and clamp to
-    // FTB's editor range (0.1 – 2.0).
+    // The quest format writes the icon multiplier as `icon_scale`; also accept
+    // the legacy `icon_scaling` key the app once emitted for subdirs layouts,
+    // and clamp to the editor range (0.1 – 2.0).
     let icon_scaling = m
         .get_f64("icon_scale")
         .or_else(|| m.get_f64("icon_scaling"))
@@ -1173,15 +1173,22 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
                 .or_else(|| m.get_str("entity_type"))
                 .or_else(|| m.get_str("mob"))
                 .unwrap_or("").to_string();
-            let count = m.get_i64("count").unwrap_or(1) as i32;
+            // FTB writes the kill count under `value`; accept `count` as a legacy fallback.
+            let count = m.get_i64("value").or_else(|| m.get_i64("count")).unwrap_or(1) as i32;
             (ObjectiveType::EntityKill, entity, count)
         }
         // Location visit
         "location" | "ftbquests:location" | "minecraft:location" => {
             let dim = m.get_str("dimension").unwrap_or("").to_string();
-            let x = m.get_f64("x").unwrap_or(0.0);
-            let y = m.get_f64("y").unwrap_or(0.0);
-            let z = m.get_f64("z").unwrap_or(0.0);
+            // FTB serializes the box as position:[I;x,y,z] + size:[I;w,h,d]; accept x/y/z/w/h/d as legacy.
+            let pos = m.get_int_array("position").cloned()
+                .or_else(|| m.get_list("position").and_then(|l| l.iter().map(|v| v.as_i64().map(|n| n as i32)).collect::<Option<Vec<_>>>()))
+                .unwrap_or_default();
+            let sz = m.get_int_array("size").cloned()
+                .or_else(|| m.get_list("size").and_then(|l| l.iter().map(|v| v.as_i64().map(|n| n as i32)).collect::<Option<Vec<_>>>()))
+                .unwrap_or_default();
+            let (x, y, z) = if pos.len() >= 3 { (pos[0] as f64, pos[1] as f64, pos[2] as f64) } else { (0.0, 0.0, 0.0) };
+            let (w, h, d) = if sz.len() >= 3 { (sz[0] as f64, sz[1] as f64, sz[2] as f64) } else { (1.0, 1.0, 1.0) };
             let radius = m.get_f64("radius").unwrap_or(0.0);
             let target = if !dim.is_empty() { dim } else { format!("{},{},{},{}", x, y, z, radius) };
             (ObjectiveType::LocationVisit, target, 1)
@@ -1257,7 +1264,7 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
         objective_type,
         target,
         target_count,
-        required: !m.get_bool("optional").unwrap_or(false),
+        required: !m.get_bool("optional_task").or_else(|| m.get_bool("optional")).unwrap_or(false),
         description,
         ..Default::default()
     };
@@ -1281,13 +1288,47 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
     obj.consume_items = m.get_bool("consume_items").unwrap_or(false);
     obj.match_nbt = m.get_bool("match_nbt").unwrap_or(false);
     obj.ignore_nbt = m.get_bool("ignore_nbt").unwrap_or(false);
+    obj.task_screen_only = m.get_bool("task_screen_only").unwrap_or(false);
+    obj.only_from_crafting = m.get_bool("only_from_crafting").unwrap_or(false);
+    obj.match_components = m.get_bool("match_components").unwrap_or(false);
     
-    // Location/radius for location tasks
+    // Location/box for location tasks
     if matches!(obj.objective_type, ObjectiveType::LocationVisit) {
         obj.x = m.get_f64("x").unwrap_or(0.0);
         obj.y = m.get_f64("y").unwrap_or(0.0);
         obj.z = m.get_f64("z").unwrap_or(0.0);
+        let pos_vals: Vec<i32> = match m.get("position") {
+            Some(v) => match v {
+                SnbtValue::IntArray(arr) => arr.clone(),
+                SnbtValue::List(list) => list.iter().filter_map(|i| i.as_i64().map(|n| n as i32)).collect(),
+                _ => Vec::new(),
+            },
+            None => Vec::new(),
+        };
+        if pos_vals.len() >= 3 {
+            obj.x = pos_vals[0] as f64;
+            obj.y = pos_vals[1] as f64;
+            obj.z = pos_vals[2] as f64;
+        }
+        let size_vals: Vec<i32> = match m.get("size") {
+            Some(v) => match v {
+                SnbtValue::IntArray(arr) => arr.clone(),
+                SnbtValue::List(list) => list.iter().filter_map(|i| i.as_i64().map(|n| n as i32)).collect(),
+                _ => Vec::new(),
+            },
+            None => Vec::new(),
+        };
+        if size_vals.len() >= 3 {
+            obj.box_w = size_vals[0] as f64;
+            obj.box_h = size_vals[1] as f64;
+            obj.box_d = size_vals[2] as f64;
+        } else {
+            obj.box_w = m.get_f64("w").unwrap_or(0.0);
+            obj.box_h = m.get_f64("h").unwrap_or(0.0);
+            obj.box_d = m.get_f64("d").unwrap_or(0.0);
+        }
         obj.radius = m.get_f64("radius").unwrap_or(0.0);
+        obj.ignore_dim = m.get_bool("ignore_dimension").or_else(|| m.get_bool("ignore_dim")).unwrap_or(false);
         obj.dimension = m.get_str("dimension").unwrap_or("").to_string();
     }
     
@@ -1297,11 +1338,16 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
             .or_else(|| m.get_str("entity_type"))
             .or_else(|| m.get_str("mob"))
             .unwrap_or("").to_string();
+        obj.custom_name = m.get_str("custom_name").unwrap_or("").to_string();
+        // FTB-canonical key is `entityTypeTag`; `tag` is accepted as a legacy fallback.
+        obj.entity_type_tag = m.get_str("entityTypeTag").or_else(|| m.get_str("tag")).unwrap_or("").to_string();
+        obj.nbt_filter = m.get_str("nbt_filter").unwrap_or("").to_string();
     }
     
-    // Advancement ID
+    // Advancement ID + criterion
     if matches!(obj.objective_type, ObjectiveType::Advancement) {
         obj.advancement_id = m.get_str("advancement").unwrap_or("").to_string();
+        obj.criterion = m.get_str("criterion").unwrap_or("").to_string();
     }
     
     // Custom JSON for custom tasks
@@ -1358,6 +1404,7 @@ fn parse_snbt_single_task(m: &SnbtValue) -> Result<QuestObjective> {
     // Game Stage
     if matches!(obj.objective_type, ObjectiveType::GameStage) {
         obj.advancement_id = m.get_str("stage").unwrap_or("").to_string(); // reuse field
+        obj.team_stage = m.get_bool("team_stage").unwrap_or(false);
     }
 
     Ok(obj)
@@ -1467,6 +1514,15 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
         consume_items: false,
         match_nbt: false,
         ignore_nbt: false,
+        random_bonus: 0.0,
+        only_one: false,
+        permission_level: 0,
+        silent: false,
+        feedback_message: String::new(),
+        autoclaim: String::new(),
+        exclude_from_claim_all: false,
+        ignore_reward_blocking: false,
+        disable_reward_screen_blur: false,
     };
 
     match reward_type_str.as_str() {
@@ -1475,6 +1531,8 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
             reward.reward_type = RewardType::Item;
             reward.item_id = item;
             reward.item_count = count;
+            reward.random_bonus = m.get_f64("random_bonus").unwrap_or(0.0);
+            reward.only_one = m.get_bool("only_one").unwrap_or(false);
             // Handle components (1.20.5+)
             if let Some(components) = m.get("components").and_then(|v| v.as_compound()) {
                 reward.nbt_data = crate::imports::snbt::compound_to_snbt(&components);
@@ -1501,6 +1559,9 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
         "command" | "ftbquests:command" | "minecraft:command" => {
             reward.reward_type = RewardType::Command;
             reward.command = m.get_str("command").unwrap_or("").to_string();
+            reward.permission_level = m.get_i64("permission_level").unwrap_or(0) as i32;
+            reward.silent = m.get_bool("silent").unwrap_or(false);
+            reward.feedback_message = m.get_str("feedback_message").unwrap_or("").to_string();
         }
         "loot" | "ftbquests:loot" | "minecraft:loot" => {
             reward.reward_type = RewardType::LootTable;
@@ -1569,6 +1630,11 @@ fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
     reward.consume_items = m.get_bool("consume_items").unwrap_or(false);
     reward.match_nbt = m.get_bool("match_nbt").unwrap_or(false);
     reward.ignore_nbt = m.get_bool("ignore_nbt").unwrap_or(false);
+    reward.team_reward = m.get_bool("team_reward").unwrap_or(false);
+    reward.autoclaim = m.get_str("auto").unwrap_or("").to_string();
+    reward.exclude_from_claim_all = m.get_bool("exclude_from_claim_all").unwrap_or(false);
+    reward.ignore_reward_blocking = m.get_bool("ignore_reward_blocking").unwrap_or(false);
+    reward.disable_reward_screen_blur = m.get_bool("disable_reward_screen_blur").unwrap_or(false);
 
     reward.label = if title.is_empty() { reward.reward_type.display_name().to_string() } else { title };
 
@@ -2089,7 +2155,18 @@ fn parse_json5_task(m: &serde_json::Map<String, serde_json::Value>) -> Result<Qu
         objective_type,
         target,
         target_count: count,
-        required: !m.get("optional").and_then(|v| v.as_bool()).unwrap_or(false),
+        required: !m.get("optional_task").or_else(|| m.get("optional")).and_then(|v| v.as_bool()).unwrap_or(false),
+        custom_name: m.get("custom_name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        entity_type_tag: m.get("entityTypeTag").or_else(|| m.get("tag")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        nbt_filter: m.get("nbt_filter").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        team_stage: m.get("team_stage").and_then(|v| v.as_bool()).unwrap_or(false),
+        criterion: m.get("criterion").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        consume_items: m.get("consume_items").and_then(|v| v.as_bool()).unwrap_or(false),
+        match_nbt: m.get("match_nbt").and_then(|v| v.as_bool()).unwrap_or(false),
+        ignore_nbt: m.get("ignore_nbt").and_then(|v| v.as_bool()).unwrap_or(false),
+        task_screen_only: m.get("task_screen_only").and_then(|v| v.as_bool()).unwrap_or(false),
+        only_from_crafting: m.get("only_from_crafting").and_then(|v| v.as_bool()).unwrap_or(false),
+        match_components: m.get("match_components").and_then(|v| v.as_bool()).unwrap_or(false),
         ..Default::default()
     })
 }
@@ -2150,6 +2227,16 @@ fn parse_json5_reward(m: &serde_json::Map<String, serde_json::Value>) -> Result<
         reward_type,
         item_id: if is_table_type { String::new() } else { item_id.clone() },
         table_id: if is_table_type { item_id } else { String::new() },
+        random_bonus: m.get("random_bonus").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        only_one: m.get("only_one").and_then(|v| v.as_bool()).unwrap_or(false),
+        permission_level: m.get("permission_level").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+        silent: m.get("silent").and_then(|v| v.as_bool()).unwrap_or(false),
+        feedback_message: m.get("feedback_message").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        team_reward: m.get("team_reward").and_then(|v| v.as_bool()).unwrap_or(false),
+        autoclaim: m.get("auto").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        exclude_from_claim_all: m.get("exclude_from_claim_all").and_then(|v| v.as_bool()).unwrap_or(false),
+        ignore_reward_blocking: m.get("ignore_reward_blocking").and_then(|v| v.as_bool()).unwrap_or(false),
+        disable_reward_screen_blur: m.get("disable_reward_screen_blur").and_then(|v| v.as_bool()).unwrap_or(false),
         ..Default::default()
     })
 }
@@ -2225,6 +2312,7 @@ fn build_dependency_edges(graph: &mut QuestGraph, result: &mut FtBQuestsImportRe
                     label: None,
                     edge_type: EdgeType::Prerequisite,
                     inverted: false,
+                    ..Default::default()
                 });
                 resolved += 1;
             }

@@ -16,6 +16,7 @@ import { defaultQuestNodeData } from './quest-helpers'
 import { stripMcFormatting } from '../../core/theme/font-formatter'
 import { IconPicker } from './icon-picker'
 import { BookSettings } from './book-settings'
+import { RewardTablesModal } from './RewardTablesModal'
 
 export interface ToolbarAPI {
   scheduleAutoSave: () => void
@@ -43,6 +44,7 @@ export function ImportExportToolbar({
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [iconPickerState, setIconPickerState] = useState<{ open: boolean; target: IconPickerTarget | null }>({ open: false, target: null })
   const [showBookSettings, setShowBookSettings] = useState(false)
+  const [showRewardTables, setShowRewardTables] = useState(false)
   const [showPrismPicker, setShowPrismPicker] = useState(false)
   const [prismInstances, setPrismInstances] = useState<PrismInstance[] | null>(null)
   const [prismLoading, setPrismLoading] = useState(false)
@@ -386,6 +388,7 @@ export function ImportExportToolbar({
             )}
           </div>
           <button className="book-btn" onClick={() => setShowBookSettings(true)}>⚙️ Settings</button>
+          <button className="book-btn" onClick={() => setShowRewardTables(true)} title="Edit weighted reward tables">🎁 Tables</button>
         </div>
         <div className="quest-editor-toolbar-right" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 11, opacity: 0.6, marginRight: 4, whiteSpace: 'nowrap' }} title="Loaded textures">
@@ -429,6 +432,14 @@ export function ImportExportToolbar({
         onClose={() => setShowBookSettings(false)}
         onSave={() => saveGraphRef.current?.()}
         pickDir={pickDir}
+      />
+
+      <RewardTablesModal
+        open={showRewardTables}
+        graph={graph}
+        textureIndex={textureIndex}
+        onGraphChange={(g) => { setGraph(g); scheduleAutoSave() }}
+        onClose={() => setShowRewardTables(false)}
       />
     </>
   )

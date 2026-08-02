@@ -2,16 +2,16 @@ import { loadImage } from './sprite-sheet'
 
 const bakeCache = new Map<string, Promise<string | null>>()
 
-// FTB's shape backgrounds are white filled silhouettes (transparent outside the
-// shape). In-game they are drawn with `background.withColor(WHITE wAlpha150)`
-// over a dark plate; the editor instead bakes a neutral grey fill so the quest
+// Shape backgrounds are white filled silhouettes (transparent outside the
+// shape). In-game they are tinted white and drawn over a dark plate; the editor
+// instead bakes a neutral grey fill so the quest
 // tile reads as grey without relying on a CSS plate (which painted a grey box
 // behind every shape). This grey is baked at high alpha so the silhouette keeps
 // a slight translucency but stays clearly visible on any canvas backdrop.
 const FILL_GREY = 'rgba(168, 175, 186, 0.9)'
-// Outline at ~58% opacity, matching FTB's `quest_not_started_color` (white @ 58%
-// alpha). Explicit quest colors are tinted onto the near-white outline texture
-// first, then the 58% opacity is applied here.
+// Outline at ~58% opacity, matching the in-game not-started default (near-white
+// at ~58% alpha). Explicit quest colors are tinted onto the near-white outline
+// texture first, then the 58% opacity is applied here.
 const OUTLINE_OPACITY = 0.6
 
 export function parseHexColor(color: string): { r: number; g: number; b: number; a: number } | null {
