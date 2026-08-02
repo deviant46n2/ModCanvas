@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-const CACHE_VERSION: u32 = 7;
+const CACHE_VERSION: u32 = 8;
 
 mod cache;
 mod layers;

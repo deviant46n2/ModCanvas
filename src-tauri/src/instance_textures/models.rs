@@ -128,7 +128,7 @@ impl Models {
         if parent.starts_with("builtin/") || parent == "none" {
             return None;
         }
-        let (pns, ppath) = split_ref(ns, parent);
+        let (pns, ppath) = split_parent_ns(parent);
         if let Some(rest) = ppath.strip_prefix("block/") {
             self.resolve_block(&pns, rest, by_id, seen, depth + 1)
         } else {
@@ -160,7 +160,7 @@ impl Models {
         if parent.starts_with("builtin/") || parent == "none" {
             return None;
         }
-        let (pns, ppath) = split_ref(ns, parent);
+        let (pns, ppath) = split_parent_ns(parent);
         let p = ppath.strip_prefix("block/").unwrap_or(&ppath);
         self.resolve_block(&pns, p, by_id, seen, depth + 1)
     }
@@ -183,7 +183,7 @@ impl Models {
             if parent.starts_with("builtin/") || parent == "none" {
                 return false;
             }
-            let (pns, p) = split_ref(&cur.1, parent);
+            let (pns, p) = split_parent_ns(parent);
             let (pkind, ppath) = parent_kind_path(&cur.0, &p);
             cur = (pkind, pns, ppath);
             depth += 1;
@@ -208,7 +208,7 @@ impl Models {
         if parent.starts_with("builtin/") || parent == "none" {
             return None;
         }
-        let (pns, ppath) = split_ref(ns, parent);
+        let (pns, ppath) = split_parent_ns(parent);
         let (pkind, p) = parent_kind_path("block", &ppath);
         if pkind == "block" {
             self.block_texture_in_chain(&pns, &p, by_id, seen, depth + 1)
@@ -223,6 +223,17 @@ pub(super) fn split_ref(ns: &str, value: &str) -> (String, String) {
     match value.split_once(':') {
         Some((a, b)) => (a.to_string(), b.to_string()),
         None => (ns.to_string(), value.to_string()),
+    }
+}
+
+/// Resolve a model `parent` reference. Unlike texture refs, a namespace-less
+/// parent (`"parent": "block/cube"`) always refers to the vanilla `minecraft:`
+/// namespace (`minecraft:block/cube`) — Minecraft never inherits the child's
+/// namespace for parents.
+pub(super) fn split_parent_ns(value: &str) -> (String, String) {
+    match value.split_once(':') {
+        Some((a, b)) => (a.to_string(), b.to_string()),
+        None => ("minecraft".to_string(), value.to_string()),
     }
 }
 

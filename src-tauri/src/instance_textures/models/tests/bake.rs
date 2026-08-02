@@ -221,3 +221,74 @@ fn child_model_overrides_parent_texture_slot() {
     let url = out.get("mymod:override").and_then(|u| u.as_deref()).expect("materialized");
     assert!(url.starts_with("data:image/png;base64,"));
 }
+
+/// A mod block model that parents to a namespace-less vanilla parent
+/// (`"parent":"block/cube"`) must resolve against `minecraft:block/cube` (which
+/// carries the geometry), not against the mod's own namespace. Without this the
+/// parent chain lookup fails and the block degrades to a flat 16px face.
+#[test]
+fn vanilla_namespace_less_parent_resolves_to_minecraft() {
+    let (dir, instance) = new_instance();
+write_jar_entries(
+        &instance.join("mods").join("a.jar"),
+        &[
+            (
+                "assets/mymod/models/item/blocky.json",
+                br#"{"parent":"mymod:block/blocky","display":{"gui":{"rotation":[30,45,0],"scale":[0.625,0.625,0.625]}}}"#,
+            ),
+            (
+                "assets/mymod/models/block/blocky.json",
+                br#"{"parent":"block/cube","textures":{"particle":"mymod:block/side","up":"mymod:block/top","down":"mymod:block/bottom","north":"mymod:block/side","south":"mymod:block/side","east":"mymod:block/side","west":"mymod:block/side"}}"#,
+            ),
+            ("assets/mymod/textures/block/top.png", &real_png(11)),
+            ("assets/mymod/textures/block/bottom.png", &real_png(11)),
+            ("assets/mymod/textures/block/side.png", &real_png(11)),
+            (
+                "assets/minecraft/models/block/cube.json",
+                br##"{
+                    "parent": "block/block",
+                    "elements": [{
+                        "from": [0,0,0],
+                        "to": [16,16,16],
+                        "faces": {
+                            "up": {"uv": [0,0,16,16], "texture": "#up"},
+                            "down": {"uv": [0,0,16,16], "texture": "#down"},
+                            "north": {"uv": [0,0,16,16], "texture": "#north"},
+                            "south": {"uv": [0,0,16,16], "texture": "#south"},
+                            "east": {"uv": [0,0,16,16], "texture": "#east"},
+                            "west": {"uv": [0,0,16,16], "texture": "#west"}
+                        }
+                    }]
+                }"##,
+            ),
+            (
+                "assets/minecraft/models/block/block.json",
+                br##"{
+                    "textures": {"particle": "#all"},
+                    "elements": [{
+                        "from": [0,0,0],
+                        "to": [16,16,16],
+                        "faces": {
+                            "down": {"uv": [0,0,16,16], "texture": "#down", "cullface": "down"},
+                            "up": {"uv": [0,0,16,16], "texture": "#up", "cullface": "up"},
+                            "north": {"uv": [0,0,16,16], "texture": "#north", "cullface": "north"},
+                            "south": {"uv": [0,0,16,16], "texture": "#south", "cullface": "south"},
+                            "west": {"uv": [0,0,16,16], "texture": "#west", "cullface": "west"},
+                            "east": {"uv": [0,0,16,16], "texture": "#east", "cullface": "east"}
+                        }
+                    }]
+                }"##,
+            ),
+    ],
+    );
+
+    let idx = scan_instance_textures(&instance);
+    let bake = idx.get("mymod:blocky").unwrap_or_else(|| panic!("mymod:blocky missing, got {idx:?}"));
+    assert!(
+        bake.starts_with("bake:mymod:block/blocky"),
+        "expected bake descriptor for vanilla-parent block, got {bake}"
+    );
+    let out = resolve_texture_urls(&instance, &["mymod:blocky".to_string()]);
+    let url = out.get("mymod:blocky").and_then(|u| u.as_deref()).expect("materialized");
+    assert!(url.starts_with("data:image/png;base64,"));
+}

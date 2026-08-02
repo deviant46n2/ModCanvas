@@ -6,7 +6,7 @@
 // reference to a concrete `ns:path` texture id ready for index lookup.
 
 use super::merge::{parse_display, parse_elements, resolve_slot, split_model_ref, RawElement};
-use super::{parent_kind_path, split_ref, Models};
+use super::{parent_kind_path, split_parent_ns, Models};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
@@ -118,7 +118,7 @@ impl MergedModel {
             if parent.starts_with("builtin/") || parent == "none" {
                 break;
             }
-            let (pns, p) = split_ref(&cur.0, parent);
+            let (pns, p) = split_parent_ns(parent);
             let (pkind, ppath) = parent_kind_path(&cur.1, &p);
             cur = (pns, pkind, ppath);
         }

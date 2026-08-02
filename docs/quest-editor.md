@@ -137,6 +137,19 @@ no GPU, and no game assets ever bundled (per AGENTS.md).
   descriptor is never emitted.
 - Flat `item/generated` models still resolve to a single texture (unchanged).
 
+### Parent references and namespaces
+
+A model `parent` reference without an explicit namespace (`"parent": "block/cube"`)
+is resolved against the **vanilla `minecraft:` namespace** — never the child
+model's namespace. `Models::resolve_*`, `chain_has_elements`,
+`block_texture_in_chain` and `baker::resolve` all use `split_parent_ns`
+(`instance_textures/models.rs`), which defaults namespace-less parent refs to
+`minecraft`. This is what lets a mod block like
+`industrialforegoing:fluid_placer` parent through `base_block` into
+`block/cube` (vanilla geometry) and bake into a 3D icon instead of degrading to
+a flat 16px face. `split_ref` (texture refs) still inherits the child namespace —
+only *parents* use the vanilla default, matching Minecraft's own resolver.
+
 ## Texture slot resolution
 
 Block/plant models resolve icons from these `textures` slots, in order:
