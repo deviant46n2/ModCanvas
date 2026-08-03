@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "ModCanvas - Professional development environment for Minecraft modpacks"
 authors = ["deviant"]
+license = "GPL-3.0"
 
 [dependencies]
 tauri = { version = "2", features = [] }

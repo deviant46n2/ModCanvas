@@ -2,6 +2,8 @@
 
 First off, thank you for considering contributing! Whether you're fixing a bug, improving documentation, adding new visual canvas nodes, or writing tests, your help makes this tool better for the entire Minecraft modpack and server community.
 
+The project is licensed under **GPL-3.0** (app + companion mod); standalone utility libraries may use permissive licenses. By contributing you agree that your contributions are licensed accordingly.
+
 ---
 
 ## Our Core Philosophies
