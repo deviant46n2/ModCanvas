@@ -69,7 +69,9 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
     onClosePack,
   } = props
 
-  const tabsDisabled = !packLoaded && activeTab !== 'mods'
+  // Tabs are always navigable (all panels stay mounted and handle their own
+  // empty state), so no disabled gating is needed here.
+  const tabsDisabled = false
 
   return (
     <div className="project-workspace">
@@ -141,42 +143,43 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
       )}
 
       <div className="workspace-content">
-        {activeTab === 'mods' && <ModsTab {...props.modsTab} />}
-        {activeTab === 'configs' && packLoaded && <ConfigsTab {...props.configsTab} />}
-        {activeTab === 'progression' && packLoaded && (
+        {/* All tabs stay mounted so switching never re-runs their load effects
+            (texture scans, quest graph, config reads). Inactive panels are
+            hidden via CSS rather than unmounted. */}
+        <div id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods" className={activeTab === 'mods' ? '' : 'tab-hidden'}>
+          <ModsTab {...props.modsTab} />
+        </div>
+        <div id="tabpanel-configs" role="tabpanel" aria-labelledby="tab-configs" className={activeTab === 'configs' ? '' : 'tab-hidden'}>
+          <ConfigsTab {...props.configsTab} />
+        </div>
+        <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression" className={activeTab === 'progression' ? '' : 'tab-hidden'}>
           <ErrorBoundary>
-            <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression">
-              <ProgressionGraph projectId={project.id} />
-            </div>
+            <ProgressionGraph projectId={project.id} />
           </ErrorBoundary>
-        )}
-        {activeTab === 'quests' && packLoaded && (
+        </div>
+        <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests" className={activeTab === 'quests' ? '' : 'tab-hidden'}>
           <ErrorBoundary>
-            <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests">
-              <CanvasThemeProvider>
-                <QuestBookEditor 
-                  projectId={project.id} 
-                  projectPath={project.path} 
-                  wsConnected={props.wsStatus.connected}
-                  ingestResult={ingestResult}
-                  packLoaded={packLoaded}
-                />
-              </CanvasThemeProvider>
-            </div>
+            <CanvasThemeProvider>
+              <QuestBookEditor 
+                projectId={project.id} 
+                projectPath={project.path} 
+                wsConnected={props.wsStatus.connected}
+                ingestResult={ingestResult}
+                packLoaded={packLoaded}
+              />
+            </CanvasThemeProvider>
           </ErrorBoundary>
-        )}
-        {activeTab === 'recipes' && packLoaded && (
+        </div>
+        <div id="tabpanel-recipes" role="tabpanel" aria-labelledby="tab-recipes" className={activeTab === 'recipes' ? '' : 'tab-hidden'}>
           <ErrorBoundary>
-            <div id="tabpanel-recipes" role="tabpanel" aria-labelledby="tab-recipes">
-              <RecipeEditor projectId={project.id} projectPath={project.path} />
-            </div>
+            <RecipeEditor
+              projectId={project.id}
+              projectPath={project.path}
+              minecraftVersion={project.minecraft_version}
+              modLoader={project.mod_loader}
+            />
           </ErrorBoundary>
-        )}
-        {(!packLoaded && activeTab !== 'mods') && (
-          <div className="workspace-placeholder">
-            <p>Load the pack first to access this tab</p>
-          </div>
-        )}
+        </div>
       </div>
 
       <LoadPackModal

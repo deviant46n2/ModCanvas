@@ -1,6 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { SearchResult, TagInfo, GeneratedScripts } from './types'
+import type { SearchResult, TagInfo, GeneratedScripts, DiscoveredRecipe } from './types'
 import type { IngestResult, ItemRegistryEntry } from './quest-types'
+
+export async function scanPackRecipes(projectPath: string): Promise<DiscoveredRecipe[]> {
+  return invoke<DiscoveredRecipe[]>('scan_pack_recipes_cmd', { projectPath })
+}
 
 export async function searchItems(
   query: string,

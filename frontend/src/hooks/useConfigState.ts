@@ -1,33 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listConfigFiles, readConfigFile, parseConfigFile, saveStructuredConfig, writeConfigFile } from '../services/api'
 import type { Project } from './useProjectState'
 import { useHistory } from './history-provider'
-
-interface ConfigFileInfo {
-  path: string
-  name: string
-  format: string
-  size: number
-}
-
-interface ConfigValue {
-  type: string
-  value?: string | number | boolean
-  fields?: Record<string, ConfigValue>
-  items?: ConfigValue[]
-  options?: string[]
-  comment?: string
-  min?: number
-  max?: number
-  step?: number
-  unit?: string
-}
-
-interface ParsedConfig {
-  format: string
-  root: ConfigValue
-  raw: string
-}
+import type { ConfigValue, ConfigFileInfo, ParsedConfig } from '../core/config/types'
+import { defaultChild, deleteAt, duplicateAt, getAt, moveArrayAt, setAt } from '../core/config/tree'
 
 function formatForPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
@@ -56,7 +32,20 @@ export function useConfigState(selectedProject: Project | null) {
   const [configSaving, setConfigSaving] = useState(false)
   const [parsedConfig, setParsedConfig] = useState<ParsedConfig | null>(null)
   const [configMode, setConfigMode] = useState<'structured' | 'raw'>('structured')
+  const [configSearch, setConfigSearch] = useState('')
+  const lastSavedRef = useRef<string>('')
   const history = useHistory()
+
+  // Dirty tracking: a config file is "dirty" when its in-memory content no
+  // longer matches the last saved/reloaded snapshot (deep-compared for the
+  // structured tree, raw string for raw mode).
+  const configDirty = useMemo(() => {
+    if (!selectedConfig) return false
+    if (configMode === 'structured' && parsedConfig) {
+      return JSON.stringify(parsedConfig.root) !== lastSavedRef.current
+    }
+    return configContent !== lastSavedRef.current
+  }, [selectedConfig, configMode, parsedConfig, configContent])
 
   // Restore history steps that target the currently-open config file. If the
   // step targets a different file, open that file with the restored payload so
@@ -108,23 +97,53 @@ export function useConfigState(selectedProject: Project | null) {
     }
   }
 
+  const maybeDiscard = useCallback((): boolean => {
+    if (!configDirty) return true
+    // eslint-disable-next-line no-alert
+    return window.confirm('You have unsaved changes. Discard them?')
+  }, [configDirty])
+
   async function openConfigFile(file: ConfigFileInfo) {
     if (!selectedProject) return
+    if (!maybeDiscard()) return
     try {
       const content = await readConfigFile(selectedProject.id, file.path)
       setSelectedConfig(file)
       setConfigContent(content)
       setConfigMode('structured')
+      setConfigSearch('')
 
       try {
         const parsed = await parseConfigFile(selectedProject.id, file.path)
         setParsedConfig(parsed)
+        lastSavedRef.current = JSON.stringify(parsed.root)
       } catch {
         setParsedConfig(null)
         setConfigMode('raw')
+        lastSavedRef.current = content
       }
     } catch (e) {
       console.error('Failed to read config file:', e)
+    }
+  }
+
+  async function revertConfigFile() {
+    if (!selectedConfig || !selectedProject) return
+    try {
+      const content = await readConfigFile(selectedProject.id, selectedConfig.path)
+      setConfigContent(content)
+      setConfigMode('structured')
+      try {
+        const parsed = await parseConfigFile(selectedProject.id, selectedConfig.path)
+        setParsedConfig(parsed)
+        lastSavedRef.current = JSON.stringify(parsed.root)
+      } catch {
+        setParsedConfig(null)
+        setConfigMode('raw')
+        lastSavedRef.current = content
+      }
+    } catch (e) {
+      console.error('Failed to revert config file:', e)
     }
   }
 
@@ -134,8 +153,10 @@ export function useConfigState(selectedProject: Project | null) {
     try {
       if (configMode === 'structured' && parsedConfig) {
         await saveStructuredConfig(selectedProject.id, selectedConfig.path, parsedConfig.root)
+        lastSavedRef.current = JSON.stringify(parsedConfig.root)
       } else {
         await writeConfigFile(selectedProject.id, selectedConfig.path, configContent)
+        lastSavedRef.current = configContent
       }
     } catch (e) {
       console.error('Failed to save config file:', e)
@@ -144,40 +165,66 @@ export function useConfigState(selectedProject: Project | null) {
     }
   }
 
-  function updateConfigValue(path: string[], value: ConfigValue) {
-    if (!parsedConfig || !selectedConfig) return
-
-    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
-    const newRoot = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
-
-    let current = newRoot
-    for (let i = 0; i < path.length - 1; i++) {
-      if (current.type === 'object' && current.fields) {
-        current = current.fields[path[i]]
-      } else if (current.type === 'group' && current.fields) {
-        current = current.fields[path[i]]
-      } else if (current.type === 'array' && current.items) {
-        current = current.items[parseInt(path[i])]
-      }
-    }
-
-    const lastKey = path[path.length - 1]
-    if (current.type === 'object' && current.fields) {
-      current.fields[lastKey] = value
-    } else if (current.type === 'group' && current.fields) {
-      current.fields[lastKey] = value
-    } else if (current.type === 'array' && current.items) {
-      current.items[parseInt(lastKey)] = value
-    }
-
-    setParsedConfig({ ...parsedConfig, root: newRoot })
+  const commitRoot = useCallback((nextRoot: ConfigValue, label: string, before: ConfigValue) => {
+    if (!selectedConfig) return
+    setParsedConfig((prev) => (prev ? { ...prev, root: nextRoot } : prev))
     history.commit({
       subject: 'config',
       target: selectedConfig.path,
-      label: `Edit ${selectedConfig.name}`,
+      label,
       before,
-      after: newRoot,
+      after: nextRoot,
     })
+  }, [selectedConfig, history])
+
+  function updateConfigValue(path: string[], value: ConfigValue) {
+    if (!parsedConfig || !selectedConfig) return
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = setAt(parsedConfig.root, path, value)
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
+  }
+
+  function addConfigArrayItem(path: string[]) {
+    if (!parsedConfig || !selectedConfig) return
+    const array = getAt(parsedConfig.root, path)
+    if (!array || array.type !== 'array') return
+    const template = array.items?.length ? array.items[array.items.length - 1] : undefined
+    const newItem = defaultChild(template)
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = setAt(parsedConfig.root, [...path, String(array.items?.length ?? 0)], newItem)
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
+  }
+
+  function addConfigField(path: string[]) {
+    if (!parsedConfig || !selectedConfig) return
+    // eslint-disable-next-line no-alert
+    const key = window.prompt('New field name')
+    if (!key) return
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = setAt(parsedConfig.root, [...path, key], defaultChild(undefined))
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
+  }
+
+  function removeConfigAt(path: string[]) {
+    if (!parsedConfig || !selectedConfig || path.length === 0) return
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = deleteAt(parsedConfig.root, path)
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
+  }
+
+  function moveConfigArrayItem(arrayPath: string[], from: number, to: number) {
+    if (!parsedConfig || !selectedConfig) return
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = moveArrayAt(parsedConfig.root, arrayPath, from, to)
+    if (newRoot === parsedConfig.root) return
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
+  }
+
+  function duplicateConfigAt(path: string[]) {
+    if (!parsedConfig || !selectedConfig || path.length === 0) return
+    const before = JSON.parse(JSON.stringify(parsedConfig.root)) as ConfigValue
+    const newRoot = duplicateAt(parsedConfig.root, path)
+    commitRoot(newRoot, `Edit ${selectedConfig.name}`, before)
   }
 
   function undoConfigChange() {
@@ -205,6 +252,8 @@ export function useConfigState(selectedProject: Project | null) {
     setConfigFiles([])
     setSelectedConfig(null)
     setConfigContent('')
+    setConfigSearch('')
+    lastSavedRef.current = ''
   }
 
   // The config tab's undo button only shows when the top history entry is a
@@ -218,11 +267,19 @@ export function useConfigState(selectedProject: Project | null) {
     configSaving,
     parsedConfig,
     configMode, setConfigMode,
+    configSearch, setConfigSearch,
+    configDirty,
     canUndoConfig,
     loadConfigFiles,
     openConfigFile,
+    revertConfigFile,
     saveConfigFile,
     updateConfigValue,
+    addConfigArrayItem,
+    addConfigField,
+    removeConfigAt,
+    moveConfigArrayItem,
+    duplicateConfigAt,
     undoConfigChange,
     resetConfigState,
   }

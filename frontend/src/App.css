@@ -566,6 +566,12 @@ body {
   height: 100%;
 }
 
+/* Inactive tabs stay mounted (so state + loaded data persist) but are hidden.
+   This keeps tab switches instant instead of remounting heavy editors. */
+.workspace-content > [role="tabpanel"].tab-hidden {
+  display: none;
+}
+
 /* ================================================================
    MODS PANEL
    ================================================================ */
@@ -1019,6 +1025,112 @@ body {
   gap: var(--space-2);
   justify-content: flex-end;
   margin-top: var(--space-5);
+}
+
+/* ================================================================
+   LOAD PACK PROGRESS
+   ================================================================ */
+
+.load-pack-modal {
+  width: 520px;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-body {
+  margin-top: var(--space-4);
+}
+
+.load-pack-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stage-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stage-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.stage-message {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.stage-detail {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.stage-file {
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-bar-container {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-sunken);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width 0.15s ease;
+}
+
+.progress-percent {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: right;
+}
+
+.error-details {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-subtle);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.error-details pre {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.success-message {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.success-message .hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
 }
 
 /* ================================================================
@@ -1650,8 +1762,15 @@ body {
 
 .configs-panel {
   display: flex;
+  flex-direction: row;
   height: 100%;
   gap: var(--space-4);
+}
+
+/* The configs-panel itself carries role="tabpanel", so override the
+   generic column layout applied to tab panels with an explicit row. */
+.workspace-content > .configs-panel[role="tabpanel"] {
+  flex-direction: row;
 }
 
 .configs-sidebar {
@@ -1970,6 +2089,89 @@ select.config-input {
   padding: var(--space-2);
   color: var(--color-text-tertiary);
   font-style: italic;
+}
+
+/* Field / array row controls (reorder, duplicate, remove) */
+.config-field-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.config-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.config-icon-btn:hover:not(:disabled) {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary);
+}
+
+.config-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.config-icon-btn.config-remove:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.config-icon-btn.config-duplicate:hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.config-array-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.config-reorder-controls {
+  display: inline-flex;
+  flex-direction: column;
+  margin-top: var(--space-2);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.config-reorder-controls .config-icon-btn {
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
+
+.config-add-btn {
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.config-add-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 

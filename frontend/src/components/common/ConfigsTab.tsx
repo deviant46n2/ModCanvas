@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
 import { ConfigFileRow, type ConfigRowExtraProps } from './rows'
@@ -13,13 +14,38 @@ export interface ConfigsTabProps {
   onConfigModeChange: (mode: 'structured' | 'raw') => void
   configSaving: boolean
   onSaveConfig: () => void
+  onRevertConfig: () => void
   parsedConfig: ParsedConfig | null
   onUpdateConfigValue: (path: string[], value: ConfigValue) => void
+  onAddConfigArrayItem: (path: string[]) => void
+  onAddConfigField: (path: string[]) => void
+  onRemoveConfigAt: (path: string[]) => void
+  onMoveConfigArrayItem: (arrayPath: string[], from: number, to: number) => void
+  onDuplicateConfigAt: (path: string[]) => void
+  configSearch: string
+  onConfigSearchChange: (value: string) => void
+  configDirty: boolean
   canUndoConfig: boolean
   onUndoConfig: () => void
 }
 
 export function ConfigsTab(props: ConfigsTabProps) {
+  const [editorSearch, setEditorSearch] = useState('')
+  const [collapsedAll, setCollapsedAll] = useState(false)
+
+  const filteredFiles = useMemo(() => {
+    const q = props.configSearch.trim().toLowerCase()
+    if (!q) return props.configFiles
+    return props.configFiles.filter(
+      (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q),
+    )
+  }, [props.configFiles, props.configSearch])
+
+  const showDirtyHint =
+    props.configMode === 'structured'
+      ? props.configDirty && !!props.parsedConfig
+      : props.configDirty
+
   return (
     <ErrorBoundary>
       <div className="configs-panel" id="tabpanel-configs" role="tabpanel" aria-labelledby="tab-configs">
@@ -27,17 +53,28 @@ export function ConfigsTab(props: ConfigsTabProps) {
           <div className="section-header">
             <h3>Config Files ({props.configFiles.length})</h3>
           </div>
-          <div className="config-file-list" style={{ height: 'calc(100vh - 300px)' }}>
-            {props.configFiles.length === 0 ? (
-              <div className="empty-state">No config files found. Import a modpack to get config files.</div>
+          <input
+            type="text"
+            className="config-search"
+            placeholder="Search files..."
+            value={props.configSearch}
+            onChange={(e) => props.onConfigSearchChange(e.target.value)}
+          />
+          <div className="config-file-list" style={{ height: 'calc(100vh - 340px)' }}>
+            {filteredFiles.length === 0 ? (
+              <div className="empty-state">
+                {props.configFiles.length === 0
+                  ? 'No config files found. Import a modpack to get config files.'
+                  : 'No files match your search.'}
+              </div>
             ) : (
               <List<ConfigRowExtraProps>
                 style={{ height: '100%', width: '100%' }}
                 rowComponent={ConfigFileRow}
-                rowCount={props.configFiles.length}
+                rowCount={filteredFiles.length}
                 rowHeight={60}
                 rowProps={{
-                  configFiles: props.configFiles,
+                  configFiles: filteredFiles,
                   selectedConfig: props.selectedConfig,
                   openConfigFile: props.onOpenConfig,
                 }}
@@ -49,7 +86,10 @@ export function ConfigsTab(props: ConfigsTabProps) {
           {props.selectedConfig ? (
             <>
               <div className="config-editor-header">
-                <span className="config-editor-filename">{props.selectedConfig.name}</span>
+                <span className="config-editor-filename">
+                  {props.selectedConfig.name}
+                  {showDirtyHint && <span className="config-dirty-dot" title="Unsaved changes" />}
+                </span>
                 <div className="config-editor-actions">
                   {props.parsedConfig && (
                     <div className="config-mode-toggle">
@@ -67,35 +107,78 @@ export function ConfigsTab(props: ConfigsTabProps) {
                       </button>
                     </div>
                   )}
+                  {props.configMode === 'structured' && props.parsedConfig && (
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => {
+                        setCollapsedAll((v) => !v)
+                        setEditorSearch('')
+                      }}
+                      title="Collapse or expand all sections"
+                    >
+                      {collapsedAll ? 'Expand all' : 'Collapse all'}
+                    </button>
+                  )}
                   {props.configMode === 'structured' && props.canUndoConfig && (
                     <button className="btn-secondary btn-sm" onClick={props.onUndoConfig}>
                       Undo
                     </button>
                   )}
+                  <button
+                    className="btn-secondary btn-sm"
+                    onClick={props.onRevertConfig}
+                    disabled={!showDirtyHint}
+                    title="Discard changes and reload from disk"
+                  >
+                    Revert
+                  </button>
                   <button className="btn-primary btn-sm" onClick={props.onSaveConfig} disabled={props.configSaving}>
                     {props.configSaving ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               </div>
               {props.configMode === 'structured' && props.parsedConfig ? (
-                <div className="config-structured-editor">
-                  {props.parsedConfig.root.type === 'object' || props.parsedConfig.root.type === 'group' ? (
-                    Object.entries(props.parsedConfig.root.fields || {}).map(([key, val]) => (
+                <>
+                  <input
+                    type="text"
+                    className="config-search config-editor-search"
+                    placeholder="Search keys and values..."
+                    value={editorSearch}
+                    onChange={(e) => setEditorSearch(e.target.value)}
+                  />
+                  <div className="config-structured-editor" key={collapsedAll ? 'collapsed' : 'expanded'}>
+                    {props.parsedConfig.root.type === 'object' || props.parsedConfig.root.type === 'group' ? (
+                      Object.entries(props.parsedConfig.root.fields || {}).map(([key, val]) => (
+                        <ConfigValueEditor
+                          key={key}
+                          value={val}
+                          path={[key]}
+                          onChange={props.onUpdateConfigValue}
+                          query={editorSearch}
+                          collapsed={collapsedAll}
+                          onAddArrayItem={props.onAddConfigArrayItem}
+                          onAddField={props.onAddConfigField}
+                          onRemoveAt={props.onRemoveConfigAt}
+                          onMoveArrayItem={props.onMoveConfigArrayItem}
+                          onDuplicateAt={props.onDuplicateConfigAt}
+                        />
+                      ))
+                    ) : (
                       <ConfigValueEditor
-                        key={key}
-                        value={val}
-                        path={[key]}
+                        value={props.parsedConfig.root}
+                        path={['root']}
                         onChange={props.onUpdateConfigValue}
+                        query={editorSearch}
+                        collapsed={collapsedAll}
+                        onAddArrayItem={props.onAddConfigArrayItem}
+                        onAddField={props.onAddConfigField}
+                        onRemoveAt={props.onRemoveConfigAt}
+                        onMoveArrayItem={props.onMoveConfigArrayItem}
+                        onDuplicateAt={props.onDuplicateConfigAt}
                       />
-                    ))
-                  ) : (
-                    <ConfigValueEditor
-                      value={props.parsedConfig.root}
-                      path={['root']}
-                      onChange={props.onUpdateConfigValue}
-                    />
-                  )}
-                </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <textarea
                   className="config-editor-textarea"

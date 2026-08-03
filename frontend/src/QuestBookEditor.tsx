@@ -25,6 +25,8 @@ import {
   buildTexturePathIndex,
   findTextureKeysForTarget,
   collectNeededTargets,
+  prefetchAllChapterTextures,
+  registerBakedKeysFromIndex,
   isUsableTextureValue,
 } from './services/texture-loader'
 import { requestResolveTags } from './services/smart-filter-tags'
@@ -132,8 +134,26 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     }
   }, [projectId, packLoaded])
 
+  // Background warm-up: once the pack is loaded and the graph is available,
+  // queue texture materialization for ALL chapters/groups (not just the active
+  // one). This runs invisibly after Load Pack so that opening the Chapters
+  // screen later is instant — the icons are already resident.
+  const prefetchedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!packLoaded || !graph || !graph.chapters.length) return
+    const instancePath = ingestResult?.active_instance || projectPath || ''
+    if (!instancePath) return
+    const key = `${projectId}|${instancePath}`
+    if (prefetchedFor.current === key) return
+    prefetchedFor.current = key
+    const count = prefetchAllChapterTextures(graph, instancePath)
+    // eslint-disable-next-line no-console
+    console.log(`[ModCanvas] Pre-warming ${count} quest textures in the background…`)
+  }, [packLoaded, graph, projectId, projectPath, ingestResult?.active_instance])
+
   useEffect(() => {
     if (ingestResult?.asset_registry?.by_id) {
+      registerBakedKeysFromIndex(ingestResult.asset_registry.by_id)
       setIngestIndex(ingestResult.asset_registry.by_id)
       setTextureIndex(prev => ({ ...prev, ...ingestResult.asset_registry.by_id }))
     }
@@ -151,6 +171,7 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     if (instancePath) {
       scanInstanceTextures(instancePath).then((idx) => {
         if (cancelled || !idx || Object.keys(idx).length === 0) return
+        registerBakedKeysFromIndex(idx)
         setTextureIndex(prev => ({ ...prev, ...idx }))
       }).catch(() => {})
       scanInstanceAnimations(instancePath).then((map) => {

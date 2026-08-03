@@ -25,14 +25,43 @@ export function CraftingGrid({
   initialGrid 
 }: CraftingGridProps) {
   const [grid, setGrid] = useState<(RecipeIngredient | null)[][]>(
-    initialGrid || (size === 2 ? EMPTY_2x2 : EMPTY_3x3)
+    () => initialGrid || (size === 2 ? EMPTY_2x2 : EMPTY_3x3)
   );
   const [shapeless, setShapeless] = useState(false);
   const [draggedItem, setDraggedItem] = useState<RecipeIngredient | null>(null);
   const [dragFrom, setDragFrom] = useState<{ row: number; col: number } | null>(null);
   const dragOverRef = useRef<{ row: number; col: number } | null>(null);
+  const emitLockRef = useRef(true);
+  const suppressNextEmit = useRef(false);
 
+  // Key from props so we can re-sync when a different recipe is selected.
+  const initialKey = useRef<string>('');
+
+  const syncKey = useCallback((g: (RecipeIngredient | null)[][]): string => {
+    return JSON.stringify(g.map((r) => r.map((c) => (c ? `${c.tag ? '#' : ''}${c.item}` : ''))));
+  }, []);
+
+  const currentKey = syncKey(initialGrid ?? (size === 2 ? EMPTY_2x2 : EMPTY_3x3));
+
+  // Sync from props whenever the recipe content changes (new recipe / type).
   useEffect(() => {
+    if (currentKey === initialKey.current) return;
+    initialKey.current = currentKey;
+    suppressNextEmit.current = true;
+    setGrid(initialGrid || (size === 2 ? EMPTY_2x2 : EMPTY_3x3));
+  }, [currentKey, initialGrid, size]);
+
+  // Emit grid changes to the parent, but never on the initial mount, and never
+  // for changes that came from syncing props (a recipe switch / type change).
+  useEffect(() => {
+    if (emitLockRef.current) {
+      emitLockRef.current = false;
+      return;
+    }
+    if (suppressNextEmit.current) {
+      suppressNextEmit.current = false;
+      return;
+    }
     if (onChange) {
       onChange(grid);
     }

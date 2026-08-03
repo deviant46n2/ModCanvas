@@ -210,24 +210,48 @@ pub fn generate_recipe_scripts(project_id: String, recipes: Vec<Recipe>) -> Resu
 }
 
 #[tauri::command]
-pub fn write_script_files(project_id: String, kubejs_script: String, crafttweaker_script: String) -> Result<(), String> {
-    use crate::path_safety::atomic_write_str;
+pub fn write_script_files(
+    db: State<'_, Database>,
+    project_id: String,
+    kubejs_script: String,
+    crafttweaker_script: String,
+) -> Result<(), String> {
+    use crate::path_safety::{atomic_write_str, validate_project_write};
     use std::path::PathBuf;
-    
-    // Write KubeJS script
-    let kubejs_path = PathBuf::from("/tmp").join("scripts").join("kubejs").join("startup_scripts").join("recipes.js");
-    std::fs::create_dir_all(kubejs_path.parent().unwrap()).map_err(|e| e.to_string())?;
-    atomic_write_str(&kubejs_path, &kubejs_script).map_err(|e| e.to_string())?;
-    
-    // Write CraftTweaker script
-    let ct_path = PathBuf::from("/tmp").join("scripts").join("crafttweaker.zs");
-    std::fs::create_dir_all(ct_path.parent().unwrap()).map_err(|e| e.to_string())?;
-    atomic_write_str(&ct_path, &crafttweaker_script).map_err(|e| e.to_string())?;
-    
+
+    let pid = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let project = db
+        .get_project(&pid)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+    let root = PathBuf::from(&project.path);
+
+    // Scope: write KubeJS recipes under
+    // `<project>/kubejs/server_scripts/modcanvas_recipes.js` (a dedicated file
+    // so a save NEVER overwrites a pack-author's existing recipe files, e.g.
+    // `recipes.js`) and CraftTweaker under
+    // `<project>/scripts/modcanvas_crafttweaker.zs`. Both are validated to
+    // remain inside the project root and written atomically so an interrupted
+    // write never corrupts the existing script.
+    let kubejs_rel = "kubejs/server_scripts/modcanvas_recipes.js";
+    let kubejs_abs = validate_project_write(&project.path, kubejs_rel)?;
+    if let Some(parent) = kubejs_abs.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write_str(&kubejs_abs, &kubejs_script)?;
+
+    let ct_rel = "scripts/modcanvas_crafttweaker.zs";
+    let ct_abs = validate_project_write(&project.path, ct_rel)?;
+    if let Some(parent) = ct_abs.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write_str(&ct_abs, &crafttweaker_script)?;
+
     Ok(())
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScriptOutput {
     pub kubejs: String,
     pub crafttweaker: String,

@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export type RecipeType = 'shaped' | 'shapeless' | 'smithing' | 'stonecutting' | 'smelting' | 'blasting' | 'smoking' | 'campfire';
 
+export type RecipeOrigin = 'vanilla' | 'kubejs' | 'crafttweaker' | 'authored';
+
 export interface RecipeIngredient {
   item: string;
   count?: number;
@@ -28,6 +30,10 @@ export interface Recipe {
   experience?: number;
   cookingTime?: number;
   category?: string;
+  /** Provenance of the recipe: where it was loaded from. */
+  origin?: RecipeOrigin;
+  /** Absolute path of the source file (present for discovered recipes). */
+  source?: string;
 }
 
 interface RecipeSnapshot {
@@ -55,8 +61,11 @@ interface RecipeState {
   addRecipe: (recipe: Omit<Recipe, 'id'>) => string;
   updateRecipe: (id: string, updates: Partial<Recipe>) => void;
   deleteRecipe: (id: string) => void;
+  bulkDeleteRecipes: (ids: string[]) => void;
+  reorderRecipes: (from: number, to: number) => void;
   selectRecipe: (id: string | null) => void;
   setRecipes: (recipes: Recipe[]) => void;
+  loadRecipesFromPack: (recipes: Recipe[]) => number;
   markClean: () => void;
   markDirty: () => void;
   duplicateRecipe: (id: string) => string | null;
@@ -123,6 +132,40 @@ export const useRecipeStore = create<RecipeState>()(
         });
       },
 
+      bulkDeleteRecipes: (ids) => {
+        set((state) => {
+          const idSet = new Set(ids);
+          undoStack.push(takeSnapshot(state));
+          if (undoStack.length > MAX_UNDO) undoStack.shift();
+          redoStack = [];
+          const remaining = state.recipes.filter((r) => !idSet.has(r.id));
+          return {
+            recipes: remaining,
+            selectedRecipeId: idSet.has(state.selectedRecipeId ?? '') ? (remaining[0]?.id ?? null) : state.selectedRecipeId,
+            dirty: true,
+            canUndo: undoStack.length > 0,
+            canRedo: false,
+          };
+        });
+      },
+
+      reorderRecipes: (from, to) => {
+        set((state) => {
+          undoStack.push(takeSnapshot(state));
+          if (undoStack.length > MAX_UNDO) undoStack.shift();
+          redoStack = [];
+          const next = [...state.recipes];
+          const [moved] = next.splice(from, 1);
+          next.splice(to, 0, moved);
+          return {
+            recipes: next,
+            dirty: true,
+            canUndo: undoStack.length > 0,
+            canRedo: false,
+          };
+        });
+      },
+
       selectRecipe: (id) => {
         set({ selectedRecipeId: id });
       },
@@ -131,6 +174,27 @@ export const useRecipeStore = create<RecipeState>()(
         undoStack = [];
         redoStack = [];
         set({ recipes, dirty: false, canUndo: false, canRedo: false });
+      },
+
+      loadRecipesFromPack: (discovered) => {
+        // Dedupe by source resource id (the discovered recipe's `id` is the
+        // `ns:file` resource id) so distinct recipes that share an output item
+        // are NOT collapsed, and re-importing the same pack is idempotent.
+        const existing = new Set(
+          get().recipes.map((r) => `${r.origin ?? 'authored'}:${r.source ?? r.id}`)
+        );
+        const fresh = discovered.filter((r) => {
+          const key = `${r.origin ?? 'authored'}:${r.source ?? r.id}`;
+          if (existing.has(key)) return false;
+          existing.add(key);
+          return true;
+        });
+        if (fresh.length === 0) return 0;
+        set((state) => ({
+          recipes: [...state.recipes, ...fresh],
+          dirty: true,
+        }));
+        return fresh.length;
       },
 
       markClean: () => {

@@ -114,9 +114,26 @@ export interface GeneratedScripts {
   crafttweakerScript: string;
 }
 
+export type RecipeOrigin = 'vanilla' | 'kubejs' | 'crafttweaker';
+
+export interface DiscoveredRecipe {
+  recipe: import('../core/recipe/recipe-store').Recipe;
+  origin: RecipeOrigin;
+  source: string;
+  id: string;
+  label: string;
+  editable: boolean;
+}
+
 export interface LoadPackProgress {
   stage: 'idle' | 'textures' | 'quests' | 'mods' | 'complete' | 'error'
   message: string
   progress: number
   error?: string
+  /** Current file being processed (e.g. a jar name), when available. */
+  file?: string
+  /** Items processed so far within the current stage. */
+  done?: number
+  /** Total items in the current stage. */
+  total?: number
 }

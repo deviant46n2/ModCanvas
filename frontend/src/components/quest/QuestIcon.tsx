@@ -17,6 +17,10 @@ interface QuestIconProps {
  *  or an emoji/char fallback once it is known unresolvable. */
 export function QuestIcon({ url, pending, fallback, size, imgSize, fallbackFontSize, textureKey }: QuestIconProps) {
   if (url) {
+    // Baked 3D icons are crisp isometric renders baked near display size;
+    // render them with nearest-neighbor so the pixel-art texels stay hard
+    // (smooth scaling was blurring them).
+    const rendering = 'pixelated'
     return (
       <AnimatedSprite
         url={url}
@@ -24,7 +28,7 @@ export function QuestIcon({ url, pending, fallback, size, imgSize, fallbackFontS
         width={imgSize ?? size}
         height={imgSize ?? size}
         alt=""
-        imageRendering="pixelated"
+        imageRendering={rendering}
       />
     )
   }

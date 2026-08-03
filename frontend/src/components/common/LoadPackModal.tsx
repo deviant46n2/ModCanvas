@@ -75,6 +75,7 @@ export function LoadPackModal({ show, onClose, progress }: LoadPackModalProps) {
   const isComplete = progress.stage === 'complete'
   const isLoading = !isError && !isComplete
   const detail = getDetailForProgress(progress.stage, progress.progress)
+  const hasFileProgress = progress.file || (progress.done !== undefined && progress.total !== undefined)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -90,6 +91,16 @@ export function LoadPackModal({ show, onClose, progress }: LoadPackModalProps) {
               <span className="stage-label">{stageLabels[progress.stage]}</span>
               <span className="stage-message">{progress.message}</span>
               {isLoading && <span className="stage-detail">{detail}</span>}
+              {isLoading && hasFileProgress && (
+                <div className="stage-file">
+                  <span className="stage-file-count">
+                    {progress.done !== undefined && progress.total !== undefined
+                      ? `${progress.done} / ${progress.total} · `
+                      : ''}
+                    {progress.file ? `Processing ${progress.file}` : ''}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="progress-bar-container">
               <div 

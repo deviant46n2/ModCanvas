@@ -589,12 +589,14 @@
   fill: none;
 }
 
-.react-flow__edge:hover .react-flow__edge-path {
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
-}
-
+/* Hover/selected glow WITHOUT CSS `filter`. Applying a filter to an edge path
+   inside ReactFlow's transformed viewport forces the browser to rasterize that
+   subtree at CSS-pixel resolution, which visually degrades (pixelates) the
+   whole canvas on hover. A plain brighter stroke reads the same without the
+   compositing-layer penalty. */
+.react-flow__edge:hover .react-flow__edge-path,
 .react-flow__edge.selected .react-flow__edge-path {
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55));
+  stroke-width: 3;
 }
 
 .quest-edge-label {

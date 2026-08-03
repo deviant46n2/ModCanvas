@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
+import { listen } from '@tauri-apps/api/event'
 import {
   getCurseforgeApiKey,
   setCurseforgeApiKey as apiSetCurseforgeApiKey,
@@ -66,6 +67,26 @@ export function useAppState() {
     progress: 0,
   })
   const [packLoaded, setPackLoaded] = useState(false)
+  const autoReopenDone = useRef(false)
+
+  // Listen for granular progress events emitted by the backend during ingest
+  // (per-jar texture scanning), so the load bar shows real file-by-file work.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    listen<LoadPackProgress>('modcanvas-load-pack-progress', (event) => {
+      const p = event.payload
+      setLoadPackProgress((prev) => ({
+        ...prev,
+        stage: p.stage === 'textures' ? 'textures' : prev.stage,
+        message: p.message,
+        progress: Math.max(prev.progress, p.progress),
+        file: p.file,
+        done: p.done,
+        total: p.total,
+      }))
+    }).then((u) => { unlisten = u })
+    return () => { unlisten?.() }
+  }, [])
 
   const runIngestion = useCallback(async (instancePath: string) => {
     if (!instancePath) return
@@ -89,43 +110,44 @@ export function useAppState() {
     if (!project.path) return
     setPackLoaded(false)
     setShowLoadPack(true)
-    setLoadPackProgress({ stage: 'textures', message: 'Preparing to scan textures...', progress: 5 })
+    setLoadPackProgress({ stage: 'textures', message: 'Preparing to scan textures...', progress: 2 })
     
     // Yield to let modal render first
     await new Promise(r => setTimeout(r, 0))
 
     try {
-      // Stage 1: Ingest textures
-      setLoadPackProgress({ stage: 'textures', message: 'Scanning JAR files...', progress: 10 })
-      console.log('[Frontend] Load Pack - calling ingest for path:', project.path)
+      // Stage 1: Ingest textures (backend emits per-jar progress events that
+      // the listener above forwards into the load bar).
+      setLoadPackProgress({ stage: 'textures', message: 'Scanning mod jars for textures...', progress: 5 })
       const ingestResult = await apiIngestActiveInstance(project.path)
-      console.log('[Frontend] Ingest result:', {
-        textures_indexed: ingestResult.textures_indexed,
-        jars_scanned: ingestResult.jars_scanned,
-      })
       setIngestResult(ingestResult)
-      setLoadPackProgress({ stage: 'textures', message: `Indexed ${ingestResult.textures_indexed} textures from ${ingestResult.jars_scanned} mods`, progress: 30 })
+      setLoadPackProgress({ stage: 'textures', message: `Indexed ${ingestResult.textures_indexed} textures from ${ingestResult.jars_scanned} mods`, progress: 32 })
 
       // Stage 2: Import FTB Quests
-      setLoadPackProgress({ stage: 'quests', message: 'Reading FTB Quests data...', progress: 40 })
+      setLoadPackProgress({ stage: 'quests', message: 'Locating FTB Quests data files...', progress: 36 })
       const importResult = await apiImportFtbQuests(project.path)
       setLoadPackProgress({ stage: 'quests', message: `Found ${importResult.chapter_count} chapters, ${importResult.quest_count} quests`, progress: 55 })
-      
+
       // Save quest graph to database
       if (importResult.graph && importResult.graph.chapters.length > 0) {
-        setLoadPackProgress({ stage: 'quests', message: 'Saving quest graph to database...', progress: 65 })
+        setLoadPackProgress({ stage: 'quests', message: 'Saving quest graph to database...', progress: 60 })
         await apiSaveQuestGraph(project.id, importResult.graph)
       }
 
-      // Stage 3: Load mods
-      setLoadPackProgress({ stage: 'mods', message: 'Scanning instance mods folder...', progress: 70 })
-      await apiScanInstanceMods(project.id)
-      setLoadPackProgress({ stage: 'mods', message: 'Loading mod metadata...', progress: 80 })
+      // Stage 3: Scan + load mods (file-by-file via the returned mod list)
+      setLoadPackProgress({ stage: 'mods', message: 'Scanning instance mods folder...', progress: 64 })
+      const scannedMods = await apiScanInstanceMods(project.id)
+      setLoadPackProgress({ stage: 'mods', message: `Found ${scannedMods.length} mods in instance`, progress: 72 })
+
+      setLoadPackProgress({ stage: 'mods', message: 'Loading mod details...', progress: 78 })
       await modState.loadProjectMods(project.id)
 
       // Stage 4: Load configs
-      setLoadPackProgress({ stage: 'mods', message: 'Loading config files...', progress: 90 })
+      setLoadPackProgress({ stage: 'mods', message: 'Loading config files...', progress: 86 })
       await configState.loadConfigFiles()
+
+      // Stage 5: Prepare quest/progression/recipe data
+      setLoadPackProgress({ stage: 'mods', message: 'Preparing editor data...', progress: 94 })
 
       // Complete
       setLoadPackProgress({ stage: 'complete', message: 'Pack loaded successfully!', progress: 100 })
@@ -161,15 +183,44 @@ export function useAppState() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (selectedProject) {
-      modState.loadProjectMods(selectedProject.id)
+      // NOTE: mods/configs are intentionally NOT auto-loaded here — that
+      // happens only when the user clicks "Load Pack" (which scans the
+      // instance and loads mods + configs). Loading them on project open made
+      // the app start slow.
       modState.resetModState()
       configState.resetConfigState()
     }
   }, [selectedProject])
+
+  // Auto-reopen the last-opened pack on launch: after the project list loads,
+  // if a last-project id was stored and matches a known project, select it so
+  // the workspace returns to that pack. Mods/configs load from their caches and
+  // the quest graph loads from the DB — we do NOT re-run the heavy ingest +
+  // FTB import that `loadPack` performs, so reopen is instant.
+  useEffect(() => {
+    if (autoReopenDone.current) return
+    const id = projectState.getLastProjectId()
+    if (!id) {
+      autoReopenDone.current = true
+      return
+    }
+    // Wait for the project list to actually load before giving up.
+    if (projectState.projects.length === 0) return
+    const target = projectState.projects.find((p) => p.id === id)
+    if (!target) {
+      autoReopenDone.current = true
+      return
+    }
+    autoReopenDone.current = true
+    projectState.setSelectedProject(target)
+    setActiveTab('mods')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectState.projects])
 
   async function loadCurseforgeApiKey() {
     try {

@@ -20,6 +20,8 @@ import ProgressionCanvas from './components/progression/ProgressionCanvas'
 import ProgressionToolbar from './components/progression/ProgressionToolbar'
 import ProgressionNodeInspector from './components/progression/ProgressionNodeInspector'
 import ProgressionAnalysisOverlay from './components/progression/ProgressionAnalysisOverlay'
+import { buildVanillaTemplate } from './core/progression/vanilla-template'
+import './ProgressionGraph.css'
 
 interface ProgressionGraphProps {
   projectId: string
@@ -42,23 +44,35 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const toRfNodes = useCallback((graph: ProgressionGraphData): Node[] => {
-    return graph.nodes.map((n) => ({
-      id: n.id,
-      type: n.node_type,
-      position: n.position,
-      data: {
-        label: n.label,
-        description: n.description,
-        nodeType: n.node_type,
-        mod_refs: n.mod_refs,
-        item_refs: n.item_refs,
-        chapter_id: n.chapter_id,
-        phase: n.phase,
-        stage_name: n.stage_name,
-        icon: n.icon,
-        color: n.color,
-      },
-    }))
+    return graph.nodes.map((n) => {
+      // The backend's ProgressionNode only persists a `data` map; read the
+      // extra UI fields from the top level if present, else from `data`.
+      const d = n.data || {}
+      const icon = n.icon || d.icon || ''
+      const color = n.color || d.color || ''
+      const phase = n.phase || d.phase || ''
+      const stage_name = n.stage_name || d.stage_name || ''
+      const chapter_id = n.chapter_id || d.chapter_id || null
+      const item_refs = n.item_refs?.length ? n.item_refs : (d.item_refs ? JSON.parse(d.item_refs) : [])
+      const mod_refs = n.mod_refs?.length ? n.mod_refs : (d.mod_refs ? JSON.parse(d.mod_refs) : [])
+      return {
+        id: n.id,
+        type: n.node_type,
+        position: n.position,
+        data: {
+          label: n.label,
+          description: n.description,
+          nodeType: n.node_type,
+          mod_refs,
+          item_refs,
+          chapter_id,
+          phase,
+          stage_name,
+          icon,
+          color,
+        },
+      }
+    })
   }, [])
 
   const toRfEdges = useCallback((graph: ProgressionGraphData): Edge[] => {
@@ -88,21 +102,34 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
     if (!graph) return
     const updatedGraph: ProgressionGraphData = {
       ...graph,
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        node_type: (n.data?.nodeType as string) || 'milestone',
-        label: (n.data?.label as string) || 'New Node',
-        description: (n.data?.description as string) || '',
-        position: n.position,
-        data: {},
-        mod_refs: (n.data?.mod_refs as string[]) || [],
-        item_refs: (n.data?.item_refs as string[]) || [],
-        chapter_id: (n.data?.chapter_id as string) || null,
-        phase: (n.data?.phase as string) || '',
-        stage_name: (n.data?.stage_name as string) || '',
-        icon: (n.data?.icon as string) || '',
-        color: (n.data?.color as string) || '',
-      })),
+      nodes: nodes.map((n) => {
+        const data = (n.data as Record<string, unknown>) || {}
+        // Stash UI-only fields in `data` so the backend round-trip keeps them.
+        const stash: Record<string, string> = {
+          icon: (data.icon as string) || '',
+          color: (data.color as string) || '',
+          phase: (data.phase as string) || '',
+          stage_name: (data.stage_name as string) || '',
+          chapter_id: (data.chapter_id as string) || '',
+        }
+        if (Array.isArray(data.item_refs)) stash.item_refs = JSON.stringify(data.item_refs)
+        if (Array.isArray(data.mod_refs)) stash.mod_refs = JSON.stringify(data.mod_refs)
+        return {
+          id: n.id,
+          node_type: (data.nodeType as string) || 'milestone',
+          label: (data.label as string) || 'New Node',
+          description: (data.description as string) || '',
+          position: n.position,
+          data: stash,
+          mod_refs: (data.mod_refs as string[]) || [],
+          item_refs: (data.item_refs as string[]) || [],
+          chapter_id: (data.chapter_id as string) || null,
+          phase: (data.phase as string) || '',
+          stage_name: (data.stage_name as string) || '',
+          icon: (data.icon as string) || '',
+          color: (data.color as string) || '',
+        }
+      }),
       edges: edges.map((e) => ({
         id: e.id,
         source: e.source,
@@ -139,6 +166,14 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
     } catch (e) {
       console.error('Failed to load progression from pack:', e)
     }
+  }, [projectId, setNodes, setEdges, toRfNodes, toRfEdges])
+
+  const loadVanillaTemplate = useCallback(() => {
+    const graph = buildVanillaTemplate(projectId)
+    setGraph(graph)
+    setNodes(toRfNodes(graph))
+    setEdges(toRfEdges(graph))
+    setSelectedNode(null)
   }, [projectId, setNodes, setEdges, toRfNodes, toRfEdges])
 
   const onConnect = useCallback(
@@ -239,6 +274,7 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
         setSelectedNodeType={setSelectedNodeType}
         onAddNode={() => addNode(selectedNodeType)}
         onAutoGenerate={autoGenerate}
+        onVanillaTemplate={loadVanillaTemplate}
         onSave={saveGraph}
         onAnalyze={loadAnalysis}
       />

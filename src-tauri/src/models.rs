@@ -195,6 +195,7 @@ pub enum InstanceStatus {
 
 /// Recipe system types for visual recipe editor
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Recipe {
     pub id: String,
     pub name: String,

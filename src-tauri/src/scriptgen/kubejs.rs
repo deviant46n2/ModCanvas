@@ -616,4 +616,22 @@ mod tests {
         assert!(script.contains("cooked_beef"));
         assert!(script.contains(".cookingTime(600)"));
     }
+
+    #[test]
+    fn test_deserialize_camelcase_cooking_time() {
+        // The frontend emits `cookingTime` (camelCase); without serde
+        // `rename_all = "camelCase"` on Recipe this value would be dropped.
+        let json = r#"{
+            "id": "r",
+            "name": "Smelt",
+            "type": "smelting",
+            "output": { "item": "minecraft:iron_ingot", "count": 1 },
+            "ingredients": [ { "item": "minecraft:iron_ore", "tag": false } ],
+            "experience": 0.7,
+            "cookingTime": 300
+        }"#;
+        let recipe: Recipe = serde_json::from_str(json).unwrap();
+        assert_eq!(recipe.cooking_time, Some(300));
+        assert_eq!(recipe.experience, Some(0.7));
+    }
 }

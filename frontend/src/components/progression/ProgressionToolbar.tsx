@@ -3,13 +3,14 @@ interface ProgressionToolbarProps {
   setSelectedNodeType: (type: string) => void
   onAddNode: () => void
   onAutoGenerate: () => void
+  onVanillaTemplate: () => void
   onSave: () => void
   onAnalyze: () => void
 }
 
 export default function ProgressionToolbar({
   selectedNodeType, setSelectedNodeType, onAddNode,
-  onAutoGenerate, onSave, onAnalyze,
+  onAutoGenerate, onVanillaTemplate, onSave, onAnalyze,
 }: ProgressionToolbarProps) {
   return (
     <div className="progression-toolbar">
@@ -28,7 +29,8 @@ export default function ProgressionToolbar({
           </select>
         </div>
         <button className="btn-primary" onClick={onAddNode}>+ Add</button>
-        <button className="btn-success" onClick={onAutoGenerate}>Load from Pack</button>
+        <button className="btn-success" onClick={onVanillaTemplate}>Vanilla Template</button>
+        <button className="btn-secondary" onClick={onAutoGenerate}>Load from Pack</button>
         <button className="btn-secondary" onClick={onSave}>Save</button>
         <button className="btn-secondary" onClick={onAnalyze}>Analyze</button>
       </div>

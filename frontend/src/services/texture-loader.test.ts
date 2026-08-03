@@ -6,6 +6,9 @@ import {
   buildTexturePathIndex,
   findTextureKeysForTarget,
   collectNeededTargets,
+  prefetchAllChapterTextures,
+  registerBakedKeysFromIndex,
+  isBakedTexture,
   subscribeLoadingChange,
   requestMaterialize,
   textureDisplayUrl,
@@ -173,5 +176,38 @@ describe('texture materialization loading state', () => {
     await vi.waitFor(() => {
       expect(textureDisplayUrl(index, 'ftbquests:textures/shapes/octagon/outline.png')).toBe('data:image/png;base64,outline');
     });
+  });
+
+  it('prefetches textures for every chapter, not just the active one', () => {
+    const chapter = (id: string, icon: string): QuestGraphData['chapters'][number] =>
+      ({ id, title: id, description: '', order_index: 0, group_id: null, icon, background_image: '' }) as unknown as QuestGraphData['chapters'][number];
+    const node = (id: string, chapterId: string, target: string): QuestNodeData =>
+      ({ id, chapter_id: chapterId, node_type: 'quest', label: id, x: 0, y: 0, objectives: [{ id: `o_${id}`, objective_type: 'item', target, item_tag: '', icon: '', title: '' }], rewards: [], connections: [], dependencies: [], text: '', icon: '' }) as unknown as QuestNodeData;
+
+    const graph: QuestGraphData = {
+      id: 'g', project_id: 'p', name: 'Test', description: '',
+      chapters: [chapter('c1', 'minecraft:oak_log'), chapter('c2', 'minecraft:diamond')],
+      chapter_groups: [],
+      nodes: [node('n1', 'c1', 'minecraft:stone'), node('n2', 'c2', 'minecraft:diamond')],
+      edges: [],
+    } as unknown as QuestGraphData;
+
+    const all = collectNeededTargets(graph, null, null);
+    expect(all).toContain('minecraft:oak_log');   // chapter 1 icon
+    expect(all).toContain('minecraft:diamond');    // chapter 2 icon + objective
+    expect(all).toContain('minecraft:stone');      // chapter 1 objective
+
+    const count = prefetchAllChapterTextures(graph, '/tmp/inst');
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it('registers bake: descriptor keys for smooth UI scaling', () => {
+    expect(isBakedTexture('minecraft:stone')).toBe(false);
+    registerBakedKeysFromIndex({
+      'minecraft:stone': 'bake:minecraft:block/stone',
+      'minecraft:oak_log': 'jar:/x.jar!assets/minecraft/textures/item/oak_log.png',
+    });
+    expect(isBakedTexture('minecraft:stone')).toBe(true);
+    expect(isBakedTexture('minecraft:oak_log')).toBe(false);
   });
 });

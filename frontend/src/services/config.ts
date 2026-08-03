@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ConfigFileInfo, ConfigValue, ParsedConfig } from './types'
+import type { ConfigFileInfo, ConfigValue, ParsedConfig } from '../core/config/types'
 
 export async function listConfigFiles(projectId: string): Promise<ConfigFileInfo[]> {
   return invoke<ConfigFileInfo[]>('list_config_files', { projectId })

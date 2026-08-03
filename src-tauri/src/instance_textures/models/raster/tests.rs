@@ -219,3 +219,110 @@ fn euler_matrix_rotates_yaw() {
     let v = mat3_mul_vec3(&m, &[1.0, 0.0, 0.0]);
     assert!(v[0].abs() < 1e-4 && v[2] < -0.99, "expected -Z, got {v:?}");
 }
+
+/// Minecraft's exact per-direction block brightness: top brightest, sides
+/// alternate 0.8 / 0.6, bottom darkest. Getting these right is what makes
+/// isometric icons look like in-game blocks.
+#[test]
+fn face_shade_matches_minecraft_constants() {
+    assert!((face_shade(FaceDir::Up) - 1.0).abs() < 1e-6);
+    assert!((face_shade(FaceDir::North) - 0.8).abs() < 1e-6);
+    assert!((face_shade(FaceDir::South) - 0.8).abs() < 1e-6);
+    assert!((face_shade(FaceDir::West) - 0.6).abs() < 1e-6);
+    assert!((face_shade(FaceDir::East) - 0.6).abs() < 1e-6);
+    assert!((face_shade(FaceDir::Down) - 0.5).abs() < 1e-6);
+}
+
+/// Coverage downsampling must keep texels crisp: a sharp 2×2 checker on a face
+/// should render as hard black/white texel blocks with NO blended intermediate
+/// greys in the face interior (box-averaging used to smear texel boundaries,
+/// which is what made the icons look blurry).
+#[test]
+fn checker_texels_stay_crisp_no_interior_blur() {
+    let model = cube_model();
+    let mut textures = textures_for(&model);
+    // 2×2 checker: pure black / pure white, no shade variance to isolate texels.
+    for (name, t) in textures.iter_mut() {
+        t.w = 2;
+        t.h = 2;
+        t.rgba = vec![0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255];
+        let _ = name;
+    }
+    let mut model = model;
+    for el in &mut model.elements {
+        el.shade = false;
+    }
+    let out = render(&model, &textures).expect("render");
+    let mut dec = png::Decoder::new(std::io::Cursor::new(out));
+    dec.set_transformations(png::Transformations::EXPAND);
+    let mut reader = dec.read_info().expect("header");
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).expect("frame");
+    let w = info.width as usize;
+    let h = info.height as usize;
+    // Collect opaque pixel values in the face interior (avoid the outer AA
+    // fringe by skipping the outermost 8% of rows/cols).
+    let mut greys = std::collections::HashMap::<u8, u32>::new();
+    for y in (h / 10)..(h - h / 10) {
+        for x in (w / 10)..(w - w / 10) {
+            let i = (y * w + x) * 4;
+            if buf[i + 3] == 255 {
+                *greys.entry(buf[i]).or_default() += 1;
+            }
+        }
+    }
+    // Crisp 2-tone checker → almost all pixels are exactly 0 or 255.
+    let total: u32 = greys.values().sum();
+    let crisp = greys.get(&0).copied().unwrap_or(0) + greys.get(&255).copied().unwrap_or(0);
+    let ratio = crisp as f64 / total.max(1) as f64;
+    assert!(ratio > 0.95, "interior texels blurred: only {:.1}% pure 0/255 (greys={:?})", ratio * 100.0, greys.iter().take(6).collect::<Vec<_>>());
+}
+
+/// Supersampling must anti-alias the cube silhouette: the border pixels around
+/// the opaque core should contain fractional-alpha pixels (the AA fringe),
+/// which only appears when rendering is done above native resolution.
+#[test]
+fn supersampling_produces_antialiased_edges() {
+    let model = cube_model();
+    let out = render(&model, &textures_for(&model)).expect("render");
+    let mut dec = png::Decoder::new(std::io::Cursor::new(out));
+    dec.set_transformations(png::Transformations::EXPAND);
+    let mut reader = dec.read_info().expect("header");
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let _info = reader.next_frame(&mut buf).expect("frame");
+    // Fractional alpha pixels (1..254) prove the edges were supersampled.
+    let partial = buf.chunks_exact(4).filter(|px| px[3] > 0 && px[3] < 255).count();
+    assert!(partial > 50, "expected an AA fringe, got {partial} partial-alpha px");
+}
+
+/// Debug helper (not a real assertion): render a checker cube and dump it to
+/// the temp dir for visual inspection.
+/// The whole point of the corrected lighting: with a uniform solid texture, the
+/// three visible cube faces must sample three distinct brightness levels
+/// (top lit, sides mid, one side dark), which is what gives blocks their
+/// recognizable 3D look. Regression: old constants made west/east 1.0 and 0.8,
+/// so two faces were identically bright and the cube looked flat.
+#[test]
+fn cube_faces_have_distinct_shading_levels() {
+    let model = cube_model();
+    // Solid texture everywhere (no checker) so only per-face lighting varies.
+    let textures = textures_for(&model);
+    let out = render(&model, &textures).expect("render");
+    let mut dec = png::Decoder::new(std::io::Cursor::new(out));
+    dec.set_transformations(png::Transformations::EXPAND);
+    let mut reader = dec.read_info().expect("header");
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let _info = reader.next_frame(&mut buf).expect("frame");
+    // Collect distinct opaque grey levels (quantized to 4-steps to tolerate AA
+    // fringes along face borders).
+    let mut levels: std::collections::HashSet<u8> = std::collections::HashSet::new();
+    for px in buf.chunks_exact(4) {
+        if px[3] == 255 {
+            levels.insert((px[0] / 4) * 4);
+        }
+    }
+    // 200 base → top 200, north/south 160, west/east 120, down 100. AA edges
+    // produce in-between values, so require at least 3 distinct core levels.
+    let distinct = levels.len();
+    assert!(distinct >= 3, "expected >=3 brightness levels, got {distinct} ({:?})", levels.iter().take(8).collect::<Vec<_>>());
+}

@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use zip::ZipArchive;
 
-use rayon::prelude::*;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextureEntry {
     pub namespace: String,
@@ -193,6 +191,20 @@ fn cache_path(mods_dir: &Path) -> PathBuf {
 /// Ingest an active modpack instance: scan all `.jar` files, build a
 /// `VirtualAssetRegistry`, cache the result, and return it along with counts.
 pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
+    ingest_active_instance_with_progress(instance_path, &mut |_| {})
+}
+
+/// Emit an `IngestProgress` event to the frontend window.
+fn emit_ingest(app: &tauri::AppHandle, progress: &IngestProgress) {
+    use tauri::Emitter;
+    let _ = app.emit("modcanvas-load-pack-progress", progress);
+}
+
+/// Ingest an instance, reporting granular progress along the way.
+pub fn ingest_active_instance_with_progress(
+    instance_path: &Path,
+    progress: &mut dyn FnMut(&IngestProgress),
+) -> IngestResult {
     let act = instance_path.to_string_lossy().to_string();
     let mods_dir = instance_path.join("mods");
     let kubejs_assets_dir = instance_path.join("kubejs").join("assets");
@@ -204,8 +216,25 @@ pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
     eprintln!("[Ingestion] kubejs_assets_dir: {:?}", kubejs_assets_dir);
     eprintln!("[Ingestion] kubejs_assets_dir exists: {}", kubejs_assets_dir.exists());
 
+    progress(&IngestProgress {
+        stage: "textures".to_string(),
+        message: "Locating mod jars in mods/ folder".to_string(),
+        progress: 5,
+        file: None,
+        done: 0,
+        total: 0,
+    });
+
     if !mods_dir.exists() {
         eprintln!("[Ingestion] No mods directory at {:?}, returning empty registry", mods_dir);
+        progress(&IngestProgress {
+            stage: "textures".to_string(),
+            message: "No mods folder found".to_string(),
+            progress: 10,
+            file: None,
+            done: 0,
+            total: 0,
+        });
         return IngestResult {
             asset_registry: VirtualAssetRegistry {
                 by_id: HashMap::new(),
@@ -280,6 +309,14 @@ pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
 
                         if !kubejs_changed {
                             eprintln!("[Ingestion] Cache hit: {} textures for {}", cached.textures_indexed, &act);
+                            progress(&IngestProgress {
+                                stage: "textures".to_string(),
+                                message: format!("Cache hit: {} textures from {} mods", cached.textures_indexed, jars_scanned),
+                                progress: 32,
+                                file: None,
+                                done: jars_scanned,
+                                total: jars_scanned.max(1),
+                            });
                             let mut by_id: HashMap<String, String> = HashMap::new();
                             for entry in &cached.textures {
                                 by_id.insert(entry.raw_key.clone(), entry.file_path.clone());
@@ -313,12 +350,39 @@ pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
         eprintln!("[Ingestion] Scanning {} jar files in {:?}...", jars_scanned, mods_dir);
     }
 
-    let scan_results: Vec<Vec<TextureEntry>> = current_jars.par_iter().map(|(jar_path, _, _, _)| {
-        scan_jar_textures_for_registry(jar_path).unwrap_or_else(|e| {
-            eprintln!("[Ingestion] Failed to scan jar {}: {}", jar_path.display(), e);
-            Vec::new()
+    let total_jars = jars_scanned.max(1);
+    progress(&IngestProgress {
+        stage: "textures".to_string(),
+        message: if cache_hit { "Reading cached texture index".to_string() } else { format!("Scanning {jars_scanned} mod jars for textures") },
+        progress: 12,
+        file: None,
+        done: 0,
+        total: total_jars,
+    });
+
+    let scan_results: Vec<Vec<TextureEntry>> = current_jars
+        .iter()
+        .enumerate()
+        .map(|(i, (jar_path, _, _, _))| {
+            progress(&IngestProgress {
+                stage: "textures".to_string(),
+                message: "Scanning mod jar for textures".to_string(),
+                progress: 12 + ((i as u8).saturating_mul(18) / total_jars as u8).min(18),
+                file: Some(
+                    jar_path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                ),
+                done: i + 1,
+                total: total_jars,
+            });
+            scan_jar_textures_for_registry(jar_path).unwrap_or_else(|e| {
+                eprintln!("[Ingestion] Failed to scan jar {}: {}", jar_path.display(), e);
+                Vec::new()
+            })
         })
-    }).collect();
+        .collect();
 
     let mut all_textures: Vec<TextureEntry> = Vec::new();
     let mut by_id: HashMap<String, String> = HashMap::new();
@@ -349,6 +413,15 @@ pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
 
     let textures_indexed = all_textures.len();
     eprintln!("[Ingestion] Indexed {} textures for instance {}", textures_indexed, act);
+
+    progress(&IngestProgress {
+        stage: "textures".to_string(),
+        message: format!("Indexed {textures_indexed} textures from {jars_scanned} mods"),
+        progress: 32,
+        file: None,
+        done: jars_scanned,
+        total: total_jars,
+    });
 
     // Save cache
     let kubejs_mtime = if kubejs_assets_dir.exists() {
@@ -406,9 +479,25 @@ struct IngestCache {
 // ── Tauri command ──────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn ingest_active_instance_cmd(instance_path: String) -> Result<IngestResult, String> {
+pub fn ingest_active_instance_cmd(
+    app: tauri::AppHandle,
+    instance_path: String,
+) -> Result<IngestResult, String> {
     let path = std::path::Path::new(&instance_path);
-    Ok(ingest_active_instance(path))
+    let mut emit = |p: &IngestProgress| emit_ingest(&app, p);
+    Ok(ingest_active_instance_with_progress(path, &mut emit))
+}
+
+/// Progress event payload streamed to the frontend during ingest.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestProgress {
+    pub stage: String,
+    pub message: String,
+    pub progress: u8,
+    pub file: Option<String>,
+    pub done: usize,
+    pub total: usize,
 }
 
 /// Load the ingest cache for a mods directory if it exists.

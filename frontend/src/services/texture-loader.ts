@@ -167,6 +167,28 @@ let flushing = false
 let loading = false
 const loadingSubscribers = new Set<(loading: boolean, remaining: number) => void>()
 
+/// Keys whose source is a `bake:` descriptor. These are synthetic 3D isometric
+/// renders (NOT 16px Minecraft textures) and should be scaled smoothly in the
+/// UI — nearest-neighbor downscaling of a 3D render looks aliased, whereas
+/// smooth scaling keeps it clean.
+const bakedKeys = new Set<string>()
+
+export function isBakedTexture(key: string): boolean {
+  return bakedKeys.has(key)
+}
+
+export function markBakedKeys(keys: Iterable<string>): void {
+  for (const k of keys) bakedKeys.add(k)
+}
+
+/** Scan a texture index for `bake:` descriptors and register them as baked so
+ *  their rendered icons are scaled smoothly in the UI. */
+export function registerBakedKeysFromIndex(textureIndex: Record<string, string>): void {
+  for (const [key, src] of Object.entries(textureIndex)) {
+    if (src.startsWith('bake:')) bakedKeys.add(key)
+  }
+}
+
 export function subscribeMaterialized(fn: (added: string[]) => void): () => void {
   subscribers.add(fn)
   return () => subscribers.delete(fn)
@@ -264,4 +286,23 @@ function flush(instancePath: string): void {
         emitLoading()
       }
     })
+}
+
+/**
+ * Background prefetch: queue texture materialization for EVERY chapter and
+ * group in the graph (not just the currently-active chapter). Called after the
+ * pack loads so that opening the Quests / Chapters screen is instant — the
+ * icons are already resident by the time the user navigates there.
+ */
+export function prefetchAllChapterTextures(
+  graph: import('./quest-types').QuestGraphData,
+  instancePath: string,
+): number {
+  // `activeChapter: null` makes collectNeededTargets walk every chapter/node.
+  const targets = collectNeededTargets(graph, null, null)
+  const pending = targets.filter(
+    (t) => t && !materialized.has(t) && !queuedSet.has(t) && (notFound.get(t) ?? 0) < MAX_NOT_FOUND_RETRIES,
+  ).length
+  requestMaterialize(targets, instancePath)
+  return pending
 }

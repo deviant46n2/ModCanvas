@@ -14,6 +14,8 @@ export interface Project {
   path: string
 }
 
+const LAST_PROJECT_KEY = 'modcanvas:last-project-id'
+
 export function useProjectState() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -23,12 +25,38 @@ export function useProjectState() {
   const [modLoader, setModLoader] = useState('Forge')
   const [confirmCloseProject, setConfirmCloseProject] = useState(false)
 
+  function persistSelection(id: string | null) {
+    try {
+      if (id) localStorage.setItem(LAST_PROJECT_KEY, id)
+      else localStorage.removeItem(LAST_PROJECT_KEY)
+    } catch {
+      /* storage may be unavailable */
+    }
+  }
+
+  /** Remember the selected project so it can be reopened on next launch. */
+  function rememberProject(project: Project | null) {
+    setSelectedProject(project)
+    persistSelection(project?.id ?? null)
+  }
+
   async function loadProjects() {
     try {
       const result = await listProjects()
       setProjects(result)
+      return result
     } catch (e) {
       console.error('Failed to load projects:', e)
+      return []
+    }
+  }
+
+  /** Return the last-selected project id, if any. */
+  function getLastProjectId(): string | null {
+    try {
+      return localStorage.getItem(LAST_PROJECT_KEY)
+    } catch {
+      return null
     }
   }
 
@@ -41,7 +69,7 @@ export function useProjectState() {
         `~/modpacks/${newProjectName.toLowerCase().replace(/\s+/g, '-')}`,
       )
       setProjects([project, ...projects])
-      setSelectedProject(project)
+      rememberProject(project)
       setShowNewProject(false)
       setNewProjectName('')
     } catch (e) {
@@ -62,7 +90,7 @@ export function useProjectState() {
     try {
       await deleteProject(selectedProject!.id)
       await loadProjects()
-      setSelectedProject(null)
+      rememberProject(null)
       return true
     } catch (e) {
       console.error('Failed to delete project:', e)
@@ -77,19 +105,20 @@ export function useProjectState() {
   }
 
   function handleCloseProject() {
-    setSelectedProject(null)
+    rememberProject(null)
   }
 
   return {
     projects,
     selectedProject,
-    setSelectedProject,
+    setSelectedProject: rememberProject,
     showNewProject, setShowNewProject,
     newProjectName, setNewProjectName,
     mcVersion, setMcVersion,
     modLoader, setModLoader,
     confirmCloseProject, setConfirmCloseProject,
     loadProjects,
+    getLastProjectId,
     handleCreateProject,
     handleSaveProject,
     handleConfirmDelete,

@@ -8,9 +8,19 @@ use super::baker::{FaceDir, MergedModel};
 use super::merge::{mat3_mul, mat3_mul_vec3};
 use std::collections::HashMap;
 
-/// Output icon size in pixels.
-pub const OUTPUT_SIZE: u32 = 256;
-const PAD: f32 = 8.0;
+/// Output icon size in pixels. Kept small (close to how icons are displayed)
+/// so textures stay crisp when the browser scales the PNG — a large supersampled
+/// PNG gets smoothed/downscaled and the 16px pixel-art blurs.
+/// Output icon size in pixels. Matches the app's common quest-icon display
+/// sizes (18–64px) so the browser does minimal scaling. Combined with the
+/// frontend rendering baked icons with `image-rendering: pixelated`, texels
+/// stay crisp and hard like real Minecraft icons.
+pub const OUTPUT_SIZE: u32 = 64;
+/// Internal render resolution multiplier. Rendering at 4× then coverage-
+/// downsampling anti-aliases only the silhouette edges, keeping the interior
+/// texels crisp and pixelated like real Minecraft icons.
+const SUPERSAMPLE: u32 = 4;
+const PAD: f32 = 4.0;
 use std::f32::consts::SQRT_2;
 
 /// A decoded RGBA texture ready for sampling.
@@ -21,17 +31,24 @@ pub struct Texture {
     pub rgba: Vec<u8>,
 }
 
-/// Per-face brightness, matching the in-game item lighting for block models
-/// (top 1.0, north/west 1.0, south/east 0.8, bottom 0.5).
+/// Per-face brightness, matching Minecraft's block-model lighting exactly
+/// (up 1.0, north/south 0.8, west/east 0.6, down 0.5). The west/east faces are
+/// darker than north/south — that contrast is what makes isometric blocks read
+/// as three-dimensional.
 fn face_shade(dir: FaceDir) -> f32 {
     match dir {
-        FaceDir::Up | FaceDir::North | FaceDir::West => 1.0,
-        FaceDir::South | FaceDir::East => 0.8,
+        FaceDir::Up => 1.0,
+        FaceDir::North | FaceDir::South => 0.8,
+        FaceDir::West | FaceDir::East => 0.6,
         FaceDir::Down => 0.5,
     }
 }
 
 /// Render `model` with the given textures into a PNG (RGBA, transparent bg).
+///
+/// Rasterizes into a supersampled buffer then box-downsamples to
+/// [`OUTPUT_SIZE`]. Downsampling averages premultiplied alpha so translucent
+/// edges get correct coverage instead of dark fringes.
 pub fn render(model: &MergedModel, textures: &HashMap<String, Texture>) -> Option<Vec<u8>> {
     let rot = euler_matrix(model.display.rotation);
     let quads = build_quads(model, textures, &rot);
@@ -48,31 +65,87 @@ pub fn render(model: &MergedModel, textures: &HashMap<String, Texture>) -> Optio
     if !(minx < maxx && miny < maxy) {
         return None;
     }
+    let ss = SUPERSAMPLE;
+    let hi_size = (OUTPUT_SIZE * ss) as usize;
     let avail = OUTPUT_SIZE as f32 - 2.0 * PAD;
     let fit = avail / (maxx - minx).max(maxy - miny).max(1e-6);
     let ox = PAD - minx * fit;
     let oy = maxy * fit + PAD;
 
-    let size = OUTPUT_SIZE as usize;
-    let mut fbuf = vec![0u8; size * size * 4];
-    let mut zbuf = vec![f32::NEG_INFINITY; size * size];
+    let mut fbuf = vec![0u8; hi_size * hi_size * 4];
+    let mut zbuf = vec![f32::NEG_INFINITY; hi_size * hi_size];
 
+    // Rasterize into supersampled space (fit/ox/oy scaled by `ss`).
     for q in &quads {
         let Some(tex) = textures.get(&q.tex_key) else { continue };
         for tri in [(0usize, 1usize, 2usize), (0, 2, 3)] {
-            raster_tri(&q, tex, tri, fit, ox, oy, size, &mut fbuf, &mut zbuf);
+            raster_tri(&q, tex, tri, fit * ss as f32, ox * ss as f32, oy * ss as f32, hi_size, &mut fbuf, &mut zbuf);
         }
     }
 
-    let mut out = Vec::new();
+    let out = downsample(&fbuf, hi_size, OUTPUT_SIZE as usize, ss as usize);
+    let mut png_out = Vec::new();
     {
-        let mut enc = png::Encoder::new(&mut out, OUTPUT_SIZE, OUTPUT_SIZE);
+        let mut enc = png::Encoder::new(&mut png_out, OUTPUT_SIZE, OUTPUT_SIZE);
         enc.set_color(png::ColorType::Rgba);
         enc.set_depth(png::BitDepth::Eight);
         let mut writer = enc.write_header().ok()?;
-        writer.write_image_data(&fbuf).ok()?;
+        writer.write_image_data(&out).ok()?;
     }
-    Some(out)
+    Some(png_out)
+}
+
+/// Coverage-based downsample from a supersampled buffer.
+///
+/// For each output pixel we look at the `ss×ss` subsamples:
+/// - **Alpha** = fraction of solid (opaque) subsamples → anti-aliases the
+///   silhouette edge while keeping the interior fully opaque.
+/// - **Color** = the nearest solid subsample to the pixel center. This keeps
+///   the 16px texture texels crisp and pixelated instead of blurring them the
+///   way a box-average (bilinear) downsample would.
+fn downsample(fbuf: &[u8], hi: usize, lo: usize, ss: usize) -> Vec<u8> {
+    let mut out = vec![0u8; lo * lo * 4];
+    let cell = (ss * ss) as f32;
+    let half = ss / 2;
+    for oy in 0..lo {
+        for ox in 0..lo {
+            // Count solid subsamples and remember the nearest solid one.
+            let mut solid = 0u32;
+            let mut chosen: Option<[u8; 4]> = None;
+            let mut best_dist = u32::MAX;
+            for dy in 0..ss {
+                for dx in 0..ss {
+                    let hi_idx = ((oy * ss + dy) * hi + (ox * ss + dx)) * 4;
+                    let a = fbuf[hi_idx + 3];
+                    if a == 0 {
+                        continue;
+                    }
+                    solid += 1;
+                    // Prefer the subsample nearest the pixel center so texels
+                    // stay crisp; fall back to the first solid one.
+                    let dist = (dy as i32 - half as i32).unsigned_abs()
+                        + (dx as i32 - half as i32).unsigned_abs();
+                    if dist < best_dist {
+                        best_dist = dist;
+                        chosen = Some([fbuf[hi_idx], fbuf[hi_idx + 1], fbuf[hi_idx + 2], a]);
+                    }
+                }
+            }
+            let out_idx = (oy * lo + ox) * 4;
+            if solid == 0 {
+                out[out_idx + 3] = 0;
+                continue;
+            }
+            let Some([r, g, b, a]) = chosen else { continue };
+            let coverage = solid as f32 / cell;
+            let alpha = (a as f32 * coverage).round() as u8;
+            out[out_idx] = r;
+            out[out_idx + 1] = g;
+            out[out_idx + 2] = b;
+            out[out_idx + 3] = alpha;
+        }
+    }
+    out
 }
 
 #[derive(Clone, Copy)]

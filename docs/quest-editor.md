@@ -2,6 +2,24 @@
 
 Minecraft items, chapter icons and decorations that animate in-game (vertical frame-strip PNG + adjacent `*.png.mcmeta` animation metadata) play in the editor instead of showing as a flat sprite strip.
 
+## Background prefetch of all chapters
+
+After a pack loads, the QuestBookEditor secretly warms texture materialization
+for **every** chapter and group — not just the currently-active one — so
+opening the Chapters/Quests screen later is instant.
+
+- `frontend/src/services/texture-loader.ts` — `prefetchAllChapterTextures(graph, instancePath)`
+  calls `collectNeededTargets(graph, null, null)` (null active chapter = walk
+  every chapter/node) and queues them through the existing `requestMaterialize`
+  batch pipeline. Returns the number of pending keys.
+- `frontend/src/QuestBookEditor.tsx` — a `useEffect` on `packLoaded` fires the
+  prefetch once per project+instance (guarded by a `useRef`), running
+  invisibly in the background. The shared loading indicator (`subscribeLoadingChange`)
+  reports activity, but the Quests tab stays responsive.
+- Prefetch runs at low priority through the 200-key batch materializer, so it
+  never blocks the UI; keys already materialized or marked not-found are
+  skipped.
+
 ## Data flow
 
 1. **Rust scan** — `scan_instance_animations_cmd` (`src-tauri/src/instance_textures.rs`) collects every `*.png.mcmeta` alongside the texture index in a single pass (`pixels.rs` `merge_archive_ex`/`merge_dir_ex` collect the `.mcmeta` files). The `.mcmeta` JSON is keyed by the same texture key form as the texture index (`attach_animations`). `CACHE_VERSION` is bumped whenever the index shape or layer semantics change; the disk cache stores `animations` alongside `by_id`.
@@ -186,10 +204,34 @@ couldn't resolve its textures) can succeed after the index is refreshed.
 
 `raster::render` (`instance_textures/models/raster.rs`) builds quads from faces,
 backface-culls, applies `display.gui` scale→rotate→translate (center at 8,8,8),
-shades per face (top/north/west 1.0, south/east 0.8, bottom 0.5, `shade:false`→1.0),
-and alpha-composites with a z-buffer into a 256×256 transparent PNG. Element
-rotations support single-axis `angle` and multi-axis `x/y/z` forms, including the
-`rescale` flag (shrink by 1/√2, vanilla plant/crop behavior).
+shades per face, and alpha-composites with a z-buffer. Two quality details make
+the icons look close to in-game Minecraft blocks:
+
+- **Correct lighting**: per-face brightness matches Minecraft's block-model
+  constants exactly — up 1.0, north/south 0.8, west/east 0.6, down 0.5
+  (`shade:false`→1.0). The west/east darker-than-north/south contrast is what
+  gives the isometric view its recognizable 3D depth; the old constants
+  (north/west 1.0, east 0.8) made side faces over-bright and the cube look flat.
+- **Supersampling + crisp texels**: rendering happens at 4× resolution
+  (`SUPERSAMPLE`), then a **coverage-based downsample** collapses the
+  `ss×ss` subsamples down to the 96×96 output. Alpha is the solid-subpixel
+  coverage (anti-aliasing only the silhouette edge); the color is taken from
+  the nearest solid subsample to the pixel center, so the 16px texture texels
+  stay hard and pixelated instead of being smeared by a box-average. The bake
+  size (96px, `OUTPUT_SIZE`) is close to the display sizes used in the UI —
+  a large supersampled PNG gets smoothed by the browser's downscale and the
+  pixel-art blurs.
+
+**Display pipeline**: baked icons are crisp isometric renders baked near the
+app's display sizes (64px `OUTPUT_SIZE`), and the UI renders **all** icons
+(flat textures and bakes) with `image-rendering: pixelated` — nearest-neighbor
+scaling. That is exactly how Minecraft icons look: small, hard, pixelated
+pixels. Rendering bakes with smooth (`auto`) scaling was the source of the
+"blurry 3D" report — bilinear downscale/upscale smears the 16px texels into
+gradients.
+
+Element rotations support single-axis `angle` and multi-axis `x/y/z` forms,
+including the `rescale` flag (shrink by 1/√2, vanilla plant/crop behavior).
 
 ## Source files
 
@@ -198,6 +240,17 @@ rotations support single-axis `angle` and multi-axis `x/y/z` forms, including th
 - `src-tauri/src/instance_textures/models/merge.rs` — model parsing helpers.
 - `src-tauri/src/instance_textures/models/raster.rs` (+ `raster/tests.rs`) — software rasterizer.
 - `src-tauri/src/instance_textures/materialize.rs` — `resolve_texture_urls` / `bake_icon`.
+- `frontend/src/components/quest/QuestIcon.tsx` + `AnimatedSprite.tsx` — icon
+  rendering (always `image-rendering: pixelated`).
+
+## Edge-hover rendering note
+
+The quest canvas previously applied `filter: drop-shadow(...)` to
+`.react-flow__edge:hover .react-flow__edge-path`. A CSS `filter` on an SVG path
+inside ReactFlow's transformed viewport forces the browser to rasterize that
+subtree at CSS-pixel resolution (DPR 1), which made the whole canvas visibly
+"go pixelated" while hovering a dependency line. The hover/selected glow is now
+a plain brighter `stroke-width` bump — same visual, no compositing penalty.
 
 # Quest Editor — Grid Snapping (In-Game Parity)
 

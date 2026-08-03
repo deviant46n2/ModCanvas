@@ -1,4 +1,5 @@
 import type { SearchResult, TagInfo } from '../../services/api';
+import { SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
 
 interface RecipePaletteProps {
   searchResults: SearchResult[];
@@ -6,6 +7,11 @@ interface RecipePaletteProps {
   activeSearchTab: 'items' | 'tags';
   onDragStart: (item: SearchResult) => void;
   getTextureUrl: (itemId: string) => string | null;
+}
+
+function setDragPayload(e: React.DragEvent, payload: SlotDragPayload) {
+  e.dataTransfer?.setData(SLOT_DRAG_MIME, JSON.stringify(payload));
+  e.dataTransfer.effectAllowed = 'copy';
 }
 
 export function RecipePalette({
@@ -30,7 +36,10 @@ export function RecipePalette({
               key={item.id}
               className="palette-item"
               draggable
-              onDragStart={() => onDragStart(item)}
+              onDragStart={(e) => {
+                onDragStart(item);
+                setDragPayload(e, { item: item.id, name: item.name });
+              }}
             >
               <div className="palette-item-icon">
                 {getTextureUrl(item.id) ? (
@@ -54,7 +63,8 @@ export function RecipePalette({
           ))
         ) : (
           tagResults.map(tag => (
-            <div key={tag.id} className="palette-item tag-item">
+            <div key={tag.id} className="palette-item tag-item" draggable
+              onDragStart={(e) => setDragPayload(e, { item: `#${tag.id}`, name: tag.name, tag: true })}>
               <div className="palette-item-icon">🏷️</div>
               <div className="palette-item-info">
                 <span className="palette-item-name">{tag.name}</span>

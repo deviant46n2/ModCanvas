@@ -107,4 +107,32 @@ describe('recipe-store', () => {
     useRecipeStore.getState().undo(); // should be no-op
     expect(useRecipeStore.getState().recipes).toHaveLength(1);
   });
+
+  it('loadRecipesFromPack appends distinct recipes even when outputs collide', () => {
+    const discovered = [
+      // Two recipes from different files sharing the same output must BOTH load.
+      { ...makeRecipe('from-a'), id: 'a', origin: 'kubejs' as const, source: '/x/recipes_a.js', output: { item: 'minecraft:stone', count: 1 } },
+      { ...makeRecipe('from-b'), id: 'b', origin: 'kubejs' as const, source: '/x/recipes_b.js', output: { item: 'minecraft:stone', count: 1 } },
+      { ...makeRecipe('from-json'), id: 'c', origin: 'vanilla' as const, source: '/data/mc/recipes/x.json' },
+    ];
+    const added = useRecipeStore.getState().loadRecipesFromPack(discovered);
+    expect(added).toBe(3);
+    expect(useRecipeStore.getState().recipes).toHaveLength(3);
+    expect(useRecipeStore.getState().dirty).toBe(true);
+
+    // Same sources again -> deduped, nothing added.
+    const again = useRecipeStore.getState().loadRecipesFromPack(discovered);
+    expect(again).toBe(0);
+    expect(useRecipeStore.getState().recipes).toHaveLength(3);
+  });
+
+  it('loadRecipesFromPack preserves authored recipes', () => {
+    const authored = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().loadRecipesFromPack([
+      { ...makeRecipe('pack'), id: 'p', origin: 'vanilla' as const, source: '/data/x.json' },
+    ]);
+    const ids = useRecipeStore.getState().recipes.map((r) => r.id);
+    expect(ids).toContain(authored);
+    expect(ids).toContain('p');
+  });
 });

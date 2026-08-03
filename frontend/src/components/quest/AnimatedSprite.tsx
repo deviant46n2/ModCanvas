@@ -82,6 +82,10 @@ export function AnimatedSprite({
 
   const animated = ready && sheet && sheet.count > 1 ? sheet : null
   const displayUrl = animated ? animated.url : url
+  // Always nearest-neighbor: Minecraft textures (and the crisp 64px baked
+  // icons) are pixel art and must render with hard pixels. Smooth scaling was
+  // blurring the baked icons.
+  const rendering = imageRendering ?? 'pixelated'
 
   if (animated) {
     const durationMs = Math.max(1, (animated.count - 1) * frameDurationMs(meta, animated.interpolated))
@@ -92,7 +96,7 @@ export function AnimatedSprite({
       backgroundImage: `url(${animated.url})`,
       backgroundRepeat: 'no-repeat',
       backgroundSize: `100% ${animated.count * 100}%`,
-      imageRendering: imageRendering ?? 'pixelated',
+      imageRendering: rendering,
       animationName: 'quest-frame-strip',
       animationTimingFunction: `steps(${animated.count - 1}, end)`,
       animationDuration: `${durationMs}ms`,
@@ -128,7 +132,7 @@ export function AnimatedSprite({
       title={title}
       onClick={onClick}
       onError={onError}
-      style={{ width, height, imageRendering: imageRendering ?? 'pixelated', ...style }}
+      style={{ width, height, imageRendering: rendering, ...style }}
     />
   )
 }
