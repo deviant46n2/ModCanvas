@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CheckSquareIcon, SquareIcon } from '../ui/icons'
 import { scanPackRecipes } from '../../services/api';
 import type { DiscoveredRecipe } from '../../services/api';
 import type { Recipe } from '../../core/recipe/recipe-store';
@@ -185,7 +186,7 @@ export function LoadPackRecipesModal({ projectPath, onClose, onImport, existingR
                       });
                     }}
                   >
-                    {recipes.every((r) => selected.has(keyOf(r))) ? '☑' : '☐'} {group}
+                    {recipes.every((r) => selected.has(keyOf(r))) ? <CheckSquareIcon size={14} /> : <SquareIcon size={14} />} {group}
                   </button>
                   <span className="result-count">{recipes.length}</span>
                 </div>

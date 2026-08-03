@@ -1,4 +1,6 @@
 import React from 'react'
+import { SearchIcon } from '../ui/icons'
+import type { ReactNode } from 'react'
 import type { QuestTileData } from './QuestTileTypes'
 import { ICON_SIZE, resolveIconKey } from './QuestTileTypes'
 import { isTexturePending } from '../../services/texture-loader'
@@ -17,7 +19,7 @@ export interface QuestTileBodyProps {
   editObjField: string | null
   editRewField: string | null
   questIconUrl: string | null
-  fallbackIcon: string
+  fallbackIcon: ReactNode
   inputRef: React.RefObject<HTMLInputElement | null>
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   onEditValueChange: (value: string) => void
@@ -85,14 +87,14 @@ export function QuestTileBody({
           ) : iconPending ? (
             <QuestIcon pending url={null} fallback="" size={ICON_SIZE} />
           ) : (
-            <span style={{ fontSize: ICON_SIZE * 0.7 }}>{fallbackIcon}</span>
+            <span className="quest-tile-fallback" style={{ fontSize: ICON_SIZE * 0.7 }}>{fallbackIcon}</span>
           )}
           <button
             className="quest-tile-icon-btn"
             onClick={(e) => { e.stopPropagation(); data.onOpenIconPicker?.('quest') }}
             title="Pick icon from mods"
           >
-            🔍
+            <SearchIcon size={14} />
           </button>
         </div>
       </div>

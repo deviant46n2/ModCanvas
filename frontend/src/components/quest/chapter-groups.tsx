@@ -1,4 +1,5 @@
 import type { NodeProps } from '@xyflow/react';
+import { ChevronRightIcon } from '../ui/icons'
 
 const GROUP_HEIGHT = 36;
 
@@ -33,7 +34,7 @@ function GroupNodeComponent({ data, selected }: NodeProps) {
           transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
         }}
       >
-        ▶
+        <ChevronRightIcon size={12} />
       </span>
       <span
         className="ch-tree-group-title"

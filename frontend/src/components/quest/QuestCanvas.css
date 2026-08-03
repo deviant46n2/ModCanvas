@@ -440,7 +440,8 @@
   max-width: 160px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: text;
 }
 
 /* Node handles — invisible, only exist for edge routing */
@@ -1261,32 +1262,6 @@
   border-color: var(--ftb-accent);
 }
 
-/* Advanced toggle */
-.quest-detail-toggle-btn {
-  margin-left: auto;
-  background: transparent;
-  border: 1px solid #3d3d44;
-  color: var(--ftb-text-dim);
-  font-size: 11px;
-  font-family: 'JetBrains Mono', monospace;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-
-.quest-detail-toggle-btn:hover {
-  color: var(--ftb-accent);
-  border-color: var(--ftb-accent);
-}
-
-.quest-detail-advanced {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px;
-  background: #1e1e22;
-  border: 1px solid #3d3d44;
-}
-
 /* Delete button */
 .quest-detail-delete-btn {
   background: transparent;
@@ -1643,4 +1618,453 @@
   font-size: 11px;
   opacity: 0.7;
   padding: 4px 9px;
+}
+
+/* Glyph-free icon fallbacks & compact controls */
+.ftb-quest-node-icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ftb-quest-node-icon-fallback svg {
+  width: 16px;
+  height: 16px;
+}
+
+.canvas-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-search-clear svg {
+  display: block;
+}
+
+/* Glyph-free canvas toolbar controls */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.align-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--ftb-border);
+  margin: 0 2px;
+}
+
+.cycle-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cycle-warning svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.connect-mode-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ftb-text-bright);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.connect-mode-close:hover {
+  background: var(--ftb-accent);
+  color: var(--ftb-bg);
+}
+
+.connect-mode-close svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.quest-deco-handle-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quest-deco-handle-delete svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+}
+
+/* ─── Quest detail: flat section nav ─────────────────────────────── */
+
+.quest-detail-nav {
+  position: sticky;
+  top: -12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  background: var(--ftb-surface, #12131a);
+}
+
+.quest-detail-nav-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #25252a;
+  border: 1px solid #3d3d44;
+  color: var(--ftb-text-dim);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.quest-detail-nav-chip:hover {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.quest-detail-nav-chip.active {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent-hover);
+  color: #fff;
+}
+
+.quest-detail-section-header[role="button"] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.quest-detail-section-header[role="button"]:hover {
+  color: var(--ftb-text-bright);
+}
+
+.quest-detail-section-title {
+  flex: 1;
+}
+
+.quest-detail-section-chevron {
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+}
+
+.quest-detail-section-action {
+  margin-left: auto;
+  display: flex;
+}
+
+.quest-detail-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Clickable quest header icon (opens the icon picker) */
+.quest-detail-icon-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+}
+
+.quest-detail-icon-btn img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.quest-detail-icon-btn:hover {
+  border-color: var(--ftb-accent);
+}
+
+.quest-detail-icon-badge {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 2px 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+.quest-detail-icon-btn:hover .quest-detail-icon-badge {
+  opacity: 1;
+}
+
+/* Task/reward card reorder buttons */
+.quest-detail-card-reorder {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.quest-detail-card-reorder-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6a6a72;
+  cursor: pointer;
+  padding: 1px 3px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.quest-detail-card-reorder-btn:hover:not(:disabled) {
+  color: var(--ftb-accent);
+  border-color: #3d3d44;
+}
+
+.quest-detail-card-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Inline quest title rename on the canvas */
+.ftb-quest-node-title-input {
+  width: calc(100% - 12px);
+  max-width: 160px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--ftb-text-bright);
+  background: #18181c;
+  border: 1px solid var(--ftb-accent);
+  outline: none;
+  padding: 1px 4px;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+}
+
+/* Pane context menu: task-type grid */
+.ctx-menu-grid-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid var(--border-muted, #333a45);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 12px;
+  color: var(--text-normal, #d7dce5);
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.ctx-menu-grid-toggle:hover {
+  background: var(--bg-hover, #262d38);
+}
+
+.ctx-menu-task-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ctx-menu-task-grid-item {
+  background: var(--bg-hover, #262d38);
+  border: 1px solid var(--border-muted, #333a45);
+  border-radius: 5px;
+  color: var(--text-normal, #d7dce5);
+  font-size: 11px;
+  padding: 6px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-menu-task-grid-item:hover {
+  background: var(--ftb-accent, #5b9bd5);
+  color: #fff;
+  border-color: var(--ftb-accent-hover);
+}
+
+/* Chapter tree: hover actions + inline rename */
+.ch-tree-chapter-actions {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.ch-tree-chapter:hover .ch-tree-chapter-actions {
+  opacity: 1;
+}
+
+.ch-tree-action-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  padding: 1px 2px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.ch-tree-action-btn:hover:not(:disabled) {
+  color: var(--ftb-accent);
+  border-color: var(--ftb-border);
+}
+
+.ch-tree-action-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.ch-tree-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--ftb-text);
+  background: var(--ftb-input-bg);
+  border: 1px solid var(--ftb-accent);
+  outline: none;
+  padding: 1px 4px;
+}
+
+/* Shortcuts & gestures cheat sheet */
+.quest-shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quest-shortcuts {
+  background: var(--ftb-surface, #12131a);
+  border: 2px solid var(--ftb-border);
+  border-radius: 8px;
+  width: 640px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.quest-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #222226;
+  border-bottom: 2px solid var(--ftb-accent);
+}
+
+.quest-shortcuts-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ftb-accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-shortcuts-close {
+  background: transparent;
+  border: none;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.quest-shortcuts-close:hover {
+  color: var(--ftb-text-bright);
+}
+
+.quest-shortcuts-body {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  overflow-y: auto;
+  flex-wrap: wrap;
+}
+
+.quest-shortcuts-col {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quest-shortcuts-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ftb-text-dim);
+  opacity: 0.7;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 2px;
+}
+
+.quest-shortcut-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.quest-shortcut-key {
+  flex-shrink: 0;
+  min-width: 130px;
+  background: #25252a;
+  border: 1px solid #3d3d44;
+  border-radius: 4px;
+  color: var(--ftb-text-bright);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  padding: 2px 6px;
+  text-align: center;
+}
+
+.quest-shortcut-label {
+  color: var(--ftb-text);
 }

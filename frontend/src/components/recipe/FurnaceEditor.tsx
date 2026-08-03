@@ -1,4 +1,5 @@
 import IngredientSlot from './IngredientSlot';
+import { ArrowRightIcon } from '../ui/icons'
 import { readSlot, writeSlot } from '../../core/recipe/specialized';
 import type { Recipe, RecipeIngredient } from '../../core/recipe/recipe-store';
 import type { RecipeIssue } from '../../core/recipe/validation';
@@ -28,7 +29,7 @@ export function FurnaceEditor({ recipe, onUpdateRecipe, getTextureUrl, issues = 
           onDrop={setInput}
           onChange={setInput}
         />
-        <span className="specialized-arrow">→</span>
+        <span className="specialized-arrow" aria-hidden="true"><ArrowRightIcon size={16} /></span>
         <div className={`output-section ${inputIssues ? 'has-issues' : ''}`}>
           <label className="specialized-output-label">Output</label>
           <div className="output-editor">

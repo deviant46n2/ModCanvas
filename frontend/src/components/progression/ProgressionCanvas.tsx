@@ -3,11 +3,14 @@ import type { NodeProps } from '@xyflow/react'
 import { ReactFlow, Controls, Background, MiniMap } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import type { ReactNode } from 'react'
+import { FlagIcon, LockOpenIcon, ZapIcon, TrophyIcon, PackageIcon } from '../ui/icons'
 
 function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const nodeType = (data.nodeType as string) || 'milestone'
-  const icons: Record<string, string> = {
-    milestone: '🎯', unlock: '🔓', phase: '⚡', achievement: '🏆', content: '📦',
+  const icons: Record<string, ReactNode> = {
+    milestone: <FlagIcon size={18} />, unlock: <LockOpenIcon size={18} />, phase: <ZapIcon size={18} />,
+    achievement: <TrophyIcon size={18} />, content: <PackageIcon size={18} />,
   }
   const modCount = ((data.mod_refs as string[]) || []).length
   const label = (data.label as string) || 'Node'
@@ -26,7 +29,7 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   return (
     <div className={`progression-node ${nodeType}-node ${selected ? 'selected' : ''}`} style={{ borderColor }}>
       <div className="node-header">
-        <div className="node-icon">{icons[nodeType] || '📦'}</div>
+        <div className="node-icon" style={{ color: borderColor }}>{icons[nodeType]}</div>
         <div className="node-title">
           <div className="node-label">{label}</div>
           {phase && <div className="node-subtitle">{phase}</div>}

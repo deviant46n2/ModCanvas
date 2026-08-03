@@ -1,3 +1,5 @@
+import { RefreshIcon } from '../ui/icons'
+
 export interface QuestTileFooterProps {
   canBeRepeatable: boolean
   silentlyComplete: boolean
@@ -13,7 +15,7 @@ export function QuestTileFooter({
 
   return (
     <div className="quest-tile-repeatable" title="Repeatable">
-      🔄 {silentlyComplete ? 'Silent' : `${repeatCooldown}s`}
+      <RefreshIcon size={12} /> {silentlyComplete ? 'Silent' : `${repeatCooldown}s`}
     </div>
   )
 }

@@ -1015,3 +1015,45 @@
   color: var(--color-accent);
   background: var(--color-accent-subtle);
 }
+/* Glyph-free controls (inline SVG replaces text glyphs) */
+.palette-item-icon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-tertiary);
+}
+
+.ingredient-slot-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ingredient-slot-clear svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.recipe-field-issue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recipe-field-issue svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.specialized-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+}
+
+.specialized-arrow svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}

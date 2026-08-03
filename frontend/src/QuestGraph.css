@@ -2085,3 +2085,56 @@
   font-family: var(--font-ui);
   flex-shrink: 0;
 }
+
+/* Glyph-free state badges (colored dots replace emoji) */
+.node-vis-badge {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  font-size: 0;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+
+.vis-state-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary, #7f849c);
+}
+
+.vis-state-dot[data-vis="NeverVisible"] { background: #f38ba8; }
+.vis-state-dot[data-vis="AlwaysVisible"] { background: #a6e3a1; }
+.vis-state-dot[data-vis="WhenDependenciesComplete"] { background: #f9e2af; }
+.vis-state-dot[data-vis="WhenQuestComplete"] { background: #89b4fa; }
+.vis-state-dot[data-vis="WhenAllComplete"] { background: #cba6f7; }
+
+.node-optional-badge {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  font-size: 0;
+  border-radius: 50%;
+  background: rgba(180, 195, 220, 0.5);
+}
+
+.quest-tile-optional-badge {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(180, 195, 220, 0.5);
+}
+
+.quest-tile-repeatable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quest-tile-repeatable svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}

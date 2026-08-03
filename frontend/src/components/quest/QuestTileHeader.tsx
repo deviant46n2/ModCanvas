@@ -1,11 +1,12 @@
 import React from 'react'
+import type { ReactNode } from 'react'
 import type { QuestTileData } from './QuestTileTypes'
 
 export interface QuestTileHeaderProps {
   data: QuestTileData
   editingField: string | null
   editValue: string
-  visIcon: string
+  visIcon: ReactNode
   inputRef: React.RefObject<HTMLInputElement | null>
   onEditValueChange: (value: string) => void
   onStartEdit: (field: string, value: string) => void

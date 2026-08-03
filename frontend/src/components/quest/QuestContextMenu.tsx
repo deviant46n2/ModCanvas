@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { ChevronDownIcon, ChevronRightIcon } from '../ui/icons'
 
 export interface QuestCtxMenuState {
   x: number
@@ -15,6 +16,7 @@ interface QuestContextMenuProps {
   hasClipboard: boolean
   onClose: () => void
   onEdit: (nodeId: string) => void
+  onRename: (nodeId: string) => void
   onDuplicate: () => void
   onCopyId: () => void
   onDelete: () => void
@@ -58,6 +60,7 @@ export function QuestContextMenu({
   hasClipboard,
   onClose,
   onEdit,
+  onRename,
   onDuplicate,
   onCopyId,
   onDelete,
@@ -70,6 +73,7 @@ export function QuestContextMenu({
   objectiveTypes,
 }: QuestContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const [showTaskGrid, setShowTaskGrid] = useState(false)
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -93,14 +97,15 @@ export function QuestContextMenu({
       {menu.mode === 'node' ? (
         <>
           {selectedCount > 1 && <Group>Editing {selectedCount} quests</Group>}
-          {menu.nodeId && <Item label="✏️ Edit Quest" onClick={doAndClose(() => onEdit(menu.nodeId!))} />}
+          {menu.nodeId && <Item label="Edit Quest" onClick={doAndClose(() => onEdit(menu.nodeId!))} />}
+          {menu.nodeId && <Item label="Rename" onClick={doAndClose(() => onRename(menu.nodeId!))} />}
           <Item label="Duplicate" onClick={doAndClose(onDuplicate)} />
           <Item label="Copy Quest ID" onClick={doAndClose(onCopyId)} />
           <Divider />
           {simMode && (
             <>
-              <Item label="✓ Complete Selected" onClick={doAndClose(onComplete)} />
-              <Item label="↺ Reset Selected" onClick={doAndClose(onReset)} />
+              <Item label="Complete Selected" onClick={doAndClose(onComplete)} />
+              <Item label="Reset Selected" onClick={doAndClose(onReset)} />
               <Divider />
             </>
           )}
@@ -108,15 +113,34 @@ export function QuestContextMenu({
         </>
       ) : (
         <>
-          <Item label="➕ Add Quest" onClick={doAndClose(onAddQuest)} />
-          <Item label="🔗 Add Quest Link" onClick={doAndClose(onAddLink)} />
+          <Item label="Add Quest" onClick={doAndClose(onAddQuest)} />
+          <Item label="Add Quest Link" onClick={doAndClose(onAddLink)} />
           <Divider />
           <Group>New Quest with Task</Group>
-          {objectiveTypes.map(t => (
-            <Item key={t.value} label={t.label} onClick={doAndClose(() => onAddQuestWithTask(t.value))} />
-          ))}
+          <button
+            className="ctx-menu-grid-toggle"
+            onClick={() => setShowTaskGrid(g => !g)}
+            aria-expanded={showTaskGrid}
+          >
+            {showTaskGrid ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
+            <span>{showTaskGrid ? 'Hide task types' : 'Choose task type'}</span>
+          </button>
+          {showTaskGrid && (
+            <div className="ctx-menu-task-grid">
+              {objectiveTypes.map(t => (
+                <button
+                  key={t.value}
+                  className="ctx-menu-task-grid-item"
+                  onClick={doAndClose(() => onAddQuestWithTask(t.value))}
+                  title={t.label}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <Divider />
-          <Item label="📋 Paste Quest" onClick={doAndClose(onPaste)} disabled={!hasClipboard} />
+          <Item label="Paste Quest" onClick={doAndClose(onPaste)} disabled={!hasClipboard} />
         </>
       )}
     </div>

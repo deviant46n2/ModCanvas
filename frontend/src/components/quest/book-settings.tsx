@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
 import { scanModJarTextures } from '../../services/api'
 import { SHAPES, PROGRESSION_MODES } from './quest-helpers'
@@ -43,7 +44,7 @@ export function BookSettings({
           <div className="ftb-popup-header-left">
             <div className="ftb-popup-title">Book Settings</div>
           </div>
-          <button className="ftb-popup-close" onClick={onClose}>✕</button>
+          <button className="ftb-popup-close" onClick={onClose} aria-label="Close"><XIcon size={14} /></button>
         </div>
         <div className="ftb-popup-body">
           <div className="ftb-popup-section">
@@ -131,7 +132,7 @@ export function BookSettings({
                 }}>Load Textures</button>
               </div>
               <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                🖼 {Object.keys(textureIndex).length} textures loaded
+                {Object.keys(textureIndex).length} textures loaded
               </div>
             </div>
           </div>

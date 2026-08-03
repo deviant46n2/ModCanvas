@@ -1,4 +1,5 @@
 import React from 'react'
+import { SearchIcon, CheckIcon, XIcon, TrashIcon } from '../../components/ui/icons'
 import type { QuestObjectiveData, QuestTileData } from './QuestTileTypes'
 import { getIconUrl, getObjectiveIcon, getFallbackIcon, resolveIconKey } from './QuestTileTypes'
 import { isTexturePending } from '../../services/texture-loader'
@@ -64,7 +65,7 @@ export function ObjectiveRow({
             onClick={(e) => { e.stopPropagation(); data.onOpenIconPicker?.('objective', idx) }}
             title="Pick item icon"
           >
-            🔍
+            <SearchIcon size={12} />
           </button>
         )}
       </div>
@@ -131,13 +132,13 @@ export function ObjectiveRow({
       <div className="quest-tile-objective-actions">
         {editObjectiveIdx === idx ? (
           <>
-            <button className="quest-tile-btn save" onClick={onSaveEdit} title="Save">✓</button>
-            <button className="quest-tile-btn cancel" onClick={onCancelEdit} title="Cancel">✕</button>
+            <button className="quest-tile-btn save" onClick={onSaveEdit} title="Save"><CheckIcon size={12} /></button>
+            <button className="quest-tile-btn cancel" onClick={onCancelEdit} title="Cancel"><XIcon size={12} /></button>
           </>
         ) : (
-          <button className="quest-tile-btn delete" onClick={() => data.onRemoveObjective?.(data.id, obj.id)} title="Remove">🗑</button>
+          <button className="quest-tile-btn delete" onClick={() => data.onRemoveObjective?.(data.id, obj.id)} title="Remove"><TrashIcon size={12} /></button>
         )}
-        {!obj.required && <span className="quest-tile-optional-badge" title="Optional">○</span>}
+        {!obj.required && <span className="quest-tile-optional-badge" title="Optional" />}
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { XIcon } from '../ui/icons'
 import type { RecipeIngredient } from '../../core/recipe/recipe-store';
 import { recipeIngredientFromPayload, SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
 
@@ -94,8 +95,9 @@ export function IngredientSlot({
               className="ingredient-slot-clear"
               onClick={(e) => { e.stopPropagation(); onDrop(null); onChange(null); }}
               title={`Clear ${label}`}
+              aria-label={`Clear ${label}`}
             >
-              ×
+              <XIcon size={12} />
             </button>
           )}
         </>

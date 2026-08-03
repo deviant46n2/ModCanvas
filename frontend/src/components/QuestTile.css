@@ -617,3 +617,36 @@
   font-size: 11px;
   text-align: center;
 }
+/* Glyph-free icon buttons (inline SVG) */
+.quest-tile-btn svg,
+.quest-tile-icon-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.quest-tile-visibility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+}
+
+.quest-tile-team-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: rgba(180, 195, 220, 0.75);
+}
+
+.quest-tile-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quest-tile-fallback svg {
+  display: block;
+}

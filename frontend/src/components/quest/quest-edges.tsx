@@ -191,7 +191,7 @@ export function DependencyEdge({
           {label}
         </text>
       ) : null}
-      <title>{isCycle ? '⚠ Circular dependency detected!' : `${source} → ${target}`}</title>
+      <title>{isCycle ? 'Circular dependency detected!' : `${source} → ${target}`}</title>
     </g>
   );
 }

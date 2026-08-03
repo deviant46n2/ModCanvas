@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import type { QuestTileData, QuestObjectiveData, QuestRewardData } from './quest/QuestTileTypes'
 import { resolveIconKey, getIconUrl } from './quest/QuestTileTypes'
@@ -6,6 +7,7 @@ import QuestTileHeader from './quest/QuestTileHeader'
 import QuestTileBody from './quest/QuestTileBody'
 import QuestTileFooter from './quest/QuestTileFooter'
 import { QuestIcon } from './quest/QuestIcon'
+import { BookIcon, LockIcon, PackageIcon, FileTextIcon } from './ui/icons'
 import { isTexturePending } from '../services/texture-loader'
 
 export type { QuestTileData, QuestObjectiveData, QuestRewardData }
@@ -49,20 +51,18 @@ export function QuestTileComponent({
     nodeType === 'side_quest' ? '#a78bfa' : '#94a3b8'
   )
 
-  const fallbackIcon = nodeType === 'chapter' ? '📖' :
-    nodeType === 'gate' ? '🔒' :
-    nodeType === 'reward' ? '🎁' :
-    nodeType === 'side_quest' ? '📋' : '📜'
+  const fallbackIcon: ReactNode = nodeType === 'chapter' ? <BookIcon size={18} /> :
+    nodeType === 'gate' ? <LockIcon size={18} /> :
+    nodeType === 'reward' ? <PackageIcon size={18} /> :
+    nodeType === 'side_quest' ? <FileTextIcon size={18} /> : <BookIcon size={18} />
 
   const iconKey = resolveIconKey(icon)
   const questIconUrl = iconDataUrl || getIconUrl(textureIndex, iconKey) || null
   const iconPending = isTexturePending(textureIndex, iconKey)
 
-  const visIcon = visibility === 'NeverVisible' ? '👻' :
-    visibility === 'AlwaysVisible' ? '👁️' :
-    visibility === 'WhenDependenciesComplete' ? '🔐' :
-    visibility === 'WhenQuestComplete' ? '✅' :
-    visibility === 'WhenAllComplete' ? '🏁' : ''
+  const visIcon: ReactNode = visibility === 'Normal' ? null : (
+    <span className="vis-state-dot" data-vis={visibility} title={`Visibility: ${visibility}`} aria-label={`Visibility: ${visibility}`} />
+  )
 
   const saveEdit = useCallback(() => {
     if (editingField && onUpdateNode) {
@@ -100,7 +100,7 @@ export function QuestTileComponent({
         onDoubleClick={toggleExpanded}
       >
         {visIcon && <div className="node-vis-badge" title={visibility}>{visIcon}</div>}
-        {optional && <div className="node-optional-badge">○</div>}
+        {optional && <div className="node-optional-badge" aria-label="Optional" />}
         <div className="node-icon-large" style={{ width: iconSize, height: iconSize }}>
           <QuestIcon
             url={questIconUrl}

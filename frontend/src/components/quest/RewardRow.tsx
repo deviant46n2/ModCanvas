@@ -1,4 +1,5 @@
 import React from 'react'
+import { SearchIcon, CheckIcon, XIcon, TrashIcon } from '../../components/ui/icons'
 import type { QuestRewardData, QuestTileData } from './QuestTileTypes'
 import { getIconUrl, getRewardIcon, getFallbackIcon, resolveIconKey } from './QuestTileTypes'
 import { isTexturePending } from '../../services/texture-loader'
@@ -63,7 +64,7 @@ export function RewardRow({
             onClick={(e) => { e.stopPropagation(); data.onOpenIconPicker?.('reward', idx) }}
             title="Pick item icon"
           >
-            🔍
+            <SearchIcon size={12} />
           </button>
         )}
       </div>
@@ -118,13 +119,13 @@ export function RewardRow({
       <div className="quest-tile-reward-actions">
         {editRewardIdx === idx ? (
           <>
-            <button className="quest-tile-btn save" onClick={onSaveEdit} title="Save">✓</button>
-            <button className="quest-tile-btn cancel" onClick={onCancelEdit} title="Cancel">✕</button>
+            <button className="quest-tile-btn save" onClick={onSaveEdit} title="Save"><CheckIcon size={12} /></button>
+            <button className="quest-tile-btn cancel" onClick={onCancelEdit} title="Cancel"><XIcon size={12} /></button>
           </>
         ) : (
-          <button className="quest-tile-btn delete" onClick={() => data.onRemoveReward?.(data.id, rew.id)} title="Remove">🗑</button>
+          <button className="quest-tile-btn delete" onClick={() => data.onRemoveReward?.(data.id, rew.id)} title="Remove"><TrashIcon size={12} /></button>
         )}
-        {rew.team_reward && <span className="quest-tile-team-badge" title="Team Reward">👥</span>}
+        {rew.team_reward && <span className="quest-tile-team-badge" title="Team Reward">Team</span>}
       </div>
     </div>
   )

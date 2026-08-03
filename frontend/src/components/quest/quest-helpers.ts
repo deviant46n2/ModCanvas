@@ -119,3 +119,14 @@ export function defaultQuestNodeData(overrides?: Partial<QuestNodeData>): QuestN
     ...overrides,
   }
 }
+
+// Reorder a list item by moving it one position. Pure helper shared by the
+// task/reward reorder buttons; returns the original array when the move is a
+// no-op (out of range or same position) so callers can skip the commit.
+export function moveArrayItem<T>(list: T[], from: number, to: number): T[] {
+  if (from < 0 || from >= list.length || to < 0 || to >= list.length || from === to) return list
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}

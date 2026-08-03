@@ -6,7 +6,6 @@ interface TopBarProps {
   modLoader: string
   packVersion: string
   wsStatus: WsConnectionStatus
-  onRefreshWsStatus: () => void
   onRestartWebSocket: () => void
   deployCompanionMessage: string
   isTesting: boolean
@@ -26,7 +25,6 @@ export function TopBar({
   modLoader,
   packVersion,
   wsStatus,
-  onRefreshWsStatus,
   onRestartWebSocket,
   deployCompanionMessage,
   isTesting,
@@ -50,22 +48,15 @@ export function TopBar({
           className={`ws-status ${wsStatus.connected ? 'connected' : 'disconnected'}`}
           title={`WebSocket: ${wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'} \u2022 Port: ${wsStatus.port} \u2022 Clients: ${wsStatus.client_count}`}
         >
-          {wsStatus.connected ? '\uD83D\uDFE2' : '\u26AA'}
+          <span className={`status-dot ${wsStatus.connected ? 'running' : 'stopped'}`} />
           <span>{wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'}</span>
         </span>
         <button
-          className="ws-action-btn"
-          onClick={onRefreshWsStatus}
-          title="Check connection status"
-        >
-          {'\u21BB'}
-        </button>
-        <button
-          className="ws-action-btn"
+          className="ws-restart-btn"
           onClick={onRestartWebSocket}
           title="Restart WebSocket &amp; refresh status"
         >
-          {'\uD83D\uDD0C'}
+          Restart Server
         </button>
       </div>
       <div className="instance-actions">
@@ -90,7 +81,7 @@ export function TopBar({
       </div>
       {deployCompanionMessage && (
         <div className="deploy-companion-message" style={{ marginTop: 8, fontSize: 13, color: deployCompanionMessage.startsWith('\u2717') ? '#e74c3c' : '#27ae60' }}>
-          {deployCompanionMessage}
+          {deployCompanionMessage.replace(/^[\u2713\u2714\u2717\u2718]\s*/, '')}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { CheckIcon, XIcon, WarnIcon, InfoIcon } from './icons'
 import './Toast.css'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -88,10 +89,10 @@ function ToastItem({ toast, removeToast }: { toast: Toast; removeToast: (id: str
   }, [toast.id, toast.duration, removeToast]);
 
   const icons = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
+    success: <CheckIcon size={14} />,
+    error: <XIcon size={14} />,
+    warning: <WarnIcon size={14} />,
+    info: <InfoIcon size={14} />,
   } as const;
 
   return (
@@ -107,7 +108,7 @@ function ToastItem({ toast, removeToast }: { toast: Toast; removeToast: (id: str
         </button>
       )}
       <button className="toast-close" onClick={() => removeToast(toast.id)} aria-label="Dismiss">
-        ×
+        <XIcon size={12} />
       </button>
     </div>
   );

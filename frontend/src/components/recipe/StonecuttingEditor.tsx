@@ -1,4 +1,5 @@
 import IngredientSlot from './IngredientSlot';
+import { ArrowRightIcon } from '../ui/icons'
 import { readSlot, writeSlot } from '../../core/recipe/specialized';
 import type { Recipe, RecipeIngredient } from '../../core/recipe/recipe-store';
 
@@ -25,7 +26,7 @@ export function StonecuttingEditor({ recipe, onUpdateRecipe, getTextureUrl }: St
           onDrop={setInput}
           onChange={setInput}
         />
-        <span className="specialized-arrow">→</span>
+        <span className="specialized-arrow" aria-hidden="true"><ArrowRightIcon size={16} /></span>
         <div className="output-section">
           <label className="specialized-output-label">Output</label>
           <div className="output-editor">

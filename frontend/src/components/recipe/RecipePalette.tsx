@@ -1,4 +1,5 @@
 import type { SearchResult, TagInfo } from '../../services/api';
+import { PackageIcon, TagIcon } from '../ui/icons'
 import { SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
 
 interface RecipePaletteProps {
@@ -45,7 +46,7 @@ export function RecipePalette({
                 {getTextureUrl(item.id) ? (
                   <img src={getTextureUrl(item.id)!} alt={item.name} />
                 ) : (
-                  <span>📦</span>
+                  <PackageIcon size={16} />
                 )}
               </div>
               <div className="palette-item-info">
@@ -65,7 +66,7 @@ export function RecipePalette({
           tagResults.map(tag => (
             <div key={tag.id} className="palette-item tag-item" draggable
               onDragStart={(e) => setDragPayload(e, { item: `#${tag.id}`, name: tag.name, tag: true })}>
-              <div className="palette-item-icon">🏷️</div>
+              <div className="palette-item-icon"><TagIcon size={16} /></div>
               <div className="palette-item-info">
                 <span className="palette-item-name">{tag.name}</span>
                 <span className="palette-item-id">{tag.id}</span>

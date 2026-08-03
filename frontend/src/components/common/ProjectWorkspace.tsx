@@ -28,7 +28,6 @@ export interface ProjectWorkspaceProps {
   wsStatus: WsConnectionStatus
   activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes'
   onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes') => void
-  onRefreshWsStatus: () => void
   onRestartWebSocket: () => void
   deployCompanionMessage: string
   isTesting: boolean
@@ -81,7 +80,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         modLoader={project.mod_loader}
         packVersion={project.pack_version}
         wsStatus={props.wsStatus}
-        onRefreshWsStatus={props.onRefreshWsStatus}
         onRestartWebSocket={props.onRestartWebSocket}
         deployCompanionMessage={props.deployCompanionMessage}
         isTesting={props.isTesting}

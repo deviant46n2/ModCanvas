@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChapterImage } from '../../services/api';
 import { resolveAssetUrl } from '../../services/asset-resolver';
 import { chapterImageRect } from './decoration-picker';
-import { AnimatedSprite } from './AnimatedSprite';
+import { AnimatedSprite } from './AnimatedSprite'
+import { XIcon } from '../ui/icons';
 
 interface ChapterDecorationsCanvasProps {
   images: ChapterImage[];
@@ -183,7 +184,7 @@ export function ChapterDecorationsCanvas({
                       onSelect(null);
                     }}
                   >
-                    ×
+                    <XIcon size={10} />
                   </span>
                 </>
               )}

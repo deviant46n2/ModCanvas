@@ -251,3 +251,16 @@
   stroke: var(--color-border-default);
   stroke-width: 2;
 }
+
+/* Glyph-free node type icons */
+.node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}

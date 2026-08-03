@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ArrowDownIcon, ArrowUpIcon, BookIcon, XIcon } from '../ui/icons'
 import type { QuestChapter, QuestChapterGroup } from '../../services/api'
 import { questIconUrl, resolveIconKey } from './questIcons'
 import { AnimatedSprite } from './AnimatedSprite'
@@ -50,7 +51,7 @@ export function ChapterSettings({
           <div className="ftb-popup-header-left">
             <div className="ftb-popup-title">Chapter Settings</div>
           </div>
-          <button className="ftb-popup-close" onClick={onClose}>✕</button>
+          <button className="ftb-popup-close" onClick={onClose} aria-label="Close"><XIcon size={14} /></button>
         </div>
         <div className="ftb-popup-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <div className="ftb-popup-section">
@@ -76,7 +77,7 @@ export function ChapterSettings({
                   {iconUrl ? (
                     <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(chapter.icon)} width={24} height={24} alt="" />
                   ) : (
-                    <span style={{ fontSize: 12 }}>📖</span>
+                    <BookIcon size={16} />
                   )}
                 </div>
                 <button className="ftb-popup-btn" onClick={onPickIcon}>Change Icon</button>
@@ -175,8 +176,8 @@ export function ChapterSettings({
             <button className="ftb-popup-btn danger" onClick={onDelete}>Delete Chapter</button>
           </div>
           <div className="ftb-popup-footer-right">
-            <button className="ftb-popup-btn" onClick={() => onMove(-1)} title="Move chapter up">↑ Move Up</button>
-            <button className="ftb-popup-btn" onClick={() => onMove(1)} title="Move chapter down">↓ Move Down</button>
+            <button className="ftb-popup-btn" onClick={() => onMove(-1)} title="Move chapter up"><ArrowUpIcon size={12} /> Move Up</button>
+            <button className="ftb-popup-btn" onClick={() => onMove(1)} title="Move chapter down"><ArrowDownIcon size={12} /> Move Down</button>
             <button className="ftb-popup-btn" onClick={onClose}>Close</button>
           </div>
         </div>

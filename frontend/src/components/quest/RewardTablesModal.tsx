@@ -5,6 +5,7 @@ import { isTexturePending } from '../../services/texture-loader'
 import { AnimatedSprite } from './AnimatedSprite'
 import { SmartFilterIcon } from './SmartFilterIcon'
 import { getFallbackIcon } from './QuestTileTypes'
+import { ArrowDownIcon, ArrowUpIcon, XIcon } from '../ui/icons'
 import { generateFtbHexId, defaultReward } from './quest-helpers'
 
 interface RewardTablesModalProps {
@@ -121,7 +122,7 @@ export function RewardTablesModal({
           <div className="ftb-popup-header-left">
             <div className="ftb-popup-title">Reward Tables</div>
           </div>
-          <button className="ftb-popup-close" onClick={onClose}>✕</button>
+          <button className="ftb-popup-close" onClick={onClose} aria-label="Close"><XIcon size={14} /></button>
         </div>
         <div className="ftb-popup-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <div className="ftb-popup-field" style={{ marginBottom: 8 }}>
@@ -190,14 +191,14 @@ export function RewardTablesModal({
                   return (
                     <div key={r.id} className="ftb-popup-field" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 0' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <button className="ftb-popup-btn" style={{ padding: '1px 6px' }} onClick={() => moveEntry(selected.id, r.id, -1)} disabled={idx === 0} title="Move up">↑</button>
-                        <button className="ftb-popup-btn" style={{ padding: '1px 6px' }} onClick={() => moveEntry(selected.id, r.id, 1)} disabled={idx === (selected.rewards || []).length - 1} title="Move down">↓</button>
+                        <button className="ftb-popup-btn" style={{ padding: '1px 6px' }} onClick={() => moveEntry(selected.id, r.id, -1)} disabled={idx === 0} title="Move up"><ArrowUpIcon size={12} /></button>
+                        <button className="ftb-popup-btn" style={{ padding: '1px 6px' }} onClick={() => moveEntry(selected.id, r.id, 1)} disabled={idx === (selected.rewards || []).length - 1} title="Move down"><ArrowDownIcon size={12} /></button>
                       </div>
                       <div style={{ width: 24, height: 24, flexShrink: 0, background: 'var(--ftb-input-bg)', border: '1px solid var(--ftb-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', imageRendering: 'pixelated' }}>
                         {r.smart_filter ? (
                           <SmartFilterIcon dsl={r.smart_filter} textureIndex={textureIndex} fallback={getFallbackIcon('item')} size={18} />
                         ) : iconUrl ? <AnimatedSprite url={iconUrl} textureKey={resolveIconKey(r.item_id || r.items[0] || '')} width={18} height={18} alt="" /> : pending ? (
-                          <span style={{ fontSize: 10 }}>⌛</span>
+                          <span style={{ fontSize: 10 }}>…</span>
                         ) : (
                           <span style={{ fontSize: 12 }}>{getFallbackIcon('item')}</span>
                         )}
@@ -224,7 +225,7 @@ export function RewardTablesModal({
                         value={r.weight}
                         onChange={(e) => updateEntry(selected.id, r.id, 'weight', parseFloat(e.target.value) || 0)}
                       />
-                      <button className="ftb-popup-btn danger" style={{ padding: '1px 8px' }} onClick={() => removeEntry(selected.id, r.id)} title="Remove entry">✕</button>
+                      <button className="ftb-popup-btn danger" style={{ padding: '1px 8px' }} onClick={() => removeEntry(selected.id, r.id)} title="Remove entry"><XIcon size={12} /></button>
                     </div>
                   )
                 })}

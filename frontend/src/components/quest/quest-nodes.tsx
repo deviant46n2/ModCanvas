@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
+import { BookIcon, CheckIcon } from '../ui/icons'
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { useMcTheme } from '../theme/theme-context';
@@ -47,6 +48,12 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const iconSize = Math.max(8, Math.round(shapeSize * (2 / 3) * iconScale));
   const [imgError, setImgError] = useState(false);
   const [tileUrl, setTileUrl] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const onRename = d.onRename as ((label: string) => void) | undefined;
+  const renameNonce = (d.renameNonce as number) || 0;
+  const nonceRef = useRef(0);
   const { applyQuestNodeBorder, getItemIconStyle, isLoaded } = useMcTheme();
 
   const prevIconUrlRef = useRef(iconUrl);
@@ -56,6 +63,30 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
       prevIconUrlRef.current = iconUrl;
     }
   }, [iconUrl]);
+
+  const startRename = () => {
+    if (!onRename) return;
+    setRenameDraft(label);
+    setRenaming(true);
+    requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    });
+  };
+  const commitRename = () => {
+    if (!renaming) return;
+    setRenaming(false);
+    const value = renameDraft.trim();
+    if (value && value !== label) onRename?.(value);
+  };
+  const cancelRename = () => setRenaming(false);
+
+  useEffect(() => {
+    if (renameNonce > 0 && renameNonce !== nonceRef.current) {
+      nonceRef.current = renameNonce;
+      startRename();
+    }
+  }, [renameNonce]);
 
   // Bake the whole shape tile (grey fill + tinted/white outline) into a single
   // square data URL at the display size, so no CSS stretching / scaling can
@@ -139,7 +170,7 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
             {iconUrl && !imgError ? (
               <AnimatedSprite url={iconUrl} textureKey={hasIcon} width={iconSize} height={iconSize} alt="" className="ftb-quest-node-icon-img" onError={() => setImgError(true)} />
             ) : (
-              <span className="ftb-quest-node-icon-fallback">📜</span>
+              <span className="ftb-quest-node-icon-fallback" title="Quest has no icon"><BookIcon size={16} /></span>
             )}
           </div>
         )}
@@ -155,11 +186,34 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
           </div>
         )}
       </div>
-      <div className="ftb-quest-node-title">{label}</div>
-      {isLink && <div className="ftb-quest-link-badge" title={linkTarget ? `Links to quest ${linkTarget}` : 'Unlinked quest reference'}>🔗{linkTarget ? '' : '?'}</div>}
-      {isSimHidden && <div className="ftb-quest-sim-badge ftb-quest-sim-hidden" title="Hidden by visibility rules">👁 Hidden</div>}
-      {isSimLocked && <div className="ftb-quest-sim-badge ftb-quest-sim-locked" title="Requires missing dependencies">🔒 Locked</div>}
-      {simComplete && <div className="ftb-quest-sim-badge ftb-quest-sim-done" title="Completed (simulated)">✓</div>}
+      {renaming ? (
+        <input
+          ref={renameInputRef}
+          className="ftb-quest-node-title-input"
+          value={renameDraft}
+          onChange={(e) => setRenameDraft(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitRename();
+            else if (e.key === 'Escape') cancelRename();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <div
+          className="ftb-quest-node-title"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => { e.stopPropagation(); startRename(); }}
+          title={onRename ? 'Double-click to rename' : undefined}
+        >
+          {label}
+        </div>
+      )}
+      {isLink && <div className="ftb-quest-link-badge" title={linkTarget ? `Links to quest ${linkTarget}` : 'Unlinked quest reference'}>{linkTarget ? `Link ${linkTarget}` : 'Link'}</div>}
+      {isSimHidden && <div className="ftb-quest-sim-badge ftb-quest-sim-hidden" title="Hidden by visibility rules">Hidden</div>}
+      {isSimLocked && <div className="ftb-quest-sim-badge ftb-quest-sim-locked" title="Requires missing dependencies">Locked</div>}
+      {simComplete && <div className="ftb-quest-sim-badge ftb-quest-sim-done" title="Completed (simulated)"><CheckIcon size={10} /></div>}
       <Handle type="source" position={Position.Bottom} className="ftb-node-handle" id="sb" />
       <Handle type="source" position={Position.Right} className="ftb-node-handle" id="sr" />
       <Handle type="source" position={Position.Left} className="ftb-node-handle" id="sl" />

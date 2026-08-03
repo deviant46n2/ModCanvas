@@ -69,7 +69,7 @@ Cycle detection (`detectCycles`) flags any edge that is part of a strongly-conne
 
 ## Creating Edges
 
-1. Toggle **🔗 Connect** in the canvas toolbar. A banner appears and quest nodes expose blue connection ports (React Flow v12 renders source handles with a bare `source` class — the connect-mode CSS targets `.react-flow__handle.source`).
+1. Toggle **Connect** in the canvas toolbar. A banner appears and quest nodes expose blue connection ports (React Flow v12 renders source handles with a bare `source` class — the connect-mode CSS targets `.react-flow__handle.source`).
 2. Drag from a port on the prerequisite quest to the quest that depends on it.
 
 Only the **source** ports are interactive in connect mode. Because React Flow is in loose connection mode, grabbing a *target* port would invert the dependency direction; hiding them makes **drag-from-A-to-B always produce "A → B"** (A required before B).
@@ -310,7 +310,8 @@ Chapter-level settings mirror the in-game chapter editor:
   `hide_quest_until_deps_complete`, `hide_text_until_complete`,
   `default_repeatable_quest`, `require_sequential_tasks`, `autofocus_id`).
 - `frontend/src/components/quest/ChapterSettings.tsx` — modal opened by
-  double-clicking a chapter in `ChapterTree.tsx` (or via `onEditChapter`).
+  double-clicking a chapter row in `ChapterTree.tsx` (or via the hover gear
+  button, or `onEditChapter`).
 - `frontend/src/QuestBookEditor.tsx` — `onUpdateChapter` / `onDeleteChapter` /
   `onMoveChapter` (reorders `order_index`), wired to the modal.
 - `src-tauri/src/quest/types.rs` — `QuestChapter` carries all the fields above.
@@ -384,8 +385,8 @@ ModCanvas stores them as quest nodes with
 - `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes
   `linked_quest` (plus position/title/size) for link nodes in both subdirs and
   flat-chapters layouts; link nodes are included in the per-chapter quest map.
-- `frontend/src/components/quest/QuestCanvas.tsx` — "🔗 Add Link" button on the
-  canvas; link nodes render with a dashed shape and 🔗 badge
+- `frontend/src/components/quest/QuestCanvas.tsx` — the **Add Link** button on the
+  canvas; link nodes render with a dashed shape and a text link badge
   (`quest-nodes.tsx`).
 - `frontend/src/components/quest/QuestDetailModal.tsx` — the "Quest Link"
   section lets you pick the target quest from a dropdown covering every quest
@@ -395,10 +396,13 @@ ModCanvas stores them as quest nodes with
 
 ## Per-quest advanced fields
 
-The per-quest Advanced section in the live `QuestDetailModal.tsx` exposes the
+The per-quest advanced settings in the live `QuestDetailModal.tsx` expose the
 remaining per-quest settings that were previously model-only (and only surfaced
 in the dead `inspector.tsx` legacy stack — that inspector is not
-imported/bundled):
+imported/bundled). They are grouped into four individually-collapsible
+sections — **Appearance**, **Visibility**, **Dependencies**, **Misc** — reachable
+in one click from the sticky nav chips at the top of the modal body
+(`quest-detail-sections.tsx` / `quest-section-groups.tsx`):
 
 - **Repeat cooldown** — FTB-canonical `repeat_cooldown` (plain seconds cooldown)
   + `can_repeat` tristate. Export emits `can_repeat: 1b` and
@@ -414,7 +418,7 @@ imported/bundled):
   `all_completed`), from `DEPENDENCY_REQUIREMENTS` in `quest-form-constants.ts`.
 - **Min required dependencies** — `addInt("min_required_dependencies")` (0 = none).
 - **Hide lock icon / repeat cooldown / guide page / max dependents** shown in
-  the Advanced section of `QuestDetailModal.tsx`, behind the "Advanced ▸" toggle.
+  the Visibility / Misc sections of `QuestDetailModal.tsx`.
 
 - `src-tauri/src/quest/types.rs` — `QuestNode` carries `repeat_cooldown`,
   `hide_lock_icon`, `guide_page`, `max_completable_dependents`,
@@ -427,18 +431,39 @@ imported/bundled):
 - `frontend/src/services/quest-types.ts` — `QuestNodeData` carries all six
   fields; the legacy `repeat_time` / `repeat_min_delay` / `repeat_max_delay`
   keys were removed from the frontend model.
-- `frontend/src/components/quest/QuestDetailModal.tsx` — Advanced section
-  inputs for repeat cooldown (s), Hide Lock Icon checkbox, Guide Page,
+- `frontend/src/components/quest/quest-section-groups.tsx` — grouped section
+  inputs: repeat cooldown (s), Hide Lock Icon checkbox, Guide Page,
   Dependency Requirement select, Min Required Deps, Max Completable Dependents.
-- `frontend/src/components/quest/QuestTileFooter.tsx` — repeatable tiles show
-  `🔄 <cooldown>s`.
+- `frontend/src/components/quest/QuestTileFooter.tsx` — repeatable tiles show a
+  refresh icon (inline SVG) + `<cooldown>s`.
 - Round-trip covered by
   `per_quest_repeat_and_visibility_fields_roundtrip` and
   `repeat_fields_export_uses_ftb_canonical_keys` in `export_tests.rs`.
 
+## Editor toolbar
+
+`import-export.tsx` (presentation) + `quest-toolbar-actions.ts` (save / import
+side effects) render the editor's top toolbar — all controls are text or inline
+SVG labels, no emoji:
+
+- **Textures** — scan mod jar / KubeJS textures into the index.
+- **Re-Index** — force a full texture re-index and quest re-import.
+- **Import** — single dropdown consolidating the three FTB Quests sources:
+  project directory, Prism Launcher instance (sub-view listing detected
+  instances), and any other directory.
+- **Book Settings** — chapter/book-level modal (`book-settings.tsx`).
+- **Rewards** — weighted reward tables modal (`RewardTablesModal.tsx`).
+- **Save** — one button (was previously duplicated) that saves the graph,
+  exports to FTB Quests, and hot-reloads into the game via WebSocket when
+  connected; the label reads `Save (Offline)` when no game is connected.
+  Texture count appears as an inline SVG icon + number in the right cluster.
+
+WebSocket server state lives in the app TopBar (`topbar.tsx`) as a status dot +
+**Restart Server** button; the toolbar only surfaces the offline/save state.
+
 ## Reward tables
 
-FTB `RewardTable` weighted pools can be edited in-app from a 🎁 **Tables**
+FTB `RewardTable` weighted pools can be edited in-app from the **Rewards**
 toolbar button (`RewardTablesModal.tsx`): create/rename/delete tables,
 set loot_size / empty_weight / hide_tooltip / use_title, manage weighted item
 entries (add/remove, reorder, per-entry item id, count, weight), and see how
@@ -446,11 +471,11 @@ many quest rewards reference each table. Changes autosave like the rest of the
 graph.
 
 - `frontend/src/components/quest/RewardTablesModal.tsx` — the editor modal.
-- `frontend/src/components/quest/import-export.tsx` — 🎁 Tables button opens it
+- `frontend/src/components/quest/import-export.tsx` — the **Rewards** button opens it
   and wraps graph mutations in `scheduleAutoSave`. (Old dead `RewardsTab.tsx`
   had a read-only table picker and is not imported.)
 - Table-backed reward types (`choice`, `random`, `all_table`) show a "Reward
-  Table" `<select>` in `RewardCard` (`quest-form-sections.tsx`) instead of the
+  Table" `<select>` in `RewardCard` (`reward-card.tsx`) instead of the
   item field row; `table_id` is written to the reward and is a fallback text
   input when no tables exist yet. `QuestDetailModal` threads `graph.reward_tables`
   into `RewardCard`.
@@ -460,8 +485,8 @@ graph.
 ## Task / reward field completion
 
 Per-objective and per-reward fields that FTB's in-game editor exposes are now
-editable in the live quest form (`quest-form-sections.tsx`), with matching
-SNBT/JSON5 import + export in the Rust backend:
+editable in the live quest form (`objective-card.tsx` / `reward-card.tsx`), with
+matching SNBT/JSON5 import + export in the Rust backend:
 
 - **Item task** — `task_screen_only`, `only_from_crafting` and
   `match_components` checkboxes (exported `task_screen_only: 1b` /
@@ -516,13 +541,16 @@ Right-clicking a quest node or the empty pane opens a context menu
 (`QuestContextMenu.tsx`, rendered by `QuestCanvas`), mirroring FTB's in-game
 editing UX:
 
-- **Node context menu** — Edit Quest, Duplicate (copy+paste in place), Copy
-  Quest ID, and Delete; in Simulate mode also Complete Selected / Reset Selected.
-  A multi-selection supports bulk duplicate/delete/complete/reset. Right-clicking
-  a node not currently in the selection makes it the sole operand.
+- **Node context menu** — Edit Quest, Rename (starts an inline rename on the
+  canvas), Duplicate (copy+paste in place), Copy Quest ID, and Delete; in
+  Simulate mode also Complete Selected / Reset Selected. A multi-selection
+  supports bulk duplicate/delete/complete/reset. Right-clicking a node not
+  currently in the selection makes it the sole operand.
 - **Empty-pane context menu** — Add Quest, Add Quest Link, a "New Quest with
-  Task" submenu listing every objective type, and Paste Quest (disabled until a
-  clipboard/selection exists). Placement is at the right-click cursor.
+  Task" toggle that expands a two-column grid of every objective type (clicking
+  the toggle keeps the menu compact instead of a tall 19-item list), and Paste
+  Quest (disabled until a clipboard/selection exists). Placement is at the
+  right-click cursor.
 - Wire-up: `QuestBookEditor` `onAddQuest`/`onAddQuestLink` gained an optional
   `position`, plus a new `onAddQuestWithTask(chapterId, type, position)` that
   creates a quest pre-populated with one objective of the chosen type.
@@ -553,7 +581,8 @@ components + pure logic in `src/core/quest/`):
 - **Cut / duplicate** — **Ctrl+X** cuts (copies to the internal clipboard then
   deletes the selection); **Ctrl+D** duplicates (copy+paste in place). Both
   respect the read-only lock.
-- **Editing-mode (read-only) toggle** — **🔒 View / ✏️ Edit**. Locking disables
+- **Editing-mode (read-only) toggle** — a text **View Mode / Edit Mode** toggle
+  (no glyph icons). Locking disables
   node drag, connect, edge reconnect, delete, and all add/context-menu
   mutations while leaving selection, pan, zoom, search, and Simulate available.
   It is enforced at both the React Flow prop level (`nodesDraggable`,
@@ -574,3 +603,42 @@ components + pure logic in `src/core/quest/`):
   chapter's and the book's defaults, and drives edge colors through the graph's
   `edge_color` / `edge_cycle_color` (falling back to the built-in gold/red
   constants). "Editor default" clears the overrides.
+## Flat editing flows (UX)
+
+The editor keeps common edits to one or two clicks — no nested dialogs for
+frequent operations:
+
+- **Quest modal is a single flat scroll** (`QuestDetailModal.tsx`, 266 lines):
+  no internal tab switch. The header icon is clickable (hover shows a "Change"
+  badge → icon picker), and the title/subtitle are inline text inputs with the
+  section content flowing below. Four sticky **nav chips** (Appearance /
+  Visibility / Dependencies / Misc) jump the scroll (`quest-detail-sections.tsx`);
+  the settings themselves live in collapsible groups
+  (`quest-section-groups.tsx`). The footer is **Done / Cancel / Delete Quest**
+  (plus Complete/Reset in Simulate mode) — the old verb–noun "Save Quest" label
+  is gone.
+- **Inline rename on the canvas** — double-click a quest's title on the canvas
+  turns it into an inline input (Enter/blur commits, Esc cancels). The node
+  context menu's **Rename** item starts the same edit programmatically
+  (`QuestCanvas` `renameNonce` → `quest-nodes.tsx` `onRename`). The title was
+  switched from `pointer-events: none` to `auto; cursor: text`.
+- **Task / reward reorder** — each objective and reward card has **↑/↓**
+  buttons (`objective-card.tsx` / `reward-card.tsx` → `QuestBookEditor`
+  `onMoveObjective` / `onMoveReward`, backed by `moveArrayItem` in
+  `quest-helpers.ts`); buttons are disabled at the list edges and no-op moves
+  skip an undo commit.
+- **Chapter tree** — chapter rows gained hover **↑/↓** (reorder `order_index`)
+  and a **gear** (settings) plus double-click **inline rename**
+  (`chapter-node.tsx` / `ChapterTree.tsx`); the add-chapter/add-group buttons
+  stay pinned above the list.
+- **Shortcut cheat sheet** — the **?** canvas-toolbar button (or the **?** key,
+  ignored while an input is focused) opens `keyboard-shortcuts.tsx`, listing
+  canvas (pan/zoom/select/delete/undo/redo/cut/copy/paste/duplicate) and
+  editing (node: add quest/link/task-toggle; modal: done/cancel; rename: enter/
+  escape) shortcuts with `<kbd>` styling.
+- **Compact context menu** — the "New Quest with Task" submenu is a collapsible
+  toggle that expands a two-column objective-type grid instead of a tall list
+  (`QuestContextMenu.tsx` `.ctx-menu-task-grid`).
+
+All of the above is pure UI on the existing graph model — no new IPC or file
+format changes.

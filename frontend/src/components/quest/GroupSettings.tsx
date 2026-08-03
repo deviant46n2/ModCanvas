@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ArrowDownIcon, ArrowUpIcon, XIcon } from '../ui/icons'
 import type { QuestChapter, QuestChapterGroup } from '../../services/api'
 
 interface GroupSettingsProps {
@@ -39,7 +40,7 @@ export function GroupSettings({
           <div className="ftb-popup-header-left">
             <div className="ftb-popup-title">Group Settings</div>
           </div>
-          <button className="ftb-popup-close" onClick={onClose}>✕</button>
+          <button className="ftb-popup-close" onClick={onClose} aria-label="Close"><XIcon size={14} /></button>
         </div>
         <div className="ftb-popup-body">
           <div className="ftb-popup-section">
@@ -77,8 +78,8 @@ export function GroupSettings({
             <button className="ftb-popup-btn danger" onClick={onDelete}>Delete Group</button>
           </div>
           <div className="ftb-popup-footer-right">
-            <button className="ftb-popup-btn" onClick={() => onMove(-1)} title="Move group up">↑ Move Up</button>
-            <button className="ftb-popup-btn" onClick={() => onMove(1)} title="Move group down">↓ Move Down</button>
+            <button className="ftb-popup-btn" onClick={() => onMove(-1)} title="Move group up"><ArrowUpIcon size={12} /> Move Up</button>
+            <button className="ftb-popup-btn" onClick={() => onMove(1)} title="Move group down"><ArrowDownIcon size={12} /> Move Down</button>
             <button className="ftb-popup-btn" onClick={onClose}>Close</button>
           </div>
         </div>

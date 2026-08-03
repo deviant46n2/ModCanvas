@@ -92,7 +92,6 @@ function AppRoot() {
                 wsStatus={s.wsStatus}
                 activeTab={s.activeTab}
                 onTabChange={s.handleTabChange}
-                onRefreshWsStatus={s.refreshWsStatus}
                 onRestartWebSocket={s.restartWebSocket}
                 deployCompanionMessage={s.deployCompanionMessage}
                 isTesting={s.isTesting}

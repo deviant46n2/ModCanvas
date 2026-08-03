@@ -23,11 +23,13 @@ import { normalizeShape, questSizeToPixels, snapToGridStep, OBJECTIVE_TYPES } fr
 import { nodeTypes } from './quest-nodes';
 import { generateFtbHexId } from './quest-helpers';
 import { QuestContextMenu, type QuestCtxMenuState } from './QuestContextMenu';
+import { KeyboardShortcutsOverlay } from './keyboard-shortcuts'
 import { ChapterImagesLayer } from './ChapterImagesLayer';
 import { ChapterDecorationsCanvas } from './ChapterDecorationsCanvas';
 import { DecorationPanel } from './DecorationPanel';
 import { EdgeBezierEditor } from './EdgeBezierEditor';
-import { QuestSearchBar, AlignDistributeControls, EditLockButton, ThemePresetPicker } from './canvas-tools';
+import { QuestSearchBar, AlignDistributeControls, EditLockButton, ThemePresetPicker } from './canvas-tools'
+import { WarnIcon, XIcon } from '../ui/icons';
 import { alignPositions, distributePositions, type AlignMode, type DistributeMode } from '../../core/quest/align';
 import { searchQuestNodes } from '../../core/quest/search';
 import { pickEdgeHandles } from '../../core/quest/edge-geometry';
@@ -116,6 +118,7 @@ function QuestCanvasInner({
   chapters,
   activeChapter,
   onUpdateNodes,
+  onUpdateNode,
   onAddEdge,
   onUpdateEdge,
   onUpdateEdgeBezier,
@@ -148,6 +151,8 @@ function QuestCanvasInner({
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [renameNonce, setRenameNonce] = useState<{ nodeId: string; n: number } | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [connectMode, setConnectMode] = useState(false);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [decorEditMode, setDecorEditMode] = useState(false);
@@ -261,6 +266,8 @@ function QuestCanvasInner({
             simStatus: simMode ? simStatusById[node.id] : undefined,
             simComplete: simMode ? simProgress[node.id] === 'complete' : false,
             searchStatus: searchActive ? (searchMatchIds?.has(node.id) ? 'match' : 'dim') : undefined,
+            onRename: (label: string) => onUpdateNode(node.id, { label }),
+            renameNonce: renameNonce?.nodeId === node.id ? renameNonce.n : 0,
           },
           style: {
             width: pixelSize.width,
@@ -303,7 +310,7 @@ function QuestCanvasInner({
 
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, setNodes, setEdges]);
+  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, renameNonce, onUpdateNode, setNodes, setEdges]);
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -417,6 +424,19 @@ function QuestCanvasInner({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedEdgeId, onDeleteEdge, editLocked]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const copySelected = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -658,6 +678,10 @@ function QuestCanvasInner({
     setSelectedIds(new Set());
   }, [selectedIds, ctxMenu?.nodeId, onDeleteNodes, editLocked]);
 
+  const startRenameFor = useCallback((nodeId: string) => {
+    setRenameNonce(prev => ({ nodeId, n: (prev?.n || 0) + 1 }));
+  }, []);
+
   const applySimToSelection = useCallback(
     (status: 'started' | 'complete' | null) => {
       const ids = selectedIds.size > 0 ? Array.from(selectedIds) : (ctxMenu?.nodeId ? [ctxMenu.nodeId] : []);
@@ -797,13 +821,13 @@ function QuestCanvasInner({
       <div className="canvas-toolbar">
         <div className="toolbar-group">
           <button className="toolbar-btn" onClick={handleFitView} title="Fit View">
-            🎯 Fit
+            Fit
           </button>
           <button className="toolbar-btn" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">
-            ↩ Undo
+            Undo
           </button>
           <button className="toolbar-btn" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Y)">
-            ↪ Redo
+            Redo
           </button>
           <button
             className={`toolbar-btn${connectMode ? ' toolbar-btn-active' : ''}`}
@@ -815,9 +839,12 @@ function QuestCanvasInner({
             disabled={editLocked}
             title="Toggle dependency editing: drag between quest connection ports"
           >
-            🔗 Connect
+            Connect
           </button>
           <EditLockButton locked={editLocked} onToggle={() => setEditLocked((v) => !v)} />
+          <button className="toolbar-btn" onClick={() => setShowShortcuts(true)} title="Shortcuts & gestures (?)">
+            ?
+          </button>
         </div>
         <div className="toolbar-group">
           <QuestSearchBar
@@ -862,7 +889,7 @@ function QuestCanvasInner({
               }}
               title="Edit quest log decoration images for this chapter"
             >
-              🖼 Decorations
+              Decorations
             </button>
           )}
         </div>
@@ -872,15 +899,15 @@ function QuestCanvasInner({
             onClick={() => setSimMode?.(!simMode)}
             title="Toggle progress simulation: preview hidden/locked quests, complete or reset instantly"
           >
-            🧪 Simulate
+            Simulate
           </button>
           {simMode && (
             <>
               <button className="toolbar-btn" onClick={onCompleteAll} title="Complete every quest in this chapter instantly">
-                ✓ Complete All
+                Complete All
               </button>
               <button className="toolbar-btn" onClick={onResetAll} title="Reset every quest in this chapter">
-                ↺ Reset All
+                Reset All
               </button>
             </>
           )}
@@ -894,7 +921,7 @@ function QuestCanvasInner({
           </span>
           {cycleEdges.size > 0 && (
             <span className="cycle-warning" title="Dependency loops must be broken before quests unlock properly">
-              ⚠ {cycleEdges.size} circular connection{cycleEdges.size > 1 ? 's' : ''}
+              <WarnIcon size={12} /> {cycleEdges.size} circular connection{cycleEdges.size > 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -910,8 +937,8 @@ function QuestCanvasInner({
         {connectMode && (
           <div className="connect-mode-banner">
             Drag from a quest port to another quest to create a dependency arrow.
-            <button className="connect-mode-close" onClick={() => setConnectMode(false)} title="Exit connect mode">
-              ✕
+            <button className="connect-mode-close" onClick={() => setConnectMode(false)} title="Exit connect mode" aria-label="Exit connect mode">
+              <XIcon size={12} />
             </button>
           </div>
         )}
@@ -978,6 +1005,10 @@ function QuestCanvasInner({
           <Controls />
         </ReactFlow>
 
+        {showShortcuts && (
+          <KeyboardShortcutsOverlay onClose={() => setShowShortcuts(false)} />
+        )}
+
         {viewportMenuPos && (
           <QuestContextMenu
             menu={viewportMenuPos}
@@ -986,6 +1017,7 @@ function QuestCanvasInner({
             hasClipboard={!!clipboardRef.current}
             onClose={closeCtxMenu}
             onEdit={handleCtxEdit}
+            onRename={startRenameFor}
             onDuplicate={handleCtxDuplicate}
             onCopyId={handleCtxCopyId}
             onDelete={handleCtxDelete}
@@ -1005,7 +1037,7 @@ function QuestCanvasInner({
               + Add Quest
             </div>
             <div className="chapter-add-button chapter-add-link-button" onClick={() => onAddLink?.(activeChapter)} title="Add a quest link that references another quest (cross-chapter)">
-              🔗 Add Link
+              Add Link
             </div>
           </div>
         )}
@@ -1024,7 +1056,7 @@ function QuestCanvasInner({
                   }}
                   title={bezierEditEdgeId === selectedEdge.id ? 'Hide curve control points' : 'Edit bezier control points of this arrow'}
                 >
-                  {bezierEditEdgeId === selectedEdge.id ? '✓ Done' : '🎀 Curve'}
+                  {bezierEditEdgeId === selectedEdge.id ? 'Done' : 'Curve'}
                 </button>
                 {bezierEditEdgeId === selectedEdge.id && selectedEdge.bezier && (
                   <button
@@ -1034,7 +1066,7 @@ function QuestCanvasInner({
                     }}
                     title="Reset this arrow to the default curve"
                   >
-                    ↺ Reset
+                    Reset
                   </button>
                 )}
                 <button
@@ -1046,7 +1078,7 @@ function QuestCanvasInner({
                   }}
                   title="Remove this dependency arrow (Del)"
                 >
-                  🗑 Remove connection
+                  Remove
                 </button>
               </>
             )}

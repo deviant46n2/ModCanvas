@@ -10,7 +10,7 @@ import { QuestDetailModal } from './components/quest/QuestDetailModal'
 import { ChapterSettings } from './components/quest/ChapterSettings'
 import { GroupSettings } from './components/quest/GroupSettings'
 import { ImportExportToolbar } from './components/quest/import-export'
-import { generateFtbHexId, defaultObjective, defaultReward, defaultQuestNodeData } from './components/quest/quest-helpers'
+import { generateFtbHexId, defaultObjective, defaultReward, defaultQuestNodeData, moveArrayItem } from './components/quest/quest-helpers'
 import type { ToolbarAPI } from './components/quest/import-export'
 import { resolveIconKey, getIconUrl } from './components/quest/questIcons'
 import { resolveAssetUrl } from './services/asset-resolver'
@@ -606,6 +606,32 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
+  const onMoveObjective = useCallback((nodeId: string, objectiveId: string, dir: -1 | 1) => {
+    if (!graph) return
+    const next = graph.nodes.map(n => {
+      if (n.id !== nodeId) return n
+      const list = n.objectives || []
+      const idx = list.findIndex(o => o.id === objectiveId)
+      return { ...n, objectives: moveArrayItem(list, idx, idx + dir) }
+    })
+    if (next.every((n, i) => n === graph.nodes[i])) return
+    commitGraph({ ...graph, nodes: next })
+    scheduleAutoSave()
+  }, [graph, scheduleAutoSave])
+
+  const onMoveReward = useCallback((nodeId: string, rewardId: string, dir: -1 | 1) => {
+    if (!graph) return
+    const next = graph.nodes.map(n => {
+      if (n.id !== nodeId) return n
+      const list = n.rewards || []
+      const idx = list.findIndex(r => r.id === rewardId)
+      return { ...n, rewards: moveArrayItem(list, idx, idx + dir) }
+    })
+    if (next.every((n, i) => n === graph.nodes[i])) return
+    commitGraph({ ...graph, nodes: next })
+    scheduleAutoSave()
+  }, [graph, scheduleAutoSave])
+
   const handleToggleGroup = useCallback((id: string) => {
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }))
   }, [])
@@ -718,6 +744,8 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             onEditChapter={setEditChapterId}
             onAddGroup={onAddGroup}
             onEditGroup={setEditGroupId}
+            onRenameChapter={(id, title) => onUpdateChapter(id, { title })}
+            onMoveChapter={onMoveChapter}
           />
         </aside>
         <main className="quest-editor-canvas">
@@ -767,6 +795,8 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
             onAddReward={onAddReward}
             onRemoveReward={onRemoveReward}
             onUpdateReward={onUpdateReward}
+            onMoveObjective={onMoveObjective}
+            onMoveReward={onMoveReward}
             openIconPicker={(target) => toolbarApiRef.current?.openIconPicker(target)}
             onOpenItemPicker={(target) => setItemPickerTarget(target)}
             onClose={() => setSelectedNodeId(null)}

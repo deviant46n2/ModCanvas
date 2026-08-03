@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
 import { isUsableTextureValue, textureDisplayUrl, requestMaterialize } from '../../services/texture-loader'
 import { AnimatedSprite } from './AnimatedSprite'
@@ -67,7 +68,7 @@ export function IconPicker({ open, target, textureIndex, graph, instancePath, on
             <div className="ftb-popup-title">Select Icon</div>
             <div className="ftb-popup-type">{target?.type || 'quest'}</div>
           </div>
-          <button className="ftb-popup-close" onClick={onClose}>✕</button>
+          <button className="ftb-popup-close" onClick={onClose} aria-label="Close"><XIcon size={14} /></button>
         </div>
         <div className="ftb-popup-body">
           <input

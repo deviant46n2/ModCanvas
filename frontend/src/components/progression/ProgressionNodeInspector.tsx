@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react'
+import { XIcon } from '../ui/icons'
 import type { ProgressionGraphData } from '../../services/api'
 
 interface ProgressionNodeInspectorProps {
@@ -32,7 +33,7 @@ export default function ProgressionNodeInspector({
     <div className="progression-inspector">
       <div className="inspector-header">
         <h4>Edit Node</h4>
-        <button className="btn-close" onClick={onClose}>×</button>
+        <button className="btn-close" onClick={onClose} aria-label="Close inspector"><XIcon size={14} /></button>
       </div>
       <div className="inspector-body">
         <div className="inspector-field">

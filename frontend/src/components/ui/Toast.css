@@ -54,9 +54,18 @@
 
 .toast-icon {
   flex-shrink: 0;
-  font-size: 16px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   margin-top: 1px;
+}
+
+.toast-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .toast-success .toast-icon { color: #a6e3a1; }

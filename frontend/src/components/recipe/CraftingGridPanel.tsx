@@ -1,4 +1,5 @@
 import { CraftingGrid } from './CraftingGrid';
+import { WarnIcon } from '../ui/icons'
 import { FurnaceEditor } from './FurnaceEditor';
 import { StonecuttingEditor } from './StonecuttingEditor';
 import { SmithingEditor } from './SmithingEditor';
@@ -119,7 +120,7 @@ export function CraftingGridPanel({
             />
             {outputIssues.length > 0 && (
               <span className="recipe-field-issue" title={outputIssues.map((i) => i.message).join('\n')}>
-                ⚠
+                <WarnIcon size={14} />
               </span>
             )}
           </div>

@@ -14,7 +14,7 @@ interface QuestIconProps {
 
 /** Icon slot that renders the texture (animated when its `.mcmeta` declares
  *  an animation), a shimmer skeleton while the texture is being materialized,
- *  or an emoji/char fallback once it is known unresolvable. */
+ *  or a self-authored SVG / glyph fallback once it is known unresolvable. */
 export function QuestIcon({ url, pending, fallback, size, imgSize, fallbackFontSize, textureKey }: QuestIconProps) {
   if (url) {
     // Baked 3D icons are crisp isometric renders baked near display size;

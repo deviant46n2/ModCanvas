@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { XIcon } from '../ui/icons'
 import { Grid, type CellComponentProps } from 'react-window'
 import type { ItemRegistryEntry } from '../../services/api'
 import './JeiDrawer.css'
@@ -105,7 +106,7 @@ export function JeiDrawer({ items, onSelect, onClose }: JeiDrawerProps) {
       <div className="jei-drawer-panel">
         <div className="jei-drawer-header">
           <span className="jei-drawer-title">Item Selector</span>
-          <button className="jei-drawer-close" onClick={onClose}>✕</button>
+          <button className="jei-drawer-close" onClick={onClose} aria-label="Close item browser"><XIcon size={14} /></button>
         </div>
 
         <div className="jei-drawer-search-area">

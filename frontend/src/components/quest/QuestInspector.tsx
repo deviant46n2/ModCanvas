@@ -5,6 +5,7 @@ import { questIconUrl, resolveIconKey } from './questIcons'
 import { SHAPES, OBJECTIVE_TYPES, REWARD_TYPES, VISIBILITY_OPTIONS, PROGRESSION_MODES } from './quest-form-constants'
 import { SmartFilterIcon } from './SmartFilterIcon'
 import { AnimatedSprite } from './AnimatedSprite'
+import { XIcon } from '../ui/icons'
 import './QuestInspector.css'
 
 interface QuestInspectorProps {
@@ -90,7 +91,7 @@ function ObjectiveCard({
             ))}
           </select>
         </div>
-        <button className="quest-inspector-card-remove" onClick={onRemove} title="Remove task">✕</button>
+        <button className="quest-inspector-card-remove" onClick={onRemove} title="Remove task"><XIcon size={12} /></button>
       </div>
       <div className="quest-inspector-card-body">
         <div className="quest-inspector-slot-row">
@@ -429,7 +430,7 @@ function RewardCard({
             ))}
           </select>
         </div>
-        <button className="quest-inspector-card-remove" onClick={onRemove} title="Remove reward">✕</button>
+        <button className="quest-inspector-card-remove" onClick={onRemove} title="Remove reward"><XIcon size={12} /></button>
       </div>
       <div className="quest-inspector-card-body">
         <div className="quest-inspector-slot-row">
@@ -598,7 +599,7 @@ export function QuestInspector({
               </select>
             </div>
           </div>
-          <button className="quest-inspector-close-btn" onClick={onClose}>✕</button>
+          <button className="quest-inspector-close-btn" onClick={onClose} aria-label="Close inspector"><XIcon size={14} /></button>
         </div>
 
         {/* ── Body ── */}
@@ -607,7 +608,7 @@ export function QuestInspector({
           <div className="quest-inspector-section">
             <div className="quest-inspector-section-header">
               <span className="quest-inspector-section-title">
-                <span className="section-icon">📝</span>
+                
                 Description
               </span>
             </div>
@@ -624,7 +625,7 @@ export function QuestInspector({
           <div className="quest-inspector-section">
             <div className="quest-inspector-section-header">
               <span className="quest-inspector-section-title">
-                <span className="section-icon">⚡</span>
+                
                 Tasks
                 <span className="quest-inspector-section-count">({node.objectives.length})</span>
               </span>
@@ -657,7 +658,7 @@ export function QuestInspector({
           <div className="quest-inspector-section">
             <div className="quest-inspector-section-header">
               <span className="quest-inspector-section-title">
-                <span className="section-icon">🎁</span>
+                
                 Rewards
                 <span className="quest-inspector-section-count">({node.rewards.length})</span>
               </span>
@@ -690,7 +691,7 @@ export function QuestInspector({
           <div className="quest-inspector-section">
             <div className="quest-inspector-section-header">
               <span className="quest-inspector-section-title">
-                <span className="section-icon">⚙️</span>
+                
                 Properties
               </span>
               <button
