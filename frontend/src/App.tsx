@@ -1,5 +1,6 @@
 import './App.css'
 import { useEffect } from 'react'
+import logo from './assets/logo.png'
 import { ToastProvider } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Sidebar } from './components/common/sidebar'
@@ -167,6 +168,7 @@ function AppRoot() {
             ) : (
               <div className="welcome">
                 <div className="welcome-content">
+                  <img className="welcome-logo" src={logo} alt="ModCanvas logo" />
                   <h2>Welcome to ModCanvas</h2>
                   <p>Select a project or create a new one to get started.</p>
                 </div>
