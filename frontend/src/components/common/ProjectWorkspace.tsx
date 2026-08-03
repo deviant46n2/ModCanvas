@@ -1,6 +1,7 @@
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { CanvasThemeProvider } from '../theme/theme-provider'
 import { TopBar } from './topbar'
+import { WorkspaceStatusBar } from './statusbar'
 import { ModsTab, type ModsTabProps } from './ModsTab'
 import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
 import { HistoryDrawer } from '../history/HistoryDrawer'
@@ -79,9 +80,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         minecraftVersion={project.minecraft_version}
         modLoader={project.mod_loader}
         packVersion={project.pack_version}
-        wsStatus={props.wsStatus}
-        onRestartWebSocket={props.onRestartWebSocket}
-        deployCompanionMessage={props.deployCompanionMessage}
         isTesting={props.isTesting}
         onSave={props.onSave}
         onTest={props.onTest}
@@ -92,22 +90,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onLoadPack={onLoadPack}
         onClosePack={onClosePack}
       />
-
-      {props.testProgress && (
-        <div className="launch-progress">
-          <div className="progress-phase">{props.testProgress}</div>
-        </div>
-      )}
-
-      {props.testError && (
-        <div className="launch-error">
-          <div className="error-header">
-            <strong>Test Error:</strong>
-            <button className="btn-copy" onClick={() => navigator.clipboard.writeText(props.testError)} aria-label="Copy error text">Copy</button>
-          </div>
-          <pre className="copyable">{props.testError}</pre>
-        </div>
-      )}
 
             <div className="workspace-tabs" role="tablist">        {(['mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
           <button
@@ -179,6 +161,15 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </ErrorBoundary>
         </div>
       </div>
+
+      <WorkspaceStatusBar
+        wsStatus={props.wsStatus}
+        onRestartWebSocket={props.onRestartWebSocket}
+        isTesting={props.isTesting}
+        testProgress={props.testProgress}
+        testError={props.testError}
+        deployCompanionMessage={props.deployCompanionMessage}
+      />
 
       <LoadPackModal
         show={showLoadPack}

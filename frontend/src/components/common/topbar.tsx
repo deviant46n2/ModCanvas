@@ -1,13 +1,14 @@
-import type { WsConnectionStatus } from '../../services/api'
+// Workspace header: project identity on the left, a single primary action
+// (Load Pack when unloaded, Test when loaded) plus the overflow Project menu
+// on the right. Rare/destructive actions live in the menu, not the toolbar.
+import { useState, useEffect, useRef } from 'react'
+import { ChevronDownIcon } from '../ui/icons'
 
 interface TopBarProps {
   projectName: string
   minecraftVersion: string
   modLoader: string
   packVersion: string
-  wsStatus: WsConnectionStatus
-  onRestartWebSocket: () => void
-  deployCompanionMessage: string
   isTesting: boolean
   onSave: () => void
   onTest: () => void
@@ -24,9 +25,6 @@ export function TopBar({
   minecraftVersion,
   modLoader,
   packVersion,
-  wsStatus,
-  onRestartWebSocket,
-  deployCompanionMessage,
   isTesting,
   onSave,
   onTest,
@@ -37,53 +35,114 @@ export function TopBar({
   onLoadPack,
   onClosePack,
 }: TopBarProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
+  const closeMenu = () => setMenuOpen(false)
+
   return (
     <div className="workspace-header">
-      <h2>{projectName}</h2>
-      <div className="workspace-meta">
-        MC {minecraftVersion} &bull; {modLoader} &bull; v{packVersion}
-      </div>
-      <div className="workspace-status">
-        <span
-          className={`ws-status ${wsStatus.connected ? 'connected' : 'disconnected'}`}
-          title={`WebSocket: ${wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'} \u2022 Port: ${wsStatus.port} \u2022 Clients: ${wsStatus.client_count}`}
-        >
-          <span className={`status-dot ${wsStatus.connected ? 'running' : 'stopped'}`} />
-          <span>{wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'}</span>
+      <div className="workspace-title-cluster">
+        <h2>{projectName}</h2>
+        <span className="workspace-meta">
+          MC {minecraftVersion} &bull; {modLoader} &bull; v{packVersion}
         </span>
-        <button
-          className="ws-restart-btn"
-          onClick={onRestartWebSocket}
-          title="Restart WebSocket &amp; refresh status"
-        >
-          Restart Server
-        </button>
       </div>
-      <div className="instance-actions">
-        {packLoaded ? (
-          <button className="btn-danger" onClick={onClosePack}>
-            Close Pack
-          </button>
-        ) : (
-          <button className="btn-primary" onClick={onLoadPack}>
+      <div className="workspace-actions">
+        <button className="btn-secondary" onClick={onSave} title="Save project metadata">
+          Save
+        </button>
+        {!packLoaded && (
+          <button
+            className="btn-primary"
+            onClick={onLoadPack}
+            title="Scan textures, import FTB Quests, and load mods + configs"
+          >
             Load Pack
           </button>
         )}
-        <button className="btn-secondary" onClick={onSave}>Save</button>
-        <button className="btn-success" onClick={onTest} disabled={isTesting}>
+        <button
+          className={packLoaded ? 'btn-primary' : 'btn-secondary'}
+          onClick={onTest}
+          disabled={isTesting}
+          title={
+            packLoaded
+              ? 'Launch this pack in Minecraft'
+              : 'Launch this pack in Minecraft (load the pack first for texture/quest data)'
+          }
+        >
           {isTesting ? 'Testing...' : 'Test'}
         </button>
-        <button className="btn-secondary" onClick={onDeployCompanion}>Deploy Companion</button>
-        <button className="btn-secondary" onClick={onExport}>Export</button>
-        <button className="btn-danger" onClick={onDelete}>
-          Delete
-        </button>
-      </div>
-      {deployCompanionMessage && (
-        <div className="deploy-companion-message" style={{ marginTop: 8, fontSize: 13, color: deployCompanionMessage.startsWith('\u2717') ? '#e74c3c' : '#27ae60' }}>
-          {deployCompanionMessage.replace(/^[\u2713\u2714\u2717\u2718]\s*/, '')}
+        <div ref={menuRef} className="project-menu-wrap">
+          <button
+            className="btn-secondary project-menu-trigger"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            Project <ChevronDownIcon size={14} />
+          </button>
+          {menuOpen && (
+            <div className="project-menu" role="menu">
+              {packLoaded && (
+                <div className="project-menu-group">
+                  <div className="project-menu-group-title">Pack</div>
+                  <button
+                    className="project-menu-item"
+                    role="menuitem"
+                    onClick={() => { onClosePack(); closeMenu() }}
+                  >
+                    <span className="project-menu-item-title">Close Pack</span>
+                    <span className="project-menu-item-desc">Unload this instance from the workspace</span>
+                  </button>
+                </div>
+              )}
+              <div className="project-menu-group">
+                <div className="project-menu-group-title">Setup</div>
+                <button
+                  className="project-menu-item"
+                  role="menuitem"
+                  onClick={() => { onDeployCompanion(); closeMenu() }}
+                >
+                  <span className="project-menu-item-title">Deploy Companion</span>
+                  <span className="project-menu-item-desc">Install the companion mod into the instance</span>
+                </button>
+              </div>
+              <div className="project-menu-group">
+                <div className="project-menu-group-title">Share</div>
+                <button
+                  className="project-menu-item"
+                  role="menuitem"
+                  onClick={() => { onExport(); closeMenu() }}
+                >
+                  <span className="project-menu-item-title">Export Modpack...</span>
+                  <span className="project-menu-item-desc">Build a .mrpack or CurseForge zip</span>
+                </button>
+              </div>
+              <div className="project-menu-separator" />
+              <button
+                className="project-menu-item danger"
+                role="menuitem"
+                onClick={() => { onDelete(); closeMenu() }}
+              >
+                <span className="project-menu-item-title">Delete Project...</span>
+                <span className="project-menu-item-desc">Permanently remove this project</span>
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

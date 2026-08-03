@@ -458,8 +458,10 @@ SVG labels, no emoji:
   connected; the label reads `Save (Offline)` when no game is connected.
   Texture count appears as an inline SVG icon + number in the right cluster.
 
-WebSocket server state lives in the app TopBar (`topbar.tsx`) as a status dot +
-**Restart Server** button; the toolbar only surfaces the offline/save state.
+WebSocket server state lives in the app workspace status bar
+(`statusbar.tsx`, bottom of `ProjectWorkspace`) as a status pill + **Restart**
+icon button; the toolbar only surfaces the offline/save state. See
+`docs/workspace-actions.md` for the workspace action layout.
 
 ## Reward tables
 

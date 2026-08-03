@@ -1,7 +1,10 @@
 # Load Pack Flow
 
-The **Load Pack** button loads an instance into the app: textures, FTB Quests,
-instance mods, and configs. This document describes what it does, how progress
+The **Load Pack** button (workspace header, `topbar.tsx`) loads an instance into
+the app: textures, FTB Quests, instance mods, and configs. It is the header's
+primary action while no pack is loaded; once loaded, **Test** takes over the
+primary slot and the pack can be closed from the **Project** menu. See
+`docs/workspace-actions.md`. This document describes what it does, how progress
 is reported, and the app-start behavior.
 
 ## What "Load Pack" does (in order)
