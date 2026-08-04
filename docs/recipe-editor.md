@@ -60,6 +60,11 @@ Implementation wave "Core" is complete on the `recipesystem` branch:
   Mods/Configs/Progression/Quests/Recipes never re-runs the heavy load effects
   (texture scans, quest graph, config reads). State and loaded data persist
   across switches.
+- Per-project scoping: the recipe store is cleared when the selected project
+  changes (`App.tsx` resets `useRecipeStore` on `selectedProject.id` change).
+  Recipes are pack-specific; without this reset, switching packs left the
+  previous pack's recipes in the persisted store, so the Recipes tab and Pack
+  Health reported stale results from the prior pack.
 
 Scope stayed in the "Core" wave by explicit user choice; arbitrary-paste-JSON
 import and the full vision remain future work.

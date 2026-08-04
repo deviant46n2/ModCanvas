@@ -9,6 +9,7 @@ import { NewProjectModal, ImportModal, ExportModal, DeleteConfirmModal } from '.
 import { useAppState } from './hooks/useAppState'
 import { HistoryProvider, useHistory } from './hooks/history-provider'
 import { saveQuestGraph } from './services/quest'
+import { useRecipeStore } from './core/recipe/recipe-store'
 import type { QuestGraphData } from './services/api'
 
 function App() {
@@ -30,6 +31,13 @@ function AppRoot() {
   useEffect(() => {
     history.attachProject(s.selectedProject?.id ?? null)
   }, [history, s.selectedProject?.id])
+
+  // Scope the recipe store to the active project. Recipes are pack-specific:
+  // leaving the previous pack's recipes in the (persisted) store makes the
+  // Recipes tab and Pack Health derive from stale data after switching packs.
+  useEffect(() => {
+    useRecipeStore.setState({ recipes: [], selectedRecipeId: null })
+  }, [s.selectedProject?.id])
 
   // Cross-tool undo routing: when a history step targets an editor that may be
   // unmounted, persist the restored snapshot canonically and switch tabs so a
