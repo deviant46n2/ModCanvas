@@ -1040,6 +1040,6 @@ pub fn export_ftb_quests_to_dir(
 ) -> Result<(), String> {
     let graph = super::progression::get_quest_graph(db, project_id)?;
     let path = std::path::Path::new(&output_dir);
-    crate::imports::ftb_quests::export_ftb_quests_snbt(&graph, path)
+    crate::imports::ftb_quests::export_ftb_quests_snbt(&graph, path, &std::collections::HashMap::new())
         .map_err(|e| format!("FTB Quests export failed: {}", e))
 }

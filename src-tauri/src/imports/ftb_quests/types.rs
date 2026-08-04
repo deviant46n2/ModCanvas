@@ -113,6 +113,11 @@ pub struct FtBQuestsImportResult {
     pub ftb_quests_version: Option<String>,
     /// Target Minecraft version inferred from format
     pub minecraft_version: Option<String>,
+    /// Raw SNBT sidecar for comment preservation during export.
+    /// Populated by `import_ftb_quests`; passed to `export_ftb_quests_snbt`.
+    /// Skipped during serialization — the frontend never sees this.
+    #[serde(skip)]
+    pub sidecar: super::snbt_sidecar::SnbtSidecar,
 }
 
 impl Default for FtBQuestsImportResult {
@@ -127,6 +132,7 @@ impl Default for FtBQuestsImportResult {
             issues: Vec::new(),
             ftb_quests_version: None,
             minecraft_version: None,
+            sidecar: super::snbt_sidecar::SnbtSidecar::new(),
         }
     }
 }

@@ -2,6 +2,7 @@ mod types;
 mod detect;
 mod import;
 pub mod export;
+pub mod snbt_sidecar;
 
 pub use types::*;
 pub use detect::*;
@@ -124,7 +125,7 @@ mod tests {
 
         // Export
         let export_dir = tempfile::tempdir().unwrap();
-        export_ftb_quests_snbt(&result.graph, export_dir.path()).unwrap();
+        export_ftb_quests_snbt(&result.graph, export_dir.path(), &result.sidecar).unwrap();
 
         // Verify exported files exist
         assert!(export_dir.path().join("config/ftbquests/quests/data.snbt").exists());
@@ -189,7 +190,7 @@ mod tests {
 
         // Export
         let export_dir = tempfile::tempdir().unwrap();
-        export_ftb_quests_snbt(&result.graph, export_dir.path()).unwrap();
+        export_ftb_quests_snbt(&result.graph, export_dir.path(), &result.sidecar).unwrap();
 
         // Re-import and verify edges survive
         let result2 = import_ftb_quests(export_dir.path()).unwrap();
@@ -264,7 +265,7 @@ mod tests {
 
         // Export
         let export_dir = tempfile::tempdir().unwrap();
-        export_ftb_quests_snbt(&result.graph, export_dir.path()).unwrap();
+        export_ftb_quests_snbt(&result.graph, export_dir.path(), &result.sidecar).unwrap();
 
         // Re-import
         let result2 = import_ftb_quests(export_dir.path()).unwrap();
@@ -307,7 +308,8 @@ mod tests {
         std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
 
         // Import
-        let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+        let import_result = import_ftb_quests(tmp.path()).unwrap();
+        let mut graph = import_result.graph;
 
         // Mutate: change quest title and add an objective
         let quest = graph.nodes.iter_mut()
@@ -329,7 +331,7 @@ mod tests {
 
         // Export mutated graph
         let export_dir = tempfile::tempdir().unwrap();
-        export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+        export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
 
         // Re-import
         let result2 = import_ftb_quests(export_dir.path()).unwrap();
@@ -502,13 +504,14 @@ mod tests {
     quests = []
 }"#).unwrap();
 
-        let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+        let import_result = import_ftb_quests(tmp.path()).unwrap();
+        let mut graph = import_result.graph;
         assert_eq!(graph.grid_scale, 0.5, "grid_scale should be imported from data.snbt");
 
         // Mutate to a different grain and confirm it round-trips.
         graph.grid_scale = 1.0;
         let export_dir = tempfile::tempdir().unwrap();
-        export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+        export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
         let result2 = import_ftb_quests(export_dir.path()).unwrap();
         assert_eq!(result2.graph.grid_scale, 1.0, "grid_scale should survive export/import");
 

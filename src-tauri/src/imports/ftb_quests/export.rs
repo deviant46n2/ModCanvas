@@ -1,4 +1,5 @@
 use crate::imports::snbt::{SnbtValue, CommentedSnbt, compound_to_snbt};
+use super::snbt_sidecar;
 use crate::quest::*;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -85,7 +86,11 @@ fn chapter_images_to_snbt(images: &[ChapterImage]) -> SnbtValue {
 }
 
 /// Export a QuestGraph as FTB Quests SNBT files to a directory (both Subdirs and FlatChapters formats)
-pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<()> {
+///
+/// `sidecar` is the raw-SNBT map returned from `import_ftb_quests`.  When
+/// non-empty, the exporter re-parses the original SNBT to recover user comments
+/// and merges them into the output for unchanged fields.
+pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &snbt_sidecar::SnbtSidecar) -> Result<()> {
     let quests_dir = output_dir.join("config").join("ftbquests").join("quests");
     std::fs::create_dir_all(&quests_dir)?;
 
@@ -169,7 +174,22 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<(
         let chapter_dir = quests_dir.join(&filename);
         std::fs::create_dir_all(&chapter_dir)?;
 
-        let chapter_snbt = build_subdirs_chapter(chapter_node, chapter_meta, &filename, &chapter_quests, &deps_map);
+        let mut chapter_map = build_subdirs_chapter_map(chapter_node, chapter_meta, &filename);
+
+        // Try sidecar merge: preserve comments on unchanged chapter/quest fields
+        let quests_for_chapter: Vec<SnbtValue> = chapter_quests.get(&chapter_node.id)
+            .map(|quests| quests.iter()
+                .filter_map(|q| quest_to_snbt(q, deps_map.get(&q.id), false).ok())
+                .collect())
+            .unwrap_or_default();
+
+        if let Some(merged) = snbt_sidecar::merge_quests_in_chapter(sidecar, &chapter_node.id, &chapter_map, &quests_for_chapter) {
+            chapter_map = merged;
+        } else {
+            chapter_map.insert("quests".to_string(), ce(SnbtValue::List(quests_for_chapter)));
+        }
+
+        let chapter_snbt = SnbtValue::Compound(chapter_map);
         crate::path_safety::atomic_write_str(&chapter_dir.join("chapter.snbt"), &chapter_snbt.to_snbt_string())
             .map_err(|e| anyhow::anyhow!("{e}"))?;
     }
@@ -201,10 +221,18 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<(
             HashMap::new()
         };
 
-        // Always set/update id, filename, quests
+        // Always set/update id, filename
         chapter_compound.insert("id".to_string(), ce(SnbtValue::String(chapter_node.id.clone())));
         chapter_compound.insert("filename".to_string(), ce(SnbtValue::String(filename.to_string())));
-        chapter_compound.insert("quests".to_string(), ce(SnbtValue::List(new_quests)));
+
+        // Try sidecar merge: preserve comments on unchanged quest fields
+        if let Some(merged) = snbt_sidecar::merge_quests_in_chapter(sidecar, &chapter_node.id, &chapter_compound, &new_quests) {
+            chapter_compound = merged;
+        } else {
+            // Fallback: no sidecar data, just insert quests directly
+            let quests = build_flat_chapters_quests(chapter_node, &chapter_quests, &deps_map);
+            chapter_compound.insert("quests".to_string(), ce(SnbtValue::List(quests)));
+        }
 
         // Set chapter title if non-empty, preserve existing otherwise
         if !chapter_node.label.is_empty() {
@@ -309,6 +337,25 @@ fn build_subdirs_chapter<'a>(
     chapter_quests: &HashMap<String, Vec<&'a QuestNode>>,
     deps_map: &HashMap<String, Vec<String>>,
 ) -> SnbtValue {
+    let mut chapter_map = build_subdirs_chapter_map(chapter_node, chapter_meta, filename);
+
+    if let Some(quests) = chapter_quests.get(&chapter_node.id) {
+        let quest_snbt_values: Vec<SnbtValue> = quests.iter()
+            .filter_map(|q| quest_to_snbt(q, deps_map.get(&q.id), false).ok())
+            .collect();
+        chapter_map.insert("quests".to_string(), ce(SnbtValue::List(quest_snbt_values)));
+    }
+
+    SnbtValue::Compound(chapter_map)
+}
+
+/// Build a chapter SNBT map without the quests list. Used by the sidecar merge
+/// path where quests are inserted separately.
+fn build_subdirs_chapter_map(
+    chapter_node: &QuestNode,
+    chapter_meta: Option<&QuestChapter>,
+    filename: &str,
+) -> HashMap<String, CommentedSnbt> {
     let mut chapter_map: HashMap<String, CommentedSnbt> = HashMap::new();
     chapter_map.insert("id".to_string(), ce(SnbtValue::String(chapter_node.id.clone())));
     chapter_map.insert("filename".to_string(), ce(SnbtValue::String(filename.to_string())));
@@ -371,14 +418,7 @@ fn build_subdirs_chapter<'a>(
         }
     }
 
-    if let Some(quests) = chapter_quests.get(&chapter_node.id) {
-        let quest_snbt_values: Vec<SnbtValue> = quests.iter()
-            .filter_map(|q| quest_to_snbt(q, deps_map.get(&q.id), false).ok())
-            .collect();
-        chapter_map.insert("quests".to_string(), ce(SnbtValue::List(quest_snbt_values)));
-    }
-
-    SnbtValue::Compound(chapter_map)
+    chapter_map
 }
 
 fn build_flat_chapters_quests<'a>(

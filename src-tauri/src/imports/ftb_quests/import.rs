@@ -1,5 +1,6 @@
 use super::types::{SnbtMapHelper, FtBQuestsFormat, FtBQuestsLayout, FtBQuestsImportResult, ImportStats, ImportIssue, IssueSeverity, IssueCategory};
 use super::detect::{detect_format, detect_layout};
+use super::snbt_sidecar;
 use crate::imports::snbt::{SnbtValue, CommentedSnbt, parse_snbt};
 use crate::quest::*;
 use anyhow::{Result, Context};
@@ -809,6 +810,10 @@ fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, result: &mut FtB
     let chapter_id = m.get_str("id")
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // Store raw SNBT in sidecar for comment preservation during export
+    snbt_sidecar::store_chapter(&mut result.sidecar, &chapter_id, &content);
+
     let title = m.get_str("title")
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
@@ -1923,6 +1928,9 @@ fn parse_standalone_quest_files(dir: &Path, chapter_id: &str, graph: &mut QuestG
                         if graph.nodes.iter().any(|n| n.id == quest_id) {
                             continue;
                         }
+                        // Store raw SNBT in sidecar for comment preservation
+                        snbt_sidecar::store_quest(&mut result.sidecar, quest_id, &content);
+
                         let chapter_default = graph.chapters.iter().find(|c| c.id == chapter_id).map(|c| c.default_enabled).unwrap_or(true);
                         if let Ok(node) = parse_snbt_quest(&snbt.value, chapter_id, false, chapter_default, result) {
                             graph.nodes.push(node);
