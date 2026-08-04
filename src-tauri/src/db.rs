@@ -50,6 +50,7 @@ impl Database {
                 source TEXT NOT NULL,
                 enabled INTEGER DEFAULT 1,
                 added_at TEXT NOT NULL,
+                icon TEXT,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
 
@@ -76,8 +77,24 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_mods_project ON mods(project_id);
             CREATE INDEX IF NOT EXISTS idx_mods_mod_id ON mods(mod_id);
+            -- Dedupe rows polluted by earlier plain-INSERT scans FIRST (every
+            -- scan used to append a full copy), then enforce uniqueness.
+            DELETE FROM mods WHERE id NOT IN (
+                SELECT MIN(id) FROM mods GROUP BY project_id, mod_id
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_mods_project_mod ON mods(project_id, mod_id);
             ",
         )?;
+
+        // Migration: existing DBs predate the mods.icon column.
+        let conn = self.conn.lock().unwrap();
+        let has_icon: bool = {
+            let mut stmt = conn.prepare("SELECT COUNT(*) FROM pragma_table_info('mods') WHERE name = 'icon'")?;
+            stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+        };
+        if !has_icon {
+            let _ = conn.execute_batch("ALTER TABLE mods ADD COLUMN icon TEXT;");
+        }
         Ok(())
     }
 
@@ -143,8 +160,17 @@ impl Database {
     pub fn add_mod(&self, entry: &ModEntry) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             ON CONFLICT(project_id, mod_id) DO UPDATE SET
+               slug = excluded.slug,
+               name = excluded.name,
+               version = excluded.version,
+               description = excluded.description,
+               author = excluded.author,
+               source = excluded.source,
+               enabled = excluded.enabled,
+               icon = excluded.icon",
             params![
                 entry.id.to_string(),
                 entry.project_id.to_string(),
@@ -157,6 +183,7 @@ impl Database {
                 format!("{:?}", entry.source),
                 entry.enabled as i32,
                 entry.added_at.to_rfc3339(),
+                entry.icon,
             ],
         )?;
         Ok(())
@@ -165,7 +192,7 @@ impl Database {
     pub fn get_project_mods(&self, project_id: &Uuid) -> SqlResult<Vec<ModEntry>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at FROM mods WHERE project_id = ?1"
+            "SELECT id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon FROM mods WHERE project_id = ?1"
         )?;
 
         let mods = stmt
@@ -188,6 +215,7 @@ impl Database {
                     added_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(10)?)
                         .map(|dt| dt.with_timezone(&chrono::Utc))
                         .unwrap_or_default(),
+                    icon: row.get(11).unwrap_or_default(),
                 })
             })?
             .collect::<SqlResult<Vec<_>>>()?;
@@ -385,15 +413,15 @@ impl Database {
 
                     // Insert or update mod entry
                     conn.execute(
-                        "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-                         ON CONFLICT(mod_id) DO UPDATE SET
+                        "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                         ON CONFLICT(project_id, mod_id) DO UPDATE SET
                            version = excluded.version,
                            name = excluded.name,
                            description = excluded.description,
                            source = excluded.source,
-                           enabled = excluded.enabled
-                         WHERE project_id = ?2 AND mod_id = ?3",
+                           enabled = excluded.enabled,
+                           icon = excluded.icon",
                         params![
                             Uuid::new_v4().to_string(),
                             project_id.to_string(),
@@ -401,11 +429,12 @@ impl Database {
                             slug,
                             name,
                             version,
-                            "", // description
+                            info.description.clone().unwrap_or_default(),
                             "", // author
                             format!("{:?}", source),
                             1, // enabled
                             chrono::Utc::now().to_rfc3339(),
+                            info.icon_data_url.clone(),
                         ],
                     )?;
                     synced += 1;

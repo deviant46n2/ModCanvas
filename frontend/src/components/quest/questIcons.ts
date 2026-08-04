@@ -1,4 +1,6 @@
 import { resolveAssetUrl } from '../../services/asset-resolver';
+import { isBakedTexture } from '../../services/texture-loader';
+import { isEngineConnected } from '../../services/engine-render';
 
 export function resolveIconKey(icon: string): string {
   if (!icon) return ''
@@ -36,5 +38,13 @@ export function getIconUrl(textureIndex: Record<string, string>, itemId: string)
 export function questIconUrl(icon: string, textureIndex: Record<string, string>): string | undefined {
   const key = resolveIconKey(icon)
   if (!key) return undefined
-  return getIconUrl(textureIndex, key)
+  const url = getIconUrl(textureIndex, key)
+  if (!url) return undefined
+  // Software-rasterized `bake:` icons (isometric 3D) look nothing like the
+  // in-game GUI item. When the companion engine path is active, keep them
+  // hidden (pending) until the real engine render lands instead of flashing
+  // the blocky stand-in. Once engine-rendered, the key is unmarked as baked
+  // and this check stops applying.
+  if (isBakedTexture(key) && isEngineConnected()) return undefined
+  return url
 }

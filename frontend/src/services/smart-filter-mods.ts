@@ -9,6 +9,7 @@ import type { ItemRegistryEntry } from './quest-types'
  */
 
 const modItems = new Map<string, string[]>()
+const itemToMod = new Map<string, string>()
 const subscribers = new Set<() => void>()
 let modVersion = 0
 
@@ -29,6 +30,16 @@ export function getModItems(mod: string): string[] | undefined {
 
 export function isModPending(mod: string): boolean {
   return modItems.get(mod) === undefined
+}
+
+/** Mod id for a registered item, or `undefined` if the item is unknown. */
+export function getItemMod(id: string): string | undefined {
+  return itemToMod.get(id)
+}
+
+/** Every item id in the registered instance registry, in stable order. */
+export function getAllRegisteredItems(): string[] {
+  return [...itemToMod.keys()]
 }
 
 function emitChanges(): void {
@@ -53,6 +64,12 @@ export function registerModItems(entries: ItemRegistryEntry[]): void {
     list.push(entry.id)
   }
   modItems.clear()
+  itemToMod.clear()
   for (const [mod, ids] of byMod) modItems.set(mod, ids)
+  for (const entry of entries) {
+    if (entry.id && entry.mod_id && !itemToMod.has(entry.id)) {
+      itemToMod.set(entry.id, entry.mod_id)
+    }
+  }
   emitChanges()
 }

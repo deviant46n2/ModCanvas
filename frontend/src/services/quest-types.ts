@@ -242,10 +242,34 @@ export interface QuestGraphData {
   default_consume_items?: boolean
   default_autoclaim_rewards?: string
   detection_delay?: number
+  emergency_items?: EmergencyItem[]
+  emergency_items_cooldown?: number
+  lock_message?: string
+  show_lock_icons?: boolean
+  fallback_locale?: string
+  disable_gui?: boolean
+  pause_game?: boolean
+  drop_book_on_death?: boolean
+  drop_loot_crates?: boolean
+  hide_excluded_quests?: boolean
+  verify_on_load?: boolean
+  default_quest_disable_jei?: boolean
+  loot_crate_no_drop?: LootCrateNoDrop
   // Book-level visual preset fields (editor-only, not exported to SNBT).
   edge_color?: string
   edge_cycle_color?: string
   active_theme?: string
+}
+
+export interface EmergencyItem {
+  id: string
+  count: number
+}
+
+export interface LootCrateNoDrop {
+  boss: number
+  monster: number
+  passive: number
 }
 
 export interface QuestAnalysis {

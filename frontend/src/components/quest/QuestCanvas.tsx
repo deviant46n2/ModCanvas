@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef, useReducer } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -16,6 +16,7 @@ import {
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/react';
 import type { QuestGraphData, QuestChapter, QuestEdgeData, QuestNodeData, ChapterImage, EdgeBezierRel } from '../../services/quest-types';
 import { questIconUrl } from './questIcons';
+import { subscribeEngineConnectChange } from '../../services/engine-render';
 import { textureDisplayUrl } from '../../services/texture-loader';
 import { shapeTextureKeys, type ShapeTextures } from '../../core/quest/quest-shapes';
 import { NORMAL_COLOR, CYCLE_COLOR, detectCycles } from './quest-edges';
@@ -228,6 +229,11 @@ function QuestCanvasInner({
 
   const textureVersionRef = useRef(0);
   const prevTextureIndexRef = useRef<Record<string, string> | undefined>(undefined);
+  // Rebuild quest icons when the engine-render path toggles: baked icons hide
+  // while the companion is connected (engine render is imminent) and reappear
+  // as real engine icons / software fallbacks otherwise.
+  const [iconRefreshTick, bumpIconRefresh] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => subscribeEngineConnectChange(bumpIconRefresh), []);
   useEffect(() => {
     if (textureIndex && textureIndex !== prevTextureIndexRef.current) {
       prevTextureIndexRef.current = textureIndex;
@@ -310,7 +316,7 @@ function QuestCanvasInner({
 
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, renameNonce, onUpdateNode, setNodes, setEdges]);
+  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges]);
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -320,7 +326,9 @@ function QuestCanvasInner({
 
   // Node-hover highlighting. Keeps each edge's base stroke (e.g. cycle red)
   // intact while dimming unrelated edges so the active quest's dependencies
-  // pop.
+  // pop. The dim/highlight only tweaks opacity — stroke widths stay constant so
+  // hovering never makes lines visibly jump or re-rasterize inside the scaled
+  // viewport (which reads as blur/pixel-shift against a static canvas).
   useEffect(() => {
     setEdges((eds) => eds.map((edge) => {
       const isCycle = isCycleEdge(edge);
@@ -336,10 +344,10 @@ function QuestCanvasInner({
           ...edge,
           style: isCycle
             ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 }
-            : { stroke: edgeColor, strokeWidth: 2.5, opacity: 1 },
+            : { stroke: edgeColor, strokeWidth: 1.5, opacity: 1 },
         };
       }
-      return { ...edge, style: { stroke: '#444', strokeWidth: 1, opacity: 0.06 } };
+      return { ...edge, style: { stroke: '#777', strokeWidth: 1, opacity: 0.28 } };
     }));
   }, [hoveredNodeId, isCycleEdge, edgeColor, cycleColor, setEdges]);
 

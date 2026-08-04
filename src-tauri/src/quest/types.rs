@@ -1000,6 +1000,31 @@ impl RewardTable {
     }
 }
 
+/// An item entry in the book's emergency-items list (`emergency_items`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergencyItem {
+    pub id: String,
+    #[serde(default)]
+    pub count: i32,
+}
+
+/// `loot_crate_no_drop` percentages per kill source (boss/monster/passive).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LootCrateNoDrop {
+    #[serde(default)]
+    pub boss: i32,
+    #[serde(default)]
+    pub monster: i32,
+    #[serde(default)]
+    pub passive: i32,
+}
+
+impl Default for LootCrateNoDrop {
+    fn default() -> Self {
+        Self { boss: 0, monster: 0, passive: 0 }
+    }
+}
+
 /// The complete quest graph
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestGraph {
@@ -1044,6 +1069,45 @@ pub struct QuestGraph {
     /// `detection_delay` from data.snbt — quest-completion scan ticks; FTB default 20.
     #[serde(default)]
     pub detection_delay: i32,
+    /// `emergency_items` from data.snbt — fallback items given on book open.
+    #[serde(default)]
+    pub emergency_items: Vec<EmergencyItem>,
+    /// `emergency_items_cooldown` from data.snbt — seconds between grants.
+    #[serde(default)]
+    pub emergency_items_cooldown: i32,
+    /// `lock_message` from data.snbt — tooltip shown for locked quests.
+    #[serde(default)]
+    pub lock_message: String,
+    /// `show_lock_icons` from data.snbt — draw the lock icon on locked quests.
+    #[serde(default)]
+    pub show_lock_icons: bool,
+    /// `fallback_locale` from data.snbt — locale used when the player's is missing.
+    #[serde(default)]
+    pub fallback_locale: String,
+    /// `disable_gui` from data.snbt — prevent the quest book from opening in-game.
+    #[serde(default)]
+    pub disable_gui: bool,
+    /// `pause_game` from data.snbt — pause single-player when the book is open.
+    #[serde(default)]
+    pub pause_game: bool,
+    /// `drop_book_on_death` from data.snbt — drop the book on death (keep-inventory aware).
+    #[serde(default)]
+    pub drop_book_on_death: bool,
+    /// `drop_loot_crates` from data.snbt — drop loot crates on kill.
+    #[serde(default)]
+    pub drop_loot_crates: bool,
+    /// `hide_excluded_quests` from data.snbt — hide quests excluded from the current team.
+    #[serde(default)]
+    pub hide_excluded_quests: bool,
+    /// `verify_on_load` from data.snbt — run a file integrity check on load.
+    #[serde(default)]
+    pub verify_on_load: bool,
+    /// `default_quest_disable_jei` from data.snbt — disable JEI for quests by default.
+    #[serde(default)]
+    pub default_quest_disable_jei: bool,
+    /// `loot_crate_no_drop` from data.snbt — per-source no-drop percentages.
+    #[serde(default)]
+    pub loot_crate_no_drop: LootCrateNoDrop,
     /// Book-level visual preset palette, editor-only (not exported to SNBT).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edge_color: Option<String>,
@@ -1082,6 +1146,19 @@ impl QuestGraph {
             default_consume_items: false,
             default_autoclaim_rewards: "disabled".to_string(),
             detection_delay: 20,
+            emergency_items: Vec::new(),
+            emergency_items_cooldown: 300,
+            lock_message: String::new(),
+            show_lock_icons: true,
+            fallback_locale: String::new(),
+            disable_gui: false,
+            pause_game: false,
+            drop_book_on_death: false,
+            drop_loot_crates: false,
+            hide_excluded_quests: false,
+            verify_on_load: false,
+            default_quest_disable_jei: false,
+            loot_crate_no_drop: LootCrateNoDrop::default(),
             edge_color: None,
             edge_cycle_color: None,
             active_theme: None,

@@ -3,6 +3,7 @@
 // on the right. Rare/destructive actions live in the menu, not the toolbar.
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDownIcon } from '../ui/icons'
+import { HistoryDrawer } from '../history/HistoryDrawer'
 
 interface TopBarProps {
   projectName: string
@@ -84,6 +85,7 @@ export function TopBar({
         >
           {isTesting ? 'Testing...' : 'Test'}
         </button>
+        <HistoryDrawer />
         <div ref={menuRef} className="project-menu-wrap">
           <button
             className="btn-secondary project-menu-trigger"

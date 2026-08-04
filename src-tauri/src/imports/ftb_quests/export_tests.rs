@@ -426,6 +426,94 @@ fn global_settings_roundtrip_through_export() {
 }
 
 #[test]
+fn book_level_settings_roundtrip_through_export() {
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    std::fs::create_dir_all(&quests_dir).unwrap();
+    std::fs::write(
+        quests_dir.join("data.snbt"),
+        r#"{
+        version: 13
+        emergency_items: [
+            {
+                count: 1
+                id: "minecraft:grass_block"
+            }
+            {
+                count: 3
+                id: "enderio:grains_of_infinity"
+            }
+        ]
+        emergency_items_cooldown: 300
+        lock_message: "You must unlock this first"
+        show_lock_icons: true
+        fallback_locale: "en_us"
+        disable_gui: false
+        pause_game: true
+        drop_book_on_death: true
+        drop_loot_crates: false
+        hide_excluded_quests: true
+        verify_on_load: false
+        default_quest_disable_jei: true
+        loot_crate_no_drop: {
+            boss: 25
+            monster: 50
+            passive: 0
+        }
+    }"#,
+    )
+    .unwrap();
+
+    let graph = import_ftb_quests(tmp.path()).unwrap().graph;
+    assert_eq!(graph.emergency_items.len(), 2, "emergency items parsed");
+    assert_eq!(graph.emergency_items[0].id, "minecraft:grass_block");
+    assert_eq!(graph.emergency_items[0].count, 1);
+    assert_eq!(graph.emergency_items[1].count, 3);
+    assert_eq!(graph.emergency_items_cooldown, 300);
+    assert_eq!(graph.lock_message, "You must unlock this first");
+    assert!(graph.show_lock_icons);
+    assert_eq!(graph.fallback_locale, "en_us");
+    assert!(!graph.disable_gui);
+    assert!(graph.pause_game);
+    assert!(graph.drop_book_on_death);
+    assert!(!graph.drop_loot_crates);
+    assert!(graph.hide_excluded_quests);
+    assert!(!graph.verify_on_load);
+    assert!(graph.default_quest_disable_jei);
+    assert_eq!(graph.loot_crate_no_drop.boss, 25);
+    assert_eq!(graph.loot_crate_no_drop.monster, 50);
+    assert_eq!(graph.loot_crate_no_drop.passive, 0);
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path()).unwrap();
+    let data_path = export_dir.path().join("config").join("ftbquests").join("quests").join("data.snbt");
+    let content = std::fs::read_to_string(&data_path).expect("data.snbt written");
+    assert!(content.contains("emergency_items_cooldown: 300"), "cooldown persisted");
+    assert!(content.contains("\"You must unlock this first\""), "lock message persisted");
+    assert!(content.contains("show_lock_icons: 1b"), "show lock icons persisted");
+    assert!(content.contains("\"en_us\""), "fallback locale persisted");
+    assert!(content.contains("drop_book_on_death: 1b"), "drop book persisted");
+    assert!(content.contains("boss: 25"), "loot crate boss persisted");
+
+    let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
+    assert_eq!(graph2.emergency_items.len(), 2, "emergency items survive round-trip");
+    assert_eq!(graph2.emergency_items[0].id, "minecraft:grass_block");
+    assert_eq!(graph2.emergency_items[1].id, "enderio:grains_of_infinity");
+    assert_eq!(graph2.emergency_items[1].count, 3);
+    assert_eq!(graph2.emergency_items_cooldown, 300);
+    assert_eq!(graph2.lock_message, "You must unlock this first");
+    assert!(graph2.show_lock_icons);
+    assert_eq!(graph2.fallback_locale, "en_us");
+    assert!(graph2.pause_game);
+    assert!(graph2.drop_book_on_death);
+    assert!(graph2.hide_excluded_quests);
+    assert!(graph2.default_quest_disable_jei);
+    assert_eq!(graph2.loot_crate_no_drop.boss, 25);
+    assert_eq!(graph2.loot_crate_no_drop.monster, 50);
+    assert_eq!(graph2.loot_crate_no_drop.passive, 0);
+}
+
+#[test]
 fn quest_link_roundtrips_through_export() {
     let tmp = tempfile::tempdir().unwrap();
     let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");

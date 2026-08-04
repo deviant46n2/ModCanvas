@@ -6,9 +6,9 @@ Reference for closing the gap between the **ModCanvas** desktop workbench and th
 - 🟡 **Partial** — import/export and/or data-model support exists, but no live editor UI (or the round-trip is lossy).
 - ❌ **Missing** — not implemented at all.
 
-FTB source references (`/tmp/ftbq/common/...` or the FTBTeam/FTB-Quests repo) are the authoritative behavior we aim to match. ModCanvas references are the **live** editor only — `frontend/src/QuestBookEditor.tsx`, `frontend/src/components/quest/QuestCanvas.tsx`, `QuestDetailModal.tsx`, `quest-form-sections.tsx`, `ChapterSettings.tsx`, `GroupSettings.tsx`, `book-settings.tsx`. The legacy `QuestGraph.tsx` / `QuestInspector.tsx` / `inspector.tsx` / `toolbar.tsx` / `modals.tsx` stack is dead code (not imported/bundled) and is ignored as evidence of a feature — a field that only exists there is marked ❌.
+FTB source references (`/tmp/ftbq/common/...` or the FTBTeam/FTB-Quests repo) are the authoritative behavior we aim to match. ModCanvas references are the **live** editor only — `frontend/src/QuestBookEditor.tsx`, `frontend/src/components/quest/QuestCanvas.tsx`, `QuestDetailModal.tsx`, `quest-detail-sections.tsx`, `quest-section-groups.tsx`, `ChapterSettings.tsx`, `GroupSettings.tsx`, `book-settings.tsx`. The legacy `QuestGraph.tsx` / `QuestInspector.tsx` / `inspector.tsx` / `toolbar.tsx` / `modals.tsx` stack is dead code (not imported/bundled) and is ignored as evidence of a feature — a field that only exists there is marked ❌.
 
-_Last audited against commit `86d38a4` (branch `fix/smart-filter-textures`)._
+_Last audited against `d5e233a` (branch `drunk-coding`). Audit note: file-size cap (>300 lines) is violated by 41 non-test files; quest import/export rebuilds SNBT comment-free (comment-preserving AST exists but is unused for quest content); Rust serializers gate Data Components by hardcoded `1.20.5+` heuristics with no adapter — see AGENTS.md._
 
 ---
 
@@ -27,13 +27,13 @@ Reached in-game via Settings gear → **Edit File**.
 | Default autoclaim rewards | ✅ | Editable (disabled/enabled/no_toast/invisible) + exported |
 | Detection delay | ✅ | Editable + exported |
 | Default quest size (book-level) | 🟡 | Not surfaced; chapter default exists, book default does not |
-| Emergency items + cooldown | ❌ | Not modeled/exported |
-| Drop loot crates | ❌ | Not modeled/exported |
-| Disable GUI / pause game | ❌ | Not modeled/exported |
-| Lock message / show lock icons | ❌ | Not modeled/exported |
-| Drop book on death / hide excluded / suppress autoclaim | ❌ | Not modeled/exported |
-| Fallback locale | ❌ | Not modeled/exported |
-| **Visual presets** (named shape+size records, assignable per quest/chapter) | ❌ | FTB `VisualPresetsEditorScreen`; no presets concept at all |
+| Emergency items + cooldown | ✅ | Editable (`book-settings.tsx`) + exported + round-trip tested |
+| Drop loot crates | ✅ | Editable + exported |
+| Disable GUI / pause game | ✅ | Editable + exported |
+| Lock message / show lock icons | ✅ | Editable + exported |
+| Drop book on death / hide excluded / suppress autoclaim | 🟡 | `drop_book_on_death` + `hide_excluded_quests` editable + exported; `suppress_all_autoclaiming` not modeled |
+| Fallback locale | ✅ | Editable + exported |
+| **Visual presets** (named shape+size records, assignable per quest/chapter) | ❌ | FTB `VisualPresetsEditorScreen`; book-level theme presets exist (`core/quest/theme-presets.ts`) but per-quest named shape+size presets do not |
 | Book icon / background image | 🟡 | Model carries it; icon picker targets `book` but nothing opens it |
 | Save on Server / Save as File | 🟡 | Save + Save & Hot-Reload over WS exist; no "save as file" to arbitrary path |
 
@@ -117,7 +117,7 @@ ModCanvas objective types (`quest-form-constants.ts`): item_acquisition, item_re
 
 | FTB task | FTB editable fields | ModCanvas | Notes / what to do |
 |---|---|---|---|
-| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt + smart filter | 🟢 | all flags editable; smart-filter DSL **display-only** (cycles icons), no editor |
+| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt + smart filter | 🟢 | all flags editable; smart-filter DSL **display-only** (no editor), but the icon now cycles the items that actually **match** the filter (root=AND, `not`/`and`/`or`/`only_one` semantics evaluated over the scanned item registry) at the in-game 1 s beat — see `core/quest/smart-filter.ts` |
 | Custom | custom JSON, max_progress | 🟡 | Parsed/exported; not editable, no max_progress |
 | XP | value, points | ✅ | |
 | Dimension | dim | 🟡 | Imported as `location_visit`; no dedicated UI |
@@ -164,7 +164,7 @@ FTB `RewardTable` objects (`EditRewardTableScreen`) — weighted pools reference
 |---|---|---|
 | Import/export `reward_tables/<hex>.snbt` | ✅ | Weighted pools, loot_size, empty_weight, hide_tooltip, use_title round-trip |
 | `table_id` / `reward_chests` wiring | ✅ | Carried in model; resolved on import, written on export |
-| **Live weighted-table editor** | ✅ | `RewardTablesModal.tsx` (🎁 Tables button): create/rename/delete tables, weighted entries (item/count/weight), loot_size/empty_weight/hide_tooltip/use_title, reorder, usage count |
+| **Live weighted-table editor** | ✅ | `RewardTablesModal.tsx` (🏆 Rewards toolbar button): create/rename/delete tables, weighted entries (item/count/weight), loot_size/empty_weight/hide_tooltip/use_title, reorder, usage count |
 | Choice reward per-entry options | 🟡 | Entries edited inside the table; choice-style per-reward collections still not exposed |
 
 ---
@@ -211,7 +211,7 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Delete group | ✅ | Unassigns chapters |
 | Assign chapter to group | ✅ | ChapterSettings group select |
 | Render groups as collapsible tabs | ✅ | |
-| Write `chapter_groups.snbt` on export | 🟡 | Export writes per-chapter `group` keys; confirm standalone `chapter_groups.snbt` file is emitted |
+| Write `chapter_groups.snbt` on export | ✅ | Exported (`export.rs`), parsed on import, covered by `chapter_groups_roundtrip_through_export` |
 
 ---
 
@@ -264,11 +264,11 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Dependency cycle detection + warning | ✅ |
 | Edge draw / reconnect / delete | ✅ |
 | Quest search / filter bar | ✅ Type-to-filter by label/id/subtitle/objective target; dims non-matches, Enter focuses the first match |
-| Hover dependency highlight | ✅ |
+| Hover dependency highlight | ✅ | Gentle: hovered quest's edges brighten to full opacity, others dim to 28% (opacity-only — no stroke-width jump, no CSS `filter`, so nothing blurry or pixel-shifting inside the scaled viewport) |
 | **Undo / redo (Ctrl+Z/Y)** | ✅ | Full-graph snapshot history in `QuestBookEditor`; ↩/↪ toolbar buttons + Ctrl+Z / Ctrl+Y |
 | **Bezier control-point editing per edge** | ✅ | Per-edge curve handles (`EdgeBezierEditor`); one undoable step per drag; stored in the editor graph (not in SNBT — FTB's format has no field) |
 | Editing-mode toggle | ✅ 🔒 View / ✏️ Edit: read-only lock disables move/connect/delete/add while keeping selection + navigation |
-| Emergency items | ❌ |
+| Emergency items | ✅ | §1 — editable + exported + round-trip tested |
 | Reward tables screen | ✅ §8 |
 | Other (search, align, bezier, editing toggle) | ✅ | See rows above | |
 
@@ -281,7 +281,7 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Flat-chapter layout | ✅ export | |
 | Subdirs layout | ✅ export | |
 | Layout choice | ❌ Always writes **both**; no user choice | |
-| Subdirs export completeness | 🟡 | Verify it no longer drops chapter icon/progression_mode/default_quest_size/description |
+| Subdirs export completeness | 🟡 | Chapter icon + description still dropped on subdirs export; progression_mode + default_quest_size now written |
 | Comment-preserving writes | ✅ | atomic `.tmp` + AST-preserving |
 | Legacy key aliases | 🟡 | `min_width` vs `min_window_width`, `invisible` vs `invisible_until_completed` asymmetries |
 
@@ -294,7 +294,7 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 | Rendering detail | ModCanvas | Notes / what to do |
 |---|---|---|
 | Dependency lines as **textured bezier curves** (theme-controlled texture/color/thickness/animation speed) | ❌ | Custom SVG edges with hardcoded colors; no theme texture |
-| Panel/border/background styling from theme selectors | ❌ | No `ftb_quests_theme.txt` parsing |
+| Panel/border/background styling from theme selectors | ❌ | `ftb_quests_theme.txt` parsing exists (`src-tauri/src/ftb_theme.rs`) but only resolves chapter `background` keys; panel/border/checkmark selectors still hardcoded |
 | `quest_spacing`, `pinned_quest_size`, `full_screen_quest` | ❌ | Hardcoded layout constants |
 | Checkmark / progress icons from theme | ❌ | Emoji/vector badges |
 | Quest shape tiles | ✅ | Canvas-baked via `bakeShapeTile` (verified round/transparent/grey+outline) |
@@ -302,6 +302,8 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 | Node pulse animation when selected | 🟡 | Partial |
 
 **Suggested approach:** parse the pack's `ftb_quests_theme.txt` (and defaults) in Rust or a pure `core/` parser, expose a resolved theme object to the frontend, and drive edge/panel/checkmark rendering from it — same lazy-materialization rules as the texture pipeline (descriptors, never bundled bytes).
+
+**Engine-rendered icons (companion mod) — shipped (see `docs/engine-renders.md`):** items the software rasterizer cannot bake — AND the software-baked `bake:` stand-ins — are rendered in-game by the companion mod over the WS bridge (`RENDER_ITEMS_REQUEST`/`RENDER_ITEMS_RESULT`), returned as base64 PNG data URLs, and cached per-instance by ModCanvas (`engine_renders` disk cache, invalidated when the pack's jars change). Baked icons stay hidden while the engine path is active (no ugly 3D stand-in), then load once and render instantly from cache on every subsequent open. Opt-in, offline-first, lazy; 4 renders/tick in-game so frames never hitch.
 
 ---
 
@@ -317,12 +319,32 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 
 ---
 
+## 18. Pack Health (ModCanvas-only, not an FTB feature)
+
+A workspace tab that reports the pack's file-level soundness as a pure function
+of already-materialized state (§9 of the Project Bible). **Tier 1 (reference
+integrity + coverage) is shipped** — see `docs/pack-health.md`.
+
+| Check | Status |
+|---|---|
+| Quests: dead item references against the pack's item registry | ✅ recommended (never blocking; suppressed when registry degraded) |
+| Quests: dependency cycles (reuses `core/validation/quest-validator`) | ✅ blocking |
+| Quests: undefined / unused reward tables | ✅ |
+| Quests: empty chapters, unreachable quests | ✅ |
+| Recipes: authored-only validation surfaced from `core/recipe/validation` | ✅ |
+| Pack: cover image, pack info fields, zero chapters | ✅ |
+| Registry stats + degraded-registry diagnostic in the verdict | ✅ |
+| Copy button on every finding (Trust Rule) | ✅ |
+| Tier 2 progression topology / Tier 3 flavor analytics | ❌ quarantined (§9.3) |
+
+---
+
 ## Priority shortlist — what to build first
 
 Ordered by value / effort. Items 1–2 are done. Items 3–4 are the remaining cheap wins; 5–6 are the biggest editing gaps; 7 is the deep WYSIWYG work.
 
 1. ✅ **Resurface orphaned per-quest fields in the live modal** — `repeat_cooldown`, `hide_lock_icon`, `guide_page`, `max_completable_dependents`, `dependency_requirement`, `min_required_dependencies` now all editable in the Advanced section of `QuestDetailModal.tsx`.
-2. ✅ **Reward-table editor screen** — `RewardTablesModal.tsx` (🎁 Tables): weighted entries, loot_size/empty_weight, reorder, usage count; `RewardCard` gets a table `<select>` for choice/all_table/random rewards.
+2. ✅ **Reward-table editor screen** — `RewardTablesModal.tsx` (🏆 Rewards toolbar button): weighted entries, loot_size/empty_weight, reorder, usage count; `RewardCard` gets a table `<select>` for choice/all_table/random rewards.
 3. ✅ **Right-click context menus** — node menu (Edit/Duplicate/Copy ID/Complete/Reset/Delete, bulk variants on multi-selection) and empty-pane menu (Add Quest, Add Link, New Quest with Task, Paste Quest), with right-click-to-position placement at the cursor via `QuestContextMenu.tsx`.
 4. ✅ **Undo / redo (Ctrl+Z/Y)** — full-graph snapshot history on every `commitGraph` mutation, ↩/↪ toolbar buttons with disabled states.
 5. **Task/reward field completion** — kill tag/custom_name/nbt_filter, location W×H×D box + ignore_dim, item `task_screen_only`/`only_from_crafting` + match_components, command reward permission_level/silent/feedback_message, item reward random_bonus/only_one, per-task title/icon/description, common reward fields (team/autoclaim/exclude/blocking/blur), gamestage team_stage/remove, advancement criterion.
@@ -344,6 +366,6 @@ Ordered by value / effort. Items 1–2 are done. Items 3–4 are the remaining c
    - ✅ Bezier control points per edge — `EdgeBezierEditor` draggable handles (anchored to the handle anchors so curves track quests); live preview + single undoable commit per drag; persisted in `QuestEdgeData.bezier`/`QuestEdge.bezier` (editor-only — FTB has no SNBT field).
    - ✅ Book-level visual presets — self-authored `BOOK_THEME_PRESETS` (clean-room, no FTB theme data) repaint book/chapter defaults + quest colors and drive edge colors via `edge_color`/`edge_cycle_color`.
 7. **Theme-file fidelity (§16)** — parse `ftb_quests_theme.txt` and drive edge/panel/checkmark/spacing rendering from it.
-8. **Remaining book-level settings** — emergency items, lock message, show lock icons, book icon picker, book default quest size, fallback locale, save-as-file.
+8. 🟡 **Remaining book-level settings** — emergency items (+cooldown), lock message, show lock icons, disable gui, pause game, drop book on death, drop loot crates, hide excluded quests, verify on load, default disable JEI, fallback locale, loot crate no-drop % — all shipped end-to-end (import/export/UI + roundtrip test). Remaining: **book icon picker**, **book default quest size (book-level, distinct from per-chapter)**, **save-as-file**.
 9. **Import/export hardening** — user layout choice, fix subdirs drops, unify `min_width`/`invisible` aliases, emit `chapter_groups.snbt`, parse/export quest `tags`.
 10. **Description editor** — multi-page + inline images (§17).

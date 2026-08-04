@@ -160,7 +160,7 @@ pub fn scan_instance_mods(
                     slug: mod_id.clone(),
                     name: mod_id.clone(),
                     version: mod_info.version.unwrap_or_default(),
-                    description: String::new(),
+                    description: mod_info.description.unwrap_or_default(),
                     author: String::new(),
                     source: match mod_info.loader {
                         Some(ModLoader::Fabric) => ModSource::Modrinth,
@@ -171,6 +171,7 @@ pub fn scan_instance_mods(
                     },
                     enabled: true,
                     added_at: chrono::Utc::now(),
+                    icon: mod_info.icon_data_url,
                 };
                 mods.push(entry);
             }

@@ -6,7 +6,6 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Sidebar } from './components/common/sidebar'
 import { ProjectWorkspace } from './components/common/ProjectWorkspace'
 import { NewProjectModal, ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
-import { SettingsModal } from './components/common/settings-modal'
 import { useAppState } from './hooks/useAppState'
 import { HistoryProvider, useHistory } from './hooks/history-provider'
 import { saveQuestGraph } from './services/quest'
@@ -71,7 +70,6 @@ function AppRoot() {
             onRefresh={s.loadProjects}
             onImport={() => s.setShowImport(true)}
             onNewProject={() => s.setShowNewProject(true)}
-            onSettings={() => s.setShowSettings(true)}
           />
 
           <main className="main-content">
@@ -130,6 +128,7 @@ function AppRoot() {
                   getModNameById: s.getModNameById,
                   searchSource: s.searchSource,
                   onSearchSourceChange: s.setSearchSource,
+                  installingIds: s.installingIds,
                 }}
                 configsTab={{
                   configFiles: s.configFiles,
@@ -205,16 +204,6 @@ function AppRoot() {
             projectName={s.selectedProject?.name}
             onCancel={s.handleCloseDelete}
             onConfirm={s.handleConfirmDelete}
-          />
-
-          <SettingsModal
-            show={s.showSettings}
-            onClose={s.handleCloseSettings}
-            curseforgeApiKey={s.curseforgeApiKey}
-            onApiKeyChange={s.setCurseforgeApiKey}
-            settingsSaving={s.settingsSaving}
-            settingsMessage={s.settingsMessage}
-            onSave={s.saveCurseforgeApiKey}
           />
         </div>
   )

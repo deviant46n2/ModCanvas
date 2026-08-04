@@ -113,19 +113,25 @@ impl MrPackImporter {
     }
     
     pub fn import(path: &Path) -> Result<ImportResult> {
-        let _temp;
         let temp_dir = if path.extension().map_or(false, |ext| ext == "mrpack") {
-            _temp = tempfile::tempdir()?;
-            eprintln!("[ModCanvas] Extracting mrpack to {}", _temp.path().display());
-            extract_mrpack(path, _temp.path())?;
+            // Extract into a PERSISTENT directory (not a tempdir). The tempdir
+            // guard used to drop when this function returned, deleting the pack
+            // under `project.path` and leaving the workspace with no mods/,
+            // config/, textures, or item registry.
+            let dest = crate::path_safety::imported_pack_extract_dir(
+                path.file_stem().map(|s| s.to_string_lossy()).unwrap_or_default().as_ref(),
+            )
+            .map_err(|e| anyhow::anyhow!(e))?;
+            eprintln!("[ModCanvas] Extracting mrpack to {}", dest.display());
+            extract_mrpack(path, &dest)?;
             eprintln!("[ModCanvas] Extraction complete, listing contents recursively...");
-            for entry in walkdir::WalkDir::new(_temp.path()).into_iter().filter_map(|e| e.ok()) {
+            for entry in walkdir::WalkDir::new(&dest).into_iter().filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.is_file() {
                     eprintln!("[ModCanvas]   {}", path.display());
                 }
             }
-            _temp.path().to_path_buf()
+            dest
         } else {
             path.to_path_buf()
         };

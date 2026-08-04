@@ -1,6 +1,7 @@
+import { useCallback, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
-import { ModRow, SearchResultRow, type ModRowExtraProps, type SearchResultRowExtraProps } from './rows'
+import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
 
 interface ModMetadata {
   mod_id: string
@@ -16,7 +17,9 @@ interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  icon: string | null
   source: 'modrinth' | 'curseforge'
+  mismatch?: string | null
 }
 
 interface CompatibilityIssue {
@@ -59,18 +62,72 @@ export interface ModsTabProps {
   getModNameById: (modId: string) => string
   searchSource: 'modrinth' | 'curseforge'
   onSearchSourceChange: (source: 'modrinth' | 'curseforge') => void
+  installingIds: Set<string>
 }
 
+const SEARCH_ROW_HEIGHT = 48
+
 export function ModsTab(props: ModsTabProps) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelect = useCallback((modId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(modId)) {
+        next.delete(modId)
+      } else {
+        next.add(modId)
+      }
+      return next
+    })
+  }, [])
+
+  const allFilteredSelected = useMemo(
+    () => props.filteredMods.length > 0 && props.filteredMods.every(m => selectedIds.has(m.mod_id)),
+    [props.filteredMods, selectedIds]
+  )
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (props.filteredMods.every(m => prev.has(m.mod_id))) return new Set()
+      return new Set(props.filteredMods.map(m => m.mod_id))
+    })
+  }, [props.filteredMods])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  const selectedCount = useMemo(
+    () => props.filteredMods.filter(m => selectedIds.has(m.mod_id)).length,
+    [props.filteredMods, selectedIds]
+  )
+
+  const bulkSetEnabled = useCallback(async (enabled: boolean) => {
+    const targets = props.filteredMods.filter(m => selectedIds.has(m.mod_id) && m.enabled !== enabled)
+    for (const mod of targets) {
+      await props.onToggleMod(mod)
+    }
+    clearSelection()
+  }, [props.filteredMods, selectedIds, props.onToggleMod, clearSelection])
+
   const handleSearchMods = () => {
     props.onSearchMods(props.searchSource)
   }
+
   return (
     <ErrorBoundary>
       <div className="mods-panel" id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods">
         <div className="mods-section">
           <div className="section-header">
-            <h3>Project Mods ({props.projectMods.length})</h3>
+            <div className="section-title">
+              <input
+                type="checkbox"
+                className="select-all-check"
+                checked={allFilteredSelected}
+                onChange={toggleSelectAll}
+                aria-label="Select all visible mods"
+              />
+              <h3>Project Mods ({props.projectMods.length})</h3>
+            </div>
             <div className="section-actions">
               <button
                 className="btn-secondary btn-sm"
@@ -108,6 +165,23 @@ export function ModsTab(props: ModsTabProps) {
             </div>
           </div>
 
+          {selectedCount > 0 && (
+            <div className="bulk-bar" role="toolbar" aria-label="Bulk mod actions">
+              <span className="bulk-count">{selectedCount} selected</span>
+              <div className="bulk-actions">
+                <button className="btn-secondary btn-sm" onClick={() => bulkSetEnabled(true)} disabled={props.isLoadingMetadata}>
+                  Enable selected
+                </button>
+                <button className="btn-secondary btn-sm" onClick={() => bulkSetEnabled(false)} disabled={props.isLoadingMetadata}>
+                  Disable selected
+                </button>
+              </div>
+              <button className="bulk-clear" onClick={clearSelection} aria-label="Clear selection" title="Clear selection">
+                {'\u00D7'}
+              </button>
+            </div>
+          )}
+
           {props.compatResult && (
             <div className={`compat-panel ${props.compatResult.compatible ? 'compatible' : 'has-issues'}`}>
               <div className="compat-header">
@@ -139,26 +213,22 @@ export function ModsTab(props: ModsTabProps) {
             </div>
           )}
 
-          <div className="mod-list" style={{ height: 'calc(100vh - 250px)' }}>
+          <div className="mod-list">
             {props.projectMods.length === 0 ? (
               <div className="empty-state">No mods in this project yet. Search and add mods below.</div>
             ) : props.filteredMods.length === 0 ? (
               <div className="empty-state">No mods match your filter.</div>
             ) : (
-              <List<ModRowExtraProps>
-                style={{ height: '100%', width: '100%' }}
-                rowComponent={ModRow}
-                rowCount={props.filteredMods.length}
-                rowHeight={200}
-                rowProps={{
-                  filteredMods: props.filteredMods,
-                  modMetadata: props.modMetadata,
-                  projectMods: props.projectModsForDeps,
-                  getMissingDependencies: props.getMissingDependencies,
-                  toggleModEnabled: props.onToggleMod,
-                  removeModFromProject: props.onRemoveMod,
-                  getModNameById: props.getModNameById,
-                }}
+              <ModRow
+                filteredMods={props.filteredMods}
+                modMetadata={props.modMetadata}
+                projectMods={props.projectModsForDeps}
+                getMissingDependencies={props.getMissingDependencies}
+                toggleModEnabled={props.onToggleMod}
+                removeModFromProject={props.onRemoveMod}
+                getModNameById={props.getModNameById}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
               />
             )}
           </div>
@@ -201,17 +271,18 @@ export function ModsTab(props: ModsTabProps) {
             />
             <button onClick={handleSearchMods} aria-label="Search">Search</button>
           </div>
-          <div className="search-results" style={{ height: 'calc(100vh - 480px)' }}>
+          <div className="search-results">
             {props.searchResults.length > 0 && (
               <List<SearchResultRowExtraProps>
                 style={{ height: '100%', width: '100%' }}
                 rowComponent={SearchResultRow}
                 rowCount={props.searchResults.length}
-                rowHeight={80}
+                rowHeight={SEARCH_ROW_HEIGHT}
                 rowProps={{
                   searchResults: props.searchResults,
                   projectMods: props.projectModsForDeps,
                   addModToProject: props.onAddMod,
+                  installingIds: props.installingIds,
                 }}
               />
             )}

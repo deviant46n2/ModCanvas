@@ -67,6 +67,19 @@ fn get_jar_meta(path: &Path) -> Option<JarMeta> {
     })
 }
 
+/// True for lang keys like `item.theurgy.alchemical_sulfur_dragonfruit.tooltip.extended`
+/// — description/tooltip strings that start with `item.` but are NOT item
+/// registrations. Counting them as items flooded the registry with unrenderable
+/// entries (77% of a large pack's "items" had no texture, all tooltips).
+fn is_fake_item_key(rest: &str) -> bool {
+    const MARKERS: [&str; 16] = [
+        ".tooltip", ".desc", ".description", ".lore", ".info", ".help",
+        ".guide", ".how_to", ".howto", ".wiki", ".jei", ".page", ".example",
+        ".tips", ".advancement", ".chapter",
+    ];
+    MARKERS.iter().any(|m| rest.contains(m))
+}
+
 fn parse_lang_for_items(lang_json: &str) -> Vec<(String, String, String)> {
     let mut items = Vec::new();
     let map: HashMap<String, String> = match serde_json::from_str(lang_json) {
@@ -75,12 +88,18 @@ fn parse_lang_for_items(lang_json: &str) -> Vec<(String, String, String)> {
     };
     for (key, value) in &map {
         if let Some(rest) = key.strip_prefix("item.") {
+            if is_fake_item_key(rest) {
+                continue;
+            }
             if let Some(dot) = rest.find('.') {
                 let namespace = &rest[..dot];
                 let path = &rest[dot + 1..];
                 items.push((format!("{}:{}", namespace, path), value.clone(), namespace.to_string()));
             }
         } else if let Some(rest) = key.strip_prefix("block.") {
+            if is_fake_item_key(rest) {
+                continue;
+            }
             if let Some(dot) = rest.find('.') {
                 let namespace = &rest[..dot];
                 let path = &rest[dot + 1..];
@@ -260,7 +279,7 @@ fn save_cache(instance_path: &Path, current_jars: &[(PathBuf, JarMeta)], items: 
 /// 3. `{instance_root}/versions/` (Vanilla launcher style)
 /// 4. `~/.minecraft/versions/` (global Vanilla launcher directory)
 /// 5. JARs directly in the instance path (excluding `mods/`)
-fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
+pub(crate) fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
     let mut jars = Vec::new();
 
     // 1. PrismLauncher / MultiMC: launcher root is 3 levels up from `instances/NAME/minecraft`
@@ -478,6 +497,27 @@ mod tests {
         let items = parse_lang_for_items(json);
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].0, "minecraft:diamond");
+    }
+
+    #[test]
+    fn test_parse_lang_filters_tooltip_and_description_keys() {
+        let json = r#"{
+            "item.theurgy.alchemical_sulfur_dragonfruit": "Alchemical Sulfur Dragonfruit",
+            "item.theurgy.alchemical_sulfur_dragonfruit.tooltip.extended": "Sulfur represents the idea of souls",
+            "item.mod.thing.desc": "A long description",
+            "item.mod.thing.lore": "Some lore",
+            "item.mod.real_item": "Real Item",
+            "block.mod.real_block": "Real Block",
+            "block.mod.real_block.tooltip.info": "Block info"
+        }"#;
+        let items = parse_lang_for_items(json);
+        let mut ids: Vec<String> = items.iter().map(|(id, _, _)| id.clone()).collect();
+        ids.sort();
+        assert_eq!(ids, vec![
+            "mod:real_block".to_string(),
+            "mod:real_item".to_string(),
+            "theurgy:alchemical_sulfur_dragonfruit".to_string(),
+        ]);
     }
 
     #[test]

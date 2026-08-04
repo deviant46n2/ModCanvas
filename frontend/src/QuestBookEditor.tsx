@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import { useHistory } from './hooks/history-provider'
-import { getQuestGraph } from './services/api'
+import { getQuestGraph, wsIpcGetStatus } from './services/api'
 import type { QuestGraphData, QuestChapter, QuestChapterGroup, QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel } from './services/api'
 import { QuestCanvas } from './components/quest/QuestCanvas'
 import { ChapterTree } from './components/quest/ChapterTree'
@@ -20,6 +20,7 @@ import { registerModItems } from './services/smart-filter-mods'
 import {
   subscribeMaterialized,
   subscribeLoadingChange,
+  subscribeNotFound,
   getMaterialized,
   requestMaterialize,
   buildTexturePathIndex,
@@ -28,13 +29,27 @@ import {
   prefetchAllChapterTextures,
   registerBakedKeysFromIndex,
   isUsableTextureValue,
+  isBakedTexture,
+  getBakedTextureKeys,
+  unmarkBakedKeys,
 } from './services/texture-loader'
 import { requestResolveTags } from './services/smart-filter-tags'
+import {
+  initEngineRenderListener,
+  setEngineRenderConnected,
+  subscribeEngineRenders,
+  queueEngineRenders,
+  queueEngineRendersPriority,
+  getEngineRenderCache,
+  persistEngineRenders,
+  normalizeItemId,
+} from './services/engine-render'
 import { JeiDrawer } from './components/jei/JeiDrawer'
 import { TextureLoadingBar } from './components/quest/TextureLoadingBar'
 import { AnimationProvider } from './components/quest/animation-context'
 import './components/quest/editor-theme.css'
 import type { ProgressState } from './core/quest/progress'
+import { usePackHealthStore } from './core/pack-health/pack-health-store'
 
 interface QuestBookEditorProps {
   projectId: string
@@ -46,7 +61,7 @@ interface QuestBookEditorProps {
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, wsConnected: _wsConnected, ingestResult, packLoaded }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, wsConnected, ingestResult, packLoaded }: QuestBookEditorProps) {
   const [graph, setGraph] = useState<QuestGraphData | null>(null)
   const [activeChapter, setActiveChapter] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -164,6 +179,111 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
       }).catch((e) => console.error('[QuestBookEditor] Failed to scan instance items:', e));
     }
   }, [ingestResult])
+
+  // ── Engine-render pipeline (companion mod) ──────────────────────────────
+  // When the game is running with the companion connected, icons that the local
+  // pipeline cannot bake (complex/custom mod models, fluids, …) are rendered
+  // in-game and cached. Injected into the live texture index (quest tiles) and
+  // the item registry (JEI view), and persisted to the Rust disk cache.
+  const instancePath = ingestResult?.active_instance || projectPath || ''
+  useEffect(() => {
+    let disposed = false
+    initEngineRenderListener()
+    setEngineRenderConnected(!!wsConnected)
+
+    // Fallback sync: if the `ws-ipc:status` event was missed (or the effect
+    // ran before the game connected), poll the server so the engine-render
+    // path arms itself shortly after the companion appears.
+    let pollTimer: ReturnType<typeof setInterval> | undefined
+    const syncStatus = () => {
+      wsIpcGetStatus().then((st) => {
+        if (!disposed) setEngineRenderConnected(st.connected)
+      }).catch(() => {})
+    }
+    pollTimer = setInterval(syncStatus, 5000)
+    syncStatus()
+
+    if (instancePath) {
+      getEngineRenderCache(instancePath)
+        .then((cached) => {
+          if (disposed || !cached || Object.keys(cached).length === 0) return
+          // Cached engine icons replace any software bake for these items.
+          unmarkBakedKeys(Object.keys(cached))
+          setTextureIndex((prev) => {
+            let changed = false
+            const merged = { ...prev }
+            for (const [k, v] of Object.entries(cached)) {
+              if (prev[k] !== v) {
+                merged[k] = v
+                changed = true
+              }
+            }
+            return changed ? merged : prev
+          })
+          setItems((prev) => prev.map((i) => (i.texture_data_url ? i : { ...i, texture_data_url: cached[i.id] ?? null })))
+        })
+        .catch(() => {})
+    }
+
+    const unsubRenders = subscribeEngineRenders((rendered) => {
+      // Real engine icons: stop treating them as software-baked so they render
+      // pixelated (in-game look) instead of smooth-scaled.
+      unmarkBakedKeys(Object.keys(rendered))
+      setTextureIndex((prev) => {
+        let changed = false
+        const merged = { ...prev }
+        for (const [k, v] of Object.entries(rendered)) {
+          if (prev[k] !== v) {
+            merged[k] = v
+            changed = true
+          }
+        }
+        return changed ? merged : prev
+      })
+      setItems((prev) => prev.map((i) => (i.texture_data_url ? i : { ...i, texture_data_url: rendered[i.id] ?? null })))
+      if (instancePath) {
+        persistEngineRenders(instancePath, rendered).catch((e) => console.error('[QuestBookEditor] persistEngineRenders failed:', e))
+      }
+    })
+
+    return () => {
+      disposed = true
+      if (pollTimer) clearInterval(pollTimer)
+      unsubRenders()
+    }
+  }, [instancePath, wsConnected])
+
+  // Queue engine renders once the companion is connected:
+  //  - software-baked item ids (replaced with real GUI renders, cached forever)
+  //  - registry items with no baked texture (JEI "?" slots)
+  //  - keys that exhausted materialization retries (quest tiles)
+  useEffect(() => {
+    if (!wsConnected) return
+    const missingRegistry = items.filter((i) => !i.texture_data_url).map((i) => i.id)
+    if (missingRegistry.length > 0) queueEngineRenders(missingRegistry)
+    const unsub = subscribeNotFound((keys) => {
+      const itemLike = keys.map(normalizeItemId).filter((k): k is string => !!k)
+      if (itemLike.length > 0) queueEngineRenders(itemLike)
+    })
+    return unsub
+  }, [wsConnected, instancePath, items])
+
+  // Once the texture index is loaded (which populates `bakedKeys`), queue all
+  // software-baked items for engine replacement. Runs again on index changes so
+  // newly-scanned bakes are caught; `queueEngineRenders` dedupes.
+  useEffect(() => {
+    if (!wsConnected) return
+    const baked = getBakedTextureKeys()
+    if (baked.length > 0) queueEngineRenders(baked)
+  }, [wsConnected, textureIndex])
+
+  // Feed the Pack Health panel with the already-materialized quest graph and
+  // item registry. This is a push of cached state — never a scan — so the
+  // health report updates on every commit without any extra I/O.
+  const setQuestState = usePackHealthStore((s) => s.setQuestState)
+  useEffect(() => {
+    setQuestState(graph, items)
+  }, [graph, items, setQuestState])
 
   useEffect(() => {
     const instancePath = ingestResult?.active_instance || projectPath || ''
@@ -708,7 +828,16 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected: _
     if (tags.length > 0) {
       requestResolveTags(tags, instancePath)
     }
-  }, [graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, ingestPathIndex, scanPathIndex, ingestResult?.active_instance, projectPath])
+    // Software-baked items in the CURRENT view get engine renders first so the
+    // page upgrades quickly; the background queue fills the rest of the pack.
+    if (wsConnected) {
+      const bakedInView = [...new Set([...targets].map(resolveIconKey))]
+        .filter((k) => isBakedTexture(k))
+        .map(normalizeItemId)
+        .filter((id): id is string => !!id)
+      if (bakedInView.length > 0) queueEngineRendersPriority(bakedInView)
+    }
+  }, [graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, ingestPathIndex, scanPathIndex, ingestResult?.active_instance, projectPath, wsConnected])
 
   if (!graph) {
     return <QuestBookSkeleton />

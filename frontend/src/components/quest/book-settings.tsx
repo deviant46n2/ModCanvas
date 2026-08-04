@@ -110,6 +110,79 @@ export function BookSettings({
             </div>
           </div>
           <div className="ftb-popup-section">
+            <div className="ftb-popup-section-title">Book Behavior (data.snbt)</div>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.show_lock_icons ?? true} onChange={(e) => onGraphChange({ ...graph, show_lock_icons: e.target.checked })} />
+              <span>Show lock icons on locked quests</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.pause_game ?? false} onChange={(e) => onGraphChange({ ...graph, pause_game: e.target.checked })} />
+              <span>Pause game while the book is open</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.disable_gui ?? false} onChange={(e) => onGraphChange({ ...graph, disable_gui: e.target.checked })} />
+              <span>Disable opening the quest book in-game</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.drop_book_on_death ?? false} onChange={(e) => onGraphChange({ ...graph, drop_book_on_death: e.target.checked })} />
+              <span>Drop the quest book on death</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.drop_loot_crates ?? false} onChange={(e) => onGraphChange({ ...graph, drop_loot_crates: e.target.checked })} />
+              <span>Drop loot crates on kill</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.hide_excluded_quests ?? false} onChange={(e) => onGraphChange({ ...graph, hide_excluded_quests: e.target.checked })} />
+              <span>Hide quests excluded from the team</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.verify_on_load ?? false} onChange={(e) => onGraphChange({ ...graph, verify_on_load: e.target.checked })} />
+              <span>Verify quest file integrity on load</span>
+            </label>
+            <label className="ftb-popup-checkbox">
+              <input type="checkbox" checked={graph.default_quest_disable_jei ?? false} onChange={(e) => onGraphChange({ ...graph, default_quest_disable_jei: e.target.checked })} />
+              <span>Disable JEI for quests by default</span>
+            </label>
+            <div className="ftb-popup-field">
+              <label>Lock Message</label>
+              <input type="text" value={graph.lock_message || ''} onChange={(e) => onGraphChange({ ...graph, lock_message: e.target.value })} placeholder="e.g. Complete earlier quests to unlock this" />
+            </div>
+            <div className="ftb-popup-field">
+              <label>Fallback Locale</label>
+              <input type="text" value={graph.fallback_locale || ''} onChange={(e) => onGraphChange({ ...graph, fallback_locale: e.target.value })} placeholder="e.g. en_us" />
+            </div>
+            <div className="ftb-popup-field">
+              <label>Emergency Items Cooldown (seconds)</label>
+              <input type="number" min="0" value={graph.emergency_items_cooldown ?? 300} onChange={(e) => onGraphChange({ ...graph, emergency_items_cooldown: parseInt(e.target.value) || 0 })} />
+            </div>
+            <div className="ftb-popup-field">
+              <label>Emergency Items (id + count per line)</label>
+              <textarea
+                rows={3}
+                value={(graph.emergency_items || []).map((it) => `${it.id} ${it.count}`).join('\n')}
+                onChange={(e) => {
+                  const items = e.target.value.split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                    .map((line) => {
+                      const [id, count] = line.split(/\s+/)
+                      return { id, count: parseInt(count) || 1 }
+                    })
+                  onGraphChange({ ...graph, emergency_items: items })
+                }}
+                placeholder={"minecraft:grass_block 1\nminecraft:oak_sapling 1"}
+              />
+            </div>
+            <div className="ftb-popup-field">
+              <label>Loot Crate No-Drop % (boss / monster / passive)</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input type="number" min="0" max="100" value={graph.loot_crate_no_drop?.boss ?? 0} onChange={(e) => onGraphChange({ ...graph, loot_crate_no_drop: { boss: parseInt(e.target.value) || 0, monster: graph.loot_crate_no_drop?.monster ?? 0, passive: graph.loot_crate_no_drop?.passive ?? 0 } })} />
+                <input type="number" min="0" max="100" value={graph.loot_crate_no_drop?.monster ?? 0} onChange={(e) => onGraphChange({ ...graph, loot_crate_no_drop: { boss: graph.loot_crate_no_drop?.boss ?? 0, monster: parseInt(e.target.value) || 0, passive: graph.loot_crate_no_drop?.passive ?? 0 } })} />
+                <input type="number" min="0" max="100" value={graph.loot_crate_no_drop?.passive ?? 0} onChange={(e) => onGraphChange({ ...graph, loot_crate_no_drop: { boss: graph.loot_crate_no_drop?.boss ?? 0, monster: graph.loot_crate_no_drop?.monster ?? 0, passive: parseInt(e.target.value) || 0 } })} />
+              </div>
+            </div>
+          </div>
+          <div className="ftb-popup-section">
             <div className="ftb-popup-field">
               <label>Mods Directory</label>
               <div style={{ display: 'flex', gap: 6 }}>

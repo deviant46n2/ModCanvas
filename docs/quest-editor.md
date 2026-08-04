@@ -2,6 +2,10 @@
 
 Minecraft items, chapter icons and decorations that animate in-game (vertical frame-strip PNG + adjacent `*.png.mcmeta` animation metadata) play in the editor instead of showing as a flat sprite strip.
 
+> **Engine-rendered icons:** icons ModCanvas's software rasterizer cannot bake
+> (custom mod models, fluids, NBT-dependent looks) can be rendered by the
+> in-game companion mod and cached — see [`engine-renders.md`](engine-renders.md).
+
 ## Background prefetch of all chapters
 
 After a pack loads, the QuestBookEditor secretly warms texture materialization
@@ -64,6 +68,17 @@ Edges are rendered by `DependencyEdge` (`frontend/src/components/quest/quest-edg
 - A **direction chevron** sits at the bezier midpoint and is rotated to point along the path tangent (source → target), so arrow direction stays readable over busy chapter artwork. Its control-point math replicates React Flow's `getBezierPath` (curvature `0.25`) via `computeEdgeGeometry` (`src/core/quest/edge-geometry.ts`), which the edge renderer and the bezier editor share.
 - When an edge has manual bezier control points (`EdgeBezierData.bezier`, see "Canvas tools"), the whole path — including the chevron midpoint/tangent — is recomputed from them so curve and arrow stay in agreement.
 - Edges participating in a dependency loop are drawn in bright red (`#ff6b6b`) with a red arrowhead and a "Circular dependency" tooltip.
+
+### Hover behaviour (no blur / no pixel shift)
+
+Hovering a quest highlights its dependency fan: the connected edges brighten to
+full opacity while unrelated edges dim to 28%. This is **opacity-only** — stroke
+widths stay constant and no CSS `filter` is applied. (A `filter: brightness()`
+or a stroke-width jump on a node/edge inside ReactFlow's scaled viewport forces
+the browser to re-rasterize that subtree at CSS-pixel resolution, which reads as
+a full-canvas blur plus a sub-pixel "nudge" on hover.) The quest node itself
+highlights with a gold box-shadow ring instead of a brightness filter, so the
+pixelated icons never go soft.
 
 Cycle detection (`detectCycles`) flags any edge that is part of a strongly-connected component, so users can find loops before export.
 
@@ -299,6 +314,33 @@ the in-game quest editor's placement behavior:
 - `src-tauri/src/quest/types.rs` stores it as `icon_scaling: f64` (default 1.0);
   the node renderer multiplies the 2/3 icon size by it (see above).
 
+## Smart filter icons (FTB Filter System parity)
+
+A quest/reward whose item task carries a smart-filter DSL (stored in the nested
+`item.components."ftbfiltersystem:filter"` data component) and no custom icon
+shows an icon that **cycles through the items that actually match the filter**,
+mirroring the in-game quest tile.
+
+- `frontend/src/core/quest/smart-filter.ts` — pure parser + **matcher**
+  (`smartFilterMatches` / `matchingSmartFilterItems`). Semantics match FFS's
+  `FilterParser`: the DSL string is an implicit **AND** of its top-level calls
+  (the RootFilter is an "All Of" compound), `and` = all children, `or` = any
+  child, `only_one`/`xor` = exactly one child, `not` = none of the children,
+  and `component`/`block`/`stack_size` leaves narrow without contributing
+  candidates. `matchingSmartFilterItems` evaluates the filter over the scanned
+  item registry — the analog of FTB's `DisplayStacksCache` (creative search tab
+  ∩ matcher).
+- `frontend/src/services/smart-filter-mods.ts` — holds the registered instance
+  registry (`getAllRegisteredItems`, `getItemMod`).
+- `frontend/src/services/smart-filter-tags.ts` — expands `tag`/`item_tag`
+  members into item ids via the `resolve_item_tags` Rust command.
+- `frontend/src/components/quest/SmartFilterIcon.tsx` — once the registry and
+  every referenced tag/mod are loaded, cycles the first (≤48) matching item
+  textures at the in-game **1 s** beat (`IconAnimation` uses
+  `System.currentTimeMillis()/1000L`). A filter that matches nothing falls back
+  to the generic `ftbfiltersystem:smart_filter` item, exactly like FTB showing
+  the filter stack itself.
+
 ## Chapter editing
 
 Chapter-level settings mirror the in-game chapter editor:
@@ -362,14 +404,26 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
   `default_reward_team`, `default_consume_items`, `default_autoclaim_rewards`
   (FTB `RewardAutoClaim` id: `disabled`/`enabled`/`no_toast`/`invisible`),
   `detection_delay` (int, default 20).
+- Book-behavior fields (also on `QuestGraph`, parsed/exported from `data.snbt`):
+  `emergency_items` (`Vec<EmergencyItem>` — id+count entries), 
+  `emergency_items_cooldown` (default 300), `lock_message`, `show_lock_icons`
+  (default true), `fallback_locale`, `disable_gui`, `pause_game`,
+  `drop_book_on_death`, `drop_loot_crates`, `hide_excluded_quests`,
+  `verify_on_load`, `default_quest_disable_jei`, and `loot_crate_no_drop`
+  (`LootCrateNoDrop` — boss/monster/passive percentages). Helpers
+  `EmergencyItem` and `LootCrateNoDrop` live in the same types file.
 - `src-tauri/src/imports/ftb_quests/import.rs` — `parse_global_settings` reads
   them from both `data.snbt` and `data.json5`.
 - `src-tauri/src/imports/ftb_quests/export.rs` — `export_ftb_quests_snbt` writes
   the graph's values back to `data.snbt`.
 - `frontend/src/components/quest/book-settings.tsx` — "Global Defaults
   (data.snbt)" section: reward-team and consume-items checkboxes, autoclaim
-  dropdown, detection-delay number field.
-- Round-trip covered by `global_settings_roundtrip_through_export` and
+  dropdown, detection-delay number field; "Book Behavior (data.snbt)" section:
+  lock/pause/gui/drop/death/exclude/verify/JEI checkboxes, lock-message and
+  fallback-locale text fields, emergency-items cooldown + per-line
+  `id count` list, and the boss/monster/passive no-drop percentages.
+- Round-trip covered by `global_settings_roundtrip_through_export`,
+  `book_level_settings_roundtrip_through_export`, and
   `global_settings_defaults_when_absent` in `export_tests.rs`.
 
 ## Quest links (cross-chapter references)
@@ -531,7 +585,7 @@ common reward fields via SNBT + JSON5 struct literal), `export.rs` (kill
 `permission_level`/`silent`/`feedback_message`, reward
 `team_reward`/`auto`/`exclude_from_claim_all`/`ignore_reward_blocking`/
 `disable_reward_screen_blur`). Frontend typing/defaults in `quest-types.ts`,
-`quest-helpers.ts`, `nodes.tsx`. Round-trip covered by
+`quest-helpers.ts`, `quest-form-constants.ts`. Round-trip covered by
 `kill_task_and_reward_bonus_fields_roundtrip` and
 `location_box_stage_advancement_and_reward_common_fields_roundtrip` in
 `export_tests.rs`.
@@ -563,9 +617,11 @@ editing UX:
 Edits are undoable via **Ctrl+Z** (undo) / **Ctrl+Y** (redo), and the canvas
 toolbar's **↩ Undo / ↪ Redo** buttons (disabled when no history exists). Every
 mutating graph change goes through `QuestBookEditor.commitGraph`, which pushes
-the pre-mutation graph onto an undo stack (bounded to 120 entries) and clears
-the redo stack; `undo`/`redo` swap snapshots. The initial graph load and autosave
-sync are intentionally not recorded as undoable steps.
+the pre-mutation graph onto the app-wide shared `HistoryStore`
+(`frontend/src/core/history/store.ts`, bounded to `DEFAULT_MAX_ENTRIES = 200`
+entries; see `docs/history.md`) and clears the redo stack; `undo`/`redo` swap
+snapshots. The initial graph load and autosave sync are intentionally not
+recorded as undoable steps.
 
 ## Canvas tools
 

@@ -104,7 +104,7 @@ components never talk to IPC/Tauri directly.
 Rust backend lives under `src-tauri/src/`: `scriptgen/kubejs.rs` and `models.rs`
 define the recipe model and KubeJS emission; `write_script_files` is registered
 in `src-tauri/src/commands/mod.rs` and now writes through `validate_project_write`
-into the project's `kubejs/server_scripts/recipes.js` (previously a bug wrote to
+into the project's `kubejs/server_scripts/modcanvas_recipes.js` (previously a bug wrote to
 a `/tmp` scratch path).
 
 ## Version / loader awareness
@@ -115,12 +115,12 @@ instance's `minecraftVersion` and `modLoader` down through
 `ProjectWorkspace.tsx`, and RecipeEditor uses these to:
 
 - Choose the correct KubeJS recipe syntax paths.
-- Pick the write target script (`kubejs/server_scripts/recipes.js` vs
-  CraftTweaker `scripts/crafttweaker.zs`).
+- Pick the write target script (`kubejs/server_scripts/modcanvas_recipes.js` vs
+  CraftTweaker `scripts/modcanvas_crafttweaker.zs`).
 - Scope identifier searches to the installed loader.
 
-The adapter surface is queried by the helper
-`services/recipes-generated.ts` (extends the backend-generated `services/recipes.ts`).
+The adapter surface is queried by the helper `services/recipes.ts` (the
+backend-facing data-access layer, re-exported via `services/api.ts`).
 
 ## Key behaviors
 

@@ -66,3 +66,100 @@ pub fn cache_path(instance_path: &Path) -> PathBuf {
     let _ = fs::create_dir_all(&cache_dir);
     cache_dir.join(format!("instance_textures_{}.json", hash))
 }
+
+/// Same per-path hash used by the item indexer and engine-render caches.
+fn path_hash(instance_path: &Path) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    let canonical = fs::canonicalize(instance_path).unwrap_or_else(|_| instance_path.to_path_buf());
+    canonical.to_string_lossy().replace('\\', "/").hash(&mut h);
+    format!("{:016x}", h.finish())
+}
+
+/// Delete cached index/registry files whose per-path hash is not among the
+/// currently-known instances. Stale scans (deleted instances, re-ingests of
+/// moved paths, tests) otherwise accumulate as junk — one user had 1,315
+/// texture caches totalling ~4.9 GB for two real instances.
+pub fn prune_caches(known_instance_paths: &[PathBuf], known_mods_dirs: &[PathBuf]) -> usize {
+    let Some(cache_dir) = dirs_cache_dir() else {
+        return 0;
+    };
+    let mut keep = std::collections::HashSet::new();
+    for p in known_instance_paths {
+        keep.insert(path_hash(p));
+    }
+    for m in known_mods_dirs {
+        keep.insert(path_hash(m));
+    }
+    let mut removed = 0usize;
+    let Ok(entries) = fs::read_dir(&cache_dir) else {
+        return 0;
+    };
+    let prefixes = ["instance_textures", "items", "engine_renders", "ingest", "textures"];
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(stripped) = name.strip_suffix(".json") else {
+            continue;
+        };
+        let mut matched = false;
+        for prefix in prefixes {
+            if let Some(hash) = stripped.strip_prefix(prefix).and_then(|r| r.strip_prefix('_')) {
+                matched = true;
+                if !keep.contains(hash) && fs::remove_file(&path).is_ok() {
+                    removed += 1;
+                }
+                break;
+            }
+        }
+        let _ = matched;
+    }
+    removed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prune_removes_only_non_kept_hashes() {
+        let dir = std::env::temp_dir().join(format!("modcanvas_prune_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        std::env::set_var("XDG_CACHE_HOME", dir.join("cache"));
+        let cache_dir = dirs_cache_dir().unwrap();
+        fs::create_dir_all(&cache_dir).unwrap();
+
+        // A real (existing) known instance whose path-hash goes into the keep set.
+        let known_instance = dir.join("instance_a");
+        let known_mods = known_instance.join("mods");
+        fs::create_dir_all(&known_mods).unwrap();
+
+        // Junk files whose hashes will NOT match the known instance.
+        fs::write(cache_dir.join("instance_textures_zz.json"), b"{}").unwrap();
+        fs::write(cache_dir.join("items_zz.json"), b"{}").unwrap();
+        fs::write(cache_dir.join("ingest_zz.json"), b"{}").unwrap();
+        fs::write(cache_dir.join("engine_renders_zz.json"), b"{}").unwrap();
+        fs::write(cache_dir.join("notacache_zz.json"), b"{}").unwrap();
+
+        // A genuine cache file for the known instance (computed via the real hash).
+        let keep_hash = path_hash(&known_instance);
+        fs::write(cache_dir.join(format!("instance_textures_{}.json", keep_hash)), b"{}").unwrap();
+
+        let removed = prune_caches(&[known_instance.clone()], &[known_mods]);
+
+        // Multi-word prefixes must be pruned too (this is the bug regression).
+        assert_eq!(removed, 4, "removed {removed}");
+        assert!(!cache_dir.join("instance_textures_zz.json").exists());
+        assert!(!cache_dir.join("items_zz.json").exists());
+        assert!(!cache_dir.join("ingest_zz.json").exists());
+        assert!(!cache_dir.join("engine_renders_zz.json").exists());
+        // Unrelated files and the genuine kept cache survive.
+        assert!(cache_dir.join("notacache_zz.json").exists());
+        assert!(cache_dir.join(format!("instance_textures_{}.json", keep_hash)).exists());
+        fs::remove_dir_all(&dir).ok();
+    }
+}
+

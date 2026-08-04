@@ -188,6 +188,8 @@ public class WorkbenchCompanionClient {
         if (shouldExportAssets.compareAndSet(true, false)) {
             AssetExporter.export();
         }
+
+        ItemRenderQueue.tick();
     }
 
     @SubscribeEvent
