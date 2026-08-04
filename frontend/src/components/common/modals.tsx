@@ -118,8 +118,7 @@ export function ImportModal({
               type="text"
               value={importPath}
               onChange={(e) => onImportPathChange(e.target.value)}
-              placeholder="Select .mrpack, pack.toml, or instance folder"
-              readOnly
+              placeholder="Drop a pack file here, paste a path, or Browse"
               style={{ flex: 1 }}
             />
             <button className="btn-secondary" onClick={onPickPath} aria-label="Browse for modpack file">Browse</button>

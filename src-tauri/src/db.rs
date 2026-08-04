@@ -21,70 +21,72 @@ impl Database {
     }
 
     fn init_schema(&self) -> SqlResult<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute_batch(
-            "
-            CREATE TABLE IF NOT EXISTS projects (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                minecraft_version TEXT NOT NULL,
-                mod_loader TEXT NOT NULL,
-                pack_format TEXT NOT NULL,
-                pack_version TEXT DEFAULT '1.0.0',
-                author TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                path TEXT NOT NULL
-            );
+        {
+            let conn = self.conn.lock().unwrap();
+            conn.execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    minecraft_version TEXT NOT NULL,
+                    mod_loader TEXT NOT NULL,
+                    pack_format TEXT NOT NULL,
+                    pack_version TEXT DEFAULT '1.0.0',
+                    author TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    path TEXT NOT NULL
+                );
 
-            CREATE TABLE IF NOT EXISTS mods (
-                id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                mod_id TEXT NOT NULL,
-                slug TEXT NOT NULL,
-                name TEXT NOT NULL,
-                version TEXT DEFAULT '',
-                description TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                source TEXT NOT NULL,
-                enabled INTEGER DEFAULT 1,
-                added_at TEXT NOT NULL,
-                icon TEXT,
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-            );
+                CREATE TABLE IF NOT EXISTS mods (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    mod_id TEXT NOT NULL,
+                    slug TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    version TEXT DEFAULT '',
+                    description TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    source TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    added_at TEXT NOT NULL,
+                    icon TEXT,
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                );
 
-            CREATE TABLE IF NOT EXISTS mod_metadata (
-                mod_id TEXT PRIMARY KEY,
-                slug TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                categories TEXT DEFAULT '[]',
-                dependencies TEXT DEFAULT '[]',
-                supported_loaders TEXT DEFAULT '[]',
-                supported_versions TEXT DEFAULT '[]',
-                downloads INTEGER DEFAULT 0,
-                source_url TEXT,
-                issues_url TEXT,
-                documentation_url TEXT
-            );
+                CREATE TABLE IF NOT EXISTS mod_metadata (
+                    mod_id TEXT PRIMARY KEY,
+                    slug TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    categories TEXT DEFAULT '[]',
+                    dependencies TEXT DEFAULT '[]',
+                    supported_loaders TEXT DEFAULT '[]',
+                    supported_versions TEXT DEFAULT '[]',
+                    downloads INTEGER DEFAULT 0,
+                    source_url TEXT,
+                    issues_url TEXT,
+                    documentation_url TEXT
+                );
 
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
 
-            CREATE INDEX IF NOT EXISTS idx_mods_project ON mods(project_id);
-            CREATE INDEX IF NOT EXISTS idx_mods_mod_id ON mods(mod_id);
-            -- Dedupe rows polluted by earlier plain-INSERT scans FIRST (every
-            -- scan used to append a full copy), then enforce uniqueness.
-            DELETE FROM mods WHERE id NOT IN (
-                SELECT MIN(id) FROM mods GROUP BY project_id, mod_id
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_mods_project_mod ON mods(project_id, mod_id);
-            ",
-        )?;
+                CREATE INDEX IF NOT EXISTS idx_mods_project ON mods(project_id);
+                CREATE INDEX IF NOT EXISTS idx_mods_mod_id ON mods(mod_id);
+                -- Dedupe rows polluted by earlier plain-INSERT scans FIRST (every
+                -- scan used to append a full copy), then enforce uniqueness.
+                DELETE FROM mods WHERE id NOT IN (
+                    SELECT MIN(id) FROM mods GROUP BY project_id, mod_id
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_mods_project_mod ON mods(project_id, mod_id);
+                ",
+            )?;
+        }
 
         // Migration: existing DBs predate the mods.icon column.
         let conn = self.conn.lock().unwrap();

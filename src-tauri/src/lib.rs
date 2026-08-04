@@ -62,22 +62,18 @@ pub fn run() {
             // Minecraft instance manager
             // Priority: MODCANVAS_INSTANCES_DIR env var > Prism Launcher instances dir > app_data_dir/instances
             let instances_dir = if let Ok(env_dir) = std::env::var("MODCANVAS_INSTANCES_DIR") {
-                eprintln!("[ModCanvas] Using instances dir from MODCANVAS_INSTANCES_DIR: {env_dir}");
                 std::path::PathBuf::from(env_dir)
             } else {
                 let driver = crate::launcher::PrismLauncherDriver::new();
                 let prism_dir = driver.resolve_instance_root(None);
                 if prism_dir.exists() {
-                    eprintln!("[ModCanvas] Using Prism Launcher instances dir: {:?}", prism_dir);
                     prism_dir
                 } else {
-                    let fallback = app_handle
+                    app_handle
                         .path()
                         .app_data_dir()
                         .expect("failed to resolve app data dir")
-                        .join("instances");
-                    eprintln!("[ModCanvas] Prism dir not found, using fallback: {:?}", fallback);
-                    fallback
+                        .join("instances")
                 }
             };
 
@@ -101,18 +97,13 @@ pub fn run() {
 
             // Check for test launch mode
             if let Some(instance_id) = TEST_INSTANCE_ID.get() {
-                eprintln!("[ModCanvas] Test launch mode: launching instance {}", instance_id);
                 let instance_id_clone = instance_id.clone();
                 let app_handle_for_launch = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    // Wait a bit for the app to fully initialize
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                     
                     let manager = app_handle_for_launch.state::<InstanceManager>();
-                    
-                    // Debug: list all instances
                     let instances = manager.list_instances();
-                    eprintln!("[ModCanvas] Test launch - available instances: {:?}", instances.iter().map(|i| &i.id).collect::<Vec<_>>());
                     
                     let emitter = Box::new(commands::TauriProgressEmitter(app_handle_for_launch.clone()));
                     let result = manager.launch_instance(
@@ -123,9 +114,8 @@ pub fn run() {
                         "4G",
                     );
                     
-                    match result {
-                        Ok(_) => eprintln!("[ModCanvas] Test launch completed successfully"),
-                        Err(e) => eprintln!("[ModCanvas] Test launch failed: {}", e),
+                    if let Err(e) = result {
+                        eprintln!("[ModCanvas] Test launch failed: {}", e);
                     }
                 });
             }
@@ -171,6 +161,7 @@ pub fn run() {
             commands::import_packwiz,
             commands::import_curseforge_zip,
             commands::auto_import_pack,
+            commands::pick_import_file,
             commands::export_modrinth_mrpack,
             commands::export_curseforge_zip,
             commands::get_curseforge_api_key,

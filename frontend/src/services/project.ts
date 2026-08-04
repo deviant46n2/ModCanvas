@@ -35,6 +35,10 @@ export async function autoImportPack(path: string): Promise<ImportResult> {
   return invoke<ImportResult>('auto_import_pack', { path })
 }
 
+export async function pickImportFile(): Promise<string | null> {
+  return invoke<string | null>('pick_import_file')
+}
+
 export async function exportModrinthMrpack(projectId: string): Promise<string> {
   return invoke<string>('export_modrinth_mrpack', { projectId })
 }

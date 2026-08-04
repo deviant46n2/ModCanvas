@@ -105,6 +105,45 @@ impl CurseForgeImporter {
         // Parse mod loader
         let (loader, _loader_version) = parse_curseforge_loader(&manifest.minecraft.mod_loaders);
 
+        // Extract the whole zip into a PERSISTENT per-import game directory.
+        // The project must point at a real game dir (config/, mods/, kubejs/...),
+        // not at the .zip file — otherwise the workspace has no files to work on
+        // and the pack is not launchable. Mirrors the mrpack importer.
+        let dest = crate::path_safety::imported_pack_extract_dir(
+            path.file_stem().map(|s| s.to_string_lossy()).unwrap_or_default().as_ref(),
+        )
+        .map_err(|e| anyhow::anyhow!(e))?;
+        eprintln!("[ModCanvas] Extracting CurseForge zip to {}", dest.display());
+
+        // Extract with path-safety sanitization: reject traversal and symlink escapes.
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i)?;
+            let name = entry.name().to_string();
+            if name == "manifest.json" || name == "modlist.html" {
+                continue;
+            }
+            let safe_rel = crate::path_safety::sanitize_zip_entry_path(&name)
+                .map_err(|e| anyhow::anyhow!("Unsafe zip entry path {name}: {e}"))?;
+            // CurseForge packs keep everything under `overrides/`; merge that
+            // folder into the game-dir root (config/, kubejs/, mods/, ...).
+            let overrides_dir = manifest.overrides.as_deref().unwrap_or("overrides");
+            let safe_path = std::path::Path::new(&safe_rel);
+            let dest_rel = safe_path.strip_prefix(overrides_dir).unwrap_or(safe_path);
+            let out = dest.join(dest_rel);
+            if entry.is_dir() {
+                std::fs::create_dir_all(&out)?;
+                continue;
+            }
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("Failed to create parent {} for {}", parent.display(), name))?;
+            }
+            let mut f = std::fs::File::create(&out)
+                .with_context(|| format!("Failed to create extracted file {} (from {})", out.display(), name))?;
+            std::io::copy(&mut entry, &mut f)?;
+        }
+        eprintln!("[ModCanvas] CurseForge extraction complete at {}", dest.display());
+
         let project = crate::models::Project {
             id: Uuid::new_v4(),
             name: manifest.name.clone().unwrap_or_else(|| "CurseForge Pack".to_string()),
@@ -116,7 +155,7 @@ impl CurseForgeImporter {
             author: manifest.author.clone().unwrap_or_default(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
-            path: path.to_string_lossy().to_string(),
+            path: dest.to_string_lossy().to_string(),
         };
 
         let mut unresolved_mods = Vec::new();
@@ -135,35 +174,30 @@ impl CurseForgeImporter {
             });
         }
 
-        // Extract overrides (config files)
-        let overrides_dir = manifest.overrides.as_deref().unwrap_or("overrides");
-
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)?;
-            let name = entry.name().to_string();
-
-            // Skip if not in overrides dir
-            if !name.starts_with(overrides_dir) {
+        // Collect config files from the extracted game dir (the overrides were
+        // merged into the game-dir root above). Binary files (e.g.
+        // inventory-particles caches) are skipped.
+        for entry in walkdir::WalkDir::new(&dest)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+        {
+            let p = entry.path();
+            let rel = p.strip_prefix(&dest).unwrap_or(p);
+            let rel_str = rel.to_string_lossy().replace('\\', "/");
+            if !is_config_file(&rel_str) {
                 continue;
             }
-
-            let relative = name.strip_prefix(overrides_dir).unwrap_or(&name);
-            if relative.is_empty() {
-                continue;
-            }
-
-            // Only process config-like files
-            if is_config_file(relative) {
-                let mut content = String::new();
-                entry.read_to_string(&mut content)?;
-
-                let format = crate::shared::detect_config_format(relative);
-                config_files.push(ConfigFile {
-                    path: relative.into(),
-                    content,
-                    format,
-                });
-            }
+            let content = match std::fs::read_to_string(p) {
+                Ok(c) => c,
+                Err(_) => continue, // binary / non-UTF8 file
+            };
+            let format = crate::shared::detect_config_format(&rel_str);
+            config_files.push(ConfigFile {
+                path: rel.to_path_buf(),
+                content,
+                format,
+            });
         }
 
         eprintln!(
@@ -187,10 +221,9 @@ impl CurseForgeImporter {
                 }
             },
             quest_graph: {
-                let quest_path = std::env::temp_dir().join("quests.json");
-                if quest_path.exists() {
-                    let content = std::fs::read_to_string(&quest_path).ok();
-                    content.and_then(|c| serde_json::from_str(&c).ok())
+                let quests_dir = dest.join("config/ftbquests/quests");
+                if quests_dir.is_dir() {
+                    crate::imports::ftb_quests::import_ftb_quests(&dest).ok().map(|r| r.graph)
                 } else {
                     None
                 }

@@ -9,7 +9,10 @@ license = "GPL-3.0"
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
-tauri-plugin-dialog = "2"
+# Use the xdg-desktop-portal backend instead of rfd's default gtk3 backend:
+# a GTK dialog window fails to map on some Wayland compositors (e.g. COSMIC),
+# while the portal route is compositor-agnostic and healthy.
+tauri-plugin-dialog = { version = "2", default-features = false, features = ["xdg-portal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

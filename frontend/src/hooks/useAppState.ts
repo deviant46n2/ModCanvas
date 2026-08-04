@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { open } from '@tauri-apps/plugin-dialog'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   autoImportPack,
+  pickImportFile,
   exportModrinthMrpack,
   exportCurseforgeZip,
   openPrismLauncher,
@@ -228,16 +229,27 @@ export function useAppState() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectState.projects])
 
+  // Drag-and-drop pack import: the native dialog can hang on some Wayland
+  // setups, so dropping a pack file onto the window is a reliable alternative.
+  // Tauri's drag-drop event carries real absolute paths (unlike a hidden
+  // <input type="file">, which does not expose paths on WebKitGTK).
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    getCurrentWindow().onDragDropEvent((event) => {
+      if (event.payload.type !== 'drop') return
+      const pack = event.payload.paths.find((p) => /\.(zip|mrpack|toml)$/i.test(p))
+      if (!pack) return
+      setImportPath(pack)
+      setImportError('')
+      setImportResult(null)
+      setShowImport(true)
+    }).then((u) => { unlisten = u })
+    return () => { unlisten?.() }
+  }, [])
+
   async function pickImportPath() {
     try {
-      const path = await open({
-        filters: [
-          { name: 'Modpack Files', extensions: ['mrpack', 'toml', 'zip'] },
-          { name: 'All Files', extensions: ['*'] }
-        ],
-        multiple: false,
-        directory: false
-      })
+      const path = await pickImportFile()
       if (path) setImportPath(path)
     } catch (e) {
       console.error('Failed to pick import path:', e)

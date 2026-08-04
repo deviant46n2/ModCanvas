@@ -14,6 +14,12 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    onDragDropEvent: vi.fn(() => Promise.resolve(() => {})),
+  }),
+}))
+
 // Provide a fake localStorage for zustand persist middleware
 const store: Record<string, string> = {};
 Object.defineProperty(globalThis, 'localStorage', {
