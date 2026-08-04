@@ -112,6 +112,32 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path) -> Result<(
     data_map.insert("progression_mode".to_string(), ce(SnbtValue::String(graph.book_progression_mode.to_string())));
     data_map.insert("grid_scale".to_string(), ce(SnbtValue::Double(graph.grid_scale)));
     data_map.insert("detection_delay".to_string(), ce(SnbtValue::Int(graph.detection_delay)));
+    data_map.insert("emergency_items_cooldown".to_string(), ce(SnbtValue::Int(graph.emergency_items_cooldown)));
+    data_map.insert("lock_message".to_string(), ce(SnbtValue::String(graph.lock_message.clone())));
+    data_map.insert("show_lock_icons".to_string(), ce(SnbtValue::Byte(if graph.show_lock_icons { 1 } else { 0 })));
+    data_map.insert("fallback_locale".to_string(), ce(SnbtValue::String(graph.fallback_locale.clone())));
+    data_map.insert("disable_gui".to_string(), ce(SnbtValue::Byte(if graph.disable_gui { 1 } else { 0 })));
+    data_map.insert("pause_game".to_string(), ce(SnbtValue::Byte(if graph.pause_game { 1 } else { 0 })));
+    data_map.insert("drop_book_on_death".to_string(), ce(SnbtValue::Byte(if graph.drop_book_on_death { 1 } else { 0 })));
+    data_map.insert("drop_loot_crates".to_string(), ce(SnbtValue::Byte(if graph.drop_loot_crates { 1 } else { 0 })));
+    data_map.insert("hide_excluded_quests".to_string(), ce(SnbtValue::Byte(if graph.hide_excluded_quests { 1 } else { 0 })));
+    data_map.insert("verify_on_load".to_string(), ce(SnbtValue::Byte(if graph.verify_on_load { 1 } else { 0 })));
+    data_map.insert("default_quest_disable_jei".to_string(), ce(SnbtValue::Byte(if graph.default_quest_disable_jei { 1 } else { 0 })));
+    let loot_crate_map = HashMap::from([
+        ("boss".to_string(), ce(SnbtValue::Int(graph.loot_crate_no_drop.boss))),
+        ("monster".to_string(), ce(SnbtValue::Int(graph.loot_crate_no_drop.monster))),
+        ("passive".to_string(), ce(SnbtValue::Int(graph.loot_crate_no_drop.passive))),
+    ]);
+    data_map.insert("loot_crate_no_drop".to_string(), ce(SnbtValue::Compound(loot_crate_map)));
+    if !graph.emergency_items.is_empty() {
+        let items: Vec<SnbtValue> = graph.emergency_items.iter().map(|item| {
+            let mut m = HashMap::new();
+            m.insert("id".to_string(), ce(SnbtValue::String(item.id.clone())));
+            m.insert("count".to_string(), ce(SnbtValue::Int(item.count)));
+            SnbtValue::Compound(m)
+        }).collect();
+        data_map.insert("emergency_items".to_string(), ce(SnbtValue::List(items)));
+    }
     crate::path_safety::atomic_write_str(&quests_dir.join("data.snbt"), &compound_to_snbt(&data_map))
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 

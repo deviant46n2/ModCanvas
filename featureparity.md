@@ -366,6 +366,6 @@ Ordered by value / effort. Items 1–2 are done. Items 3–4 are the remaining c
    - ✅ Bezier control points per edge — `EdgeBezierEditor` draggable handles (anchored to the handle anchors so curves track quests); live preview + single undoable commit per drag; persisted in `QuestEdgeData.bezier`/`QuestEdge.bezier` (editor-only — FTB has no SNBT field).
    - ✅ Book-level visual presets — self-authored `BOOK_THEME_PRESETS` (clean-room, no FTB theme data) repaint book/chapter defaults + quest colors and drive edge colors via `edge_color`/`edge_cycle_color`.
 7. **Theme-file fidelity (§16)** — parse `ftb_quests_theme.txt` and drive edge/panel/checkmark/spacing rendering from it.
-8. **Remaining book-level settings** — emergency items, lock message, show lock icons, book icon picker, book default quest size, fallback locale, save-as-file.
+8. 🟡 **Remaining book-level settings** — emergency items (+cooldown), lock message, show lock icons, disable gui, pause game, drop book on death, drop loot crates, hide excluded quests, verify on load, default disable JEI, fallback locale, loot crate no-drop % — all shipped end-to-end (import/export/UI + roundtrip test). Remaining: **book icon picker**, **book default quest size (book-level, distinct from per-chapter)**, **save-as-file**.
 9. **Import/export hardening** — user layout choice, fix subdirs drops, unify `min_width`/`invisible` aliases, emit `chapter_groups.snbt`, parse/export quest `tags`.
 10. **Description editor** — multi-page + inline images (§17).

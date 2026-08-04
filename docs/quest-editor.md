@@ -404,14 +404,26 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
   `default_reward_team`, `default_consume_items`, `default_autoclaim_rewards`
   (FTB `RewardAutoClaim` id: `disabled`/`enabled`/`no_toast`/`invisible`),
   `detection_delay` (int, default 20).
+- Book-behavior fields (also on `QuestGraph`, parsed/exported from `data.snbt`):
+  `emergency_items` (`Vec<EmergencyItem>` — id+count entries), 
+  `emergency_items_cooldown` (default 300), `lock_message`, `show_lock_icons`
+  (default true), `fallback_locale`, `disable_gui`, `pause_game`,
+  `drop_book_on_death`, `drop_loot_crates`, `hide_excluded_quests`,
+  `verify_on_load`, `default_quest_disable_jei`, and `loot_crate_no_drop`
+  (`LootCrateNoDrop` — boss/monster/passive percentages). Helpers
+  `EmergencyItem` and `LootCrateNoDrop` live in the same types file.
 - `src-tauri/src/imports/ftb_quests/import.rs` — `parse_global_settings` reads
   them from both `data.snbt` and `data.json5`.
 - `src-tauri/src/imports/ftb_quests/export.rs` — `export_ftb_quests_snbt` writes
   the graph's values back to `data.snbt`.
 - `frontend/src/components/quest/book-settings.tsx` — "Global Defaults
   (data.snbt)" section: reward-team and consume-items checkboxes, autoclaim
-  dropdown, detection-delay number field.
-- Round-trip covered by `global_settings_roundtrip_through_export` and
+  dropdown, detection-delay number field; "Book Behavior (data.snbt)" section:
+  lock/pause/gui/drop/death/exclude/verify/JEI checkboxes, lock-message and
+  fallback-locale text fields, emergency-items cooldown + per-line
+  `id count` list, and the boss/monster/passive no-drop percentages.
+- Round-trip covered by `global_settings_roundtrip_through_export`,
+  `book_level_settings_roundtrip_through_export`, and
   `global_settings_defaults_when_absent` in `export_tests.rs`.
 
 ## Quest links (cross-chapter references)
