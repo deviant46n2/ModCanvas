@@ -857,9 +857,15 @@ pub async fn import_curseforge_zip(
     // the CurseForge API (when a key is configured) into the extracted game
     // dir's `mods/` folder, so the pack is launchable and the mods list shows
     // real metadata. Without a key, fall back to storing placeholder entries.
+    //
+    // The project row must exist BEFORE inserting mods: `mods.project_id` has a
+    // FOREIGN KEY back to projects(id), so inserting mods first fails with
+    // "foreign key constraint failed".
     let game_dir = PathBuf::from(&result.project.path);
     let api_key = resolve_curseforge_api_key(&db)?;
     let mut resolved_mods: Vec<crate::imports::ResolvedMod> = Vec::new();
+
+    db.create_project(&result.project).map_err(|e| e.to_string())?;
 
     if let Some(key) = api_key {
         let downloads = download_curseforge_manifest_mods(
@@ -923,7 +929,6 @@ pub async fn import_curseforge_zip(
         }
     }
 
-    db.create_project(&result.project).map_err(|e| e.to_string())?;
     try_deploy_companion(&result.project.mod_loader, &result.project.minecraft_version, &result.project.path);
 
     // Load progression graph from pack if exists
