@@ -585,7 +585,7 @@ common reward fields via SNBT + JSON5 struct literal), `export.rs` (kill
 `permission_level`/`silent`/`feedback_message`, reward
 `team_reward`/`auto`/`exclude_from_claim_all`/`ignore_reward_blocking`/
 `disable_reward_screen_blur`). Frontend typing/defaults in `quest-types.ts`,
-`quest-helpers.ts`, `nodes.tsx`. Round-trip covered by
+`quest-helpers.ts`, `quest-form-constants.ts`. Round-trip covered by
 `kill_task_and_reward_bonus_fields_roundtrip` and
 `location_box_stage_advancement_and_reward_common_fields_roundtrip` in
 `export_tests.rs`.
@@ -617,9 +617,11 @@ editing UX:
 Edits are undoable via **Ctrl+Z** (undo) / **Ctrl+Y** (redo), and the canvas
 toolbar's **↩ Undo / ↪ Redo** buttons (disabled when no history exists). Every
 mutating graph change goes through `QuestBookEditor.commitGraph`, which pushes
-the pre-mutation graph onto an undo stack (bounded to 120 entries) and clears
-the redo stack; `undo`/`redo` swap snapshots. The initial graph load and autosave
-sync are intentionally not recorded as undoable steps.
+the pre-mutation graph onto the app-wide shared `HistoryStore`
+(`frontend/src/core/history/store.ts`, bounded to `DEFAULT_MAX_ENTRIES = 200`
+entries; see `docs/history.md`) and clears the redo stack; `undo`/`redo` swap
+snapshots. The initial graph load and autosave sync are intentionally not
+recorded as undoable steps.
 
 ## Canvas tools
 

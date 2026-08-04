@@ -102,8 +102,9 @@ after a real pack change; otherwise every subsequent load is instant from disk.
 
 ## Cache hygiene
 
-- `prune_caches_cmd(instancePaths, modsDirs)` (in `instance_textures/cache.rs`,
-  called automatically once on app start from `useAppState`) deletes every
+- `prune_caches_cmd(instancePaths, modsDirs)` (in `instance_textures.rs`, wrapping
+  `instance_textures/cache.rs::prune_caches`; called automatically once on app
+  start from `useAppState`) deletes every
   `instance_textures_*` / `items_*` / `engine_renders_*` / `ingest_*` /
   `textures_*` cache file whose per-path hash no longer matches a known project.
   Stale scans (deleted instances, re-ingests, tests) otherwise accumulate junk —
