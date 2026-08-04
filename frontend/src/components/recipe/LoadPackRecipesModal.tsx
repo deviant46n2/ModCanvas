@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckSquareIcon, SquareIcon } from '../ui/icons'
-import { scanPackRecipes } from '../../services/api';
+import { usePackRecipes } from '../../hooks/usePackRecipes';
 import type { DiscoveredRecipe } from '../../services/api';
 import type { Recipe } from '../../core/recipe/recipe-store';
 
@@ -36,9 +36,7 @@ function keyOfRecipe(r: Recipe): string {
 /** Scan the pack (including mod jars) for recipes and let the user search,
  * filter, and load the ones they want to edit. */
 export function LoadPackRecipesModal({ projectPath, onClose, onImport, existingRecipes = [] }: LoadPackRecipesModalProps) {
-  const [scanning, setScanning] = useState(true);
-  const [error, setError] = useState('');
-  const [all, setAll] = useState<DiscoveredRecipe[]>([]);
+  const { scanning, error, recipes: all } = usePackRecipes(projectPath);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importedCount, setImportedCount] = useState(0);
 
@@ -50,26 +48,17 @@ export function LoadPackRecipesModal({ projectPath, onClose, onImport, existingR
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    let cancelled = false;
-    setScanning(true);
-    scanPackRecipes(projectPath)
-      .then((recipes) => {
-        if (cancelled) return;
-        setAll(recipes);
-        setSelected(new Set(recipes.map((r) => keyOf(r))));
-        setLoadedIds(
-          new Set(
-            existingRecipes
-              .filter((r) => r.source)
-              .map(keyOfRecipe)
-          )
-        );
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => { if (!cancelled) setScanning(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath]);
+    if (all.length > 0) {
+      setSelected(new Set(all.map((r) => keyOf(r))));
+      setLoadedIds(
+        new Set(
+          existingRecipes
+            .filter((r) => r.source)
+            .map(keyOfRecipe)
+        )
+      );
+    }
+  }, [all, existingRecipes]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

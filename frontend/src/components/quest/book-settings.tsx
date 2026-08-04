@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
-import { scanModJarTextures } from '../../services/api'
+import { useTextureScan } from '../../hooks/useTextureScan'
 import { SHAPES, PROGRESSION_MODES } from './quest-helpers'
 
 interface BookSettingsProps {
@@ -30,6 +30,7 @@ export function BookSettings({
   pickDir,
 }: BookSettingsProps) {
   const [modsDirInput, setModsDirInput] = useState('')
+  const { scanModJarTextures: scanTextures } = useTextureScan()
 
   useEffect(() => {
     if (open) setModsDirInput(modsDir)
@@ -192,14 +193,14 @@ export function BookSettings({
                   if (!selected) return
                   setModsDirInput(selected)
                   onModsDirChange(selected)
-                  const idx = await scanModJarTextures(selected)
+                  const idx = await scanTextures(selected)
                   onTextureIndexChange(idx)
                   alert(`Loaded ${Object.keys(idx).length} textures from ${selected}`)
                 }}>Browse</button>
                 <button className="ftb-popup-btn primary" onClick={async () => {
                   if (!modsDirInput) return
                   onModsDirChange(modsDirInput)
-                  const idx = await scanModJarTextures(modsDirInput)
+                  const idx = await scanTextures(modsDirInput)
                   onTextureIndexChange(idx)
                   alert(`Loaded ${Object.keys(idx).length} textures from ${modsDirInput}`)
                 }}>Load Textures</button>

@@ -7,14 +7,15 @@ import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
 import { LoadPackRecipesModal } from './components/recipe/LoadPackRecipesModal';
 import { RecipeScriptPreview } from './components/recipe/RecipeScriptPreview';
 import type { ImportedRecipe } from './core/recipe/json-import';
-import { searchItems, searchTags, scanInstanceTextures, generateRecipeScripts, writeScriptFiles, wsIpcSendEvent } from './services/api';
+import { useInstanceTextures } from './hooks/useInstanceTextures';
+import { useItemSearch } from './hooks/useItemSearch';
+import { useRecipeSave } from './hooks/useRecipeSave';
 import { getAdapter } from './adapters';
 import { normalizeLoader } from './core/recipe/loader';
 import { validateRecipe, hasErrors, issuesByPath } from './core/recipe/validation';
 import { patternToGrid, gridToPattern } from './core/recipe/grid';
-import { requestMaterialize, subscribeMaterialized, textureDisplayUrl, isTexturePending, registerBakedKeysFromIndex } from './services/texture-loader';
-import type { Recipe, RecipeIngredient } from './core/recipe/recipe-store';
-import type { SearchResult, TagInfo } from './services/api';
+import { requestMaterialize, subscribeMaterialized, textureDisplayUrl, isTexturePending } from './services/texture-loader';
+import type { RecipeIngredient } from './core/recipe/recipe-store';
 import './RecipeEditor.css';
 
 interface RecipeEditorProps {
@@ -46,17 +47,13 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const adapter = getAdapter(minecraftVersion, normalizeLoader(modLoader));
   const recipeScriptPath = `${adapter.getRecipeScriptPath(projectPath)}/modcanvas_recipes.js`;
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const { textureIndex, loading: indexLoading } = useInstanceTextures(projectPath);
+  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, tagResults, searching: isSearching } = useItemSearch(adapter.loader, adapter.mcVersion);
+  const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId, recipeScriptPath);
+
   const [activeSearchTab, setActiveSearchTab] = useState<'items' | 'tags'>('items');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [tagResults, setTagResults] = useState<TagInfo[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [draggedItem, setDraggedItem] = useState<SearchResult | null>(null);
-  const [textureIndex, setTextureIndex] = useState<Record<string, string>>({});
+  const [draggedItem, setDraggedItem] = useState<import('./services/api').SearchResult | null>(null);
   const [, setTextureTick] = useState(0);
-  const [indexLoading, setIndexLoading] = useState(false);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [showLoadPack, setShowLoadPack] = useState(false);
 
@@ -65,54 +62,10 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const issues = issuesByPath(recipeIssues);
   const hasBlockingErrors = hasErrors(recipeIssues);
 
-  // Compact texture index (descriptors only — never base64). Icons are
-  // materialized lazily in batches via the shared texture-loader, so opening
-  // the Recipes tab does not pull every mod's textures into memory.
-  useEffect(() => {
-    if (!projectPath) return;
-    let cancelled = false;
-    setIndexLoading(true);
-    scanInstanceTextures(projectPath)
-      .then((idx) => {
-        if (cancelled || !idx || Object.keys(idx).length === 0) return;
-        registerBakedKeysFromIndex(idx);
-        setTextureIndex((prev) => ({ ...prev, ...idx }));
-      })
-      .catch((e) => console.error('Failed to load texture index:', e))
-      .finally(() => { if (!cancelled) setIndexLoading(false); });
-    return () => { cancelled = true; };
-  }, [projectPath]);
-
   // Re-render when lazy materialization makes more icons available.
   useEffect(() => {
     return subscribeMaterialized(() => setTextureTick((t) => t + 1));
   }, []);
-
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setTagResults([]);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      const [items, tags] = await Promise.all([
-        searchItems(query, adapter.loader, adapter.mcVersion),
-        searchTags(query, adapter.loader, adapter.mcVersion),
-      ]);
-      setSearchResults(items);
-      setTagResults(tags);
-    } catch (e) {
-      console.error('Search failed:', e);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [adapter.loader, adapter.mcVersion]);
-
-  useEffect(() => {
-    const t = setTimeout(() => handleSearch(searchQuery), 300);
-    return () => clearTimeout(t);
-  }, [searchQuery, handleSearch]);
 
   const getTextureUrl = (itemId: string): string | null => {
     if (!itemId) return null;
@@ -138,25 +91,8 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     }
   }, [getSelectedRecipe, updateRecipe]);
 
-  const handleSaveRecipes = async () => {
-    if (!projectId) return;
-    try {
-      setShowSaveDialog(true);
-      setSaveMessage('Generating scripts...');
-      const allRecipes = recipes.filter((r: Recipe) => r.output.item && !hasErrors(validateRecipe(r)));
-      if (allRecipes.length !== recipes.length) {
-        setSaveMessage(`Saving ${allRecipes.length}/${recipes.length} recipes (skipped invalid).`);
-      }
-      const { kubejsScript, crafttweakerScript } = await generateRecipeScripts(projectId, allRecipes);
-      await writeScriptFiles(projectId, kubejsScript, crafttweakerScript);
-      setSaveMessage('Scripts saved successfully!');
-      markClean();
-      await wsIpcSendEvent('RELOAD_KUBEJS_SCRIPTS', recipeScriptPath);
-      setTimeout(() => { setShowSaveDialog(false); setSaveMessage(''); }, 3000);
-    } catch (e) {
-      console.error('Save failed:', e);
-      setSaveMessage(`Error: ${e}`);
-    }
+  const handleSaveRecipes = () => {
+    saveRecipes(recipes, markClean);
   };
 
   const handleNewRecipe = () => {

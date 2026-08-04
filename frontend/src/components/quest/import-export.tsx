@@ -8,7 +8,7 @@ import { IconPicker } from './icon-picker'
 import { BookSettings } from './book-settings'
 import { RewardTablesModal } from './RewardTablesModal'
 import { ImportMenu } from './import-menu'
-import { useQuestToolbarActions } from './quest-toolbar-actions'
+import { useQuestToolbarActions } from '../../hooks/useQuestToolbarActions'
 import { pickDir } from './pick-dir'
 import { SearchIcon, RefreshIcon, SettingsIcon, TrophyIcon, TagIcon } from '../ui/icons'
 

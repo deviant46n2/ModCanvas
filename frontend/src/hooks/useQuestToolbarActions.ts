@@ -12,11 +12,11 @@ import {
   wsIpcGetStatus,
   wsIpcRestart,
   listPrismInstances,
-} from '../../services/api'
-import type { QuestGraphData, PrismInstance } from '../../services/api'
-import { defaultQuestNodeData } from './quest-helpers'
-import { stripMcFormatting } from '../../core/theme/font-formatter'
-import { pickDir } from './pick-dir'
+} from '../services/api'
+import type { QuestGraphData, PrismInstance } from '../services/api'
+import { defaultQuestNodeData } from '../components/quest/quest-helpers'
+import { stripMcFormatting } from '../core/theme/font-formatter'
+import { pickDir } from '../components/quest/pick-dir'
 
 export interface QuestToolbarActions {
   saveMessage: { text: string; ok: boolean } | null
