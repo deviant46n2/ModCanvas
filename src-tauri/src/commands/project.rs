@@ -48,7 +48,7 @@ pub fn list_projects(
     manager: State<'_, InstanceManager>,
 ) -> Result<Vec<Project>, String> {
     let instances = manager.reload_instances();
-    db.upsert_prism_instances(&instances)
+    db.sync_prism_instances(&instances)
         .map_err(|e| format!("Failed to sync instances: {e}"))?;
     db.list_projects().map_err(|e| e.to_string())
 }

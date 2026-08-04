@@ -54,6 +54,43 @@ underlying scanner is still cache-validated so a cached reload is instant
 - This was a deliberate change: previously `useEffect([selectedProject])`
   called `loadProjectMods` on every open, which slowed startup.
 
+## Project list persistence
+
+The sidebar project list is the SQLite `projects` table
+(`app_data_dir/modcanvas.db`) — the **persistent source of truth**. On every
+`list_projects` call the backend re-scans the instance roots and calls
+`Database::sync_prism_instances`, which is **strictly additive**: live
+instances are inserted or updated in place by their `game_dir` path, but rows
+are **never deleted** by the sync.
+
+This is deliberate. Deleting a Prism instance in the launcher, deleting an
+imported pack's folder, or losing the instance-scan root (the app can fall
+back between the Prism roots and `app_data/instances`) must not silently wipe
+a project the user has worked on. Projects leave the list only through an
+explicit **Delete** action (`delete_project` command), which also removes the
+pack's files on disk.
+
+## Instance root discovery
+
+`InstanceManager` scans **all** existing Prism instance roots and merges the
+results, so instances spread across several Prism installs all appear. On
+Linux the candidates are the native root
+(`~/.local/share/PrismLauncher/instances`), the Flatpak root
+(`~/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances`),
+and the data-local root; duplicates are de-duplicated by canonical path
+(`LauncherDriver::resolve_instance_roots`). The **primary** root — the first
+existing candidate, or whichever has the most instance subdirectories
+(`resolve_instance_root`) — is where new instances are created. If no Prism
+root exists, `app_data/instances` is the single fallback root, and the
+`MODCANVAS_INSTANCES_DIR` env var overrides all of the above.
+
+> Historical bug (fixed): `resolve_instance_root` used to pick a **single**
+> root by "most subdirectories", and `upsert_prism_instances` ran
+> `DELETE FROM projects WHERE path NOT IN (live paths)` on every sync.
+> Instances in the non-selected root were invisible, and whichever scan won
+> wiped the other root's projects from the DB — so deleted-instance packs and
+> live packs flip-flopped and never coexisted.
+
 ## Files
 
 - Backend: `src-tauri/src/ingest.rs` (`IngestProgress`,

@@ -21,16 +21,33 @@ pub trait LauncherDriver: Send + Sync {
         working_dir: Option<&std::path::Path>,
     ) -> Result<Child, String>;
 
-    /// Given a custom override path, resolve the effective instance root.
+    /// Resolve every existing, de-duplicated instance root, in priority
+    /// order (primary first). The app scans ALL of them so instances spread
+    /// across several Prism installs (e.g. a native build and a Flatpak
+    /// build) are all visible instead of only whichever root has the most
+    /// subdirectories.
+    fn resolve_instance_roots(&self) -> Vec<PathBuf> {
+        let mut seen = std::collections::HashSet::new();
+        self.default_instance_roots()
+            .into_iter()
+            .filter(|p| p.exists())
+            .filter(|p| {
+                let key = p.canonicalize().unwrap_or_else(|_| p.clone());
+                seen.insert(key)
+            })
+            .collect()
+    }
+
+    /// Given a custom override path, resolve the effective primary instance
+    /// root (used for creating new instances).
     fn resolve_instance_root(&self, custom_path: Option<&str>) -> PathBuf {
         if let Some(p) = custom_path {
             return PathBuf::from(p);
         }
         // Prefer the directory that actually contains instance subdirs,
         // not just an empty data dir that happens to exist.
-        self.default_instance_roots()
+        self.resolve_instance_roots()
             .into_iter()
-            .filter(|p| p.exists())
             .max_by_key(|p| {
                 std::fs::read_dir(p)
                     .into_iter()

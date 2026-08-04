@@ -60,28 +60,34 @@ pub fn run() {
             app.manage(intelligence);
 
             // Minecraft instance manager
-            // Priority: MODCANVAS_INSTANCES_DIR env var > Prism Launcher instances dir > app_data_dir/instances
-            let instances_dir = if let Ok(env_dir) = std::env::var("MODCANVAS_INSTANCES_DIR") {
-                std::path::PathBuf::from(env_dir)
-            } else {
-                let driver = crate::launcher::PrismLauncherDriver::new();
-                let prism_dir = driver.resolve_instance_root(None);
-                if prism_dir.exists() {
-                    prism_dir
+            // Priority: MODCANVAS_INSTANCES_DIR env var > all existing Prism
+            // Launcher instance roots > app_data_dir/instances. Every existing
+            // Prism root (native + Flatpak + data_local) is scanned and merged,
+            // so instances spread across several Prism installs all appear.
+            let instances_dirs: Vec<std::path::PathBuf> =
+                if let Ok(env_dir) = std::env::var("MODCANVAS_INSTANCES_DIR") {
+                    vec![std::path::PathBuf::from(env_dir)]
                 } else {
-                    app_handle
-                        .path()
-                        .app_data_dir()
-                        .expect("failed to resolve app data dir")
-                        .join("instances")
-                }
-            };
+                    let driver = crate::launcher::PrismLauncherDriver::new();
+                    let roots = driver.resolve_instance_roots();
+                    if roots.is_empty() {
+                        vec![app_handle
+                            .path()
+                            .app_data_dir()
+                            .expect("failed to resolve app data dir")
+                            .join("instances")]
+                    } else {
+                        roots
+                    }
+                };
 
-            std::fs::create_dir_all(&instances_dir)
-                .expect("failed to create instances directory");
+            for dir in &instances_dirs {
+                std::fs::create_dir_all(dir)
+                    .expect("failed to create instances directory");
+            }
 
             let launcher_driver: Arc<dyn LauncherDriver> = Arc::new(PrismLauncherDriver::new());
-            let instance_manager = InstanceManager::new(instances_dir, launcher_driver);
+            let instance_manager = InstanceManager::new(instances_dirs, launcher_driver);
             app.manage(instance_manager);
 
             // WebSocket IPC Server for Minecraft Companion Mod

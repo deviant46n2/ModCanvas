@@ -279,16 +279,18 @@ pub use crate::models::{MinecraftInstance, InstanceStatus};
 
 pub struct InstanceManager {
     instances: std::sync::Arc<Mutex<Vec<MinecraftInstance>>>,
-    base_dir: PathBuf,
+    /// All instance roots to scan, in priority order. `base_dirs[0]` is the
+    /// primary root where new instances are created.
+    base_dirs: Vec<PathBuf>,
     _driver: Arc<dyn LauncherDriver>,
 }
 
 impl InstanceManager {
-    pub fn new(base_dir: PathBuf, driver: Arc<dyn LauncherDriver>) -> Self {
-        eprintln!("[ModCanvas] InstanceManager::new() called with base_dir: {:?}", base_dir);
+    pub fn new(base_dirs: Vec<PathBuf>, driver: Arc<dyn LauncherDriver>) -> Self {
+        eprintln!("[ModCanvas] InstanceManager::new() called with base_dirs: {:?}", base_dirs);
         let manager = Self {
             instances: std::sync::Arc::new(Mutex::new(Vec::new())),
-            base_dir,
+            base_dirs,
             _driver: driver,
         };
         manager.load_instances();
@@ -299,43 +301,55 @@ impl InstanceManager {
     fn load_instances(&self) {
         let mut instances = self.instances.lock().unwrap();
         instances.clear();
-        eprintln!("[ModCanvas] load_instances() reading dir: {:?}", self.base_dir);
 
-        if let Ok(entries) = std::fs::read_dir(&self.base_dir) {
-            let entries: Vec<_> = entries.flatten().collect();
-            eprintln!("[ModCanvas] load_instances() found {} entries", entries.len());
-            for entry in entries {
-                let path = entry.path();
-                if !path.is_dir() {
-                    continue;
-                }
-                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    // Skip Prism internal directories
-                    if dir_name.starts_with('.') || dir_name == "instgroups.json" {
+        for base_dir in &self.base_dirs {
+            eprintln!("[ModCanvas] load_instances() reading dir: {:?}", base_dir);
+            if let Ok(entries) = std::fs::read_dir(base_dir) {
+                let entries: Vec<_> = entries.flatten().collect();
+                eprintln!("[ModCanvas] load_instances() found {} entries", entries.len());
+                for entry in entries {
+                    let path = entry.path();
+                    if !path.is_dir() {
                         continue;
                     }
+                    if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                        // Skip Prism internal directories
+                        if dir_name.starts_with('.') || dir_name == "instgroups.json" {
+                            continue;
+                        }
 
-                    // Prism instances have a minecraft/ subdirectory
-                    let minecraft_dir = path.join("minecraft");
-                    let game_dir = if minecraft_dir.exists() {
-                        minecraft_dir.to_str().unwrap_or(path.to_str().unwrap_or("")).to_string()
-                    } else {
-                        path.to_str().unwrap_or("").to_string()
-                    };
+                        // Prism instances have a minecraft/ subdirectory
+                        let minecraft_dir = path.join("minecraft");
+                        let game_dir = if minecraft_dir.exists() {
+                            minecraft_dir.to_str().unwrap_or(path.to_str().unwrap_or("")).to_string()
+                        } else {
+                            path.to_str().unwrap_or("").to_string()
+                        };
 
-                    // Try to parse our own instance.json first
-                    let metadata_path = path.join("instance.json");
-                    let instance = if metadata_path.exists() {
-                        if let Ok(content) = std::fs::read_to_string(&metadata_path) {
-                            if let Ok(meta) = serde_json::from_str::<InstanceMetadata>(&content) {
-                                MinecraftInstance {
-                                    id: meta.id,
-                                    name: meta.name,
-                                    mc_version: meta.mc_version,
-                                    loader: meta.loader,
-                                    loader_version: meta.loader_version,
-                                    game_dir: game_dir.clone(),
-                                    status: InstanceStatus::Stopped,
+                        // Try to parse our own instance.json first
+                        let metadata_path = path.join("instance.json");
+                        let instance = if metadata_path.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&metadata_path) {
+                                if let Ok(meta) = serde_json::from_str::<InstanceMetadata>(&content) {
+                                    MinecraftInstance {
+                                        id: meta.id,
+                                        name: meta.name,
+                                        mc_version: meta.mc_version,
+                                        loader: meta.loader,
+                                        loader_version: meta.loader_version,
+                                        game_dir: game_dir.clone(),
+                                        status: InstanceStatus::Stopped,
+                                    }
+                                } else {
+                                    MinecraftInstance {
+                                        id: Uuid::new_v4().to_string(),
+                                        name: dir_name.to_string(),
+                                        mc_version: "Unknown".to_string(),
+                                        loader: "Unknown".to_string(),
+                                        loader_version: None,
+                                        game_dir: game_dir.clone(),
+                                        status: InstanceStatus::Stopped,
+                                    }
                                 }
                             } else {
                                 MinecraftInstance {
@@ -349,37 +363,27 @@ impl InstanceManager {
                                 }
                             }
                         } else {
+                            // Native Prism instance — read from instance.cfg + mmc-pack.json
+                            let display_name = parse_prism_instance_cfg(&path)
+                                .unwrap_or_else(|| dir_name.to_string());
+                            let (mc_version, loader, loader_version) = parse_prism_mmc_pack(&path);
                             MinecraftInstance {
                                 id: Uuid::new_v4().to_string(),
-                                name: dir_name.to_string(),
-                                mc_version: "Unknown".to_string(),
-                                loader: "Unknown".to_string(),
-                                loader_version: None,
+                                name: display_name,
+                                mc_version,
+                                loader,
+                                loader_version,
                                 game_dir: game_dir.clone(),
                                 status: InstanceStatus::Stopped,
                             }
-                        }
-                    } else {
-                        // Native Prism instance — read from instance.cfg + mmc-pack.json
-                        let display_name = parse_prism_instance_cfg(&path)
-                            .unwrap_or_else(|| dir_name.to_string());
-                        let (mc_version, loader, loader_version) = parse_prism_mmc_pack(&path);
-                        MinecraftInstance {
-                            id: Uuid::new_v4().to_string(),
-                            name: display_name,
-                            mc_version,
-                            loader,
-                            loader_version,
-                            game_dir: game_dir.clone(),
-                            status: InstanceStatus::Stopped,
-                        }
-                    };
-                    instances.push(instance);
-                    eprintln!("[ModCanvas] Loaded instance: {}", dir_name);
+                        };
+                        instances.push(instance);
+                        eprintln!("[ModCanvas] Loaded instance: {}", dir_name);
+                    }
                 }
+            } else {
+                eprintln!("[ModCanvas] load_instances() failed to read directory");
             }
-        } else {
-            eprintln!("[ModCanvas] load_instances() failed to read directory");
         }
     }
 
@@ -425,12 +429,13 @@ impl InstanceManager {
 
         // Use a sanitized version of the name as the folder name
         let folder_name = sanitize_instance_name(name);
-        let mut instance_dir = self.base_dir.join(&folder_name);
+        let primary_dir = self.base_dirs.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+        let mut instance_dir = primary_dir.join(&folder_name);
 
         // Handle name collisions by appending a number
         if instance_dir.exists() {
             for i in 2..1000 {
-                let candidate = self.base_dir.join(format!("{} ({})", folder_name, i));
+                let candidate = primary_dir.join(format!("{} ({})", folder_name, i));
                 if !candidate.exists() {
                     instance_dir = candidate;
                     break;
@@ -485,7 +490,15 @@ impl InstanceManager {
     }
 
     pub fn base_dir(&self) -> &std::path::Path {
-        &self.base_dir
+        self.base_dirs
+            .first()
+            .map(|p| p.as_path())
+            .unwrap_or_else(|| std::path::Path::new("."))
+    }
+
+    /// All instance roots scanned by this manager (primary first).
+    pub fn base_dirs(&self) -> &[PathBuf] {
+        &self.base_dirs
     }
 
     pub fn remove_instance(&self, id: &str) -> Result<bool, String> {
@@ -910,4 +923,79 @@ pub fn get_all_kubejs_scripts(game_dir: &PathBuf) -> Vec<KubeJSScript> {
         .into_iter()
         .flat_map(|dir| dir.scripts)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_prism_instance(root: &std::path::Path, name: &str, mc: &str, loader: &str) {
+        let dir = root.join(name);
+        std::fs::create_dir_all(dir.join("minecraft")).unwrap();
+        std::fs::write(
+            dir.join("instance.cfg"),
+            format!("InstanceType=OneSix\nname={name}\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("mmc-pack.json"),
+            format!(
+                r#"{{"components":[
+                    {{"uid":"net.minecraft","version":"{mc}"}},
+                    {{"uid":"{loader}","version":"9.9.9"}}
+                ]}}"#
+            ),
+        )
+        .unwrap();
+    }
+
+    /// Instances spread across several roots (native + Flatpak Prism) must
+    /// all be discovered and merged, not just the ones in one root.
+    #[test]
+    fn scans_all_instance_roots() {
+        let temp = std::env::temp_dir().join(format!("modcanvas_inst_{}", Uuid::new_v4()));
+        let root_a = temp.join("a");
+        let root_b = temp.join("b");
+        std::fs::create_dir_all(&root_a).unwrap();
+        std::fs::create_dir_all(&root_b).unwrap();
+
+        write_prism_instance(&root_a, "Pack A", "1.20.1", "net.minecraftforge");
+        write_prism_instance(&root_a, "Pack B", "1.21.1", "net.fabricmc.fabric");
+        write_prism_instance(&root_b, "Pack C", "26.2", "net.fabricmc.fabric-loader");
+
+        let driver: Arc<dyn LauncherDriver> = Arc::new(crate::launcher::PrismLauncherDriver::new());
+        let manager = InstanceManager::new(vec![root_a, root_b], driver);
+
+        let mut names: Vec<String> = manager
+            .list_instances()
+            .into_iter()
+            .map(|i| i.name)
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["Pack A", "Pack B", "Pack C"]);
+
+        let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    /// The primary (first) root is used when creating new instances.
+    #[test]
+    fn create_instance_uses_primary_root() {
+        let temp = std::env::temp_dir().join(format!("modcanvas_inst_{}", Uuid::new_v4()));
+        let root_a = temp.join("a");
+        let root_b = temp.join("b");
+        std::fs::create_dir_all(&root_a).unwrap();
+        std::fs::create_dir_all(&root_b).unwrap();
+
+        let driver: Arc<dyn LauncherDriver> = Arc::new(crate::launcher::PrismLauncherDriver::new());
+        let manager = InstanceManager::new(vec![root_a.clone(), root_b.clone()], driver);
+
+        manager
+            .create_instance("My New Pack", "1.20.1", "Forge", Some("47.0.0"))
+            .unwrap();
+
+        assert!(root_a.join("My New Pack").exists(), "instance created under primary root");
+        assert!(!root_b.join("My New Pack").exists(), "instance NOT created under secondary root");
+
+        let _ = std::fs::remove_dir_all(&temp);
+    }
 }

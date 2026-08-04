@@ -306,32 +306,18 @@ impl Database {
         self.set_setting("curseforge_api_key", key)
     }
 
-    pub fn upsert_prism_instances(
+    /// Sync live Prism instances into the projects DB. This is strictly
+    /// additive: instances are inserted, or updated in place, by `game_dir`
+    /// path. Rows are NEVER deleted here — the `projects` table is the
+    /// persistent source of truth for the project list. Deleting a Prism
+    /// instance, an imported pack's folder, or losing the scan root must not
+    /// silently wipe a project the user has worked on. Projects are only
+    /// removed by an explicit `delete_project` command.
+    pub fn sync_prism_instances(
         &self,
         instances: &[crate::models::MinecraftInstance],
     ) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
-
-        // Remove DB projects whose path no longer matches any live Prism instance
-        let live_paths: Vec<&str> = instances.iter().map(|i| i.game_dir.as_str()).collect();
-        if live_paths.is_empty() {
-            // Safety: don't wipe DB if scan returned nothing (disk error etc.)
-        } else {
-            let placeholders: Vec<String> = live_paths.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
-            let sql = format!(
-                "DELETE FROM projects WHERE path NOT IN ({})",
-                placeholders.join(", ")
-            );
-            let params_refs: Vec<&dyn rusqlite::types::ToSql> = live_paths.iter()
-                .map(|p| p as &dyn rusqlite::types::ToSql)
-                .collect();
-            let mut stmt = conn.prepare(&sql)?;
-            let param_refs: Vec<&dyn rusqlite::types::ToSql> = params_refs.iter().map(|p| *p as &dyn rusqlite::types::ToSql).collect();
-            let removed = stmt.execute(rusqlite::params_from_iter(param_refs.iter()))?;
-            if removed > 0 {
-                eprintln!("[ModCanvas] Cleaned up {} stale project(s) from DB", removed);
-            }
-        }
 
         for inst in instances {
             let exists: bool = {
@@ -445,5 +431,86 @@ impl Database {
         }
         eprintln!("[ModCanvas] Synced {} mods from {:?} to project {}", synced, mods_dir, project_id);
         Ok(synced)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{InstanceStatus, MinecraftInstance, ModLoader, PackFormat};
+
+    fn temp_db() -> (Database, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "modcanvas_db_test_{}.db",
+            Uuid::new_v4()
+        ));
+        let db = Database::open(&path).expect("open temp db");
+        (db, path)
+    }
+
+    fn make_project(name: &str, path: &str) -> Project {
+        let now = chrono::Utc::now();
+        Project {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            description: String::new(),
+            minecraft_version: "1.20.1".to_string(),
+            mod_loader: ModLoader::Forge,
+            pack_format: PackFormat::Unknown,
+            pack_version: "1.0.0".to_string(),
+            author: String::new(),
+            created_at: now,
+            updated_at: now,
+            path: path.to_string(),
+        }
+    }
+
+    fn make_instance(id: &str, name: &str, game_dir: &str) -> MinecraftInstance {
+        MinecraftInstance {
+            id: id.to_string(),
+            name: name.to_string(),
+            mc_version: "1.20.1".to_string(),
+            loader: "Forge".to_string(),
+            loader_version: None,
+            game_dir: game_dir.to_string(),
+            status: InstanceStatus::Stopped,
+        }
+    }
+
+    /// Sync is strictly additive: projects whose path is not in the live
+    /// instance list (deleted instances, imported packs, manual projects)
+    /// must survive the sync. Regression for the old behavior that wiped
+    /// every non-Prism project on each `list_projects` call.
+    #[test]
+    fn sync_prism_instances_never_deletes_projects() {
+        let (db, db_path) = temp_db();
+
+        let manual_path = "/home/user/modpacks/MyManualPack";
+        let live_path = "/home/user/.local/share/PrismLauncher/instances/Live/minecraft";
+        let orphaned_path = "/home/user/.local/share/PrismLauncher/instances/Gone/minecraft";
+
+        db.create_project(&make_project("Manual", manual_path)).unwrap();
+        db.create_project(&make_project("Live", live_path)).unwrap();
+        db.create_project(&make_project("Orphaned", orphaned_path)).unwrap();
+
+        // One live instance matching "Live", plus a brand-new instance.
+        let instances = vec![
+            make_instance("live-1", "Live", live_path),
+            make_instance("new-1", "New Pack", "/home/user/.local/share/PrismLauncher/instances/New/minecraft"),
+        ];
+
+        db.sync_prism_instances(&instances).unwrap();
+
+        let projects = db.list_projects().unwrap();
+        let paths: Vec<&str> = projects.iter().map(|p| p.path.as_str()).collect();
+
+        assert!(paths.contains(&manual_path), "manual project must persist: {paths:?}");
+        assert!(paths.contains(&orphaned_path), "deleted-instance project must persist: {paths:?}");
+        assert!(paths.contains(&live_path), "live instance project must be present: {paths:?}");
+        assert!(paths.contains(&"/home/user/.local/share/PrismLauncher/instances/New/minecraft"),
+            "new instance must be added: {paths:?}");
+        assert_eq!(projects.len(), 4, "expected all 4 projects after additive sync: {paths:?}");
+
+        let _ = std::fs::remove_file(&db_path);
     }
 }
