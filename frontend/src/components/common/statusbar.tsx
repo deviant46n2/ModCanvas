@@ -1,7 +1,10 @@
 // Workspace status bar: WebSocket server state on the left, live Test /
 // Deploy Companion feedback on the right. System state lives here so the
 // toolbar and banners don't have to grow to carry it.
+import { useEffect, useState } from 'react'
 import type { WsConnectionStatus } from '../../services/api'
+import { getEngineStats, subscribeEngineStats } from '../../services/engine-render'
+import { getBakedTextureKeys } from '../../services/texture-loader'
 import { RefreshIcon } from '../ui/icons'
 
 interface WorkspaceStatusBarProps {
@@ -23,11 +26,20 @@ export function WorkspaceStatusBar({
   testError,
   deployCompanionMessage,
 }: WorkspaceStatusBarProps) {
+  const [engineStats, setEngineStats] = useState(() => getEngineStats())
+  useEffect(() => subscribeEngineStats(() => setEngineStats(getEngineStats())), [])
   const deployOk = /^[\u2713\u2714]/.test(deployCompanionMessage)
   const deployErr = /^[\u2717\u2718]/.test(deployCompanionMessage)
   const deployClass = deployOk ? 'ok' : deployErr ? 'error' : 'info'
   const deployText = deployCompanionMessage.replace(DEPLOY_GLYPHS, '')
   const errorFirstLine = testError.split('\n')[0]
+
+  const bakedCount = getBakedTextureKeys().length
+  const engineLabel = engineStats.connected
+    ? `Engine \u2713 ${engineStats.sent} sent / ${engineStats.rendered} done (${engineStats.queue} queued, ${bakedCount} baked)`
+    : engineStats.rendered > 0
+      ? `Engine cached (${engineStats.rendered}${bakedCount > 0 ? `, ${bakedCount} baked` : ''})`
+      : `Engine idle (${bakedCount} baked)`
 
   return (
     <footer className="workspace-statusbar">
@@ -47,6 +59,13 @@ export function WorkspaceStatusBar({
         >
           <RefreshIcon size={12} />
         </button>
+        <span
+          className={`ws-status ${engineStats.connected ? 'connected' : 'disconnected'}`}
+          title="Companion engine icon rendering (RENDER_ITEMS_REQUEST/RESULT)"
+        >
+          <span className={`status-dot ${engineStats.connected ? 'running' : 'stopped'}`} />
+          <span>{engineLabel}</span>
+        </span>
       </div>
       <div className="workspace-statusbar-group workspace-statusbar-right">
         {isTesting && (

@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod config_parser;
 pub mod db;
+pub mod engine_renders;
 pub mod icons;
 pub mod imports;
 pub mod indexer;
@@ -141,6 +142,7 @@ pub fn run() {
             commands::get_project_mods,
             commands::search_mods,
             commands::search_modpacks,
+            commands::install_mod_from_search,
             commands::check_compatibility,
             commands::get_config,
             commands::save_config,
@@ -230,6 +232,9 @@ pub fn run() {
             crate::instance_textures::scan_instance_animations_cmd,
             crate::instance_textures::resolve_item_tags_cmd,
             crate::ftb_theme::get_quest_theme_background,
+            crate::engine_renders::get_engine_renders_cmd,
+            crate::engine_renders::save_engine_renders_cmd,
+            crate::instance_textures::prune_caches_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Minecraft Modpack Maker");

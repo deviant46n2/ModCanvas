@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { type RowComponentProps } from 'react-window'
 
 interface ModMetadata {
@@ -14,7 +15,9 @@ interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  icon: string | null
   source: 'modrinth' | 'curseforge'
+  mismatch?: string | null
 }
 
 interface ModDependency {
@@ -35,6 +38,29 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function sourceKey(source?: string | null): string {
+  if (!source) return 'local'
+  const s = source.toLowerCase()
+  if (s.includes('modrinth')) return 'modrinth'
+  if (s.includes('curse')) return 'curseforge'
+  return 'local'
+}
+
+/** Small rounded thumbnail with a graceful monogram fallback. */
+function ModThumb({ icon, name, size = 28 }: { icon?: string | null; name: string; size?: number }) {
+  const [failed, setFailed] = useState(false)
+  const showImage = !!icon && !failed
+  return (
+    <span className={`mod-thumb${showImage ? '' : ' mod-thumb-fallback'}`} style={{ width: size, height: size, borderRadius: 6 }}>
+      {showImage ? (
+        <img src={icon as string} alt="" draggable={false} onError={() => setFailed(true)} />
+      ) : (
+        <span className="mod-thumb-letter">{name ? name.charAt(0).toUpperCase() : '?'}</span>
+      )}
+    </span>
+  )
+}
+
 export interface ModRowExtraProps {
   filteredMods: any[]
   modMetadata: Map<string, ModMetadata>
@@ -43,75 +69,91 @@ export interface ModRowExtraProps {
   toggleModEnabled: (mod: any) => Promise<void>
   removeModFromProject: (modId: string) => Promise<void>
   getModNameById: (modId: string) => string
+  selectedIds: ReadonlySet<string>
+  onToggleSelect: (modId: string) => void
 }
 
 export function ModRow({
-  index,
-  style,
   filteredMods,
   modMetadata,
-  projectMods,
   getMissingDependencies,
   toggleModEnabled,
   removeModFromProject,
   getModNameById,
-}: RowComponentProps<ModRowExtraProps>) {
-  const mod = filteredMods[index]
-  const meta = modMetadata.get(mod.mod_id)
-  const missingDeps = getMissingDependencies(mod.mod_id)
+  selectedIds,
+  onToggleSelect,
+}: ModRowExtraProps) {
   return (
-    <div style={style}>
-      <div className={`mod-card ${!mod.enabled ? 'disabled' : ''} ${missingDeps.length > 0 ? 'has-missing-deps' : ''}`}>
-        <div className="mod-card-header">
-          <div className="mod-info">
-            <div className="mod-name">{mod.name}</div>
-            <div className="mod-author">{mod.author}</div>
-          </div>
-          <div className="mod-actions">
-            <button
-              className={`btn-toggle ${mod.enabled ? 'enabled' : 'disabled'}`}
-              onClick={() => toggleModEnabled(mod)}
-              title={mod.enabled ? 'Disable' : 'Enable'}
-              aria-pressed={mod.enabled}
-            >
-              {mod.enabled ? 'ON' : 'OFF'}
-            </button>
-            <button
-              className="btn-remove"
-              onClick={() => removeModFromProject(mod.mod_id)}
-              title="Remove mod"
-              aria-label={`Remove ${mod.name}`}
-            >
-              {'\u00D7'}
-            </button>
-          </div>
-        </div>
-        <div className="mod-desc">{mod.description}</div>
-        <div className="mod-meta">
-          <span>{mod.source}</span>
-          {mod.version && <span>v{mod.version}</span>}
-          {meta && meta.categories.length > 0 && (
-            <span className="mod-categories">{meta.categories.join(', ')}</span>
-          )}
-        </div>
-        {meta && meta.dependencies.length > 0 && (
-          <div className="mod-dependencies">
-            {meta.dependencies.map((dep: ModDependency, i: number) => {
-              const isPresent = projectMods.some(m => m.mod_id === dep.mod_id)
-              return (
-                <span key={i} className={`dep-badge ${dep.dependency_type} ${isPresent ? 'present' : 'missing'}`}>
-                  {dep.dependency_type}: {getModNameById(dep.mod_id)}
+    <div className="mod-grid">
+      {filteredMods.map((mod) => {
+        const meta = modMetadata.get(mod.mod_id)
+        const missingDeps = getMissingDependencies(mod.mod_id)
+        const selected = selectedIds.has(mod.mod_id)
+        const depCount = meta?.dependencies?.length ?? 0
+        const downloads = typeof mod.downloads === 'number' ? mod.downloads : meta?.downloads ?? 0
+        const description = mod.description || meta?.description || ''
+        const icon = mod.icon ?? meta?.icon ?? null
+
+        return (
+          <div
+            key={mod.mod_id}
+            className={`mod-card-grid ${!mod.enabled ? 'disabled' : ''} ${missingDeps.length > 0 ? 'has-missing-deps' : ''} ${selected ? 'selected' : ''}`}
+          >
+            <div className="mod-card-grid-head">
+              <input
+                type="checkbox"
+                className="mod-row-checkbox"
+                checked={selected}
+                onChange={() => onToggleSelect(mod.mod_id)}
+                aria-label={`Select ${mod.name}`}
+              />
+              <ModThumb icon={icon} name={mod.name} size={36} />
+              <div className="mod-card-grid-title">
+                <span className="mod-row-name">{mod.name}</span>
+                <span className="mod-row-author">{mod.author || meta?.author || ''}</span>
+              </div>
+              <button
+                className={`btn-toggle ${mod.enabled ? 'enabled' : 'disabled'}`}
+                onClick={() => toggleModEnabled(mod)}
+                title={mod.enabled ? 'Disable' : 'Enable'}
+                aria-pressed={mod.enabled}
+              >
+                {mod.enabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <div className="mod-card-grid-desc">{description}</div>
+            <div className="mod-card-grid-meta">
+              <span className={`source-badge ${sourceKey(mod.source)}`}>{mod.source || 'Local'}</span>
+              {mod.version && <span className="mod-row-chip">v{mod.version}</span>}
+              {downloads > 0 && <span className="mod-row-chip">{downloads.toLocaleString()} dl</span>}
+              {depCount > 0 && <span className="mod-row-chip">{depCount} deps</span>}
+              {meta && meta.categories?.length > 0 && (
+                <span className="mod-row-chip mod-row-cats" title={meta.categories.join(', ')}>
+                  {meta.categories.slice(0, 2).join(', ')}
                 </span>
-              )
-            })}
+              )}
+              {missingDeps.length > 0 && (
+                <span
+                  className="mod-row-warn"
+                  title={`Missing required: ${missingDeps.map((d) => getModNameById(d.mod_id)).join(', ')}`}
+                >
+                  !
+                </span>
+              )}
+              <span className="mod-card-grid-actions">
+                <button
+                  className="btn-remove"
+                  onClick={() => removeModFromProject(mod.mod_id)}
+                  title="Remove mod"
+                  aria-label={`Remove ${mod.name}`}
+                >
+                  {'\u00D7'}
+                </button>
+              </span>
+            </div>
           </div>
-        )}
-        {missingDeps.length > 0 && (
-          <div className="mod-missing-deps">
-            Missing required: {missingDeps.map(d => d.mod_id).join(', ')}
-          </div>
-        )}
-      </div>
+        )
+      })}
     </div>
   )
 }
@@ -147,6 +189,7 @@ export interface SearchResultRowExtraProps {
   searchResults: ModMetadata[]
   projectMods: any[]
   addModToProject: (mod: any) => Promise<void>
+  installingIds: Set<string>
 }
 
 export function SearchResultRow({
@@ -155,34 +198,45 @@ export function SearchResultRow({
   searchResults,
   projectMods,
   addModToProject,
+  installingIds,
 }: RowComponentProps<SearchResultRowExtraProps>) {
   const mod = searchResults[index]
   const isAdded = projectMods.some(m => m.mod_id === mod.mod_id)
+  const isInstalling = installingIds.has(mod.mod_id)
   return (
-    <div style={style}>
-      <div className="mod-card" style={{ height: '100%' }}>
-        <div className="mod-card-header">
-          <div className="mod-info">
-            <div className="mod-name">{mod.name}</div>
-            <div className="mod-author">{mod.author}</div>
+    <div style={style} className="mod-row-wrap">
+      <div className={`mod-row ${isAdded || isInstalling ? 'disabled' : ''}`}>
+        <ModThumb icon={mod.icon ?? null} name={mod.name} />
+        <div className="mod-row-main">
+          <div className="mod-row-title">
+            <span className="mod-row-name">{mod.name}</span>
+            {mod.author && <span className="mod-row-author">{mod.author}</span>}
           </div>
-          <button
-            className={`btn-add ${isAdded ? 'added' : ''}`}
-            onClick={() => !isAdded && addModToProject(mod)}
-            disabled={isAdded}
-            aria-label={isAdded ? `${mod.name} already added` : `Add ${mod.name}`}
-          >
-            {isAdded ? 'Added' : '+ Add'}
-          </button>
+          <div className="mod-row-desc">{mod.description}</div>
         </div>
-        <div className="mod-desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {mod.description}
-        </div>
-        <div className="mod-meta">
-          <span>{mod.downloads.toLocaleString()} downloads</span>
-          {mod.categories.length > 0 && (
-            <span className="mod-categories">{mod.categories.join(', ')}</span>
+        <div className="mod-row-meta">
+          <span className={`source-badge ${mod.source}`}>{mod.source}</span>
+          {mod.downloads > 0 && <span className="mod-row-chip">{mod.downloads.toLocaleString()} dl</span>}
+          {mod.mismatch && (
+            <span className="mod-row-warn mod-row-warn-text" title={mod.mismatch}>
+              diff version
+            </span>
           )}
+          {mod.categories?.length > 0 && (
+            <span className="mod-row-chip mod-row-cats" title={mod.categories.join(', ')}>
+              {mod.categories.slice(0, 2).join(', ')}
+            </span>
+          )}
+        </div>
+        <div className="mod-row-actions">
+          <button
+            className={`btn-add ${isAdded || isInstalling ? 'added' : ''}`}
+            onClick={() => !isAdded && !isInstalling && addModToProject(mod)}
+            disabled={isAdded || isInstalling}
+            aria-label={isAdded ? `${mod.name} already added` : isInstalling ? `Installing ${mod.name}` : `Add ${mod.name}`}
+          >
+            {isInstalling ? 'Installing...' : isAdded ? 'Added' : '+ Add'}
+          </button>
         </div>
       </div>
     </div>

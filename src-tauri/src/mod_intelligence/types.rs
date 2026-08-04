@@ -22,6 +22,8 @@ pub(crate) struct ModrinthHit {
     pub(crate) categories: Option<Vec<String>>,
     pub(crate) versions: Vec<String>,
     pub(crate) project_type: String,
+    #[serde(default)]
+    pub(crate) icon_url: Option<String>,
 }
 
 impl From<ModrinthHit> for crate::models::ModMetadata {
@@ -40,6 +42,9 @@ impl From<ModrinthHit> for crate::models::ModMetadata {
             source_url: None,
             issues_url: None,
             documentation_url: None,
+            icon: hit.icon_url,
+            source: "modrinth".to_string(),
+            mismatch: None,
         }
     }
 }
@@ -58,6 +63,8 @@ pub(crate) struct ModrinthProject {
     pub(crate) source_url: Option<String>,
     pub(crate) issues_url: Option<String>,
     pub(crate) documentation_url: Option<String>,
+    #[serde(default)]
+    pub(crate) icon_url: Option<String>,
     pub(crate) team: String,
 }
 
@@ -89,6 +96,9 @@ impl From<ModrinthProject> for crate::models::ModMetadata {
             source_url: project.source_url,
             issues_url: project.issues_url,
             documentation_url: project.documentation_url,
+            icon: project.icon_url,
+            source: "modrinth".to_string(),
+            mismatch: None,
         }
     }
 }
@@ -139,6 +149,8 @@ pub struct CurseForgeModInfo {
     pub categories: Vec<CurseForgeCategory>,
     #[serde(default)]
     pub gameVersions: Vec<String>,
+    #[serde(default)]
+    pub logo: Option<CurseForgeLogo>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,6 +161,12 @@ pub struct CurseForgeCategory {
 #[derive(Debug, Deserialize)]
 pub struct CurseForgeAuthor {
     pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CurseForgeLogo {
+    #[serde(rename = "thumbnailUrl", default)]
+    pub thumbnail_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,12 +183,30 @@ pub struct CurseForgeFileResponse {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CurseForgeFileListResponse {
+    pub data: Vec<CurseForgeFileInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct CurseForgeFileInfo {
     pub id: u64,
     pub displayName: String,
     pub fileName: String,
     pub downloadUrl: Option<String>,
     pub fileLength: Option<u64>,
+    #[serde(default)]
+    pub fileDate: Option<String>,
+    #[serde(default)]
+    pub isAvailable: Option<bool>,
+    #[serde(default)]
+    pub gameVersions: Vec<String>,
+    #[serde(default)]
+    pub modLoaderType: Option<i64>,
+    /// Early-access files are only visible to the author's club members and
+    /// must never be auto-picked as the "latest" downloadable file.
+    #[serde(default)]
+    pub isEarlyAccess: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

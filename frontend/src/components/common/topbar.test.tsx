@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TopBar } from './topbar'
+import { HistoryProvider } from '../../hooks/history-provider'
 
 const base = {
   projectName: 'My Pack',
@@ -19,7 +20,7 @@ const base = {
 
 describe('TopBar', () => {
   it('shows Load Pack as the primary action when the pack is not loaded', () => {
-    render(<TopBar {...base} packLoaded={false} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={false} /></HistoryProvider>)
     const load = screen.getByRole('button', { name: /load pack/i })
     const test = screen.getByRole('button', { name: 'Test' })
     expect(load.className).toContain('btn-primary')
@@ -27,19 +28,19 @@ describe('TopBar', () => {
   })
 
   it('promotes Test to primary and hides Load Pack once loaded', () => {
-    render(<TopBar {...base} packLoaded={true} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={true} /></HistoryProvider>)
     expect(screen.queryByRole('button', { name: /load pack/i })).toBeNull()
     expect(screen.getByRole('button', { name: 'Test' }).className).toContain('btn-primary')
   })
 
   it('shows a Testing label and disables Test while a test is running', () => {
-    render(<TopBar {...base} packLoaded={true} isTesting={true} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={true} isTesting={true} /></HistoryProvider>)
     const test = screen.getByRole('button', { name: /testing/i })
     expect(test).toBeDisabled()
   })
 
   it('groups Close Pack, Deploy Companion, Export, and Delete under the Project menu', () => {
-    render(<TopBar {...base} packLoaded={true} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={true} /></HistoryProvider>)
     fireEvent.click(screen.getByRole('button', { name: /project/i }))
     expect(screen.getByRole('menuitem', { name: /close pack/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /deploy companion/i })).toBeInTheDocument()
@@ -48,13 +49,13 @@ describe('TopBar', () => {
   })
 
   it('hides Close Pack from the menu when the pack is not loaded', () => {
-    render(<TopBar {...base} packLoaded={false} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={false} /></HistoryProvider>)
     fireEvent.click(screen.getByRole('button', { name: /project/i }))
     expect(screen.queryByRole('menuitem', { name: /close pack/i })).toBeNull()
   })
 
   it('fires the right handlers from the Project menu and closes it', () => {
-    render(<TopBar {...base} packLoaded={true} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={true} /></HistoryProvider>)
     fireEvent.click(screen.getByRole('button', { name: /project/i }))
     fireEvent.click(screen.getByRole('menuitem', { name: /export modpack/i }))
     expect(base.onExport).toHaveBeenCalledTimes(1)
@@ -62,7 +63,7 @@ describe('TopBar', () => {
   })
 
   it('fires Delete from the menu (confirm dialog is the caller responsibility)', () => {
-    render(<TopBar {...base} packLoaded={true} />)
+    render(<HistoryProvider><TopBar {...base} packLoaded={true} /></HistoryProvider>)
     fireEvent.click(screen.getByRole('button', { name: /project/i }))
     fireEvent.click(screen.getByRole('menuitem', { name: /delete project/i }))
     expect(base.onDelete).toHaveBeenCalledTimes(1)

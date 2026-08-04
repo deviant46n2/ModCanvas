@@ -57,10 +57,17 @@ pub fn list_projects(
 pub fn delete_project(db: State<'_, Database>, project_id: String) -> Result<bool, String> {
     let id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
 
-    // Look up the project's path so we can remove the Prism instance dir too
+    // Look up the project's path so we can remove its files on disk.
     if let Ok(Some(project)) = db.get_project(&id) {
         let game_dir = std::path::PathBuf::from(&project.path);
-        if let Some(instance_dir) = game_dir.parent() {
+        // Imported mrpacks live in their own top-level dir under the imports
+        // root — delete the pack dir itself. Prism/attached instances point at
+        // `<instance>/minecraft`, so deleting the parent removes the instance.
+        if project.pack_format == PackFormat::ModrinthMrpack {
+            if game_dir.exists() {
+                let _ = std::fs::remove_dir_all(&game_dir);
+            }
+        } else if let Some(instance_dir) = game_dir.parent() {
             if instance_dir.exists() {
                 let _ = std::fs::remove_dir_all(instance_dir);
             }
@@ -119,6 +126,7 @@ pub fn add_mod(
         },
         enabled: enabled.unwrap_or(true),
         added_at: Utc::now(),
+        icon: None,
     };
 
     db.add_mod(&entry).map_err(|e| e.to_string())?;

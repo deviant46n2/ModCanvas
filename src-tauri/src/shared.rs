@@ -79,34 +79,37 @@ pub struct ModJarInfo {
     pub mod_id: Option<String>,
     pub version: Option<String>,
     pub loader: Option<ModLoader>,
+    pub description: Option<String>,
+    pub icon_data_url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct FabricModJson {
-    id: String,
-    version: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize)]
-struct QuiltModJson {
-    version: serde_json::Value,
-    quilt_loader: QuiltLoader,
-}
-
-#[derive(Debug, Deserialize)]
-struct QuiltLoader {
-    entrypoints: QuiltEntrypoints,
-}
-
-#[derive(Debug, Deserialize)]
-struct QuiltEntrypoints {
-    main: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct McmodInfo {
-    modid: String,
-    version: String,
+fn read_jar_icon_data_url(archive: &mut ZipArchive<std::fs::File>, icon_path: &str) -> Option<String> {
+    let path = icon_path.trim().trim_start_matches('/');
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).ok()?;
+        let name = entry.name().replace('\\', "/");
+        if name == path || name.ends_with(&format!("/{path}")) {
+            let mut buf = Vec::new();
+            if entry.read_to_end(&mut buf).ok().filter(|n| *n > 0).is_none() {
+                return None;
+            }
+            let mime = if path.to_lowercase().ends_with(".png") {
+                "image/png"
+            } else if path.to_lowercase().ends_with(".jpg") || path.to_lowercase().ends_with(".jpeg") {
+                "image/jpeg"
+            } else if path.to_lowercase().ends_with(".gif") {
+                "image/gif"
+            } else {
+                "image/png"
+            };
+            return Some(format!(
+                "data:{};base64,{}",
+                mime,
+                base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &buf)
+            ));
+        }
+    }
+    None
 }
 
 fn extract_version_string(val: &serde_json::Value) -> Option<String> {
@@ -127,132 +130,192 @@ fn extract_version_string(val: &serde_json::Value) -> Option<String> {
 
 /// Extract mod metadata from a JAR file by inspecting fabric.mod.json,
 /// quilt.mod.json, META-INF/mods.toml, META-INF/neoforge.mods.toml,
-/// or mcmod.info inside the archive.
+/// or mcmod.info inside the archive. Also pulls the human description and the
+/// mod's own icon (from the jar, as a base64 data URL) when present.
 pub fn extract_mod_info_from_jar(jar_path: &Path) -> Result<Option<ModJarInfo>> {
     let file = std::fs::File::open(jar_path)?;
     let mut archive = ZipArchive::new(file)?;
 
+    // (info without icon data, icon path to read later)
+    let mut found: Option<(ModJarInfo, Option<String>)> = None;
+
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i)?;
-        let name = entry.name();
+        let mut entry = match archive.by_index(i) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        let name = entry.name().to_string();
 
         if name == "fabric.mod.json" {
             let mut content = String::new();
-            entry.read_to_string(&mut content)?;
-            // Try typed deserialization first
-            if let Ok(fabric_mod) = serde_json::from_str::<FabricModJson>(&content) {
-                return Ok(Some(ModJarInfo {
-                    mod_id: Some(fabric_mod.id),
-                    version: extract_version_string(&fabric_mod.version),
-                    loader: Some(ModLoader::Fabric),
-                }));
+            if entry.read_to_string(&mut content).is_err() {
+                continue;
             }
-            // Fallback: raw JSON traversal
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                let mod_id = json
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let version = json
-                    .get("version")
-                    .and_then(|v| extract_version_string(v));
-                if mod_id.is_some() {
-                    return Ok(Some(ModJarInfo {
-                        mod_id,
-                        version,
-                        loader: Some(ModLoader::Fabric),
-                    }));
+                let icon = json
+                    .get("icon")
+                    .and_then(|v| match v {
+                        serde_json::Value::String(s) => Some(s.clone()),
+                        serde_json::Value::Object(o) => {
+                            o.get("path").and_then(|p| p.as_str()).map(|s| s.to_string())
+                        }
+                        _ => None,
+                    });
+                let info = ModJarInfo {
+                    mod_id: json.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    version: json.get("version").and_then(|v| extract_version_string(v)),
+                    loader: Some(ModLoader::Fabric),
+                    description: json.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    icon_data_url: None,
+                };
+                if info.mod_id.is_none() {
+                    continue;
                 }
+                found = Some((info, icon));
+                break;
             }
         } else if name == "quilt.mod.json" {
             let mut content = String::new();
-            entry.read_to_string(&mut content)?;
-            // Try typed deserialization first
-            if let Ok(quilt_mod) = serde_json::from_str::<QuiltModJson>(&content) {
-                let mod_id = quilt_mod
-                    .quilt_loader
-                    .entrypoints
-                    .main
-                    .first()
-                    .cloned()
-                    .unwrap_or_default();
-                return Ok(Some(ModJarInfo {
-                    mod_id: Some(mod_id),
-                    version: extract_version_string(&quilt_mod.version),
-                    loader: Some(ModLoader::Quilt),
-                }));
+            if entry.read_to_string(&mut content).is_err() {
+                continue;
             }
-            // Fallback: raw JSON traversal
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
                 let mod_id = json
                     .pointer("/quilt_loader/entrypoints/main/0")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-                let version = json
-                    .get("version")
-                    .and_then(|v| extract_version_string(v));
-                if mod_id.is_some() {
-                    return Ok(Some(ModJarInfo {
-                        mod_id,
-                        version,
-                        loader: Some(ModLoader::Quilt),
-                    }));
+                if mod_id.is_none() {
+                    continue;
                 }
+                let info = ModJarInfo {
+                    mod_id,
+                    version: json.get("version").and_then(|v| extract_version_string(v)),
+                    loader: Some(ModLoader::Quilt),
+                    description: json.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    icon_data_url: None,
+                };
+                let icon_path = json.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+                found = Some((info, icon_path));
+                break;
             }
-        } else if name == "META-INF/mods.toml" {
+        } else if name == "META-INF/mods.toml" || name == "META-INF/neoforge.mods.toml" {
             let mut content = String::new();
-            entry.read_to_string(&mut content)?;
+            if entry.read_to_string(&mut content).is_err() {
+                continue;
+            }
             if let Ok(doc) = content.parse::<toml_edit::DocumentMut>() {
                 if let Some(mods) = doc.get("mods").and_then(|m| m.as_array_of_tables()) {
                     if let Some(first_mod) = mods.iter().next() {
-                        return Ok(Some(ModJarInfo {
-                            mod_id: first_mod
-                                .get("modId")
+                        let info = ModJarInfo {
+                            mod_id: first_mod.get("modId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                            version: first_mod.get("version").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                            loader: Some(if name.ends_with("neoforge.mods.toml") {
+                                ModLoader::NeoForge
+                            } else {
+                                ModLoader::Forge
+                            }),
+                            description: first_mod
+                                .get("description")
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string()),
-                            version: first_mod
-                                .get("version")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string()),
-                            loader: Some(ModLoader::Forge),
-                        }));
-                    }
-                }
-            }
-        } else if name == "META-INF/neoforge.mods.toml" {
-            let mut content = String::new();
-            entry.read_to_string(&mut content)?;
-            if let Ok(doc) = content.parse::<toml_edit::DocumentMut>() {
-                if let Some(mods) = doc.get("mods").and_then(|m| m.as_array_of_tables()) {
-                    if let Some(first_mod) = mods.iter().next() {
-                        return Ok(Some(ModJarInfo {
-                            mod_id: first_mod
-                                .get("modId")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string()),
-                            version: first_mod
-                                .get("version")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string()),
-                            loader: Some(ModLoader::NeoForge),
-                        }));
+                            icon_data_url: None,
+                        };
+                        let icon_path = first_mod.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+                        found = Some((info, icon_path));
+                        break;
                     }
                 }
             }
         } else if name == "mcmod.info" {
             let mut content = String::new();
-            entry.read_to_string(&mut content)?;
-            if let Ok(info) = serde_json::from_str::<Vec<McmodInfo>>(&content) {
-                if let Some(first) = info.first() {
-                    return Ok(Some(ModJarInfo {
-                        mod_id: Some(first.modid.clone()),
-                        version: Some(first.version.clone()),
+            if entry.read_to_string(&mut content).is_err() {
+                continue;
+            }
+            if let Ok(info_list) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+                if let Some(first) = info_list.first() {
+                    let info = ModJarInfo {
+                        mod_id: first.get("modid").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        version: first.get("version").and_then(|v| v.as_str()).map(|s| s.to_string()),
                         loader: Some(ModLoader::Forge),
-                    }));
+                        description: first
+                            .get("description")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        icon_data_url: None,
+                    };
+                    let logo = first.get("logoFile").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    found = Some((info, logo));
+                    break;
                 }
             }
         }
     }
 
+    // Read the icon from the jar after the iteration borrow has ended.
+    if let Some((mut info, icon_path)) = found {
+        if let Some(path) = icon_path {
+            info.icon_data_url = read_jar_icon_data_url(&mut archive, &path);
+        }
+        return Ok(Some(info));
+    }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
+    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+
+    fn write_test_mod_jar(path: &Path) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut zip = ZipWriter::new(file);
+        let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("META-INF/mods.toml", options).unwrap();
+        zip.write_all(
+            br#"modLoader = "javafml"
+loaderVersion = "[47,)"
+
+[[mods]]
+modId = "example_mod"
+version = "1.2.3"
+displayName = "Example Mod"
+description = "Adds example things to the game."
+icon = "logo.png"
+"#,
+        )
+        .unwrap();
+        zip.start_file("logo.png", options).unwrap();
+        zip.write_all(b"\x89PNG\r\n\x1a\nfakepng").unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn extracts_description_and_icon_from_jar() {
+        let dir = tempdir().unwrap();
+        let jar = dir.path().join("example.jar");
+        write_test_mod_jar(&jar);
+
+        let info = extract_mod_info_from_jar(&jar).unwrap().expect("mod info");
+        assert_eq!(info.mod_id.as_deref(), Some("example_mod"));
+        assert_eq!(info.version.as_deref(), Some("1.2.3"));
+        assert_eq!(info.description.as_deref(), Some("Adds example things to the game."));
+        let icon = info.icon_data_url.expect("icon data url");
+        assert!(icon.starts_with("data:image/png;base64,"), "got {icon}");
+        assert!(icon.len() > 30);
+    }
+
+    #[test]
+    fn returns_none_for_jar_without_mod_metadata() {
+        let dir = tempdir().unwrap();
+        let jar = dir.path().join("junk.jar");
+        let file = std::fs::File::create(&jar).unwrap();
+        let mut zip = ZipWriter::new(file);
+        let junk_options: FileOptions<'_, ()> = FileOptions::default();
+        zip.start_file("assets/foo/textures/item/x.png", junk_options).unwrap();
+        zip.write_all(b"data").unwrap();
+        zip.finish().unwrap();
+        assert!(extract_mod_info_from_jar(&jar).unwrap().is_none());
+    }
 }

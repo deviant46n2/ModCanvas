@@ -1,14 +1,18 @@
+import { useEffect } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { CanvasThemeProvider } from '../theme/theme-provider'
 import { TopBar } from './topbar'
 import { WorkspaceStatusBar } from './statusbar'
 import { ModsTab, type ModsTabProps } from './ModsTab'
 import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
-import { HistoryDrawer } from '../history/HistoryDrawer'
 import ProgressionGraph from '../../ProgressionGraph'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
 import { LoadPackModal } from './LoadPackModal'
+import { PackHealthProvider } from './PackHealthProvider'
+import { PackHealthTab } from './PackHealthTab'
+import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
+import { getPackIcon } from '../../services/mods'
 import type { WsConnectionStatus, IngestResult } from '../../services/api'
 import type { LoadPackProgress } from '../../services/types'
 
@@ -27,8 +31,8 @@ export interface ProjectWorkspaceProps {
     path: string
   }
   wsStatus: WsConnectionStatus
-  activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes'
-  onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes') => void
+  activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'
+  onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') => void
   onRestartWebSocket: () => void
   deployCompanionMessage: string
   isTesting: boolean
@@ -73,6 +77,32 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
   // empty state), so no disabled gating is needed here.
   const tabsDisabled = false
 
+  // Detect the pack's cover image once (pack.png / icon.png in the instance
+  // root) and publish it to the health store. One call per load, never on
+  // demand — feeds the pack-coverage check.
+  const setHasCoverImage = usePackHealthStore((s) => s.setHasCoverImage)
+  useEffect(() => {
+    const instancePath = ingestResult?.active_instance || project.path
+    if (!packLoaded || !instancePath) return
+    let cancelled = false
+    getPackIcon(instancePath)
+      .then((url) => {
+        if (!cancelled) setHasCoverImage(!!url)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [packLoaded, ingestResult?.active_instance, project.path, setHasCoverImage])
+
+  // Clear stale health state the moment the pack is closed so a later project
+  // never inherits another pack's quest graph / item registry.
+  useEffect(() => {
+    if (!packLoaded) {
+      usePackHealthStore.setState({ questGraph: null, itemRegistry: null, hasCoverImage: false })
+    }
+  }, [packLoaded])
+
   return (
     <div className="project-workspace">
       <TopBar
@@ -91,7 +121,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onClosePack={onClosePack}
       />
 
-            <div className="workspace-tabs" role="tablist">        {(['mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
+            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
           <button
             key={tab}
             id={`tab-${tab}`}
@@ -108,8 +138,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         ))}
       </div>
 
-      <HistoryDrawer />
-
       {!packLoaded && activeTab === 'mods' && (
         <div className="load-pack-prompt">
           <div className="prompt-content">
@@ -122,45 +150,52 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         </div>
       )}
 
-      <div className="workspace-content">
-        {/* All tabs stay mounted so switching never re-runs their load effects
-            (texture scans, quest graph, config reads). Inactive panels are
-            hidden via CSS rather than unmounted. */}
-        <div id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods" className={activeTab === 'mods' ? '' : 'tab-hidden'}>
-          <ModsTab {...props.modsTab} />
-        </div>
-        <div id="tabpanel-configs" role="tabpanel" aria-labelledby="tab-configs" className={activeTab === 'configs' ? '' : 'tab-hidden'}>
-          <ConfigsTab {...props.configsTab} />
-        </div>
-        <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression" className={activeTab === 'progression' ? '' : 'tab-hidden'}>
-          <ErrorBoundary>
-            <ProgressionGraph projectId={project.id} />
-          </ErrorBoundary>
-        </div>
-        <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests" className={activeTab === 'quests' ? '' : 'tab-hidden'}>
-          <ErrorBoundary>
-            <CanvasThemeProvider>
-              <QuestBookEditor 
-                projectId={project.id} 
-                projectPath={project.path} 
-                wsConnected={props.wsStatus.connected}
-                ingestResult={ingestResult}
-                packLoaded={packLoaded}
+      <PackHealthProvider project={project} packLoaded={packLoaded}>
+        <div className="workspace-content">
+          {/* All tabs stay mounted so switching never re-runs their load effects
+              (texture scans, quest graph, config reads). Inactive panels are
+              hidden via CSS rather than unmounted. */}
+          <div id="tabpanel-health" role="tabpanel" aria-labelledby="tab-health" className={activeTab === 'health' ? '' : 'tab-hidden'}>
+            <ErrorBoundary>
+              <PackHealthTab />
+            </ErrorBoundary>
+          </div>
+          <div id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods" className={activeTab === 'mods' ? '' : 'tab-hidden'}>
+            <ModsTab {...props.modsTab} />
+          </div>
+          <div id="tabpanel-configs" role="tabpanel" aria-labelledby="tab-configs" className={activeTab === 'configs' ? '' : 'tab-hidden'}>
+            <ConfigsTab {...props.configsTab} />
+          </div>
+          <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression" className={activeTab === 'progression' ? '' : 'tab-hidden'}>
+            <ErrorBoundary>
+              <ProgressionGraph projectId={project.id} />
+            </ErrorBoundary>
+          </div>
+          <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests" className={activeTab === 'quests' ? '' : 'tab-hidden'}>
+            <ErrorBoundary>
+              <CanvasThemeProvider>
+                <QuestBookEditor 
+                  projectId={project.id} 
+                  projectPath={project.path} 
+                  wsConnected={props.wsStatus.connected}
+                  ingestResult={ingestResult}
+                  packLoaded={packLoaded}
+                />
+              </CanvasThemeProvider>
+            </ErrorBoundary>
+          </div>
+          <div id="tabpanel-recipes" role="tabpanel" aria-labelledby="tab-recipes" className={activeTab === 'recipes' ? '' : 'tab-hidden'}>
+            <ErrorBoundary>
+              <RecipeEditor
+                projectId={project.id}
+                projectPath={project.path}
+                minecraftVersion={project.minecraft_version}
+                modLoader={project.mod_loader}
               />
-            </CanvasThemeProvider>
-          </ErrorBoundary>
+            </ErrorBoundary>
+          </div>
         </div>
-        <div id="tabpanel-recipes" role="tabpanel" aria-labelledby="tab-recipes" className={activeTab === 'recipes' ? '' : 'tab-hidden'}>
-          <ErrorBoundary>
-            <RecipeEditor
-              projectId={project.id}
-              projectPath={project.path}
-              minecraftVersion={project.minecraft_version}
-              modLoader={project.mod_loader}
-            />
-          </ErrorBoundary>
-        </div>
-      </div>
+      </PackHealthProvider>
 
       <WorkspaceStatusBar
         wsStatus={props.wsStatus}

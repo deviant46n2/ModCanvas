@@ -316,12 +316,16 @@
   gap: 4px;
   background: transparent;
   cursor: pointer;
-  transition: filter 0.15s;
   position: relative;
 }
 
-.ftb-quest-node:hover {
-  filter: brightness(1.15);
+/* Hover highlight WITHOUT a CSS `filter`. Inside ReactFlow's transformed
+   viewport a `filter: brightness()` forces the browser to rasterize the node
+   into its own compositing layer at CSS-pixel resolution, which makes the
+   pixelated icon blurry and can nudge it by a sub-pixel. A box-shadow ring
+   reads as the same feedback without any rasterization cost. */
+.ftb-quest-node:hover .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 2px rgba(242, 201, 76, 0.45), 0 0 12px rgba(242, 201, 76, 0.15);
 }
 
 .ftb-quest-node.selected .ftb-quest-shape-wrap {

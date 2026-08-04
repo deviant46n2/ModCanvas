@@ -268,6 +268,19 @@ pub fn scan_instance_textures_cmd(instance_path: String) -> Result<HashMap<Strin
     Ok(by_id)
 }
 
+/// Delete stale per-instance cache files (texture/items/engine-render/ingest)
+/// that no longer match any known instance. Pass the live instance paths and
+/// their `mods/` dirs to keep; everything else is junk from old scans.
+#[tauri::command]
+pub fn prune_caches_cmd(
+    instance_paths: Vec<String>,
+    mods_dirs: Vec<String>,
+) -> Result<usize, String> {
+    let keep_instances: Vec<PathBuf> = instance_paths.into_iter().map(PathBuf::from).collect();
+    let keep_mods: Vec<PathBuf> = mods_dirs.into_iter().map(PathBuf::from).collect();
+    Ok(crate::instance_textures::cache::prune_caches(&keep_instances, &keep_mods))
+}
+
 /// Return the per-instance animation metadata map: texture key → raw `.mcmeta`
 /// JSON for every animated texture (adjacent `<texture>.png.mcmeta` files).
 #[tauri::command]

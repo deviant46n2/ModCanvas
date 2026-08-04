@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { listen } from '@tauri-apps/api/event'
 import {
-  getCurseforgeApiKey,
-  setCurseforgeApiKey as apiSetCurseforgeApiKey,
   autoImportPack,
   exportModrinthMrpack,
   exportCurseforgeZip,
@@ -38,7 +36,7 @@ export function useAppState() {
   const configState = useConfigState(selectedProject)
   const launchState = useLaunchState(selectedProject)
 
-  const [activeTab, setActiveTab] = useState<'mods' | 'configs' | 'progression' | 'quests' | 'recipes'>('mods')
+  const [activeTab, setActiveTab] = useState<'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'>('mods')
 
   const [showImport, setShowImport] = useState(false)
   const [importPath, setImportPath] = useState('')
@@ -50,11 +48,6 @@ export function useAppState() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportPath, setExportPath] = useState('')
-
-  const [showSettings, setShowSettings] = useState(false)
-  const [curseforgeApiKey, setCurseforgeApiKey] = useState('')
-  const [settingsSaving, setSettingsSaving] = useState(false)
-  const [settingsMessage, setSettingsMessage] = useState('')
 
   const [ingestResult, setIngestResult] = useState<IngestResult | null>(null)
   const [ingesting, setIngesting] = useState(false)
@@ -173,7 +166,6 @@ export function useAppState() {
 
   useEffect(() => {
     projectState.loadProjects()
-    loadCurseforgeApiKey()
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') projectState.loadProjects()
@@ -185,6 +177,20 @@ export function useAppState() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Prune stale per-instance caches (old scans/instances leave junk that can
+  // total gigabytes). Runs once after the project list loads, keeping caches
+  // for every known project path + mods dir.
+  const prunedRef = useRef(false)
+  useEffect(() => {
+    if (prunedRef.current || projectState.projects.length === 0) return
+    prunedRef.current = true
+    import('../services/recipes').then(({ pruneCaches }) => {
+      const instancePaths = projectState.projects.map((p) => p.path)
+      const modsDirs = projectState.projects.map((p) => `${p.path}/mods`)
+      pruneCaches(instancePaths, modsDirs).catch(() => {})
+    })
+  }, [projectState.projects])
 
   useEffect(() => {
     if (selectedProject) {
@@ -221,28 +227,6 @@ export function useAppState() {
     setActiveTab('mods')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectState.projects])
-
-  async function loadCurseforgeApiKey() {
-    try {
-      const key = await getCurseforgeApiKey()
-      if (key) setCurseforgeApiKey(key)
-    } catch (e) {
-      console.error('Failed to load CurseForge API key:', e)
-    }
-  }
-
-  async function saveCurseforgeApiKey() {
-    setSettingsSaving(true)
-    setSettingsMessage('')
-    try {
-      await apiSetCurseforgeApiKey(curseforgeApiKey)
-      setSettingsMessage('API key saved successfully')
-    } catch (e) {
-      setSettingsMessage(`Error: ${e}`)
-    } finally {
-      setSettingsSaving(false)
-    }
-  }
 
   async function pickImportPath() {
     try {
@@ -307,7 +291,7 @@ export function useAppState() {
     }
   }
 
-  function handleTabChange(tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes') {
+  function handleTabChange(tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') {
     setActiveTab(tab)
     if (tab === 'configs' && selectedProject) {
       configState.loadConfigFiles()
@@ -337,11 +321,6 @@ export function useAppState() {
     setExportError('')
   }
 
-  function handleCloseSettings() {
-    setShowSettings(false)
-    setSettingsMessage('')
-  }
-
   async function handleConfirmDelete() {
     const success = await projectState.handleConfirmDelete()
     if (success) {
@@ -366,19 +345,12 @@ export function useAppState() {
     isExporting,
     exportError,
     exportPath,
-    showSettings, setShowSettings,
-    curseforgeApiKey, setCurseforgeApiKey,
-    settingsSaving,
-    settingsMessage,
     handleTabChange,
     handleCloseImport,
     handleImportDone,
     resetImportState,
     handleCloseExport,
-    handleCloseSettings,
     handleConfirmDelete,
-    loadCurseforgeApiKey,
-    saveCurseforgeApiKey,
     pickImportPath,
     importPack,
     exportMrpack,

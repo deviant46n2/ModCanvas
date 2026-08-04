@@ -51,7 +51,28 @@ export async function searchMods(
   query: string,
   loader: string,
   mcVersion: string,
-  source: 'modrinth' | 'curseforge' = 'modrinth',
+  source: 'modrinth' | 'curseforge' | 'all' = 'modrinth',
 ): Promise<ModMetadata[]> {
   return invoke<ModMetadata[]>('search_mods', { query, loader, mcVersion, source })
+}
+
+export interface InstallModArgs {
+  projectId: string
+  source: 'modrinth' | 'curseforge'
+  modId: string
+  slug: string
+  name: string
+  author: string
+  description: string
+  version?: string
+  icon?: string | null
+}
+
+/** Download a searched mod's jar into the instance's mods/ folder + record it. */
+export async function installModFromSearch(args: InstallModArgs): Promise<any> {
+  return invoke<any>('install_mod_from_search', { ...args })
+}
+
+export async function getPackIcon(path: string): Promise<string | null> {
+  return invoke<string | null>('get_pack_icon', { path })
 }

@@ -117,7 +117,7 @@ ModCanvas objective types (`quest-form-constants.ts`): item_acquisition, item_re
 
 | FTB task | FTB editable fields | ModCanvas | Notes / what to do |
 |---|---|---|---|
-| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt + smart filter | 🟢 | all flags editable; smart-filter DSL **display-only** (cycles icons), no editor |
+| Item | item, count, consume_items, only_from_crafting, match_components, task_screen_only, nbt + smart filter | 🟢 | all flags editable; smart-filter DSL **display-only** (no editor), but the icon now cycles the items that actually **match** the filter (root=AND, `not`/`and`/`or`/`only_one` semantics evaluated over the scanned item registry) at the in-game 1 s beat — see `core/quest/smart-filter.ts` |
 | Custom | custom JSON, max_progress | 🟡 | Parsed/exported; not editable, no max_progress |
 | XP | value, points | ✅ | |
 | Dimension | dim | 🟡 | Imported as `location_visit`; no dedicated UI |
@@ -264,7 +264,7 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Dependency cycle detection + warning | ✅ |
 | Edge draw / reconnect / delete | ✅ |
 | Quest search / filter bar | ✅ Type-to-filter by label/id/subtitle/objective target; dims non-matches, Enter focuses the first match |
-| Hover dependency highlight | ✅ |
+| Hover dependency highlight | ✅ | Gentle: hovered quest's edges brighten to full opacity, others dim to 28% (opacity-only — no stroke-width jump, no CSS `filter`, so nothing blurry or pixel-shifting inside the scaled viewport) |
 | **Undo / redo (Ctrl+Z/Y)** | ✅ | Full-graph snapshot history in `QuestBookEditor`; ↩/↪ toolbar buttons + Ctrl+Z / Ctrl+Y |
 | **Bezier control-point editing per edge** | ✅ | Per-edge curve handles (`EdgeBezierEditor`); one undoable step per drag; stored in the editor graph (not in SNBT — FTB's format has no field) |
 | Editing-mode toggle | ✅ 🔒 View / ✏️ Edit: read-only lock disables move/connect/delete/add while keeping selection + navigation |
@@ -303,6 +303,8 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 
 **Suggested approach:** parse the pack's `ftb_quests_theme.txt` (and defaults) in Rust or a pure `core/` parser, expose a resolved theme object to the frontend, and drive edge/panel/checkmark rendering from it — same lazy-materialization rules as the texture pipeline (descriptors, never bundled bytes).
 
+**Engine-rendered icons (companion mod) — shipped (see `docs/engine-renders.md`):** items the software rasterizer cannot bake — AND the software-baked `bake:` stand-ins — are rendered in-game by the companion mod over the WS bridge (`RENDER_ITEMS_REQUEST`/`RENDER_ITEMS_RESULT`), returned as base64 PNG data URLs, and cached per-instance by ModCanvas (`engine_renders` disk cache, invalidated when the pack's jars change). Baked icons stay hidden while the engine path is active (no ugly 3D stand-in), then load once and render instantly from cache on every subsequent open. Opt-in, offline-first, lazy; 4 renders/tick in-game so frames never hitch.
+
 ---
 
 ## 17. In-quest view editor (in-game quest details panel)
@@ -314,6 +316,26 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 | Inline image components in description | ❌ | |
 | Clickable dependency/dependant arrows in view | 🟡 | Dependency lines clickable-ish on canvas only |
 | Pin quest / open in guide | ❌ | |
+
+---
+
+## 18. Pack Health (ModCanvas-only, not an FTB feature)
+
+A workspace tab that reports the pack's file-level soundness as a pure function
+of already-materialized state (§9 of the Project Bible). **Tier 1 (reference
+integrity + coverage) is shipped** — see `docs/pack-health.md`.
+
+| Check | Status |
+|---|---|
+| Quests: dead item references against the pack's item registry | ✅ recommended (never blocking; suppressed when registry degraded) |
+| Quests: dependency cycles (reuses `core/validation/quest-validator`) | ✅ blocking |
+| Quests: undefined / unused reward tables | ✅ |
+| Quests: empty chapters, unreachable quests | ✅ |
+| Recipes: authored-only validation surfaced from `core/recipe/validation` | ✅ |
+| Pack: cover image, pack info fields, zero chapters | ✅ |
+| Registry stats + degraded-registry diagnostic in the verdict | ✅ |
+| Copy button on every finding (Trust Rule) | ✅ |
+| Tier 2 progression topology / Tier 3 flavor analytics | ❌ quarantined (§9.3) |
 
 ---
 

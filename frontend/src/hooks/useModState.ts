@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
-import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, searchMods, addMod, removeMod, scanInstanceMods } from '../services/api'
+import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, searchMods, addMod, removeMod, scanInstanceMods, installModFromSearch } from '../services/api'
+import { useToast } from '../components/ui/Toast'
 import { debounce } from '../core/utils/debounce'
 import type { Project } from './useProjectState'
 
@@ -22,7 +23,9 @@ export interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  icon: string | null
   source: 'modrinth' | 'curseforge'
+  mismatch?: string | null
 }
 
 export interface CompatibilityIssue {
@@ -50,6 +53,9 @@ export function useModState(selectedProject: Project | null) {
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
   const [compatResult, setCompatResult] = useState<any | null>(null)
   const [isCheckingCompat, setIsCheckingCompat] = useState(false)
+  // Mod ids currently being downloaded/installed from search results.
+  const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
+  const { showToast } = useToast()
 
   const debouncedSetModFilter = useCallback(
     debounce((value: string) => setModFilter(value), 300),
@@ -136,21 +142,43 @@ export function useModState(selectedProject: Project | null) {
 
   async function addModToProject(mod: any) {
     if (!selectedProject) return
+    const modId = mod.mod_id as string
+    const source: 'modrinth' | 'curseforge' =
+      mod.source === 'curseforge' || mod.source === 'modrinth' ? mod.source : searchSource
+    setInstallingIds(prev => new Set(prev).add(modId))
     try {
-      await addMod(
-        selectedProject.id,
-        mod.mod_id,
-        mod.slug,
-        mod.name,
-        mod.version,
-        mod.description,
-        mod.author,
-        mod.source || 'Modrinth',
-        true,
-      )
+      const installed = await installModFromSearch({
+        projectId: selectedProject.id,
+        source,
+        modId,
+        slug: mod.slug,
+        name: mod.name,
+        author: mod.author,
+        description: mod.description,
+        version: mod.version,
+        icon: mod.icon ?? null,
+      })
+      showToast({
+        type: 'success',
+        title: `Installed ${installed.name || mod.name}`,
+        message: `Downloaded and added to ${selectedProject.name}`,
+      })
       await loadProjectMods(selectedProject.id)
-    } catch (e) {
-      console.error('Failed to add mod:', e)
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || String(e)
+      console.error('[ModCanvas] Failed to install mod:', msg)
+      showToast({
+        type: 'error',
+        title: `Failed to install ${mod.name}`,
+        message: msg,
+        duration: 8000,
+      })
+    } finally {
+      setInstallingIds(prev => {
+        const next = new Set(prev)
+        next.delete(modId)
+        return next
+      })
     }
   }
 
@@ -238,6 +266,7 @@ export function useModState(selectedProject: Project | null) {
     isLoadingMetadata,
     compatResult, setCompatResult,
     isCheckingCompat,
+    installingIds,
     debouncedSetModFilter,
     filteredMods,
     loadProjectMods,

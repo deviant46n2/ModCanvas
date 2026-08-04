@@ -32,18 +32,61 @@ impl ModIntelligence {
 
         let bytes = resp.bytes().await?;
 
-        // Extract filename from URL path
+        // Extract filename from URL path, sanitized so a malicious URL can't
+        // escape the destination directory via `..` or path separators.
         let url_path = url.split('?').next().unwrap_or(url);
-        let filename = url_path.rsplit('/').next()
+        let raw_filename = url_path.rsplit('/').next()
             .filter(|s| !s.is_empty())
             .unwrap_or("mod.jar");
-
+        let filename = sanitize_filename(raw_filename);
         let file_path = dest_dir.join(filename);
         crate::path_safety::atomic_write(&file_path, &bytes)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         eprintln!("[ModCanvas] Downloaded {} ({} bytes) to {}", url, bytes.len(), file_path.display());
 
         Ok(file_path.to_string_lossy().to_string())
+    }
+}
+
+/// Keep only safe filename characters and reject anything that could traverse
+/// the filesystem (`..`, `/`, `\`, NUL). Falls back to `mod.jar`.
+pub(crate) fn sanitize_filename(raw: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .map(|c| if c.is_alphanumeric() || matches!(c, '.' | '_' | '-' | '(' | ')') { c } else { '_' })
+        .collect();
+    if cleaned.is_empty() || cleaned == "." || cleaned == ".." || cleaned.contains("..") {
+        return "mod.jar".to_string();
+    }
+    cleaned
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_filename;
+
+    #[test]
+    fn keeps_normal_jar_filename() {
+        assert_eq!(sanitize_filename("jei-1.21.1-19.21.0.247.jar"), "jei-1.21.1-19.21.0.247.jar");
+    }
+
+    #[test]
+    fn strips_path_traversal_and_separators() {
+        assert_eq!(sanitize_filename("../../etc/passwd"), "mod.jar");
+        assert_eq!(sanitize_filename("../evil.jar"), "mod.jar");
+        assert_eq!(sanitize_filename("a/b.jar"), "a_b.jar");
+    }
+
+    #[test]
+    fn handles_empty_and_dots() {
+        assert_eq!(sanitize_filename(""), "mod.jar");
+        assert_eq!(sanitize_filename("."), "mod.jar");
+        assert_eq!(sanitize_filename(".."), "mod.jar");
+    }
+
+    #[test]
+    fn allows_parentheses_like_modrinth_filenames() {
+        assert_eq!(sanitize_filename("Xaero's Minimap (1.21.1).jar"), "Xaero_s_Minimap_(1.21.1).jar");
     }
 }
 

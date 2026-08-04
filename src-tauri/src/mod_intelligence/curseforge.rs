@@ -76,15 +76,91 @@ impl ModIntelligence {
             name: info.name,
             description: info.summary.unwrap_or_default(),
             author,
-            categories: vec![],
+            categories: info.categories.iter().map(|c| c.name.clone()).collect(),
             dependencies: vec![],
             supported_loaders: vec![],
-            supported_versions: vec![],
+            supported_versions: info.gameVersions.clone(),
             downloads: info.downloadCount.unwrap_or(0),
             source_url: info.links.as_ref().and_then(|l| l.websiteUrl.clone()),
             issues_url: info.links.as_ref().and_then(|l| l.issuesUrl.clone()),
             documentation_url: info.links.as_ref().and_then(|l| l.wiki_url.clone()),
+            icon: info.logo.as_ref().and_then(|l| l.thumbnail_url.clone()),
+            source: "curseforge".to_string(),
+            mismatch: None,
         })
+    }
+
+    /// Resolve the newest downloadable file for a CurseForge project matching
+    /// the given Minecraft version + loader, returning its file id.
+    ///
+    /// CurseForge files are listed newest-first; we skip early-access and
+    /// unavailable files and prefer one whose `gameVersions` contains the
+    /// target MC version (falling back to the newest file overall).
+    pub async fn resolve_curseforge_file(
+        &self,
+        project_id: u64,
+        api_key: &str,
+        mc_version: &str,
+        loader: &str,
+    ) -> anyhow::Result<u64> {
+        let mut url = format!("{}/mods/{}/files", CURSEFORGE_API, project_id);
+        let params: Vec<String> = std::iter::empty()
+            .chain(if mc_version.is_empty() {
+                None
+            } else {
+                Some(format!("gameVersion={}", urlencoding::encode(mc_version)))
+            })
+            .chain(match loader {
+                "NeoForge" => Some("modLoaderType=6".to_string()),
+                "Fabric" => Some("modLoaderType=4".to_string()),
+                "Quilt" => Some("modLoaderType=5".to_string()),
+                _ => Some("modLoaderType=1".to_string()), // Forge
+            })
+            .chain(Some("pageSize=50".to_string()))
+            .collect();
+        if !params.is_empty() {
+            url.push('?');
+            url.push_str(&params.join("&"));
+        }
+
+        let resp = self.client.get(&url)
+            .header("x-api-key", api_key)
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            anyhow::bail!("CurseForge API returned {} for project files", resp.status());
+        }
+
+        let list: CurseForgeFileListResponse = resp.json().await?;
+        let eligible: Vec<&CurseForgeFileInfo> = list.data.iter()
+            .filter(|f| f.isEarlyAccess != Some(true))
+            .filter(|f| f.isAvailable != Some(false))
+            .collect();
+
+        // Prefer a file that explicitly lists the target MC version, then fall
+        // back to the newest eligible file (API returns newest-first).
+        if let Some(f) = eligible.iter().find(|f| !mc_version.is_empty() && f.gameVersions.iter().any(|v| v == mc_version)) {
+            return Ok(f.id);
+        }
+        eligible.first()
+            .map(|f| f.id)
+            .ok_or_else(|| anyhow::anyhow!("No downloadable files for CurseForge project {}", project_id))
+    }
+
+    /// Download the best-matching CurseForge file for a project into `dest`.
+    /// Combines `resolve_curseforge_file` + `download_curseforge_mod`.
+    pub async fn download_curseforge_mod_for_version(
+        &self,
+        project_id: u64,
+        api_key: &str,
+        mc_version: &str,
+        loader: &str,
+        dest_path: &Path,
+    ) -> anyhow::Result<String> {
+        let file_id = self.resolve_curseforge_file(project_id, api_key, mc_version, loader).await?;
+        self.download_curseforge_mod(project_id, file_id, api_key, dest_path).await
     }
     
     /// Search CurseForge mods by query
@@ -119,14 +195,17 @@ impl ModIntelligence {
                 name: info.name,
                 description: info.summary.unwrap_or_default(),
                 author,
-                categories: vec![],
+                categories: info.categories.iter().map(|c| c.name.clone()).collect(),
                 dependencies: vec![],
                 supported_loaders: vec![],
-                supported_versions: vec![],
+                supported_versions: info.gameVersions.clone(),
                 downloads: info.downloadCount.unwrap_or(0),
                 source_url: info.links.as_ref().and_then(|l| l.websiteUrl.clone()),
                 issues_url: info.links.as_ref().and_then(|l| l.issuesUrl.clone()),
                 documentation_url: None,
+                icon: info.logo.as_ref().and_then(|l| l.thumbnail_url.clone()),
+                source: "curseforge".to_string(),
+                mismatch: None,
             }
         }).collect())
     }

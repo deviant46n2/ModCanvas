@@ -1,4 +1,4 @@
-import { DownloadIcon, PlusIcon, RefreshIcon, SearchIcon, SettingsIcon } from '../ui/icons'
+import { DownloadIcon, PlusIcon, RefreshIcon, SearchIcon } from '../ui/icons'
 
 interface Project {
   id: string
@@ -21,7 +21,6 @@ interface SidebarProps {
   onRefresh: () => void
   onImport: () => void
   onNewProject: () => void
-  onSettings: () => void
 }
 
 import logo from '../../assets/logo.png'
@@ -34,16 +33,12 @@ export function Sidebar({
   onRefresh,
   onImport,
   onNewProject,
-  onSettings,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <img className="sidebar-logo" src={logo} alt="ModCanvas logo" />
         <h1>ModCanvas</h1>
-        <button className="btn-icon" onClick={onSettings} title="Settings" aria-label="Settings">
-          <SettingsIcon size={16} />
-        </button>
       </div>
 
       <div className="sidebar-section">

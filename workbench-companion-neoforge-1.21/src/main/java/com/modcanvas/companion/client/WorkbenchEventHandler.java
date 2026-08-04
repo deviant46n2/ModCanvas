@@ -1,16 +1,29 @@
 package com.modcanvas.companion.client;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 public class WorkbenchEventHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger("WorkbenchEventHandler");
 
     public static void handleEvent(WorkbenchCompanionClient.WorkbenchEvent event) {
         LOGGER.info("[WorkbenchEventHandler] Processing event: {}", event);
+
+        if (event.eventType.equals("RENDER_ITEMS_REQUEST")) {
+            // Item rendering does not need a world/player; handled first so it
+            // also works from the main menu.
+            handleRenderItems(event);
+            return;
+        }
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
@@ -27,6 +40,33 @@ public class WorkbenchEventHandler {
             case "RELOAD_ALL" -> handleReloadAll(event);
             default -> LOGGER.warn("[WorkbenchEventHandler] Unknown event type: {}", event.eventType);
         }
+    }
+
+    /** Queue a batch of item ids for in-game rendering. Results stream back as
+     * a single {@code RENDER_ITEMS_RESULT} once the queue drains (see
+     * {@link ItemRenderQueue}). */
+    private static void handleRenderItems(WorkbenchCompanionClient.WorkbenchEvent event) {
+        JsonObject payload = event.payload != null ? event.payload : new JsonObject();
+        String requestId = payload.has("requestId") ? payload.get("requestId").getAsString() : null;
+        int size = payload.has("size") ? payload.get("size").getAsInt() : ItemIconRenderer.DEFAULT_SIZE;
+
+        List<String> items = new ArrayList<>();
+        JsonElement itemsEl = payload.get("items");
+        if (itemsEl != null && itemsEl.isJsonArray()) {
+            for (JsonElement el : itemsEl.getAsJsonArray()) {
+                if (el.isJsonPrimitive() && el.getAsJsonPrimitive().isString()) {
+                    items.add(el.getAsString());
+                }
+            }
+        }
+
+        if (items.isEmpty()) {
+            LOGGER.info("[WorkbenchEventHandler] RENDER_ITEMS_REQUEST with no items; ignoring");
+            return;
+        }
+
+        ItemRenderQueue.enqueue(items, requestId, size);
+        LOGGER.info("[WorkbenchEventHandler] Queued {} items for engine rendering", items.size());
     }
 
     private static void handleQuestReload(WorkbenchCompanionClient.WorkbenchEvent event) {

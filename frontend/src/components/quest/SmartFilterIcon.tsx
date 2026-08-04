@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { smartFilterMembers } from '../../core/quest/smart-filter'
+import { smartFilterMembers, matchingSmartFilterItems } from '../../core/quest/smart-filter'
 import { getIconUrl, resolveIconKey } from './QuestTileTypes'
 import { isTexturePending } from '../../services/texture-loader'
 import { getTagItems, getTagVersion, isTagPending, subscribeTagChanges } from '../../services/smart-filter-tags'
-import { getModItems, getModVersion, isModPending, subscribeModChanges } from '../../services/smart-filter-mods'
+import { getAllRegisteredItems, getItemMod, getModItems, getModVersion, isModPending, subscribeModChanges } from '../../services/smart-filter-mods'
 import { QuestIcon } from './QuestIcon'
 import { AnimatedSprite } from './AnimatedSprite'
 
-const CYCLE_MS = 1500
+// In-game, `IconAnimation.draw` picks `list.get((System.currentTimeMillis() /
+// 1000L) % size)` — the quest icon rotates once per second. Match that beat so
+// the editor doesn't appear to lag behind (or race past) the in-game quest.
+const CYCLE_MS = 1000
+
+// A `not(...)`-heavy filter (e.g. `not(item(x))`) matches almost the whole
+// registry. In-game the icon really does cycle through every creative-tab hit,
+// but materializing thousands of textures per quest tile is wasteful; cycling
+// the first matches keeps the parity look without the cost.
+const MAX_MATCHED_DISPLAY = 48
 
 interface SmartFilterIconProps {
   dsl: string
@@ -48,27 +57,50 @@ function useMemberUrls(
     const members: MemberState[] = []
     let pending = false
     const seen = new Set<string>()
-    for (const member of smartFilterMembers(dsl)) {
+    const pushItem = (id: string) => {
+      const { url, key, pending: p } = itemState(id, textureIndex)
+      if (url && !seen.has(key)) {
+        seen.add(key)
+        members.push({ url, key })
+      } else if (p) {
+        pending = true
+      }
+    }
+
+    // Full-filter matching (parity with in-game): once the instance item
+    // registry and every referenced tag/mod are loaded, the icon cycles through
+    // the items that actually satisfy the DSL — root=AND, `not` narrows, etc.
+    // Until then fall back to the flat leaf candidates below.
+    const registry = getAllRegisteredItems()
+    const membersList = smartFilterMembers(dsl)
+    const registryReady = registry.length > 0
+    const tagsReady = membersList.every(
+      (m) => m.type !== 'tag' || getTagItems(m.tag) !== undefined,
+    )
+    const modsReady = membersList.every(
+      (m) => m.type !== 'mod' || !isModPending(m.mod),
+    )
+    if (registryReady && tagsReady && modsReady) {
+      const matched = matchingSmartFilterItems(
+        dsl,
+        registry,
+        { tagItems: (t) => getTagItems(t), modOf: getItemMod },
+      )
+      for (const id of matched.slice(0, MAX_MATCHED_DISPLAY)) pushItem(id)
+      // A filter that matches nothing falls back to the generic smart filter
+      // item below (FTB shows the filter stack itself in that case).
+      return { members, pending }
+    }
+
+    for (const member of membersList) {
       if (member.type === 'item') {
-        const { url, key, pending: p } = itemState(member.id, textureIndex)
-        if (url && !seen.has(key)) {
-          seen.add(key)
-          members.push({ url, key })
-        } else if (p) {
-          pending = true
-        }
+        pushItem(member.id)
       } else if (member.type === 'tag') {
         if (isTagPending(member.tag)) {
           pending = true
         }
         for (const item of getTagItems(member.tag) || []) {
-          const { url, key, pending: p } = itemState(item, textureIndex)
-          if (url && !seen.has(key)) {
-            seen.add(key)
-            members.push({ url, key })
-          } else if (p) {
-            pending = true
-          }
+          pushItem(item)
         }
       } else if (member.type === 'mod') {
         const items = getModItems(member.mod)
@@ -77,13 +109,7 @@ function useMemberUrls(
           continue
         }
         for (const item of items) {
-          const { url, key, pending: p } = itemState(item, textureIndex)
-          if (url && !seen.has(key)) {
-            seen.add(key)
-            members.push({ url, key })
-          } else if (p) {
-            pending = true
-          }
+          pushItem(item)
         }
       }
     }

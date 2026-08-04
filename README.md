@@ -53,6 +53,13 @@ cd frontend && pnpm test && pnpm lint
 cargo test   # in src-tauri/
 ```
 
+> **`pnpm dev` opens a blank window?** The dev server is pinned to
+> `127.0.0.1:5173` (`frontend/vite.config.ts`) to match Tauri's `devUrl`.
+> WebKitGTK resolves `localhost` over IPv4, and Vite's default IPv6-only bind
+> silently yields an empty webview. If port 5173 is occupied by a stale Vite,
+> `strictPort` now fails loudly instead of drifting — kill it with
+> `pkill -x modcanvas; pkill -f 'node .*vite'` and retry.
+
 ## Documentation
 
 - **[Project Bible](docs/PROJECT_BIBLE.md)** — mission, roadmap, and the ruleset that guides development.

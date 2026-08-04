@@ -2,6 +2,10 @@
 
 Minecraft items, chapter icons and decorations that animate in-game (vertical frame-strip PNG + adjacent `*.png.mcmeta` animation metadata) play in the editor instead of showing as a flat sprite strip.
 
+> **Engine-rendered icons:** icons ModCanvas's software rasterizer cannot bake
+> (custom mod models, fluids, NBT-dependent looks) can be rendered by the
+> in-game companion mod and cached — see [`engine-renders.md`](engine-renders.md).
+
 ## Background prefetch of all chapters
 
 After a pack loads, the QuestBookEditor secretly warms texture materialization
@@ -64,6 +68,17 @@ Edges are rendered by `DependencyEdge` (`frontend/src/components/quest/quest-edg
 - A **direction chevron** sits at the bezier midpoint and is rotated to point along the path tangent (source → target), so arrow direction stays readable over busy chapter artwork. Its control-point math replicates React Flow's `getBezierPath` (curvature `0.25`) via `computeEdgeGeometry` (`src/core/quest/edge-geometry.ts`), which the edge renderer and the bezier editor share.
 - When an edge has manual bezier control points (`EdgeBezierData.bezier`, see "Canvas tools"), the whole path — including the chevron midpoint/tangent — is recomputed from them so curve and arrow stay in agreement.
 - Edges participating in a dependency loop are drawn in bright red (`#ff6b6b`) with a red arrowhead and a "Circular dependency" tooltip.
+
+### Hover behaviour (no blur / no pixel shift)
+
+Hovering a quest highlights its dependency fan: the connected edges brighten to
+full opacity while unrelated edges dim to 28%. This is **opacity-only** — stroke
+widths stay constant and no CSS `filter` is applied. (A `filter: brightness()`
+or a stroke-width jump on a node/edge inside ReactFlow's scaled viewport forces
+the browser to re-rasterize that subtree at CSS-pixel resolution, which reads as
+a full-canvas blur plus a sub-pixel "nudge" on hover.) The quest node itself
+highlights with a gold box-shadow ring instead of a brightness filter, so the
+pixelated icons never go soft.
 
 Cycle detection (`detectCycles`) flags any edge that is part of a strongly-connected component, so users can find loops before export.
 
@@ -298,6 +313,33 @@ the in-game quest editor's placement behavior:
   layouts), so FTB picks the value up.
 - `src-tauri/src/quest/types.rs` stores it as `icon_scaling: f64` (default 1.0);
   the node renderer multiplies the 2/3 icon size by it (see above).
+
+## Smart filter icons (FTB Filter System parity)
+
+A quest/reward whose item task carries a smart-filter DSL (stored in the nested
+`item.components."ftbfiltersystem:filter"` data component) and no custom icon
+shows an icon that **cycles through the items that actually match the filter**,
+mirroring the in-game quest tile.
+
+- `frontend/src/core/quest/smart-filter.ts` — pure parser + **matcher**
+  (`smartFilterMatches` / `matchingSmartFilterItems`). Semantics match FFS's
+  `FilterParser`: the DSL string is an implicit **AND** of its top-level calls
+  (the RootFilter is an "All Of" compound), `and` = all children, `or` = any
+  child, `only_one`/`xor` = exactly one child, `not` = none of the children,
+  and `component`/`block`/`stack_size` leaves narrow without contributing
+  candidates. `matchingSmartFilterItems` evaluates the filter over the scanned
+  item registry — the analog of FTB's `DisplayStacksCache` (creative search tab
+  ∩ matcher).
+- `frontend/src/services/smart-filter-mods.ts` — holds the registered instance
+  registry (`getAllRegisteredItems`, `getItemMod`).
+- `frontend/src/services/smart-filter-tags.ts` — expands `tag`/`item_tag`
+  members into item ids via the `resolve_item_tags` Rust command.
+- `frontend/src/components/quest/SmartFilterIcon.tsx` — once the registry and
+  every referenced tag/mod are loaded, cycles the first (≤48) matching item
+  textures at the in-game **1 s** beat (`IconAnimation` uses
+  `System.currentTimeMillis()/1000L`). A filter that matches nothing falls back
+  to the generic `ftbfiltersystem:smart_filter` item, exactly like FTB showing
+  the filter stack itself.
 
 ## Chapter editing
 

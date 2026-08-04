@@ -37,6 +37,12 @@ pub mod events {
     pub const CLIENT_INFO: &str = "CLIENT_INFO";
     pub const PING: &str = "PING";
     pub const PONG: &str = "PONG";
+    /// ModCanvas → companion: render a batch of item ids with the real Minecraft
+    /// renderer (payload: `requestId`, `size`, `items[]`).
+    pub const RENDER_ITEMS_REQUEST: &str = "RENDER_ITEMS_REQUEST";
+    /// companion → ModCanvas: base64 PNG data URLs for rendered items
+    /// (payload: `requestId`, `rendered: {itemId: dataUrl}`).
+    pub const RENDER_ITEMS_RESULT: &str = "RENDER_ITEMS_RESULT";
 }
 
 impl ModEvent {

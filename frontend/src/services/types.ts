@@ -37,7 +37,11 @@ export interface ModMetadata {
   source_url: string | null
   issues_url: string | null
   documentation_url: string | null
+  icon: string | null
   source: 'modrinth' | 'curseforge'
+  /** Human-readable reason when a search result doesn't exactly match the
+   *  requested MC version but is still shown (CurseForge is broader). */
+  mismatch?: string | null
 }
 
 export interface CompatibilityIssue {

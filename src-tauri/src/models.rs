@@ -37,7 +37,7 @@ impl ModLoader {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PackFormat {
     CurseForge,
     ModrinthMrpack,
@@ -76,6 +76,10 @@ pub struct ModEntry {
     pub source: ModSource,
     pub enabled: bool,
     pub added_at: DateTime<Utc>,
+    /// Mod icon as a base64 data URL extracted from the jar (or a Modrinth
+    /// URL for mods added via search). Null when unavailable.
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +104,17 @@ pub struct ModMetadata {
     pub source_url: Option<String>,
     pub issues_url: Option<String>,
     pub documentation_url: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Which registry produced this result: "modrinth", "curseforge", or "".
+    /// Used by the search UI to tag results and by install to pick a downloader.
+    #[serde(default)]
+    pub source: String,
+    /// When set, the result was kept even though it does not exactly match the
+    /// requested MC version (CurseForge search is broader than Modrinth). The
+    /// string is a human-readable reason surfaced as a warning chip in the UI.
+    #[serde(default)]
+    pub mismatch: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

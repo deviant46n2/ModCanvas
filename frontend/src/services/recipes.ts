@@ -59,6 +59,15 @@ export async function scanInstanceAnimations(instancePath: string): Promise<Reco
   return invoke<Record<string, string>>('scan_instance_animations_cmd', { instancePath })
 }
 
+/** Delete stale per-instance cache files that no longer match the known
+ * instances + mods dirs. Returns the number of files removed. */
+export async function pruneCaches(
+  instancePaths: string[],
+  modsDirs: string[],
+): Promise<number> {
+  return invoke<number>('prune_caches_cmd', { instancePaths, modsDirs })
+}
+
 export async function reindexTextures(modsDir: string): Promise<Record<string, string>> {
   return invoke<Record<string, string>>('reindex_textures', { modsDir })
 }

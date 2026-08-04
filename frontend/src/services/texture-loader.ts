@@ -163,6 +163,7 @@ const MAX_NOT_FOUND_RETRIES = 3
 const queued: string[] = []
 const queuedSet = new Set<string>()
 const subscribers = new Set<(added: string[]) => void>()
+const notFoundSubscribers = new Set<(keys: string[]) => void>()
 let flushing = false
 let loading = false
 const loadingSubscribers = new Set<(loading: boolean, remaining: number) => void>()
@@ -175,6 +176,17 @@ const bakedKeys = new Set<string>()
 
 export function isBakedTexture(key: string): boolean {
   return bakedKeys.has(key)
+}
+
+/** All item ids whose icon comes from a software `bake:` render. */
+export function getBakedTextureKeys(): string[] {
+  return [...bakedKeys]
+}
+
+/** Stop treating keys as baked (e.g. after the companion renders a real engine
+ * icon for them) so the UI renders them pixelated like regular item icons. */
+export function unmarkBakedKeys(keys: Iterable<string>): void {
+  for (const k of keys) bakedKeys.delete(k)
 }
 
 export function markBakedKeys(keys: Iterable<string>): void {
@@ -192,6 +204,20 @@ export function registerBakedKeysFromIndex(textureIndex: Record<string, string>)
 export function subscribeMaterialized(fn: (added: string[]) => void): () => void {
   subscribers.add(fn)
   return () => subscribers.delete(fn)
+}
+
+/** Subscribe to keys that permanently failed to materialize (retry budget
+ * exhausted). These are candidates for engine rendering via the companion
+ * mod — the real Minecraft item renderer can bake icons ModCanvas's software
+ * rasterizer cannot. */
+export function subscribeNotFound(fn: (keys: string[]) => void): () => void {
+  notFoundSubscribers.add(fn)
+  return () => notFoundSubscribers.delete(fn)
+}
+
+function emitNotFound(keys: string[]): void {
+  if (keys.length === 0) return
+  for (const fn of [...notFoundSubscribers]) fn(keys)
 }
 
 export function getMaterialized(key: string): string | undefined {
@@ -263,6 +289,7 @@ function flush(instancePath: string): void {
   getTextureFiles(batch, instancePath)
     .then((result) => {
       const added: string[] = []
+      const exhausted: string[] = []
       for (const key of batch) {
         const url = result[key]
         if (url) {
@@ -270,11 +297,16 @@ function flush(instancePath: string): void {
           notFound.delete(key)
           added.push(key)
         } else {
-          notFound.set(key, (notFound.get(key) ?? 0) + 1)
+          const attempts = (notFound.get(key) ?? 0) + 1
+          notFound.set(key, attempts)
+          if (attempts >= MAX_NOT_FOUND_RETRIES) exhausted.push(key)
         }
       }
       if (added.length > 0) {
         for (const fn of [...subscribers]) fn(added)
+      }
+      if (exhausted.length > 0) {
+        emitNotFound(exhausted)
       }
     })
     .catch((e) => console.error('Texture materialization failed:', e))
