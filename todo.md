@@ -5,7 +5,8 @@ origins, incl. script comment-out), RecipeExplorer + filters, authored-only save
 gate, palette right rail, script drawer, type picker, bulk replace.
 
 **Status:** Backends A–C complete. Data D complete. UI 1 (RecipeExplorer) complete.
-UI 2 (disable toggle + Disabled filter + manifest re-enable) complete. Working: UI 3.
+UI 2 (disable toggle + manifest re-enable) complete. UI 3 (header cleanup) + UI 4
+(palette right rail + recipes-using-this) complete. Working: UI 5.
 Locked decisions agreed 2026-08-05. This file is the
 single source of truth for scope + semantics. Read fully before coding; follow
 AGENTS.md (docs are code, 3-layer rule, ≤300 lines/file, rebuild + mtime verify).

@@ -4,19 +4,20 @@ import type { ItemRegistryEntry, ItemTagInfo } from '../../services/api';
 import { PackageIcon, ChevronRightIcon, ChevronDownIcon } from '../ui/icons'
 import { SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
 import { getTagItems, requestResolveTags, subscribeTagChanges } from '../../services/smart-filter-tags';
+import { filterRegistryItems } from '../../services/item-registry';
+import { filterTagCatalog } from '../../core/recipe/tag-filter';
 
 interface RecipePaletteProps {
-  activeTab: 'items' | 'tags';
-  /** Instance items (already filtered by the editor's query). */
+  /** Full instance item registry (filtered internally). */
   items: ItemRegistryEntry[];
-  itemTotal: number;
-  /** Local tag catalog (already filtered by the editor's query). */
+  /** Full local tag catalog (filtered internally). */
   tags: ItemTagInfo[];
-  tagTotal: number;
   /** Instance path used to resolve expanded tag members. */
   instancePath: string;
   getTextureUrl: (itemId: string) => string | null;
   onDragStart: (payload: { item: string; name: string }) => void;
+  /** Highlight recipes using an item (`id`) or tag (`#id`). */
+  onShowRecipesUsing: (itemOrTagId: string) => void;
 }
 
 const ITEM_ROW_HEIGHT = 56;
@@ -33,9 +34,10 @@ type ItemRowData = {
   items: ItemRegistryEntry[];
   getUrl: (id: string) => string | null;
   onDragStart: (payload: { item: string; name: string }) => void;
+  onShowRecipesUsing: (itemOrTagId: string) => void;
 };
 
-function ItemRow({ index, style, items, getUrl, onDragStart }: RowComponentProps<ItemRowData>) {
+function ItemRow({ index, style, items, getUrl, onDragStart, onShowRecipesUsing }: RowComponentProps<ItemRowData>) {
   const item = items[index];
   if (!item) return <div style={style} />;
   const url = getUrl(item.id);
@@ -61,6 +63,14 @@ function ItemRow({ index, style, items, getUrl, onDragStart }: RowComponentProps
           <span className="palette-item-id">{item.id}</span>
           {item.mod_id && <span className="palette-item-mod">{item.mod_id}</span>}
         </div>
+        <button
+          type="button"
+          className="palette-using"
+          onClick={(e) => { e.stopPropagation(); onShowRecipesUsing(item.id); }}
+          title="Show recipes using this item"
+        >
+          ⇄
+        </button>
       </div>
     </div>
   );
@@ -79,13 +89,14 @@ type TagRowData = {
   onToggle: (tagId: string) => void;
   expanded: Set<string>;
   onDragStart: (payload: { item: string; name: string }) => void;
+  onShowRecipesUsing: (itemOrTagId: string) => void;
 };
 
 function tagRowHeight(row: TagRow): number {
   return row.kind === 'tag' ? TAG_ROW_HEIGHT : MEMBER_ROW_HEIGHT;
 }
 
-function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDragStart }: RowComponentProps<TagRowData>) {
+function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDragStart, onShowRecipesUsing }: RowComponentProps<TagRowData>) {
   const row = rows[index];
   if (!row) return <div style={style} />;
   if (row.kind === 'tag') {
@@ -110,6 +121,14 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDrag
             <span className="tag-member-count">{row.tag.member_count} items</span>
           </div>
           <span className="tag-badge">#</span>
+          <button
+            type="button"
+            className="palette-using"
+            onClick={(e) => { e.stopPropagation(); onShowRecipesUsing(`#${row.tag.id}`); }}
+            title="Show recipes using this tag"
+          >
+            ⇄
+          </button>
         </div>
       </div>
     );
@@ -141,15 +160,15 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDrag
 }
 
 export function RecipePalette({
-  activeTab,
   items,
-  itemTotal,
   tags,
-  tagTotal,
   instancePath,
   getTextureUrl,
   onDragStart,
+  onShowRecipesUsing,
 }: RecipePaletteProps) {
+  const [activeTab, setActiveTab] = useState<'items' | 'tags'>('items');
+  const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [, setTagTick] = useState(0);
 
@@ -169,10 +188,13 @@ export function RecipePalette({
     });
   };
 
+  const itemsFiltered = useMemo(() => filterRegistryItems(items, query), [items, query]);
+  const tagsFiltered = useMemo(() => filterTagCatalog(tags, query), [tags, query]);
+
   const rows = useMemo<TagRow[]>(() => {
     if (activeTab !== 'tags') return [];
     const out: TagRow[] = [];
-    for (const tag of tags) {
+    for (const tag of tagsFiltered) {
       out.push({ kind: 'tag', tag });
       if (!expanded.has(tag.id)) continue;
       const members = getTagItems(tag.id) ?? [];
@@ -183,25 +205,36 @@ export function RecipePalette({
       if (extra > 0) out.push({ kind: 'overflow', tagId: tag.id, extra });
     }
     return out;
-  }, [activeTab, tags, expanded]);
+  }, [activeTab, tagsFiltered, expanded]);
 
-  const title = activeTab === 'items' ? 'Items' : 'Tags';
   const count =
     activeTab === 'items'
-      ? `${items.length} / ${itemTotal} items`
-      : `${tags.length} / ${tagTotal} tags`;
+      ? `${itemsFiltered.length} / ${items.length} items`
+      : `${tagsFiltered.length} / ${tags.length} tags`;
 
   return (
     <aside className="recipe-palette">
       <div className="palette-header">
-        <h3>{title}</h3>
+        <div className="segmented-row palette-tabs">
+          <button className={activeTab === 'items' ? 'active' : ''} onClick={() => setActiveTab('items')}>Items</button>
+          <button className={activeTab === 'tags' ? 'active' : ''} onClick={() => setActiveTab('tags')}>Tags</button>
+        </div>
+      </div>
+      <div className="palette-search-row">
+        <input
+          type="text"
+          placeholder="Filter items/tags…  (@mod)"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="recipe-list-search"
+        />
         <span className="result-count">{count}</span>
       </div>
       <div className="palette-grid">
         {activeTab === 'items' &&
-          (items.length === 0 ? (
+          (itemsFiltered.length === 0 ? (
             <div className="palette-empty">
-              {itemTotal === 0
+              {items.length === 0
                 ? 'No instance items. Load a pack to index its item registry.'
                 : 'No items match your query.'}
             </div>
@@ -209,17 +242,17 @@ export function RecipePalette({
             <List
               style={{ height: '100%' }}
               rowComponent={ItemRow}
-              rowCount={items.length}
+              rowCount={itemsFiltered.length}
               rowHeight={ITEM_ROW_HEIGHT}
-              rowProps={{ items, getUrl: getTextureUrl, onDragStart }}
+              rowProps={{ items: itemsFiltered, getUrl: getTextureUrl, onDragStart, onShowRecipesUsing }}
               overscanCount={8}
             />
           ))}
 
         {activeTab === 'tags' &&
-          (tags.length === 0 ? (
+          (tagsFiltered.length === 0 ? (
             <div className="palette-empty">
-              {tagTotal === 0
+              {tags.length === 0
                 ? 'No item tags found in the instance.'
                 : 'No tags match your query.'}
             </div>
@@ -229,7 +262,7 @@ export function RecipePalette({
               rowComponent={TagRowRenderer}
               rowCount={rows.length}
               rowHeight={(index) => tagRowHeight(rows[index])}
-              rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onDragStart }}
+              rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onDragStart, onShowRecipesUsing }}
               overscanCount={8}
             />
           ))}

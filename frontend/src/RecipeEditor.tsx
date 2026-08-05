@@ -10,8 +10,6 @@ import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
 import { useRecipeDisable, manifestRecipesFrom } from './hooks/useRecipeDisable';
 import { usePackHealthStore } from './core/pack-health/pack-health-store';
-import { filterRegistryItems } from './services/item-registry';
-import { filterTagCatalog } from './core/recipe/tag-filter';
 import { scanPackRecipes, scanInstanceItems, listItemTags } from './services/api';
 import type { ItemRegistryEntry, ItemTagInfo } from './services/api';
 import { getAdapter } from './adapters';
@@ -54,8 +52,9 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const recipeScriptPath = `${adapter.getRecipeScriptPath(projectPath)}/modcanvas_recipes.js`;
   const kubejsNamespace = adapter.getKubejsDefaultNamespace();
 
-  const [activeSearchTab, setActiveSearchTab] = useState<'items' | 'tags'>('items');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Explorer owns recipe search (lifted here so "recipes using this" can drive
+  // it). The palette owns its own item/tag search internally.
+  const [explorerQuery, setExplorerQuery] = useState('');
 
   const { textureIndex, animations, loading: indexLoading } = useInstanceTextures(projectPath);
   const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId, recipeScriptPath);
@@ -76,14 +75,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry) ?? ([] as ItemRegistryEntry[]);
   const setItemRegistry = usePackHealthStore((s) => s.setItemRegistry);
   const [tagCatalog, setTagCatalog] = useState<ItemTagInfo[]>([]);
-  const registryFiltered = useMemo(
-    () => filterRegistryItems(itemRegistry, searchQuery),
-    [itemRegistry, searchQuery],
-  );
-  const tagFiltered = useMemo(
-    () => filterTagCatalog(tagCatalog, searchQuery),
-    [tagCatalog, searchQuery],
-  );
   const registryUrlById = useMemo(() => {
     const map = new Map<string, string>()
     for (const item of itemRegistry) {
@@ -183,6 +174,11 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const getRegistryTextureUrl = useCallback((itemId: string): string | null => {
     return registryUrlById.get(itemId) ?? getTextureUrl(itemId)
   }, [registryUrlById, getTextureUrl]);
+
+  // "recipes using this" drives the explorer search: `>item` / `#tag`.
+  const handleShowRecipesUsing = useCallback((itemOrTagId: string) => {
+    setExplorerQuery(itemOrTagId.startsWith('#') ? itemOrTagId : `>${itemOrTagId}`);
+  }, []);
 
   const handleGridChange = useCallback((grid: (RecipeIngredient | null)[][]) => {
     const current = getSelectedRecipe();
@@ -291,14 +287,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       <header className="recipe-editor-header">
         <h2>Recipe Editor <span className="recipe-adapter-badge">{adapter.mcVersion}/{adapter.loader}</span></h2>
         <div className="header-actions">
-          <input type="text" placeholder="Search items/tags..." value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)} className="search-input" />
-          <div className="search-tabs">
-            <button className={activeSearchTab === 'items' ? 'active' : ''}
-              onClick={() => setActiveSearchTab('items')}>Items</button>
-            <button className={activeSearchTab === 'tags' ? 'active' : ''}
-              onClick={() => setActiveSearchTab('tags')}>Tags</button>
-          </div>
           <button
             type="button"
             className={`script-toggle ${showScriptPreview ? 'active' : ''}`}
@@ -320,34 +308,25 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           <RecipeEditorSkeleton />
         ) : (
           <>
-        <RecipePalette
-          activeTab={activeSearchTab}
-          items={registryFiltered}
-          itemTotal={itemRegistry.length}
-          tags={tagFiltered}
-          tagTotal={tagCatalog.length}
-          instancePath={projectPath}
-          getTextureUrl={getRegistryTextureUrl}
-          onDragStart={setDraggedItem}
+        <RecipeExplorer
+          recipes={recipes}
+          selectedRecipeId={selectedRecipeId}
+          onSelectRecipe={selectRecipe}
+          onNewRecipe={handleNewRecipe}
+          onEditCopy={(id) => {
+            const copyId = duplicateRecipe(id);
+            if (copyId) selectRecipe(copyId);
+          }}
+          onToggleDisable={handleToggleDisable}
+          query={explorerQuery}
+          onQueryChange={setExplorerQuery}
+          getTextureUrl={getTextureUrl}
+          isDisabled={isDisabled}
+          manifestRecipes={manifestRecipes}
+          itemRegistry={itemRegistry}
         />
 
         <main className="recipe-canvas">
-          <RecipeExplorer
-            recipes={recipes}
-            selectedRecipeId={selectedRecipeId}
-            onSelectRecipe={selectRecipe}
-            onNewRecipe={handleNewRecipe}
-            onEditCopy={(id) => {
-              const copyId = duplicateRecipe(id);
-              if (copyId) selectRecipe(copyId);
-            }}
-            onToggleDisable={handleToggleDisable}
-            getTextureUrl={getTextureUrl}
-            isDisabled={isDisabled}
-            manifestRecipes={manifestRecipes}
-            itemRegistry={itemRegistry}
-          />
-
           {selectedRecipe && (
             <CraftingGridPanel
               selectedRecipe={selectedRecipe}
@@ -368,9 +347,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
               hasBlockingErrors={hasBlockingErrors}
             />
           )}
-        </main>
 
-        <aside className="recipe-detail">
           {showScriptPreview && projectId && (
             <RecipeScriptPreview
               projectId={projectId}
@@ -391,7 +368,16 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
               <p>Drop onto the crafting grid to add</p>
             </div>
           )}
-        </aside>
+        </main>
+
+        <RecipePalette
+          items={itemRegistry}
+          tags={tagCatalog}
+          instancePath={projectPath}
+          getTextureUrl={getRegistryTextureUrl}
+          onDragStart={setDraggedItem}
+          onShowRecipesUsing={handleShowRecipesUsing}
+        />
         </>
           )}
       </div>

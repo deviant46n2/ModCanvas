@@ -34,6 +34,9 @@ export interface RecipeExplorerProps {
   onNewRecipe: () => void;
   onEditCopy: (id: string) => void;
   onToggleDisable: (recipe: Recipe) => void;
+  /** Controlled search query (lifted so "recipes using this" can drive it). */
+  query: string;
+  onQueryChange: (q: string) => void;
   getTextureUrl: (itemId: string) => string | null;
   isDisabled: (r: Recipe) => boolean;
   /** Comment-out manifest pseudo-recipes, shown in the Disabled filter. */
@@ -144,12 +147,13 @@ export function RecipeExplorer({
   onNewRecipe,
   onEditCopy,
   onToggleDisable,
+  query,
+  onQueryChange,
   getTextureUrl,
   isDisabled,
   manifestRecipes,
   itemRegistry,
 }: RecipeExplorerProps) {
-  const [query, setQuery] = useState('');
   const [ownership, setOwnership] = useState<OwnershipFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [attention, setAttention] = useState(false);
@@ -288,7 +292,7 @@ export function RecipeExplorer({
             type="text"
             placeholder="Search…  @mod  #tag  >output  <input"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
             className="recipe-list-search"
           />
           <select value={type} onChange={(e) => setType(e.target.value as RecipeTypeFilter)}>
