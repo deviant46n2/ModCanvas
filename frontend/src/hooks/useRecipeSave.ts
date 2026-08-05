@@ -17,8 +17,8 @@ export function useRecipeSave(projectId: string, recipeScriptPath: string) {
       if (valid.length !== recipes.length) {
         setSaveMessage(`Saving ${valid.length}/${recipes.length} recipes (skipped invalid).`)
       }
-      const { kubejsScript, crafttweakerScript } = await generateRecipeScripts(projectId, valid)
-      await writeScriptFiles(projectId, kubejsScript, crafttweakerScript)
+      const { kubejs, crafttweaker } = await generateRecipeScripts(projectId, valid)
+      await writeScriptFiles(projectId, kubejs, crafttweaker)
       setSaveMessage('Scripts saved successfully!')
       markClean()
       // Hotswap frozen (todo.md Phase 3): the RELOAD_KUBEJS_SCRIPTS push stays

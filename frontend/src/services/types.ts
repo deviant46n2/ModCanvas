@@ -99,8 +99,8 @@ export interface ModEvent {
 }
 
 export interface GeneratedScripts {
-  kubejsScript: string;
-  crafttweakerScript: string;
+  kubejs: string;
+  crafttweaker: string;
 }
 
 export type RecipeOrigin = 'vanilla' | 'kubejs' | 'crafttweaker';

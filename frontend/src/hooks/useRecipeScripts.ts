@@ -13,7 +13,7 @@ export function useRecipeScripts(projectId: string, recipe: Recipe, isCraftTweak
     setError('')
     generateRecipeScripts(projectId, [recipe as unknown as Record<string, unknown>])
       .then((res) => {
-        if (!cancelled) setScript(isCraftTweaker ? res.crafttweakerScript : res.kubejsScript)
+        if (!cancelled) setScript(isCraftTweaker ? res.crafttweaker : res.kubejs)
       })
       .catch((e) => { if (!cancelled) setError(String(e)) })
       .finally(() => { if (!cancelled) setLoading(false) })
