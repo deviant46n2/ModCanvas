@@ -70,3 +70,29 @@ export function gridToPattern(grid: Grid, prevKey: Record<string, RecipeIngredie
   );
   return { pattern, key };
 }
+
+/**
+ * Lay a shapeless ingredient list out 3-wide into a 3×3 grid (empty tail
+ * cells become null). Row-major, so `[a, b, c, d]` fills the first row then
+ * starts the second.
+ */
+export function ingredientsToGrid(ingredients: RecipeIngredient[]): Grid {
+  const grid: Grid = [[], [], []];
+  for (let i = 0; i < ingredients.length; i++) {
+    const row = Math.floor(i / 3);
+    const col = i % 3;
+    const target = grid[row];
+    while (target.length < col) target.push(null);
+    target[col] = ingredients[i];
+  }
+  for (const row of grid) {
+    while (row.length < 3) row.push(null);
+  }
+  return grid;
+}
+
+/** Collapse a 3×3 grid back into a shapeless ingredient list (row-major,
+ *  dropping null cells). Preserves each cell's item/count/tag as-is. */
+export function gridToIngredients(grid: Grid): RecipeIngredient[] {
+  return grid.flatMap((row) => row.filter((c): c is RecipeIngredient => !!c));
+}

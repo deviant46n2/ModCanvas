@@ -199,6 +199,12 @@ describe('Adapter Matrix — Commands & Paths', () => {
       expect(adapter.getRecipeReloadCommand()).toBe('/kubejs reload server_scripts');
     }
   });
+
+  it('all adapters should default the KubeJS item namespace to kubejs', () => {
+    for (const adapter of registeredAdapters()) {
+      expect(adapter.getKubejsDefaultNamespace()).toBe('kubejs');
+    }
+  });
 });
 
 describe('Adapter Matrix — SNBT Spec Consistency', () => {

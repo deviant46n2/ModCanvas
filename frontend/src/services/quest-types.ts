@@ -330,6 +330,12 @@ export interface ItemRegistryEntry {
   texture_data_url: string | null
 }
 
+/** Entry in the local item-tag catalog (`list_item_tags_cmd`). */
+export interface ItemTagInfo {
+  id: string
+  member_count: number
+}
+
 export interface IngestTextureEntry {
   namespace: string
   path: string

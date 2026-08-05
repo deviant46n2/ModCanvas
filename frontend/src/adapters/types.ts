@@ -26,4 +26,8 @@ export interface IMinecraftVersionAdapter {
 
   getSNBTSpec(): SNBTSpecification;
   getRecipeScriptFormat(): RecipeScriptFormat;
+
+  /** Default namespace for bare KubeJS-registered item ids (KubeJS uses
+   *  `kubejs` unless a modpack overrides it in `kubejs.properties`). */
+  getKubejsDefaultNamespace(): string;
 }

@@ -1,31 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { SearchResult, TagInfo, GeneratedScripts, DiscoveredRecipe } from './types'
-import type { IngestResult, ItemRegistryEntry } from './quest-types'
+import type { GeneratedScripts, DiscoveredRecipe } from './types'
+import type { IngestResult, ItemRegistryEntry, ItemTagInfo } from './quest-types'
 
 export async function scanPackRecipes(projectPath: string): Promise<DiscoveredRecipe[]> {
   return invoke<DiscoveredRecipe[]>('scan_pack_recipes_cmd', { projectPath })
-}
-
-export async function searchItems(
-  query: string,
-  loader: string,
-  mcVersion: string,
-): Promise<SearchResult[]> {
-  return invoke<SearchResult[]>('search_items', { query, loader, mcVersion })
-}
-
-export async function searchTags(
-  query: string,
-  loader: string,
-  mcVersion: string,
-): Promise<TagInfo[]> {
-  return invoke<TagInfo[]>('search_tags', { query, loader, mcVersion })
-}
-
-export async function getItemDetails(
-  itemId: string,
-): Promise<SearchResult | null> {
-  return invoke<SearchResult | null>('get_item_details', { itemId })
 }
 
 export async function generateRecipeScripts(
@@ -97,6 +75,11 @@ export async function getTextureFiles(
   })
 }
 
-export async function scanInstanceItems(instancePath: string): Promise<ItemRegistryEntry[]> {
-  return invoke<ItemRegistryEntry[]>('scan_instance_items_cmd', { instancePath })
+export async function scanInstanceItems(instancePath: string, kubejsNamespace?: string): Promise<ItemRegistryEntry[]> {
+  return invoke<ItemRegistryEntry[]>('scan_instance_items_cmd', { instancePath, kubejsNamespace })
+}
+
+/** Local item-tag catalog (id + expanded member count) for the Tags tab. */
+export async function listItemTags(instancePath: string): Promise<ItemTagInfo[]> {
+  return invoke<ItemTagInfo[]>('list_item_tags_cmd', { instancePath })
 }

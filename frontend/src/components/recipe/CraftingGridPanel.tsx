@@ -1,5 +1,4 @@
-import { CraftingGrid } from './CraftingGrid';
-import { WarnIcon } from '../ui/icons'
+import { RecipeGrid } from './CraftingGrid';
 import { FurnaceEditor } from './FurnaceEditor';
 import { StonecuttingEditor } from './StonecuttingEditor';
 import { SmithingEditor } from './SmithingEditor';
@@ -10,13 +9,18 @@ interface CraftingGridPanelProps {
   selectedRecipe: Recipe;
   onTypeChange: (type: RecipeType) => void;
   onUpdateRecipe: (id: string, updates: Partial<Recipe>) => void;
-  onGridChange: (grid: (RecipeIngredient | null)[][]) => void;
+  /** 3×3 cell grid owned by the editor (memoized `patternToGrid` for shaped,
+   *  `ingredients` laid out 3-wide for shapeless). */
+  cells: (RecipeIngredient | null)[][];
+  instancePath: string;
+  getTextureUrl: (itemId: string) => string | null;
+  onCellChange: (row: number, col: number, ing: RecipeIngredient | null) => void;
+  onSetCount: (row: number, col: number, count: number) => void;
+  onRequestPick: (row: number, col: number) => void;
+  onPickOutput: () => void;
   onSave: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  getTextureUrl: (itemId: string) => string | null;
-  getGridSize: () => 2 | 3;
-  buildInitialGrid: () => (RecipeIngredient | null)[][];
   dirty: boolean;
   issues?: Record<string, RecipeIssue[]>;
   hasBlockingErrors?: boolean;
@@ -26,13 +30,16 @@ export function CraftingGridPanel({
   selectedRecipe,
   onTypeChange,
   onUpdateRecipe,
-  onGridChange,
+  cells,
+  instancePath,
+  getTextureUrl,
+  onCellChange,
+  onSetCount,
+  onRequestPick,
+  onPickOutput,
   onSave,
   onDelete,
   onDuplicate,
-  getTextureUrl,
-  getGridSize,
-  buildInitialGrid,
   dirty,
   issues = {},
   hasBlockingErrors = false,
@@ -41,10 +48,8 @@ export function CraftingGridPanel({
     (acc, list) => acc.concat(list),
     [],
   );
-  const outputIssues = [
-    ...(issues['output.item'] ?? []),
-    ...(issues['output.count'] ?? []),
-  ];
+
+  const isCrafting = selectedRecipe.type === 'shaped' || selectedRecipe.type === 'shapeless';
 
   return (
     <>
@@ -72,11 +77,18 @@ export function CraftingGridPanel({
             className="recipe-group-input"
           />
         </div>
-        {selectedRecipe.type === 'shaped' || selectedRecipe.type === 'shapeless' ? (
-          <CraftingGrid
-            size={getGridSize()}
-            initialGrid={buildInitialGrid()}
-            onChange={onGridChange}
+        {isCrafting ? (
+          <RecipeGrid
+            cells={cells}
+            shapeless={selectedRecipe.type === 'shapeless'}
+            instancePath={instancePath}
+            getTextureUrl={getTextureUrl}
+            onCellChange={onCellChange}
+            onSetCount={onSetCount}
+            onRequestPick={onRequestPick}
+            output={selectedRecipe.output}
+            onPickOutput={onPickOutput}
+            onOutputChange={(output) => onUpdateRecipe(selectedRecipe.id, { output })}
           />
         ) : selectedRecipe.type === 'smithing' ? (
           <SmithingEditor
@@ -98,33 +110,6 @@ export function CraftingGridPanel({
             issues={issues}
           />
         )}
-        <div className={`output-section ${outputIssues.length ? 'has-issues' : ''}`}>
-          <label>Output:</label>
-          <div className="output-editor">
-            {getTextureUrl(selectedRecipe.output.item) && (
-              <img src={getTextureUrl(selectedRecipe.output.item)!} alt="" className="output-icon" />
-            )}
-            <input
-              type="text"
-              placeholder="Output item ID"
-              value={selectedRecipe.output.item}
-              onChange={(e) => onUpdateRecipe(selectedRecipe.id, { output: { ...selectedRecipe.output, item: e.target.value } })}
-            />
-            <input
-              type="number"
-              min="1"
-              max="64"
-              value={selectedRecipe.output.count}
-              onChange={(e) => onUpdateRecipe(selectedRecipe.id, { output: { ...selectedRecipe.output, count: parseInt(e.target.value) || 1 } })}
-              style={{ width: '60px' }}
-            />
-            {outputIssues.length > 0 && (
-              <span className="recipe-field-issue" title={outputIssues.map((i) => i.message).join('\n')}>
-                <WarnIcon size={14} />
-              </span>
-            )}
-          </div>
-        </div>
       </div>
       {allIssues.length > 0 && (
         <div className={`recipe-issue-list ${hasBlockingErrors ? 'has-errors' : 'has-warnings'}`}>

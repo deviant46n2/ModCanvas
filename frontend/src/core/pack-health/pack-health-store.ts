@@ -12,6 +12,7 @@ interface PackHealthState {
   itemRegistry: ItemRegistryEntry[] | null
   hasCoverImage: boolean
   setQuestState: (graph: QuestGraphData | null, items: ItemRegistryEntry[] | null) => void
+  setItemRegistry: (items: ItemRegistryEntry[] | null) => void
   setHasCoverImage: (has: boolean) => void
 }
 
@@ -20,5 +21,6 @@ export const usePackHealthStore = create<PackHealthState>((set) => ({
   itemRegistry: null,
   hasCoverImage: false,
   setQuestState: (questGraph, itemRegistry) => set({ questGraph, itemRegistry }),
+  setItemRegistry: (itemRegistry) => set({ itemRegistry }),
   setHasCoverImage: (hasCoverImage) => set({ hasCoverImage }),
 }))

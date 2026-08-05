@@ -5,18 +5,50 @@ and the exact files that own each concern.
 
 ## Status
 
-Implementation wave "Core" is complete on the `recipesystem` branch:
+Implementation wave "Core" is complete on the `recipesystem` branch. The
+**palette / item-picker / crafting-grid redesign** (2026-08-04) is also complete
+on top of it:
 
-- Adapter-aware item/tag search.
-- **Instance Registry tab** (item browser): a third palette tab alongside Items/Tags
-  that browses every item indexed from the instance (`ItemRegistryEntry[]` pushed
-  by the quest editor's scan + engine-render / runtime-texture capture pipeline).
-  Search reuses the header query (`@modid` filter + name/id text, gated so the
-  Registry tab does not fire remote searches). Rows are draggable into the
-  crafting grid and show the item's resolved icon (engine-rendered/runtime
-  captured first, else the local texture index). Pure query/filter logic lives in
-  `frontend/src/services/item-registry.ts` (tested).
-- Grid &harr; key conversion bugfix.
+- **Modrinth-backed palette search removed.** `search_items`/`search_tags`
+  returned Modrinth *project* slugs, not Minecraft item ids, and were
+  network-dependent. Frontend usage is gone (`services/recipes.ts` no longer
+  exposes them; `hooks/useItemSearch.ts` deleted). The Rust Modrinth module
+  stays — it still backs modpack import.
+- **2-tab palette (Items + Tags), 100% local.**
+  - **Items**: the instance item registry (`scan_instance_items_cmd`),
+    virtualized, `@mod` filter, draggable rows. The old third `registry` tab
+    merged into this tab.
+  - **Tags**: the local tag catalog (`list_item_tags_cmd`), virtualized rows
+    with id + expanded member count, draggable as `#tag`, click-to-expand
+    members resolved through `requestResolveTags`/`requestMaterialize`.
+  - Pure tag filtering lives in `frontend/src/core/recipe/tag-filter.ts` (tested).
+- **KubeJS items indexed too.** `src-tauri/src/indexer_kubejs.rs` parses
+  `event.create`/`event.register` inside `onEvent('item.registry', …)` and
+  `StartupEvents.registry('item', …)` blocks (capturing chained
+  `.displayName()`/`.texture()`), walking `kubejs/startup_scripts/**/*.js` +
+  `server_scripts/**/*.js`. Bare ids are namespaced via the adapter's
+  `getKubejsDefaultNamespace()` (default `kubejs`). The item index cache
+  fingerprints these scripts, so editing one invalidates the scan.
+- **Shared `ItemPickerModal`** (extracted from the deleted `JeiDrawer`): the
+  item picker used by BOTH the quest editor and the recipe editor's grid/output
+  slots. Items only — no tag mode. Icons resolve lazily through the texture
+  index first (`textureDisplayUrl`), falling back to the registry's
+  `texture_data_url`.
+- **Crafting grid redesign, MC-authentic look in pure CSS** — no Minecraft
+  textures bundled (AGENTS.md §6). `RecipeSlot` (48px beveled slot via borders +
+  inset box-shadows + self-authored CSS dither, 32px pixel icons via
+  `AnimatedSprite`, count badge **shapeless only**, `#` ribbon + member tooltip
+  for tag cells, click → picker, double-click → clear, drag/drop, filled-cell
+  context menu with replace/set-count/clear) + `OutputSlotField`. `RecipeGrid`
+  is stateless: the editor owns cell state (`patternToGrid` for shaped,
+  `ingredientsToGrid` for shapeless) and writes through
+  `gridToPattern`/`gridToIngredients`. The old `syncKey`/`suppressNextEmit`
+  grid hack, the duplicate output editor, the dead "Shapeless" checkbox, the
+  second group input, and the 2×2 size branch are all deleted.
+
+The "Core" wave below describes the rest of the editor:
+
+- Adapter-aware item/tag search (now superseded by the local-only 2-tab palette).
 - Ingredient kinds (items + tags).
 - Validation with per-field issues.
 - Duplicate recipe.
@@ -100,9 +132,10 @@ unit-testable, no UI / IPC):
 | `recipe-store.ts` | zustand store owning `recipes`, selected recipe, and bulk results. |
 | `loader.ts` | `normalizeLoader` &mdash; folds forge/neoforge/fabric/quilt + version vectors. |
 | `validation.ts` | `validateRecipe`, `hasErrors`, `hasBlockingErrors`, `issuesByPath`. |
-| `grid.ts` | Pure grid &harr key conversion helpers (shaped/shapeless). |
+| `grid.ts` | Pure grid &harr; key conversion helpers (shaped/shapeless): `patternToGrid`/`gridToPattern`, plus `ingredientsToGrid`/`gridToIngredients` for the shapeless 3-wide layout. |
+| `tag-filter.ts` | Pure filter for the local tag catalog (`@namespace` + case-insensitive id substring). |
 | `specialized.ts` | Slot &harr; `ingredients[]` mapping for the non-crafting types (furnace `input`, stonecutting `input`, smithing `base`/`addition`). |
-| `dnd.ts` | Drag payload contract (`application/x-modcanvas-recipe-ingredient`) serialized by the palette and read by `IngredientSlot`. |
+| `dnd.ts` | Drag payload contract (`application/x-modcanvas-recipe-ingredient`) serialized by the palette and read by `IngredientSlot`/`RecipeSlot`. |
 | `json-import.ts` | Pure vanilla/KubeJS recipe JSON → `Recipe` parser (handles pre-1.20.5 `item`/`ingredients` and 1.20.5+ `id`/`ingredient`/`result` spellings; collapses alternative ingredient lists; drops smithing `template`). |
 | `recipe-editor.test.ts` | Tests for validation, grid conversions, loader, specialized slots, and JSON import. |
 
@@ -122,10 +155,20 @@ The frontend loads them via `services/recipes.ts:scanPackRecipes`, and
 `origin:source:output.item`. The `LoadPackRecipesModal` groups by source file
 with per-group toggles.
 
-`frontend/src/services/recipes.ts` is the data-access layer: `searchItems`,
-`searchTags`, `generateRecipeScripts`, `writeScriptFiles`,
-`scanModJarTextures`. It is consumed through the `services/api.ts` re-exports so
+`frontend/src/services/recipes.ts` is the data-access layer: `scanPackRecipes`,
+`scanInstanceItems(instancePath, kubejsNamespace?)`, `listItemTags(instancePath)`,
+`scanInstanceTextures`/`scanInstanceAnimations`, `generateRecipeScripts`,
+`writeScriptFiles`. It is consumed through the `services/api.ts` re-exports so
 components never talk to IPC/Tauri directly.
+
+The **item registry + tag catalog** backends:
+- `src-tauri/src/indexer.rs` + `src-tauri/src/indexer_kubejs.rs` — `scan_instance_items_cmd`
+  indexes jar/lang items AND KubeJS script registrations (`event.create`/`register`
+  with chained `.displayName()`/`.texture()`), with a versioned on-disk cache
+  fingerprinted on jars + KubeJS scripts. `mod_id` is `kubejs` for script items.
+- `src-tauri/src/instance_textures/tags.rs` — `list_item_tags_cmd` returns the
+  sorted `{id, member_count}` catalog (member counts expanded); `resolve_item_tags`
+  stays for member expansion.
 
 Rust backend lives under `src-tauri/src/`: `scriptgen/kubejs.rs` and `models.rs`
 define the recipe model and KubeJS emission; `write_script_files` is registered
@@ -143,7 +186,9 @@ instance's `minecraftVersion` and `modLoader` down through
 - Choose the correct KubeJS recipe syntax paths.
 - Pick the write target script (`kubejs/server_scripts/modcanvas_recipes.js` vs
   CraftTweaker `scripts/modcanvas_crafttweaker.zs`).
-- Scope identifier searches to the installed loader.
+- Resolve the default KubeJS item namespace via
+  `getKubejsDefaultNamespace()` (default `kubejs`), passed to
+  `scan_instance_items_cmd` so bare KubeJS ids get namespaced.
 
 The adapter surface is queried by the helper `services/recipes.ts` (the
 backend-facing data-access layer, re-exported via `services/api.ts`).
@@ -152,11 +197,17 @@ backend-facing data-access layer, re-exported via `services/api.ts`).
 
 - New recipe from an ingredient: dragging a palette item into the grid and
   then Save binds it; the grid reads back compact.
+- The crafting grid is **stateless** (`RecipeGrid`): `RecipeEditor` owns the
+  3×3 `cells` (memoized `patternToGrid` for shaped, `ingredientsToGrid` for
+  shapeless) and writes every cell edit back through
+  `gridToPattern`/`gridToIngredients` into the recipe store. There is no
+  internal grid state or sync hack, so opening a recipe can never mark it dirty.
+- Grid cells and the output slot open the shared `ItemPickerModal` on click;
+  filled cells also get a right-click context menu (replace / set count —
+  shapeless only / clear). Double-click clears a cell.
 - Duplicate: clones the selected recipe with a fresh id.
 - Per-item validation is non-blocking except grid-shape errors (marking them
   "blocking" prevents saving a broken recipe).
-- CraftingGrid re-syncs from `initialGrid` when the selected recipe changes and
-  suppresses its mount `onChange` so opening a recipe never marks it dirty.
 - Non-crafting types route to dedicated editors through `CraftingGridPanel`
   (furnace family / stonecutting / smithing), which reuse a shared
   `IngredientSlot` drop-and-type widget backed by the `specialized.ts` helpers.
@@ -170,8 +221,8 @@ backend-facing data-access layer, re-exported via `services/api.ts`).
 
 ## Definition of done
 
-- `npm test`, `npm run lint`, `tsc -b` all green (311 frontend tests).
-- `cargo test`/`cargo build` in `src-tauri/` green.
+- `pnpm test`, `pnpm lint`, `tsc -b` all green (466 frontend tests).
+- `cargo test`/`cargo build` in `src-tauri/` green (229 lib tests).
 - Any CLI flag, IPC channel, or UI node parameter added must be reflected here
   and in the matching backend/UI module.
 - The release binary is rebuilt after `src-tauri/**` or `frontend/**` edits.

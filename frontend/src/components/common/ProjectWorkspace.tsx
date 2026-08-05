@@ -158,6 +158,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                 <QuestBookEditor 
                   projectId={project.id} 
                   projectPath={project.path} 
+                  minecraftVersion={project.minecraft_version}
+                  modLoader={project.mod_loader}
                   wsConnected={props.wsStatus.connected}
                   ingestResult={ingestResult}
                   packLoaded={packLoaded}

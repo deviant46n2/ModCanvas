@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRecipeStore } from './core/recipe/recipe-store';
 import { RecipePalette } from './components/recipe/RecipePalette';
 import { RecipeList } from './components/recipe/RecipeList';
@@ -7,17 +7,19 @@ import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
 import { RecipeScriptPreview } from './components/recipe/RecipeScriptPreview';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
-import { useItemSearch } from './hooks/useItemSearch';
 import { useRecipeSave } from './hooks/useRecipeSave';
 import { usePackHealthStore } from './core/pack-health/pack-health-store';
 import { filterRegistryItems } from './services/item-registry';
-import { scanPackRecipes } from './services/api';
-import type { ItemRegistryEntry } from './services/api';
+import { filterTagCatalog } from './core/recipe/tag-filter';
+import { scanPackRecipes, scanInstanceItems, listItemTags } from './services/api';
+import type { ItemRegistryEntry, ItemTagInfo } from './services/api';
 import { getAdapter } from './adapters';
 import { normalizeLoader } from './core/recipe/loader';
 import { validateRecipe, hasErrors, issuesByPath } from './core/recipe/validation';
-import { patternToGrid, gridToPattern } from './core/recipe/grid';
+import { patternToGrid, gridToPattern, ingredientsToGrid, gridToIngredients } from './core/recipe/grid';
 import { requestMaterialize, subscribeMaterialized, textureDisplayUrl, isTexturePending } from './services/texture-loader';
+import { AnimationProvider } from './components/quest/animation-context';
+import { ItemPickerModal } from './components/common/ItemPickerModal';
 import type { RecipeIngredient } from './core/recipe/recipe-store';
 import './RecipeEditor.css';
 
@@ -49,25 +51,27 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   // the hotswap reload path are correct instead of hardcoded neoforge/1.21.1.
   const adapter = getAdapter(minecraftVersion, normalizeLoader(modLoader));
   const recipeScriptPath = `${adapter.getRecipeScriptPath(projectPath)}/modcanvas_recipes.js`;
+  const kubejsNamespace = adapter.getKubejsDefaultNamespace();
 
-  const [activeSearchTab, setActiveSearchTab] = useState<'items' | 'tags' | 'registry'>('items');
-  const activeSearchTabRef = useRef(activeSearchTab);
-  activeSearchTabRef.current = activeSearchTab;
+  const [activeSearchTab, setActiveSearchTab] = useState<'items' | 'tags'>('items');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const { textureIndex, loading: indexLoading } = useInstanceTextures(projectPath);
-  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, tagResults, searching: isSearching } = useItemSearch(
-    adapter.loader,
-    adapter.mcVersion,
-    activeSearchTabRef.current !== 'registry',
-  );
+  const { textureIndex, animations, loading: indexLoading } = useInstanceTextures(projectPath);
   const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId, recipeScriptPath);
 
-  // Instance item registry (fed by the quest editor's scan + engine-render /
-  // runtime-texture capture pipeline) backs the Registry tab's browser.
+  // Instance item registry + local tag catalog back the two palette tabs. The
+  // quest editor may already have scanned this instance; only scan here when
+  // the store is empty so the two editors share one scan.
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry) ?? ([] as ItemRegistryEntry[]);
+  const setItemRegistry = usePackHealthStore((s) => s.setItemRegistry);
+  const [tagCatalog, setTagCatalog] = useState<ItemTagInfo[]>([]);
   const registryFiltered = useMemo(
     () => filterRegistryItems(itemRegistry, searchQuery),
     [itemRegistry, searchQuery],
+  );
+  const tagFiltered = useMemo(
+    () => filterTagCatalog(tagCatalog, searchQuery),
+    [tagCatalog, searchQuery],
   );
   const registryUrlById = useMemo(() => {
     const map = new Map<string, string>()
@@ -76,11 +80,34 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     }
     return map
   }, [itemRegistry]);
-  const [draggedItem, setDraggedItem] = useState<import('./services/api').SearchResult | null>(null);
+  const [draggedItem, setDraggedItem] = useState<{ item: string; name: string } | null>(null);
   const [, setTextureTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [reloadMsg, setReloadMsg] = useState('');
+
+  useEffect(() => {
+    let disposed = false;
+    const load = async () => {
+      try {
+        const [registry, tags] = await Promise.all([
+          scanInstanceItems(projectPath, kubejsNamespace),
+          listItemTags(projectPath),
+        ]);
+        if (disposed) return;
+        setTagCatalog(tags);
+        if (usePackHealthStore.getState().itemRegistry === null) {
+          setItemRegistry(registry);
+        }
+      } catch (e) {
+        console.error('[RecipeEditor] Failed to load item registry:', e);
+      }
+    };
+    load();
+    return () => {
+      disposed = true;
+    };
+  }, [projectPath, kubejsNamespace, setItemRegistry]);
 
   // Reload recipes from the pack (recipes are auto-loaded when the pack opens;
   // this re-scans in case files changed since). Idempotent — existing recipes
@@ -140,10 +167,35 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       const { pattern, key } = gridToPattern(grid, current.key ?? {});
       updateRecipe(current.id, { pattern, key });
     } else if (current.type === 'shapeless') {
-      const ingredients = grid.flatMap(row => row.filter((c): c is RecipeIngredient => !!c).map(c => ({ item: c.item, count: c.count, tag: c.tag })));
-      updateRecipe(current.id, { ingredients });
+      updateRecipe(current.id, { ingredients: gridToIngredients(grid) });
     }
   }, [getSelectedRecipe, updateRecipe]);
+
+  // The editor owns the 3×3 cell grid. For shaped recipes cells come from the
+  // keyed pattern; for shapeless the ingredient list is laid out 3-wide.
+  const gridCells = useMemo((): (RecipeIngredient | null)[][] => {
+    if (!selectedRecipe) return [];
+    if (selectedRecipe.type === 'shaped') {
+      return patternToGrid(selectedRecipe.pattern ?? [], selectedRecipe.key ?? {});
+    }
+    if (selectedRecipe.type === 'shapeless') {
+      return ingredientsToGrid(selectedRecipe.ingredients ?? []);
+    }
+    return [];
+  }, [selectedRecipe]);
+
+  const handleCellChange = useCallback((row: number, col: number, ing: RecipeIngredient | null) => {
+    const next = gridCells.map(r => [...r]);
+    if (row < next.length && col < next[row].length) next[row][col] = ing;
+    handleGridChange(next);
+  }, [gridCells, handleGridChange]);
+
+  const handleSetCount = useCallback((row: number, col: number, count: number) => {
+    const next = gridCells.map(r => [...r]);
+    const cell = next[row]?.[col];
+    if (cell) next[row][col] = { ...cell, count };
+    handleGridChange(next);
+  }, [gridCells, handleGridChange]);
 
   const handleSaveRecipes = () => {
     saveRecipes(recipes, markClean);
@@ -196,33 +248,21 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     }
   };
 
-  const buildInitialGrid = (): (RecipeIngredient | null)[][] => {
-    if (!selectedRecipe) return [];
-    if (selectedRecipe.type === 'shaped' && selectedRecipe.pattern && selectedRecipe.key) {
-      return patternToGrid(selectedRecipe.pattern, selectedRecipe.key);
-    }
-    if (selectedRecipe.type === 'shapeless') {
-      const from = selectedRecipe.ingredients ?? [];
-      const grid: (RecipeIngredient | null)[][] = [];
-      for (let i = 0; i < from.length; i += 3) {
-        const row: (RecipeIngredient | null)[] = [...from.slice(i, i + 3)];
-        while (row.length < 3) row.push(null);
-        grid.push(row);
-      }
-      if (grid.length === 0) grid.push([null, null, null]);
-      return grid;
-    }
-    return [];
-  };
+  // Item picker target: a grid cell or the output slot.
+  const [pickTarget, setPickTarget] = useState<{ kind: 'cell'; row: number; col: number } | { kind: 'output' } | null>(null);
 
-  const getGridSize = (): 2 | 3 => {
-    if (!selectedRecipe) return 3;
-    const type = selectedRecipe.type;
-    return (type === 'stonecutting' || type === 'smelting' || type === 'blasting' ||
-            type === 'smoking' || type === 'campfire') ? 2 : 3;
-  };
+  const handlePickItem = useCallback((itemId: string) => {
+    if (!selectedRecipe) return;
+    if (pickTarget?.kind === 'cell') {
+      handleCellChange(pickTarget.row, pickTarget.col, { item: itemId, count: 1, tag: false });
+    } else if (pickTarget?.kind === 'output') {
+      updateRecipe(selectedRecipe.id, { output: { ...selectedRecipe.output, item: itemId } });
+    }
+    setPickTarget(null);
+  }, [pickTarget, selectedRecipe, handleCellChange, updateRecipe]);
 
   return (
+    <AnimationProvider animations={animations}>
     <div className="recipe-editor">
       <header className="recipe-editor-header">
         <h2>Recipe Editor <span className="recipe-adapter-badge">{adapter.mcVersion}/{adapter.loader}</span></h2>
@@ -234,13 +274,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
               onClick={() => setActiveSearchTab('items')}>Items</button>
             <button className={activeSearchTab === 'tags' ? 'active' : ''}
               onClick={() => setActiveSearchTab('tags')}>Tags</button>
-            <button className={activeSearchTab === 'registry' ? 'active' : ''}
-              onClick={() => setActiveSearchTab('registry')}
-              title="Browse every item indexed from the instance (incl. engine-captured icons)">
-              Registry
-            </button>
           </div>
-          {isSearching && <span className="search-loading">Loading...</span>}
           <button className="btn-secondary" onClick={reloadRecipes} disabled={reloading} title="Re-scan the pack for recipes (cache-aware)">
             {reloading ? 'Reloading…' : 'Reload Recipes'}
           </button>
@@ -255,14 +289,14 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         ) : (
           <>
         <RecipePalette
-          searchResults={searchResults}
-          tagResults={tagResults}
-          activeSearchTab={activeSearchTab}
+          activeTab={activeSearchTab}
+          items={registryFiltered}
+          itemTotal={itemRegistry.length}
+          tags={tagFiltered}
+          tagTotal={tagCatalog.length}
+          instancePath={projectPath}
+          getTextureUrl={getRegistryTextureUrl}
           onDragStart={setDraggedItem}
-          getTextureUrl={getTextureUrl}
-          registryItems={registryFiltered}
-          registryTotal={itemRegistry.length}
-          getRegistryTextureUrl={getRegistryTextureUrl}
         />
 
         <main className="recipe-canvas">
@@ -282,13 +316,16 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
               selectedRecipe={selectedRecipe}
               onTypeChange={(type) => updateRecipe(selectedRecipe.id, { type })}
               onUpdateRecipe={updateRecipe}
-              onGridChange={handleGridChange}
+              cells={gridCells}
+              instancePath={projectPath}
+              getTextureUrl={getTextureUrl}
+              onCellChange={handleCellChange}
+              onSetCount={handleSetCount}
+              onRequestPick={(row, col) => setPickTarget({ kind: 'cell', row, col })}
+              onPickOutput={() => setPickTarget({ kind: 'output' })}
               onSave={handleSaveRecipes}
               onDelete={handleDeleteRecipe}
               onDuplicate={handleDuplicateRecipe}
-              getTextureUrl={getTextureUrl}
-              getGridSize={getGridSize}
-              buildInitialGrid={buildInitialGrid}
               dirty={dirty}
               issues={issues}
               hasBlockingErrors={hasBlockingErrors}
@@ -308,10 +345,10 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
             <div className="detail-card dragged-preview">
               <h4>Dragged Item</h4>
               <div className="detail-item">
-                <img src={getTextureUrl(draggedItem.id) || ''} alt="" />
+                <img src={getTextureUrl(draggedItem.item) || ''} alt="" />
                 <div>
                   <strong>{draggedItem.name}</strong>
-                  <small>{draggedItem.id}</small>
+                  <small>{draggedItem.item}</small>
                 </div>
               </div>
               <p>Drop onto the crafting grid to add</p>
@@ -326,10 +363,20 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         <ImportRecipesModal onClose={() => setShowImport(false)} onImport={handleImport} />
       )}
 
+      {pickTarget && (
+        <ItemPickerModal
+          items={itemRegistry}
+          getTextureUrl={getTextureUrl}
+          onSelect={handlePickItem}
+          onClose={() => setPickTarget(null)}
+        />
+      )}
+
       {showSaveDialog && (
         <div className="save-toast">{saveMessage}</div>
       )}
     </div>
+    </AnimationProvider>
   );
 }
 

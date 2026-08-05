@@ -26,9 +26,11 @@ message for bug reports and Discord.
 ### Item-existence findings are recommended, never blocking
 
 The quest editor's item registry is a best-effort **jar/lang scan** of the
-instance. It cannot prove an item is absent: KubeJS/data-driven/custom items
-are not in jars, and imported packs have no vanilla jar. Calling a released
-pack "blocking" over a scan gap would violate the Trust Rule (§4), so:
+instance, plus **KubeJS item registrations** (`indexer_kubejs.rs` parses
+`event.create`/`event.register` in startup/server scripts). It cannot prove an
+item is absent: data-driven/registry-content items and packs without a vanilla
+jar still leave gaps. Calling a released pack "blocking" over a scan gap would
+violate the Trust Rule (§4), so:
 
 - Item-reference findings are always `recommended` with a "could be a
   custom/KubeJS item" caveat.

@@ -162,3 +162,27 @@ pub fn resolve_item_tags(instance_path: &Path, tags: &[String]) -> HashMap<Strin
     }
     out
 }
+
+/// Catalog entry for the Tags palette tab: tag id + expanded member count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ItemTagInfo {
+    pub id: String,
+    pub member_count: usize,
+}
+
+/// Every item tag found in the instance, sorted by id. Member counts are the
+/// expanded counts (nested `#tag` references included), so the palette shows
+/// how many items a tag actually matches without resolving on the client.
+pub fn list_item_tags(instance_path: &Path) -> Vec<ItemTagInfo> {
+    let index = build_tag_index(instance_path);
+    let mut out: Vec<ItemTagInfo> = index
+        .raw
+        .keys()
+        .map(|tag| ItemTagInfo {
+            id: tag.clone(),
+            member_count: index.items(tag).len(),
+        })
+        .collect();
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
+}

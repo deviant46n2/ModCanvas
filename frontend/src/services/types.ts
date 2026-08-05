@@ -98,23 +98,6 @@ export interface ModEvent {
   payload?: any
 }
 
-export interface SearchResult {
-  id: string;
-  name: string;
-  texture_url: string | null;
-  tags: string[];
-  source: string;
-  mod_id: string | null;
-  version: string | null;
-}
-
-export interface TagInfo {
-  id: string;
-  name: string;
-  member_count: number;
-  description: string | null;
-}
-
 export interface GeneratedScripts {
   kubejsScript: string;
   crafttweakerScript: string;

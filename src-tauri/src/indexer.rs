@@ -10,6 +10,14 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
+use crate::indexer_kubejs::{
+    collect_kubejs_scripts, parse_kubejs_item_registrations, KubejsItemRegistration, KubejsScriptMeta,
+};
+
+/// Bump whenever the cache shape, key forms, or layer semantics change so
+/// existing on-disk caches rescan once.
+const ITEM_CACHE_VERSION: u32 = 2;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemRegistryEntry {
     pub id: String,
@@ -27,7 +35,9 @@ struct JarMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ItemIndexerCache {
+    version: u32,
     jars: Vec<JarMeta>,
+    kubejs: Vec<KubejsScriptMeta>,
     items: Vec<ItemRegistryEntry>,
 }
 
@@ -230,13 +240,21 @@ fn find_texture_for_item(item_id: &str, textures: &HashMap<String, String>) -> O
     None
 }
 
-fn load_cache(instance_path: &Path, current_jars: &[(PathBuf, JarMeta)]) -> Option<Vec<ItemRegistryEntry>> {
+fn load_cache(
+    instance_path: &Path,
+    current_jars: &[(PathBuf, JarMeta)],
+    current_kubejs: &[(PathBuf, KubejsScriptMeta)],
+) -> Option<Vec<ItemRegistryEntry>> {
     let cp = cache_path(instance_path);
     if !cp.exists() {
         return None;
     }
     let data = fs::read_to_string(&cp).ok()?;
     let cached: ItemIndexerCache = serde_json::from_str(&data).ok()?;
+
+    if cached.version != ITEM_CACHE_VERSION {
+        return None;
+    }
 
     if current_jars.len() != cached.jars.len() {
         return None;
@@ -253,14 +271,37 @@ fn load_cache(instance_path: &Path, current_jars: &[(PathBuf, JarMeta)]) -> Opti
         return None;
     }
 
+    // KubeJS script fingerprints: any script add/remove/edit invalidates.
+    if current_kubejs.len() != cached.kubejs.len() {
+        return None;
+    }
+    let cached_ks: HashMap<&str, &KubejsScriptMeta> = cached.kubejs.iter().map(|k| (k.path.as_str(), k)).collect();
+    let kubejs_match = current_kubejs.iter().all(|(_path, meta)| {
+        cached_ks.get(meta.path.as_str()).map_or(false, |cm| {
+            cm.size == meta.size && cm.modified == meta.modified
+        })
+    });
+
+    if !kubejs_match {
+        return None;
+    }
+
     eprintln!("[Indexer] Cache hit: {} items for {}", cached.items.len(), instance_path.display());
     Some(cached.items)
 }
 
-fn save_cache(instance_path: &Path, current_jars: &[(PathBuf, JarMeta)], items: &[ItemRegistryEntry]) {
+fn save_cache(
+    instance_path: &Path,
+    current_jars: &[(PathBuf, JarMeta)],
+    current_kubejs: &[(PathBuf, KubejsScriptMeta)],
+    items: &[ItemRegistryEntry],
+) {
     let jars: Vec<JarMeta> = current_jars.iter().map(|(_, meta)| meta.clone()).collect();
+    let kubejs: Vec<KubejsScriptMeta> = current_kubejs.iter().map(|(_, meta)| meta.clone()).collect();
     let cache = ItemIndexerCache {
+        version: ITEM_CACHE_VERSION,
         jars,
+        kubejs,
         items: items.to_vec(),
     };
     let cp = cache_path(instance_path);
@@ -343,7 +384,7 @@ pub(crate) fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
     }).collect()
 }
 
-pub fn scan_instance_items(instance_path: &Path) -> Result<Vec<ItemRegistryEntry>, String> {
+pub fn scan_instance_items(instance_path: &Path, kubejs_namespace: &str) -> Result<Vec<ItemRegistryEntry>, String> {
     let mods_dir = instance_path.join("mods");
 
     // 1. Collect JARs from mods/
@@ -369,19 +410,20 @@ pub fn scan_instance_items(instance_path: &Path) -> Result<Vec<ItemRegistryEntry
         }
     }
 
-    // 3. Build metadata for cache check
+    // 3. Build metadata for cache check (jars + KubeJS scripts)
     let current_jars: Vec<(PathBuf, JarMeta)> = all_jars.iter()
         .filter_map(|p| {
             let meta = get_jar_meta(p)?;
             Some((p.clone(), meta))
         })
         .collect();
+    let current_kubejs = collect_kubejs_scripts(instance_path);
 
-    if current_jars.is_empty() {
+    if current_jars.is_empty() && current_kubejs.is_empty() {
         return Ok(Vec::new());
     }
 
-    if let Some(cached) = load_cache(instance_path, &current_jars) {
+    if let Some(cached) = load_cache(instance_path, &current_jars, &current_kubejs) {
         return Ok(cached);
     }
 
@@ -419,22 +461,75 @@ pub fn scan_instance_items(instance_path: &Path) -> Result<Vec<ItemRegistryEntry
         }
     }
 
+    // 5. Scan KubeJS scripts for item registrations (`event.create`/`register`).
+    //    Bare ids are namespaced with the adapter-provided default namespace;
+    //    `.texture()` refs resolve against the jar texture map when possible.
+    for (script_path, _) in &current_kubejs {
+        let Ok(content) = fs::read_to_string(script_path) else { continue };
+        for reg in parse_kubejs_item_registrations(&content) {
+            let KubejsItemRegistration { id, display_name, texture } = reg;
+            let full_id = namespace_kubejs_id(&id, kubejs_namespace);
+            if !seen_ids.insert(full_id.clone()) {
+                continue;
+            }
+            let name = display_name.unwrap_or_else(|| {
+                full_id.split_once(':').map(|(_, p)| p.to_string()).unwrap_or_else(|| full_id.clone())
+            });
+            let texture_data_url = texture.as_ref().and_then(|t| {
+                resolve_kubejs_texture(t, &full_id, kubejs_namespace, &all_textures)
+            });
+            all_items.push(ItemRegistryEntry {
+                id: full_id,
+                name,
+                mod_id: "kubejs".to_string(),
+                texture_data_url,
+            });
+        }
+    }
+
     all_items.sort_by(|a, b| a.mod_id.cmp(&b.mod_id).then(a.id.cmp(&b.id)));
-    save_cache(instance_path, &current_jars, &all_items);
+    save_cache(instance_path, &current_jars, &current_kubejs, &all_items);
     eprintln!("[Indexer] Indexed {} items from {} jars for {}", all_items.len(), current_jars.len(), instance_path.display());
 
     Ok(all_items)
 }
 
+/// Namespace a bare KubeJS item id with the adapter-provided default.
+fn namespace_kubejs_id(id: &str, default_ns: &str) -> String {
+    if id.contains(':') {
+        id.to_string()
+    } else {
+        format!("{default_ns}:{id}")
+    }
+}
+
+/// Resolve a `.texture('ns:path')` ref to a data URL. Bare refs inherit the
+/// item's namespace (the scan's texture keys are `ns:path`).
+fn resolve_kubejs_texture(
+    texture: &str,
+    item_id: &str,
+    default_ns: &str,
+    textures: &HashMap<String, String>,
+) -> Option<String> {
+    let key = if texture.contains(':') {
+        texture.to_string()
+    } else {
+        let ns = item_id.split_once(':').map(|(n, _)| n).unwrap_or(default_ns);
+        format!("{ns}:{texture}")
+    };
+    textures.get(&key).cloned()
+}
+
 #[tauri::command]
 pub async fn scan_instance_items_cmd(
     instance_path: String,
+    kubejs_namespace: Option<String>,
 ) -> Result<Vec<ItemRegistryEntry>, String> {
     // Jar walk + lang/model parsing can take a while on a large pack; run off
     // the main thread so the webview stays responsive.
     tauri::async_runtime::spawn_blocking(move || {
         let path = Path::new(&instance_path);
-        scan_instance_items(path)
+        scan_instance_items(path, kubejs_namespace.as_deref().unwrap_or("kubejs"))
     })
     .await
     .map_err(|e| format!("Item scan task failed: {e}"))?
@@ -587,7 +682,7 @@ mod tests {
             Some(r#"{"block.mod2.machine_frame": "Machine Frame"}"#),
         );
 
-        let items = scan_instance_items(dir.path()).unwrap();
+        let items = scan_instance_items(dir.path(), "kubejs").unwrap();
         assert_eq!(items.len(), 2);
 
         let copper = items.iter().find(|i| i.id == "mod1:ingot_copper").unwrap();
@@ -656,7 +751,7 @@ mod tests {
             Some(r#"{"item.simplemod.ingot_copper": "Copper Ingot"}"#),
         );
 
-        let items = scan_instance_items(dir.path()).unwrap();
+        let items = scan_instance_items(dir.path(), "kubejs").unwrap();
         assert_eq!(items.len(), 2);
 
         let table = items.iter().find(|i| i.id == "testmod:crafting_table").unwrap();
@@ -686,7 +781,7 @@ mod tests {
             Some(r#"{"item.somemod.ingot_copper": "Copper Ingot"}"#),
         );
 
-        let items = scan_instance_items(dir.path()).unwrap();
+        let items = scan_instance_items(dir.path(), "kubejs").unwrap();
 
         // Should contain vanilla items from root jar AND mod items from mods/
         let diamond = items.iter().find(|i| i.id == "minecraft:diamond");
@@ -714,11 +809,101 @@ mod tests {
             Some(r#"{"item.testmod.test_item": "Test Item"}"#),
         );
 
-        let items1 = scan_instance_items(dir.path()).unwrap();
+        let items1 = scan_instance_items(dir.path(), "kubejs").unwrap();
         assert_eq!(items1.len(), 1);
 
-        let items2 = scan_instance_items(dir.path()).unwrap();
+        let items2 = scan_instance_items(dir.path(), "kubejs").unwrap();
         assert_eq!(items2.len(), 1);
         assert_eq!(items1[0].id, items2[0].id);
+    }
+
+    fn write_kubejs_script(instance: &std::path::Path, contents: &str) {
+        let startup = instance.join("kubejs").join("startup_scripts");
+        fs::create_dir_all(&startup).unwrap();
+        fs::write(startup.join("items.js"), contents).unwrap();
+    }
+
+    #[test]
+    fn test_scan_instance_kubejs_items_end_to_end() {
+        let dir = tempdir().unwrap();
+        // A jar providing the texture the kubejs `.texture()` ref points at.
+        let mods = dir.path().join("mods");
+        fs::create_dir_all(&mods).unwrap();
+        create_test_jar(
+            &mods.join("m.jar"),
+            "minecraft",
+            &["item/test_item.png"],
+            Some(r#"{}"#),
+        );
+        write_kubejs_script(
+            dir.path(),
+            r#"StartupEvents.registry('item', event => {
+  event.create('test_item').displayName('Test Item').texture('minecraft:item/test_item')
+  event.create('no_icon')
+})"#,
+        );
+
+        let items = scan_instance_items(dir.path(), "kubejs").unwrap();
+        assert_eq!(items.len(), 2);
+
+        let with_icon = items.iter().find(|i| i.id == "kubejs:test_item").unwrap();
+        assert_eq!(with_icon.name, "Test Item");
+        assert_eq!(with_icon.mod_id, "kubejs");
+        assert!(
+            with_icon.texture_data_url.is_some(),
+            "kubejs item should resolve its .texture() against the jar texture map"
+        );
+
+        let no_icon = items.iter().find(|i| i.id == "kubejs:no_icon").unwrap();
+        assert_eq!(no_icon.name, "no_icon");
+        assert!(no_icon.texture_data_url.is_none());
+    }
+
+    #[test]
+    fn test_scan_instance_kubejs_bare_ids_namespaced_by_argument() {
+        let dir = tempdir().unwrap();
+        let mods = dir.path().join("mods");
+        fs::create_dir_all(&mods).unwrap();
+        create_test_jar(&mods.join("m.jar"), "minecraft", &[], Some(r#"{}"#));
+        write_kubejs_script(
+            dir.path(),
+            r#"onEvent('item.registry', event => { event.register('legacy_thing') })"#,
+        );
+
+        // Custom namespace passed from the frontend adapter.
+        let items = scan_instance_items(dir.path(), "example").unwrap();
+        assert!(items.iter().any(|i| i.id == "example:legacy_thing"));
+
+        // Bare namespaced ids are untouched.
+        write_kubejs_script(
+            dir.path(),
+            r#"StartupEvents.registry('item', event => { event.create('mymod:explicit') })"#,
+        );
+        let items = scan_instance_items(dir.path(), "example").unwrap();
+        assert!(items.iter().any(|i| i.id == "mymod:explicit"));
+    }
+
+    #[test]
+    fn test_cache_invalidates_on_kubejs_script_change() {
+        let dir = tempdir().unwrap();
+        let mods = dir.path().join("mods");
+        fs::create_dir_all(&mods).unwrap();
+        create_test_jar(&mods.join("m.jar"), "minecraft", &[], Some(r#"{}"#));
+
+        write_kubejs_script(
+            dir.path(),
+            r#"StartupEvents.registry('item', event => { event.create('first_item') })"#,
+        );
+        let items1 = scan_instance_items(dir.path(), "kubejs").unwrap();
+        assert!(items1.iter().any(|i| i.id == "kubejs:first_item"));
+
+        // Editing the script (same path) must invalidate the cached scan.
+        write_kubejs_script(
+            dir.path(),
+            r#"StartupEvents.registry('item', event => { event.create('second_item') })"#,
+        );
+        let items2 = scan_instance_items(dir.path(), "kubejs").unwrap();
+        assert!(items2.iter().any(|i| i.id == "kubejs:second_item"));
+        assert!(!items2.iter().any(|i| i.id == "kubejs:first_item"));
     }
 }

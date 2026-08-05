@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { validateRecipe, hasErrors } from './validation'
-import { patternToGrid, gridToPattern } from './grid'
+import { patternToGrid, gridToPattern, ingredientsToGrid, gridToIngredients } from './grid'
 import { normalizeLoader } from './loader'
 import { readSlot, writeSlot, slotsForType } from './specialized'
 import { importRecipeJson, parseRecipeJson } from './json-import'
+import { filterTagCatalog } from './tag-filter'
 import type { Recipe, RecipeIngredient } from './recipe-store'
 
 const ing = (item: string, extra: Partial<RecipeIngredient> = {}): RecipeIngredient => ({
@@ -235,5 +236,81 @@ describe('JSON import', () => {
     const res = importRecipeJson('this is not json')
     expect(res.recipes).toHaveLength(0)
     expect(res.errors[0].message).toContain('Invalid JSON')
+  })
+})
+
+describe('shapeless grid layout', () => {
+  it('lays ingredients out 3-wide row-major', () => {
+    const ings = [ing('a'), ing('b'), ing('c'), ing('d')]
+    const grid = ingredientsToGrid(ings)
+    expect(grid).toHaveLength(3)
+    expect(grid[0].map((c) => c?.item)).toEqual(['a', 'b', 'c'])
+    expect(grid[1].map((c) => (c ? c.item : null))).toEqual(['d', null, null])
+    expect(grid[2]).toEqual([null, null, null])
+  })
+
+  it('preserves counts and tags round-trip', () => {
+    const ings = [
+      { item: 'minecraft:iron', count: 4, tag: false },
+      { item: 'forge:ingots/iron', tag: true },
+    ]
+    expect(gridToIngredients(ingredientsToGrid(ings))).toEqual(ings)
+  })
+
+  it('collapses nulls back to a flat list in order', () => {
+    const grid = [
+      [{ item: 'a', tag: false }, null, { item: 'b', tag: false }],
+      [null, { item: 'c', count: 2, tag: false }, null],
+      [null, null, null],
+    ]
+    const out = gridToIngredients(grid)
+    expect(out.map((c) => c.item)).toEqual(['a', 'b', 'c'])
+    expect(out[2].count).toBe(2)
+  })
+
+  it('returns an empty 3x3 for no ingredients', () => {
+    const grid = ingredientsToGrid([])
+    expect(grid.map((r) => r.length)).toEqual([3, 3, 3])
+    expect(grid.flat()).toEqual([null, null, null, null, null, null, null, null, null])
+  })
+})
+
+describe('filterTagCatalog', () => {
+
+  const tags = [
+    { id: 'minecraft:logs', member_count: 11 },
+    { id: 'forge:ingots/iron', member_count: 3 },
+    { id: 'kubejs:copper_ingot', member_count: 1 },
+    { id: 'minecraft:logs_that_burn', member_count: 9 },
+  ]
+
+  it('returns everything on an empty query', () => {
+    expect(filterTagCatalog(tags, '')).toEqual(tags)
+    expect(filterTagCatalog(tags, '   ')).toEqual(tags)
+  })
+
+  it('filters by case-insensitive id substring', () => {
+    const out = filterTagCatalog(tags, 'logs')
+    expect(out.map((t) => t.id)).toEqual(['minecraft:logs', 'minecraft:logs_that_burn'])
+  })
+
+  it('filters by @namespace', () => {
+    const out = filterTagCatalog(tags, '@minecraft')
+    expect(out.map((t) => t.id)).toEqual(['minecraft:logs', 'minecraft:logs_that_burn'])
+  })
+
+  it('combines @namespace and text', () => {
+    const out = filterTagCatalog(tags, '@minecraft logs_that')
+    expect(out.map((t) => t.id)).toEqual(['minecraft:logs_that_burn'])
+  })
+
+  it('matches a slash path inside an id', () => {
+    const out = filterTagCatalog(tags, 'ingots')
+    expect(out.map((t) => t.id)).toEqual(['forge:ingots/iron'])
+  })
+
+  it('does not strip # prefixes from queries (tags are bare in the catalog)', () => {
+    const out = filterTagCatalog(tags, '#minecraft')
+    expect(out).toEqual([])
   })
 })

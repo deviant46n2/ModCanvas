@@ -20,6 +20,10 @@ export abstract class BaseMinecraftAdapter implements IMinecraftVersionAdapter {
     return '/kubejs reload server_scripts';
   }
 
+  getKubejsDefaultNamespace(): string {
+    return 'kubejs';
+  }
+
   abstract getSNBTSpec(): SNBTSpecification;
   abstract getRecipeScriptFormat(): RecipeScriptFormat;
 }

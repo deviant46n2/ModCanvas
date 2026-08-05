@@ -6,6 +6,7 @@ pub mod runtime_textures;
 pub mod icons;
 pub mod imports;
 pub mod indexer;
+pub mod indexer_kubejs;
 pub mod ingest;
 pub mod instance_textures;
 pub mod ftb_theme;
@@ -229,6 +230,7 @@ pub fn run() {
             crate::instance_textures::scan_instance_textures_cmd,
             crate::instance_textures::scan_instance_animations_cmd,
             crate::instance_textures::resolve_item_tags_cmd,
+            crate::instance_textures::list_item_tags_cmd,
             crate::ftb_theme::get_quest_theme_background,
             crate::engine_renders::get_engine_renders_cmd,
             crate::engine_renders::save_engine_renders_cmd,

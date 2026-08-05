@@ -318,5 +318,15 @@ pub fn resolve_item_tags_cmd(
     Ok(tags::resolve_item_tags(path, &tags))
 }
 
+/// List every item tag in the instance (id + expanded member count), sorted by
+/// id. Backs the Tags palette tab's local catalog.
+#[tauri::command]
+pub fn list_item_tags_cmd(
+    instance_path: String,
+) -> Result<Vec<tags::ItemTagInfo>, String> {
+    let path = std::path::Path::new(&instance_path);
+    Ok(tags::list_item_tags(path))
+}
+
 #[cfg(test)]
 mod tests;

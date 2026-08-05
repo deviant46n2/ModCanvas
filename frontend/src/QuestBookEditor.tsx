@@ -34,6 +34,8 @@ import {
   unmarkBakedKeys,
   subscribeBakedKeys,
   getBakedTextureCount,
+  textureDisplayUrl,
+  isTexturePending,
 } from './services/texture-loader'
 import { requestResolveTags } from './services/smart-filter-tags'
 import {
@@ -46,10 +48,12 @@ import {
   persistEngineRenders,
   normalizeItemId,
 } from './services/engine-render'
-import { JeiDrawer } from './components/jei/JeiDrawer'
+import { ItemPickerModal } from './components/common/ItemPickerModal'
 import { TextureLoadingBar } from './components/quest/TextureLoadingBar'
 import { EngineRenderPrompt } from './components/quest/EngineRenderPrompt'
 import { AnimationProvider } from './components/quest/animation-context'
+import { getAdapter } from './adapters'
+import { normalizeLoader } from './core/recipe/loader'
 import {
   initRuntimeTextureListener,
   subscribeRuntimeTextures,
@@ -66,6 +70,8 @@ import { usePackHealthStore } from './core/pack-health/pack-health-store'
 interface QuestBookEditorProps {
   projectId: string
   projectPath?: string
+  minecraftVersion?: string
+  modLoader?: string
   wsConnected?: boolean
   ingestResult?: IngestResult | null
   packLoaded?: boolean
@@ -75,7 +81,14 @@ interface QuestBookEditorProps {
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, wsConnected, ingestResult, packLoaded, onTest, isTesting }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting }: QuestBookEditorProps) {
+  // Resolve the adapter so bare KubeJS item ids get the pack's default
+  // namespace during the item-registry scan (shared with the recipe editor).
+  const adapter = useMemo(
+    () => getAdapter(minecraftVersion ?? '1.21.1', normalizeLoader(modLoader)),
+    [minecraftVersion, modLoader],
+  )
+  const kubejsNamespace = adapter.getKubejsDefaultNamespace()
   const [graph, setGraph] = useState<QuestGraphData | null>(null)
   const [activeChapter, setActiveChapter] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -189,12 +202,12 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
       setTextureIndex(prev => ({ ...prev, ...ingestResult.asset_registry.by_id }))
     }
     if (ingestResult?.active_instance) {
-      scanInstanceItems(ingestResult.active_instance).then((registry) => {
+      scanInstanceItems(ingestResult.active_instance, kubejsNamespace).then((registry) => {
         setItems(registry);
         registerModItems(registry);
       }).catch((e) => console.error('[QuestBookEditor] Failed to scan instance items:', e));
     }
-  }, [ingestResult])
+  }, [ingestResult, kubejsNamespace])
 
   // ── Engine-render pipeline (companion mod) ──────────────────────────────
   // When the game is running with the companion connected, icons that the local
@@ -202,6 +215,21 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
   // in-game and cached. Injected into the live texture index (quest tiles) and
   // the item registry (JEI view), and persisted to the Rust disk cache.
   const instancePath = ingestResult?.active_instance || projectPath || ''
+
+  // Item picker icons resolve lazily through the live texture index first
+  // (shared lazy materializer), falling back to the registry's own data URL —
+  // so opening the picker never deepens the base64 registry dependency.
+  const getPickerTextureUrl = useCallback(
+    (itemId: string): string | null => {
+      const url = textureDisplayUrl(textureIndex, itemId)
+      if (url) return url
+      if (isTexturePending(textureIndex, itemId) && instancePath) {
+        requestMaterialize([itemId], instancePath)
+      }
+      return null
+    },
+    [textureIndex, instancePath],
+  )
 
   // Track software-baked keys reactively so the "run the instance to capture
   // textures" prompt appears/clears as bakes are replaced by real engine icons.
@@ -1033,8 +1061,9 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
           />
         )}
         {itemPickerTarget && (
-          <JeiDrawer
+          <ItemPickerModal
             items={items}
+            getTextureUrl={getPickerTextureUrl}
             onSelect={(itemId) => {
               const t = itemPickerTarget
               if (t.type === 'objective') {
