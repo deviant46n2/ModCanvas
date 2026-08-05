@@ -15,7 +15,6 @@ interface RecipePaletteProps {
   /** Instance path used to resolve expanded tag members. */
   instancePath: string;
   getTextureUrl: (itemId: string) => string | null;
-  onDragStart: (payload: { item: string; name: string }) => void;
   /** Highlight recipes using an item (`id`) or tag (`#id`). */
   onShowRecipesUsing: (itemOrTagId: string) => void;
 }
@@ -33,11 +32,10 @@ function setDragPayload(e: React.DragEvent, payload: SlotDragPayload) {
 type ItemRowData = {
   items: ItemRegistryEntry[];
   getUrl: (id: string) => string | null;
-  onDragStart: (payload: { item: string; name: string }) => void;
   onShowRecipesUsing: (itemOrTagId: string) => void;
 };
 
-function ItemRow({ index, style, items, getUrl, onDragStart, onShowRecipesUsing }: RowComponentProps<ItemRowData>) {
+function ItemRow({ index, style, items, getUrl, onShowRecipesUsing }: RowComponentProps<ItemRowData>) {
   const item = items[index];
   if (!item) return <div style={style} />;
   const url = getUrl(item.id);
@@ -47,7 +45,6 @@ function ItemRow({ index, style, items, getUrl, onDragStart, onShowRecipesUsing 
         className="palette-item"
         draggable
         onDragStart={(e) => {
-          onDragStart({ item: item.id, name: item.name });
           setDragPayload(e, { item: item.id, name: item.name });
         }}
       >
@@ -88,7 +85,6 @@ type TagRowData = {
   getUrl: (id: string) => string | null;
   onToggle: (tagId: string) => void;
   expanded: Set<string>;
-  onDragStart: (payload: { item: string; name: string }) => void;
   onShowRecipesUsing: (itemOrTagId: string) => void;
 };
 
@@ -96,7 +92,7 @@ function tagRowHeight(row: TagRow): number {
   return row.kind === 'tag' ? TAG_ROW_HEIGHT : MEMBER_ROW_HEIGHT;
 }
 
-function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDragStart, onShowRecipesUsing }: RowComponentProps<TagRowData>) {
+function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShowRecipesUsing }: RowComponentProps<TagRowData>) {
   const row = rows[index];
   if (!row) return <div style={style} />;
   if (row.kind === 'tag') {
@@ -107,7 +103,6 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDrag
           className="palette-item tag-item"
           draggable
           onDragStart={(e) => {
-            onDragStart({ item: `#${row.tag.id}`, name: row.tag.id });
             setDragPayload(e, { item: `#${row.tag.id}`, name: row.tag.id, tag: true });
           }}
           onClick={() => onToggle(row.tag.id)}
@@ -147,7 +142,6 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onDrag
         className="tag-member-row"
         draggable
         onDragStart={(e) => {
-          onDragStart({ item: row.item, name: row.item });
           setDragPayload(e, { item: row.item, name: row.item });
         }}
         title={`Drag ${row.item} into the grid`}
@@ -164,7 +158,6 @@ export function RecipePalette({
   tags,
   instancePath,
   getTextureUrl,
-  onDragStart,
   onShowRecipesUsing,
 }: RecipePaletteProps) {
   const [activeTab, setActiveTab] = useState<'items' | 'tags'>('items');
@@ -244,7 +237,7 @@ export function RecipePalette({
               rowComponent={ItemRow}
               rowCount={itemsFiltered.length}
               rowHeight={ITEM_ROW_HEIGHT}
-              rowProps={{ items: itemsFiltered, getUrl: getTextureUrl, onDragStart, onShowRecipesUsing }}
+              rowProps={{ items: itemsFiltered, getUrl: getTextureUrl, onShowRecipesUsing }}
               overscanCount={8}
             />
           ))}
@@ -262,7 +255,7 @@ export function RecipePalette({
               rowComponent={TagRowRenderer}
               rowCount={rows.length}
               rowHeight={(index) => tagRowHeight(rows[index])}
-              rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onDragStart, onShowRecipesUsing }}
+              rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onShowRecipesUsing }}
               overscanCount={8}
             />
           ))}

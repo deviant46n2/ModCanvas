@@ -7,12 +7,20 @@ const DEBOUNCE_MS = 400
 
 /** Live render of the exact on-disk script (`generate_recipe_scripts` over the
  *  same saveable recipe set the save button writes). Debounced so typing in the
- *  grid doesn't hammer the backend on every keystroke. */
-export function useRecipeScripts(projectId: string, recipes: Recipe[], isCraftTweaker: boolean) {
+ *  grid doesn't hammer the backend on every keystroke. `disabledIdsOverride`
+ *  (e.g. `[]` for the per-recipe preview) replaces the store's remove-by-id
+ *  list. */
+export function useRecipeScripts(
+  projectId: string,
+  recipes: Recipe[],
+  isCraftTweaker: boolean,
+  disabledIdsOverride?: string[],
+) {
   const [script, setScript] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const disabledIds = useRecipeStore((s) => s.disabledIds)
+  const storeDisabledIds = useRecipeStore((s) => s.disabledIds)
+  const disabledIds = disabledIdsOverride ?? storeDisabledIds
 
   useEffect(() => {
     let cancelled = false

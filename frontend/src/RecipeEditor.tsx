@@ -4,7 +4,7 @@ import { RecipePalette } from './components/recipe/RecipePalette';
 import { RecipeExplorer } from './components/recipe/RecipeExplorer';
 import { CraftingGridPanel } from './components/recipe/CraftingGridPanel';
 import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
-import { RecipeScriptPreview } from './components/recipe/RecipeScriptPreview';
+import { RecipeScriptDrawer } from './components/recipe/RecipeScriptDrawer';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
@@ -82,7 +82,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     }
     return map
   }, [itemRegistry]);
-  const [draggedItem, setDraggedItem] = useState<{ item: string; name: string } | null>(null);
   const [, setTextureTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [reloading, setReloading] = useState(false);
@@ -349,24 +348,12 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           )}
 
           {showScriptPreview && projectId && (
-            <RecipeScriptPreview
+            <RecipeScriptDrawer
               projectId={projectId}
               recipes={recipes}
+              selectedRecipe={selectedRecipe}
               loader={adapter.loader}
             />
-          )}
-          {draggedItem && (
-            <div className="detail-card dragged-preview">
-              <h4>Dragged Item</h4>
-              <div className="detail-item">
-                <img src={getTextureUrl(draggedItem.item) || ''} alt="" />
-                <div>
-                  <strong>{draggedItem.name}</strong>
-                  <small>{draggedItem.item}</small>
-                </div>
-              </div>
-              <p>Drop onto the crafting grid to add</p>
-            </div>
           )}
         </main>
 
@@ -375,7 +362,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           tags={tagCatalog}
           instancePath={projectPath}
           getTextureUrl={getRegistryTextureUrl}
-          onDragStart={setDraggedItem}
           onShowRecipesUsing={handleShowRecipesUsing}
         />
         </>
