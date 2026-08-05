@@ -7,6 +7,7 @@
 pub mod cache;
 pub mod crafttweaker;
 pub mod kubejs;
+pub mod scan;
 pub mod vanilla;
 
 use crate::models::{Recipe, RecipeIngredient, RecipeOutput, RecipeType};
@@ -25,6 +26,23 @@ pub enum RecipeOrigin {
     Crafttweaker,
 }
 
+/// 1-based line range of a recipe call inside its source file, covering the
+/// whole call including any swallowed `.modifier(...)` chains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LineSpan {
+    pub start: u32,
+    pub end: u32,
+}
+
+/// A recipe recovered from a KubeJS/CraftTweaker script, plus the source line
+/// range it was found on (used for comment-out / uncomment).
+#[derive(Debug, Clone)]
+pub struct ParsedRecipe {
+    pub recipe: Recipe,
+    pub lines: Option<LineSpan>,
+}
+
 /// A recipe discovered on disk, ready to be loaded into the editor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +57,9 @@ pub struct DiscoveredRecipe {
     pub label: String,
     /// True when this file is pack-authored (editable) vs from a mod jar.
     pub editable: bool,
+    /// Source line span of the call (KubeJS/CraftTweaker only; `None` for
+    /// vanilla JSON / jar recipes which have no comment-out mechanism).
+    pub span: Option<LineSpan>,
 }
 
 impl DiscoveredRecipe {
@@ -209,6 +230,7 @@ pub fn scan_pack_recipes(project_path: &std::path::Path) -> Vec<DiscoveredRecipe
                     id: resource_id.clone(),
                     label: DiscoveredRecipe::label_for(path, &root),
                     editable,
+                    span: None,
                 });
             }
         }
@@ -250,17 +272,18 @@ pub fn scan_pack_recipes(project_path: &std::path::Path) -> Vec<DiscoveredRecipe
                 continue;
             }
             let Ok(content) = std::fs::read_to_string(path) else { continue };
-            for recipe in kubejs::parse_kubejs_scripts(&content) {
-                let id = format!("{}:{}", file_ns(&content), recipe.output.item);
+            for parsed in kubejs::parse_kubejs_scripts(&content) {
+                let id = format!("{}:{}", file_ns(&content), parsed.recipe.output.item);
                 let label = DiscoveredRecipe::label_for(path, &root);
                 let editable = is_editable_source(path, &root);
                 out.push(DiscoveredRecipe {
-                    recipe,
+                    recipe: parsed.recipe,
                     origin: RecipeOrigin::Kubejs,
                     source: path.to_string_lossy().to_string(),
                     id,
                     label,
                     editable,
+                    span: parsed.lines,
                 });
             }
         }
@@ -278,17 +301,18 @@ pub fn scan_pack_recipes(project_path: &std::path::Path) -> Vec<DiscoveredRecipe
                 continue;
             }
             let Ok(content) = std::fs::read_to_string(path) else { continue };
-            for recipe in crafttweaker::parse_crafttweaker(&content) {
-                let id = format!("{}:{}", file_ns(&content), recipe.output.item);
+            for parsed in crafttweaker::parse_crafttweaker(&content) {
+                let id = format!("{}:{}", file_ns(&content), parsed.recipe.output.item);
                 let label = DiscoveredRecipe::label_for(path, &root);
                 let editable = is_editable_source(path, &root);
                 out.push(DiscoveredRecipe {
-                    recipe,
+                    recipe: parsed.recipe,
                     origin: RecipeOrigin::Crafttweaker,
                     source: path.to_string_lossy().to_string(),
                     id,
                     label,
                     editable,
+                    span: parsed.lines,
                 });
             }
         }
@@ -396,6 +420,7 @@ fn scan_jar_recipes(jar_path: &std::path::Path, root: &std::path::Path, out: &mu
                     jar_path.strip_prefix(root).unwrap_or(jar_path).display()
                 ),
                 editable: false,
+                span: None,
             });
         }
     }
@@ -474,6 +499,52 @@ mod tests {
     fn empty_pack_yields_nothing() {
         let dir = tempfile::tempdir().unwrap();
         assert!(scan_pack_recipes(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn kubejs_span_is_threaded_through_discovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let kube = dir.path().join("kubejs/server_scripts");
+        std::fs::create_dir_all(&kube).unwrap();
+        std::fs::write(
+            kube.join("recipes.js"),
+            "ServerEvents.recipes(event => {\n  // event.shaped('minecraft:ghost', ['A'], { A: 'minecraft:ghost_item' })\n  event.smelting('minecraft:iron_ingot', 'minecraft:iron_ore')\n})",
+        )
+        .unwrap();
+        let found = scan_pack_recipes(dir.path());
+        assert_eq!(found.len(), 1, "commented-out kubejs call must be skipped");
+        assert_eq!(found[0].span.unwrap(), LineSpan { start: 3, end: 3 });
+    }
+
+    #[test]
+    fn crafttweaker_span_is_threaded_through_discovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let scripts = dir.path().join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        std::fs::write(
+            scripts.join("recipes.zs"),
+            "furnace.addRecipe(\"iron\", <item:minecraft:iron_ingot>, <item:minecraft:iron_ore>, 0.7, 200);",
+        )
+        .unwrap();
+        let found = scan_pack_recipes(dir.path());
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].span.unwrap(), LineSpan { start: 1, end: 1 });
+    }
+
+    #[test]
+    fn vanilla_and_jar_recipes_have_no_span() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join("data/mc/recipes");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(
+            data.join("diamond_block.json"),
+            r#"{"type":"minecraft:crafting_shaped","pattern":["A"],"key":{"A":{"item":"minecraft:diamond"}},"result":{"item":"minecraft:diamond_block"}}"#,
+        )
+        .unwrap();
+        let found = scan_pack_recipes(dir.path());
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].origin, RecipeOrigin::Vanilla);
+        assert_eq!(found[0].span, None);
     }
 
     #[test]

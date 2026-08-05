@@ -18,6 +18,7 @@ pub mod path_safety;
 pub mod progression;
 pub mod quest;
 pub mod quest_cache;
+pub mod recipe_disable;
 pub mod recipes;
 pub mod scriptgen;
 pub mod shared;
@@ -223,6 +224,8 @@ pub fn run() {
             commands::generate_recipe_scripts,
             commands::write_script_files,
             crate::recipes::scan_pack_recipes_cmd,
+            crate::recipe_disable::comment_out_recipe_call,
+            crate::recipe_disable::uncomment_recipe_call,
             crate::indexer::scan_instance_items_cmd,
             crate::ingest::ingest_active_instance_cmd,
             crate::ingest::get_texture_file,

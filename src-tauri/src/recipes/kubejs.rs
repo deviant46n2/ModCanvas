@@ -5,17 +5,28 @@
 
 use crate::models::{Recipe, RecipeIngredient, RecipeOutput, RecipeType};
 use crate::recipes::base_recipe;
+use crate::recipes::scan::{line_of, line_starts, OpaqueRegions};
+use crate::recipes::{LineSpan, ParsedRecipe};
 use regex::Regex;
 
-/// Parse a KubeJS script body, returning every recipe call we can recover.
-/// `file` is a label for provenance/debug.
-pub fn parse_kubejs_scripts(content: &str) -> Vec<Recipe> {
+/// Parse a KubeJS script body, returning every recipe call we can recover with
+/// its 1-based line span. Calls inside `//` / `/* */` comments or string
+/// literals are skipped, so commented-out calls no longer re-surface as active
+/// recipes. `file` is a label for provenance/debug.
+pub fn parse_kubejs_scripts(content: &str) -> Vec<ParsedRecipe> {
     let mut recipes = Vec::new();
     let call_re = Regex::new(r"event\.(shaped|shapeless|smelting|blasting|smoking|campfireCooking|stonecutting|smithing)\s*\(").unwrap();
+    let opaque = OpaqueRegions::scan(content, &[('\'', '\''), ('"', '"'), ('`', '`')]);
+    let starts = line_starts(content);
     // Split into `event.<fn>( ... )` chunks by scanning balanced parens.
     let mut pos = 0;
-    let bytes = content.as_bytes();
     while let Some(m) = call_re.find_at(content, pos) {
+        // A match inside a comment or string literal is not a real call.
+        if opaque.overlaps(m.start(), m.end()) {
+            let Some(next) = opaque.advance_past(m.start()) else { break };
+            pos = next;
+            continue;
+        }
         let method = m.as_str().trim_start_matches("event.").trim_end_matches('(');
         let start = m.end();
         let Some(mut end) = find_balanced_paren(content, start) else {
@@ -43,11 +54,16 @@ pub fn parse_kubejs_scripts(content: &str) -> Vec<Recipe> {
         }
         let body = &content[m.start()..end];
         if let Some(recipe) = parse_call(method, body) {
-            recipes.push(recipe);
+            recipes.push(ParsedRecipe {
+                recipe,
+                lines: Some(LineSpan {
+                    start: line_of(&starts, m.start()),
+                    end: line_of(&starts, end.saturating_sub(1)),
+                }),
+            });
         }
         pos = end;
     }
-    let _ = bytes;
     recipes
 }
 
@@ -243,9 +259,11 @@ ServerEvents.recipes(event => {
 "#;
         let recipes = parse_kubejs_scripts(script);
         assert_eq!(recipes.len(), 1);
-        assert_eq!(recipes[0].r#type, RecipeType::Shaped);
-        assert_eq!(recipes[0].output.item, "minecraft:diamond_block");
-        assert_eq!(recipes[0].key.as_ref().unwrap()["A"].item, "minecraft:diamond");
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Shaped);
+        assert_eq!(recipes[0].recipe.output.item, "minecraft:diamond_block");
+        assert_eq!(recipes[0].recipe.key.as_ref().unwrap()["A"].item, "minecraft:diamond");
+        assert_eq!(recipes[0].lines.unwrap().start, 3);
+        assert_eq!(recipes[0].lines.unwrap().end, 3);
     }
 
     #[test]
@@ -253,9 +271,9 @@ ServerEvents.recipes(event => {
         let script = r#"event.smelting('minecraft:iron_ingot', 'minecraft:iron_ore').experience(0.7).cookingTime(200)"#;
         let recipes = parse_kubejs_scripts(script);
         assert_eq!(recipes.len(), 1);
-        assert_eq!(recipes[0].r#type, RecipeType::Smelting);
-        assert_eq!(recipes[0].experience, Some(0.7));
-        assert_eq!(recipes[0].cooking_time, Some(200));
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Smelting);
+        assert_eq!(recipes[0].recipe.experience, Some(0.7));
+        assert_eq!(recipes[0].recipe.cooking_time, Some(200));
     }
 
     #[test]
@@ -263,5 +281,60 @@ ServerEvents.recipes(event => {
         let script = "const x = 1; event.shaped('a:b', ['A'], { A: 'c:d' }); console.log('hi')";
         let recipes = parse_kubejs_scripts(script);
         assert_eq!(recipes.len(), 1);
+    }
+
+    #[test]
+    fn skips_commented_out_calls() {
+        let script = r#"
+ServerEvents.recipes(event => {
+  // event.shaped('minecraft:oak_planks', ['A'], { A: 'minecraft:oak_log' })
+  event.shapeless('minecraft:stick', ['minecraft:oak_planks', 'minecraft:oak_planks'])
+})
+"#;
+        let recipes = parse_kubejs_scripts(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Shapeless);
+    }
+
+    #[test]
+    fn skips_block_commented_calls() {
+        let script = r#"
+/* event.smelting('minecraft:iron_ingot', 'minecraft:iron_ore')
+   event.blasting('minecraft:iron_ingot', 'minecraft:iron_ore') */
+event.smoking('minecraft:cooked_chicken', 'minecraft:chicken')
+"#;
+        let recipes = parse_kubejs_scripts(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Smoking);
+    }
+
+    #[test]
+    fn string_literals_containing_event_are_untouched() {
+        let script = r#"
+const tooltip = "event.shaped('fake:out', ['A'], { A: 'fake:in' }) // not a call";
+event.shaped('minecraft:real', ['A'], { A: 'minecraft:diamond' })
+"#;
+        let recipes = parse_kubejs_scripts(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.output.item, "minecraft:real");
+    }
+
+    #[test]
+    fn spans_cover_multiline_chained_calls() {
+        let script = "event.shaped(\n  'minecraft:diamond_block',\n  ['AAA'],\n  { A: 'minecraft:diamond' }\n).experience(0.0)";
+        let recipes = parse_kubejs_scripts(script);
+        assert_eq!(recipes.len(), 1);
+        let span = recipes[0].lines.unwrap();
+        assert_eq!(span.start, 1);
+        assert_eq!(span.end, 5);
+    }
+
+    #[test]
+    fn span_covers_multiple_calls_on_one_line() {
+        let script = "event.shapeless('a:b', ['c:d']); event.smelting('e:f', 'g:h')";
+        let recipes = parse_kubejs_scripts(script);
+        assert_eq!(recipes.len(), 2);
+        assert_eq!(recipes[0].lines.unwrap(), LineSpan { start: 1, end: 1 });
+        assert_eq!(recipes[1].lines.unwrap(), LineSpan { start: 1, end: 1 });
     }
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { generateRecipeScripts, writeScriptFiles, wsIpcSendEvent } from '../services/api'
 import { selectSaveableRecipes } from '../core/recipe/validation'
-import type { Recipe } from '../core/recipe/recipe-store'
+import { useRecipeStore, type Recipe } from '../core/recipe/recipe-store'
 import { HOTSWAP_FROZEN } from '../core/sync/config'
 
 export function useRecipeSave(projectId: string, recipeScriptPath: string) {
@@ -17,7 +17,8 @@ export function useRecipeSave(projectId: string, recipeScriptPath: string) {
       if (valid.length !== recipes.length) {
         setSaveMessage(`Saving ${valid.length}/${recipes.length} recipes (skipped invalid).`)
       }
-      const { kubejs, crafttweaker } = await generateRecipeScripts(projectId, valid)
+      const { disabledIds } = useRecipeStore.getState()
+      const { kubejs, crafttweaker } = await generateRecipeScripts(projectId, valid, disabledIds)
       await writeScriptFiles(projectId, kubejs, crafttweaker)
       setSaveMessage('Scripts saved successfully!')
       markClean()

@@ -134,6 +134,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         origin: r.origin,
         source: r.source,
         editable: r.editable,
+        sourceLines: r.span ?? undefined,
       }));
       const added = loadRecipesFromPack(withMeta);
       setReloadMsg(added > 0 ? `Added ${added} recipes` : 'Recipes are up to date');

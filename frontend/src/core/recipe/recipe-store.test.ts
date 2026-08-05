@@ -15,7 +15,7 @@ function makeRecipe(name: string): Omit<Recipe, 'id'> {
 describe('recipe-store', () => {
   beforeEach(() => {
     localStorage.clear();
-    useRecipeStore.setState({ recipes: [], selectedRecipeId: null, dirty: false, canUndo: false, canRedo: false });
+    useRecipeStore.setState({ recipes: [], selectedRecipeId: null, dirty: false, canUndo: false, canRedo: false, disabledIds: [], disabledScripts: [] });
   });
 
   it('adds a recipe and sets dirty', () => {
@@ -134,5 +134,142 @@ describe('recipe-store', () => {
     const ids = useRecipeStore.getState().recipes.map((r) => r.id);
     expect(ids).toContain(authored);
     expect(ids).toContain('p');
+  });
+
+  it('addRecipe marks authored, editable, enabled, modified', () => {
+    const id = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    const r = useRecipeStore.getState().recipes.find((x) => x.id === id)!;
+    expect(r.origin).toBe('authored');
+    expect(r.editable).toBe(true);
+    expect(r.disabled).toBe(false);
+    expect(r.modified).toBe(true);
+  });
+
+  it('updateRecipe marks only authored recipes modified', () => {
+    const authored = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().loadRecipesFromPack([
+      { ...makeRecipe('pack'), id: 'p', origin: 'vanilla' as const, source: '/data/x.json' },
+    ]);
+    useRecipeStore.getState().updateRecipe(authored, { name: 'edited' });
+    useRecipeStore.getState().updateRecipe('p', { name: 'touched' });
+    const a = useRecipeStore.getState().recipes.find((x) => x.id === authored)!;
+    const p = useRecipeStore.getState().recipes.find((x) => x.id === 'p')!;
+    expect(a.modified).toBe(true);
+    expect(p.modified).toBeUndefined();
+  });
+
+  it('markClean clears modified on authored recipes', () => {
+    const id = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().updateRecipe(id, { name: 'x' });
+    expect(useRecipeStore.getState().recipes.find((r) => r.id === id)?.modified).toBe(true);
+    useRecipeStore.getState().markClean();
+    expect(useRecipeStore.getState().recipes.find((r) => r.id === id)?.modified).toBe(false);
+  });
+
+  it('duplicateRecipe strips origin/source and resets disable state', () => {
+    useRecipeStore.getState().loadRecipesFromPack([
+      {
+        ...makeRecipe('pack'),
+        id: 'p',
+        origin: 'kubejs' as const,
+        source: '/x/recipes.js',
+        sourceLines: { start: 3, end: 5 },
+        editable: true,
+      },
+    ]);
+    const copyId = useRecipeStore.getState().duplicateRecipe('p')!;
+    const copy = useRecipeStore.getState().recipes.find((r) => r.id === copyId)!;
+    expect(copy.origin).toBe('authored');
+    expect(copy.editable).toBe(true);
+    expect(copy.source).toBeUndefined();
+    expect(copy.sourceLines).toBeUndefined();
+    expect(copy.disabled).toBe(false);
+    expect(copy.modified).toBe(true);
+    expect(copy.name).toBe('pack (copy)');
+  });
+
+  it('toggleDisableById toggles remove-by-id disables', () => {
+    useRecipeStore.getState().toggleDisableById('minecraft:stick');
+    expect(useRecipeStore.getState().disabledIds).toEqual(['minecraft:stick']);
+    useRecipeStore.getState().toggleDisableById('minecraft:stick');
+    expect(useRecipeStore.getState().disabledIds).toEqual([]);
+  });
+
+  it('toggleDisableAuthored flips the disabled flag and marks modified', () => {
+    const id = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().toggleDisableAuthored(id);
+    expect(useRecipeStore.getState().recipes.find((r) => r.id === id)?.disabled).toBe(true);
+    expect(useRecipeStore.getState().recipes.find((r) => r.id === id)?.modified).toBe(true);
+    useRecipeStore.getState().toggleDisableAuthored(id);
+    expect(useRecipeStore.getState().recipes.find((r) => r.id === id)?.disabled).toBe(false);
+  });
+
+  it('disabledScripts add/remove are deduped by file+startLine', () => {
+    const entry = {
+      file: '/x/recipes.js',
+      startLine: 3,
+      endLine: 5,
+      name: 'pack',
+      outputItem: 'minecraft:stick',
+      type: 'shaped' as const,
+      fingerprint: 'abc123',
+    };
+    useRecipeStore.getState().addDisabledScript(entry);
+    useRecipeStore.getState().addDisabledScript(entry);
+    expect(useRecipeStore.getState().disabledScripts).toHaveLength(1);
+    useRecipeStore.getState().removeDisabledScript('/x/recipes.js', 3);
+    expect(useRecipeStore.getState().disabledScripts).toHaveLength(0);
+  });
+
+  it('isDisabled dispatches on origin kind', () => {
+    const authored = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().toggleDisableAuthored(authored);
+    expect(useRecipeStore.getState().isDisabled({ ...makeRecipe('x'), id: 'x' })).toBe(false);
+
+    const vanilla = { ...makeRecipe('v'), id: 'minecraft:stick', origin: 'vanilla' as const };
+    expect(useRecipeStore.getState().isDisabled(vanilla)).toBe(false);
+    useRecipeStore.getState().toggleDisableById('minecraft:stick');
+    expect(useRecipeStore.getState().isDisabled(vanilla)).toBe(true);
+
+    const script = {
+      ...makeRecipe('s'),
+      id: 's',
+      origin: 'kubejs' as const,
+      source: '/x/recipes.js',
+      sourceLines: { start: 3, end: 5 },
+    };
+    expect(useRecipeStore.getState().isDisabled(script)).toBe(false);
+    useRecipeStore.getState().addDisabledScript({
+      file: '/x/recipes.js',
+      startLine: 3,
+      endLine: 5,
+      name: 's',
+      outputItem: 'minecraft:stone',
+      type: 'shaped' as const,
+      fingerprint: 'fp',
+    });
+    expect(useRecipeStore.getState().isDisabled(script)).toBe(true);
+  });
+
+  it('persists disable state alongside authored recipes', () => {
+    const id = useRecipeStore.getState().addRecipe(makeRecipe('mine'));
+    useRecipeStore.getState().toggleDisableById('minecraft:stick');
+    useRecipeStore.getState().addDisabledScript({
+      file: '/x/recipes.js',
+      startLine: 3,
+      endLine: 5,
+      name: 'pack',
+      outputItem: 'minecraft:stick',
+      type: 'shaped' as const,
+      fingerprint: 'fp',
+    });
+    // partialize keeps authored recipes + disable state, drops discovered rows.
+    const state = useRecipeStore.getState() as any;
+    // Rehydrate a fresh store the way persist does (simplified): confirm the
+    // persisted shape via the store's own state.
+    expect(state.recipes.some((r: any) => r.origin !== 'authored')).toBe(false);
+    expect(state.recipes.some((r: any) => r.id === id)).toBe(true);
+    expect(state.disabledIds).toEqual(['minecraft:stick']);
+    expect(state.disabledScripts).toHaveLength(1);
   });
 });

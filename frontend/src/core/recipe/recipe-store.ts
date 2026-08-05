@@ -36,6 +36,30 @@ export interface Recipe {
   origin?: RecipeOrigin;
   /** Absolute path of the source file (present for discovered recipes). */
   source?: string;
+  /** False ⟺ read-only mod-jar recipe (cannot be edited in place). Sent by the
+   *  backend on discovered recipes; absent/undefined on authored recipes. */
+  editable?: boolean;
+  /** 1-based line range of the call in `source` (KubeJS/CraftTweaker only) —
+   *  the target of the comment-out disable mechanism. */
+  sourceLines?: { start: number; end: number };
+  /** Authored only: disabled ⟹ excluded from script emission. */
+  disabled?: boolean;
+  /** Authored only: edited/created since the last save. Powers the "Changed"
+   *  filter; cleared by `markClean`. */
+  modified?: boolean;
+}
+
+/** A comment-out disable of a KubeJS/CraftTweaker recipe call, persisted so it
+ *  stays visible + re-enable-able after a rescan removes the recipe from the
+ *  pack list. `fingerprint` = SHA-256 (hex) of the original pre-comment lines. */
+export interface DisabledScriptEntry {
+  file: string;
+  startLine: number;
+  endLine: number;
+  name: string;
+  outputItem: string;
+  type: RecipeType;
+  fingerprint: string;
 }
 
 interface RecipeSnapshot {
@@ -60,6 +84,10 @@ interface RecipeState {
   dirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  /** Resource ids (`ns:file`) disabled via remove-by-id emission (vanilla/jar). */
+  disabledIds: string[];
+  /** Comment-out disables of KubeJS/CraftTweaker calls (persisted manifest). */
+  disabledScripts: DisabledScriptEntry[];
   addRecipe: (recipe: Omit<Recipe, 'id'>) => string;
   updateRecipe: (id: string, updates: Partial<Recipe>) => void;
   deleteRecipe: (id: string) => void;
@@ -72,6 +100,11 @@ interface RecipeState {
   markDirty: () => void;
   duplicateRecipe: (id: string) => string | null;
   getSelectedRecipe: () => Recipe | null;
+  toggleDisableById: (id: string) => void;
+  toggleDisableAuthored: (id: string) => void;
+  addDisabledScript: (entry: DisabledScriptEntry) => void;
+  removeDisabledScript: (file: string, startLine: number) => void;
+  isDisabled: (recipe: Recipe | null | undefined) => boolean;
   undo: () => void;
   redo: () => void;
 }
@@ -84,10 +117,19 @@ export const useRecipeStore = create<RecipeState>()(
       dirty: false,
       canUndo: false,
       canRedo: false,
+      disabledIds: [],
+      disabledScripts: [],
 
       addRecipe: (recipe) => {
         const id = `recipe_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const newRecipe = { ...recipe, id };
+        const newRecipe = {
+          ...recipe,
+          id,
+          origin: 'authored' as const,
+          editable: true,
+          disabled: false,
+          modified: true,
+        };
         set((state) => {
           undoStack.push(takeSnapshot(state));
           if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -109,9 +151,13 @@ export const useRecipeStore = create<RecipeState>()(
           if (undoStack.length > MAX_UNDO) undoStack.shift();
           redoStack = [];
           return {
-            recipes: state.recipes.map((r) =>
-              r.id === id ? { ...r, ...updates } : r
-            ),
+            recipes: state.recipes.map((r) => {
+              if (r.id !== id) return r;
+              // `modified` only tracks authored recipes (discovered rows are
+              // reloadable from the pack scan and never dirty).
+              const modified = r.origin === 'authored' ? true : r.modified;
+              return { ...r, ...updates, modified };
+            }),
             dirty: true,
             canUndo: undoStack.length > 0,
             canRedo: false,
@@ -200,7 +246,12 @@ export const useRecipeStore = create<RecipeState>()(
       },
 
       markClean: () => {
-        set({ dirty: false });
+        set((state) => ({
+          dirty: false,
+          recipes: state.recipes.map((r) =>
+            r.origin === 'authored' ? { ...r, modified: false } : r
+          ),
+        }));
       },
 
       markDirty: () => {
@@ -211,7 +262,17 @@ export const useRecipeStore = create<RecipeState>()(
         const recipe = get().recipes.find((r) => r.id === id);
         if (!recipe) return null;
         const newId = `recipe_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const newRecipe = { ...recipe, id: newId, name: `${recipe.name} (copy)` };
+        const newRecipe = {
+          ...recipe,
+          id: newId,
+          name: `${recipe.name} (copy)`,
+          origin: 'authored' as const,
+          editable: true,
+          source: undefined,
+          sourceLines: undefined,
+          disabled: false,
+          modified: true,
+        };
         set((state) => {
           undoStack.push(takeSnapshot(state));
           if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -229,6 +290,65 @@ export const useRecipeStore = create<RecipeState>()(
       getSelectedRecipe: () => {
         const { recipes, selectedRecipeId } = get();
         return recipes.find((r) => r.id === selectedRecipeId) || null;
+      },
+
+      toggleDisableById: (id) => {
+        set((state) => {
+          const has = state.disabledIds.includes(id);
+          return {
+            disabledIds: has
+              ? state.disabledIds.filter((x) => x !== id)
+              : [...state.disabledIds, id],
+            dirty: true,
+          };
+        });
+      },
+
+      toggleDisableAuthored: (id) => {
+        set((state) => ({
+          recipes: state.recipes.map((r) =>
+            r.id === id
+              ? { ...r, disabled: !(r.disabled === true), modified: true }
+              : r
+          ),
+          dirty: true,
+        }));
+      },
+
+      addDisabledScript: (entry) => {
+        set((state) => {
+          const exists = state.disabledScripts.some(
+            (e) => e.file === entry.file && e.startLine === entry.startLine
+          );
+          return {
+            disabledScripts: exists
+              ? state.disabledScripts
+              : [...state.disabledScripts, entry],
+            dirty: true,
+          };
+        });
+      },
+
+      removeDisabledScript: (file, startLine) => {
+        set((state) => ({
+          disabledScripts: state.disabledScripts.filter(
+            (e) => !(e.file === file && e.startLine === startLine)
+          ),
+          dirty: true,
+        }));
+      },
+
+      isDisabled: (recipe) => {
+        if (!recipe) return false;
+        if (recipe.origin === 'authored') return recipe.disabled === true;
+        if (recipe.origin === 'vanilla') return get().disabledIds.includes(recipe.id);
+        // kubejs / crafttweaker: disabled ⟺ a comment-out manifest entry matches.
+        if (recipe.source && recipe.sourceLines) {
+          return get().disabledScripts.some(
+            (e) => e.file === recipe.source && e.startLine === recipe.sourceLines!.start
+          );
+        }
+        return false;
       },
 
       undo: () => {
@@ -269,6 +389,8 @@ export const useRecipeStore = create<RecipeState>()(
       partialize: (state) => ({
         recipes: state.recipes.filter((r) => !r.origin || r.origin === 'authored'),
         selectedRecipeId: state.selectedRecipeId,
+        disabledIds: state.disabledIds,
+        disabledScripts: state.disabledScripts,
       }),
     }
   )

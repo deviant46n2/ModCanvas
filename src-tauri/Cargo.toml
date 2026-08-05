@@ -35,6 +35,7 @@ anyhow = "1"
 regex = "1"
 base64 = "0.22"
 json5 = "0.4"
+sha2 = "0.10"
 dirs-next = "2"
 dotenvy = "0.15"
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { generateRecipeScripts } from '../services/api'
 import { selectSaveableRecipes } from '../core/recipe/validation'
-import type { Recipe } from '../core/recipe/recipe-store'
+import { useRecipeStore, type Recipe } from '../core/recipe/recipe-store'
 
 const DEBOUNCE_MS = 400
 
@@ -12,6 +12,7 @@ export function useRecipeScripts(projectId: string, recipes: Recipe[], isCraftTw
   const [script, setScript] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const disabledIds = useRecipeStore((s) => s.disabledIds)
 
   useEffect(() => {
     let cancelled = false
@@ -28,7 +29,7 @@ export function useRecipeScripts(projectId: string, recipes: Recipe[], isCraftTw
     setLoading(true)
     setError('')
     timer = window.setTimeout(() => {
-      generateRecipeScripts(projectId, valid as unknown as Record<string, unknown>[])
+      generateRecipeScripts(projectId, valid as unknown as Record<string, unknown>[], disabledIds)
         .then((res) => {
           if (!cancelled) setScript(isCraftTweaker ? res.crafttweaker : res.kubejs)
         })
@@ -40,7 +41,7 @@ export function useRecipeScripts(projectId: string, recipes: Recipe[], isCraftTw
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [projectId, recipes, isCraftTweaker])
+  }, [projectId, recipes, isCraftTweaker, disabledIds])
 
   return { script, loading, error }
 }

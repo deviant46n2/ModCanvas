@@ -9,8 +9,31 @@ export async function scanPackRecipes(projectPath: string): Promise<DiscoveredRe
 export async function generateRecipeScripts(
   projectId: string,
   recipes: unknown[],
+  disabledIds: string[] = [],
 ): Promise<GeneratedScripts> {
-  return invoke<GeneratedScripts>('generate_recipe_scripts', { projectId, recipes })
+  return invoke<GeneratedScripts>('generate_recipe_scripts', { projectId, recipes, disabledIds })
+}
+
+/** Comment out a recipe call in a pack script. Returns the disable fingerprint
+ *  (SHA-256 hex of the original pre-comment lines) for later re-enable. */
+export async function commentOutRecipeCall(
+  projectId: string,
+  file: string,
+  startLine: number,
+  endLine: number,
+): Promise<string> {
+  return invoke<string>('comment_out_recipe_call', { projectId, file, startLine, endLine })
+}
+
+/** Reverse a comment-out, integrity-checked against the stored fingerprint. */
+export async function uncommentRecipeCall(
+  projectId: string,
+  file: string,
+  startLine: number,
+  endLine: number,
+  fingerprint: string,
+): Promise<void> {
+  return invoke('uncomment_recipe_call', { projectId, file, startLine, endLine, fingerprint })
 }
 
 export async function writeScriptFiles(

@@ -5,21 +5,38 @@
 
 use crate::models::{Recipe, RecipeIngredient, RecipeOutput, RecipeType};
 use crate::recipes::base_recipe;
+use crate::recipes::scan::{line_of, line_starts, OpaqueRegions};
+use crate::recipes::{LineSpan, ParsedRecipe};
 use regex::Regex;
 
-/// Parse a ZenScript body and recover every recipe call we can.
-pub fn parse_crafttweaker(content: &str) -> Vec<Recipe> {
+/// Parse a ZenScript body and recover every recipe call we can, with its
+/// 1-based line span. Calls inside `//` / `/* */` comments or string/bracket
+/// literals are skipped. `file` is a label for provenance/debug.
+pub fn parse_crafttweaker(content: &str) -> Vec<ParsedRecipe> {
     let mut recipes = Vec::new();
     let call_re = Regex::new(r"(recipes\.(addShaped|addShapeless)|furnace\.(addRecipe|addBlastingRecipe|addSmokingRecipe|addCampfireRecipe)|stonecutter\.addRecipe|smithing\.addRecipe)\s*\(").unwrap();
+    let opaque = OpaqueRegions::scan(content, &[('\'', '\''), ('"', '"'), ('<', '>')]);
+    let starts = line_starts(content);
     let mut pos = 0;
     while let Some(m) = call_re.find_at(content, pos) {
+        if opaque.overlaps(m.start(), m.end()) {
+            let Some(next) = opaque.advance_past(m.start()) else { break };
+            pos = next;
+            continue;
+        }
         let matched = m.as_str();
         let Some(end) = find_balanced_paren(content, m.end()) else {
             break;
         };
         let body = &content[m.start()..end];
         if let Some(recipe) = parse_call(matched, body) {
-            recipes.push(recipe);
+            recipes.push(ParsedRecipe {
+                recipe,
+                lines: Some(LineSpan {
+                    start: line_of(&starts, m.start()),
+                    end: line_of(&starts, end.saturating_sub(1)),
+                }),
+            });
         }
         pos = end;
     }
@@ -29,6 +46,7 @@ pub fn parse_crafttweaker(content: &str) -> Vec<Recipe> {
 fn find_balanced_paren(s: &str, from: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut in_str = false;
+    let mut bracket = false; // inside a `<...>` literal (closed by `>`)
     let mut escaped = false;
     for (i, ch) in s.char_indices() {
         if i < from {
@@ -39,13 +57,20 @@ fn find_balanced_paren(s: &str, from: usize) -> Option<usize> {
                 escaped = false;
             } else if ch == '\\' {
                 escaped = true;
-            } else if ch == '"' || ch == '\'' || ch == '<' {
+            } else if bracket && ch == '>' {
+                in_str = false;
+                bracket = false;
+            } else if !bracket && (ch == '"' || ch == '\'') {
                 in_str = false;
             }
             continue;
         }
         match ch {
-            '"' | '\'' | '<' => in_str = true,
+            '"' | '\'' => in_str = true,
+            '<' => {
+                in_str = true;
+                bracket = true;
+            }
             '(' => depth += 1,
             ')' => {
                 depth = depth.saturating_sub(1);
@@ -243,9 +268,11 @@ recipes.addShaped("diamond_block", <item:minecraft:diamond_block>,
 "#;
         let recipes = parse_crafttweaker(script);
         assert_eq!(recipes.len(), 1);
-        assert_eq!(recipes[0].r#type, RecipeType::Shaped);
-        assert_eq!(recipes[0].output.item, "minecraft:diamond_block");
-        assert_eq!(recipes[0].key.as_ref().unwrap()["A"].item, "minecraft:diamond");
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Shaped);
+        assert_eq!(recipes[0].recipe.output.item, "minecraft:diamond_block");
+        assert_eq!(recipes[0].recipe.key.as_ref().unwrap()["A"].item, "minecraft:diamond");
+        assert_eq!(recipes[0].lines.unwrap().start, 2);
+        assert_eq!(recipes[0].lines.unwrap().end, 5);
     }
 
     #[test]
@@ -253,8 +280,42 @@ recipes.addShaped("diamond_block", <item:minecraft:diamond_block>,
         let script = r#"furnace.addRecipe("iron", <item:minecraft:iron_ingot>, <item:minecraft:iron_ore>, 0.7, 200);"#;
         let recipes = parse_crafttweaker(script);
         assert_eq!(recipes.len(), 1);
-        assert_eq!(recipes[0].r#type, RecipeType::Smelting);
-        assert_eq!(recipes[0].experience, Some(0.7));
-        assert_eq!(recipes[0].cooking_time, Some(200));
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Smelting);
+        assert_eq!(recipes[0].recipe.experience, Some(0.7));
+        assert_eq!(recipes[0].recipe.cooking_time, Some(200));
+        assert_eq!(recipes[0].lines.unwrap(), LineSpan { start: 1, end: 1 });
+    }
+
+    #[test]
+    fn skips_commented_out_calls() {
+        let script = r#"
+// recipes.addShaped("block", <item:minecraft:diamond_block>, [["A"]], { "A": <item:minecraft:diamond> });
+recipes.addShapeless("stick", <item:minecraft:stick>, [<item:minecraft:oak_planks>, <item:minecraft:oak_planks>]);
+"#;
+        let recipes = parse_crafttweaker(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Shapeless);
+    }
+
+    #[test]
+    fn skips_block_commented_calls() {
+        let script = r#"
+/* furnace.addRecipe("iron", <item:minecraft:iron_ingot>, <item:minecraft:iron_ore>, 0.7, 200); */
+furnace.addBlastingRecipe("iron2", <item:minecraft:iron_ingot>, <item:minecraft:iron_ore>, 1.0, 100);
+"#;
+        let recipes = parse_crafttweaker(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.r#type, RecipeType::Blasting);
+    }
+
+    #[test]
+    fn string_literals_containing_calls_are_untouched() {
+        let script = r#"
+val note = "recipes.addShaped(\"fake\", <item:minecraft:stone>);"
+furnace.addRecipe("real", <item:minecraft:iron_ingot>, <item:minecraft:iron_ore>, 0.7, 200);
+"#;
+        let recipes = parse_crafttweaker(script);
+        assert_eq!(recipes.len(), 1);
+        assert_eq!(recipes[0].recipe.output.item, "minecraft:iron_ingot");
     }
 }

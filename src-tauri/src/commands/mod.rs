@@ -205,9 +205,14 @@ pub fn get_all_kubejs_scripts(game_dir: String) -> Result<Vec<KubeJSScript>, Str
 }
 
 #[tauri::command]
-pub async fn generate_recipe_scripts(project_id: String, recipes: Vec<Recipe>) -> Result<ScriptOutput, String> {
+pub async fn generate_recipe_scripts(
+    project_id: String,
+    recipes: Vec<Recipe>,
+    disabled_ids: Vec<String>,
+) -> Result<ScriptOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let (kubejs, ct) = crate::scriptgen::generate_script_strings(&recipes, "ModCanvas Pack");
+        let (kubejs, ct) =
+            crate::scriptgen::generate_script_strings(&recipes, &disabled_ids, "ModCanvas Pack");
         Ok(ScriptOutput { kubejs, crafttweaker: ct })
     })
     .await

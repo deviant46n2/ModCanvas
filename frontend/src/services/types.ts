@@ -112,6 +112,8 @@ export interface DiscoveredRecipe {
   id: string;
   label: string;
   editable: boolean;
+  /** 1-based line range of the call in `source` (KubeJS/CraftTweaker only). */
+  span?: { start: number; end: number } | null;
 }
 
 export interface LoadPackProgress {

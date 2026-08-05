@@ -14,10 +14,10 @@ pub fn generate_all_scripts(
     let kubejs_dir = scripts_dir.join("kubejs");
     
     // KubeJS scripts
-    scripts.extend(kubejs::generate_kubejs_scripts(&kubejs_dir, recipes));
+    scripts.extend(kubejs::generate_kubejs_scripts(&kubejs_dir, recipes, &[]));
     
     // CraftTweaker scripts - generates a single file
-    let ct_content = crafttweaker::generate_crafttweaker_scripts(recipes, "ModCanvas Pack");
+    let ct_content = crafttweaker::generate_crafttweaker_scripts(recipes, &[], "ModCanvas Pack");
     scripts.push((scripts_dir.join("crafttweaker.zs"), ct_content));
     
     scripts
@@ -26,10 +26,11 @@ pub fn generate_all_scripts(
 /// Generate scripts and return both KubeJS and CraftTweaker as strings for frontend
 pub fn generate_script_strings(
     recipes: &[Recipe],
+    disabled_ids: &[String],
     pack_name: &str,
 ) -> (String, String) {
-    let kubejs_scripts = kubejs::generate_kubejs_scripts(&PathBuf::new(), recipes);
+    let kubejs_scripts = kubejs::generate_kubejs_scripts(&PathBuf::new(), recipes, disabled_ids);
     let kubejs_combined = kubejs_scripts.iter().map(|(_, content)| content.as_str()).collect::<Vec<_>>().join("\n\n");
-    let crafttweaker = crafttweaker::generate_crafttweaker_scripts(recipes, pack_name);
+    let crafttweaker = crafttweaker::generate_crafttweaker_scripts(recipes, disabled_ids, pack_name);
     (kubejs_combined, crafttweaker)
 }

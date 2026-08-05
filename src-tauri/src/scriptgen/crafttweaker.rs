@@ -1,9 +1,12 @@
 use crate::models::{Recipe, RecipeIngredient, RecipeType};
 use std::collections::HashMap;
 
-/// Generate CraftTweaker ZenScript from recipes
+/// Generate CraftTweaker ZenScript from recipes. `disabled_ids` are resource
+/// ids (`ns:file`) of vanilla/mod-jar recipes to remove; they are emitted as
+/// `recipes.removeByRecipeName(...)` before the adds.
 pub fn generate_crafttweaker_scripts(
     recipes: &[Recipe],
+    disabled_ids: &[String],
     pack_name: &str,
 ) -> String {
     let mut lines = vec![
@@ -18,6 +21,17 @@ pub fn generate_crafttweaker_scripts(
         "import crafttweaker.api.recipe.manager.RecipeManager;".to_string(),
         "".to_string(),
     ];
+    
+    // Drop stale ids (not present in the passed recipes' id set).
+    let known: std::collections::HashSet<&String> = recipes.iter().map(|r| &r.id).collect();
+    let live: Vec<&String> = disabled_ids.iter().filter(|id| known.contains(id)).collect();
+    if !live.is_empty() {
+        lines.push("// Disabled by ModCanvas".to_string());
+        for id in &live {
+            lines.push(format!("recipes.removeByRecipeName(\"{}\");", id));
+        }
+        lines.push("".to_string());
+    }
     
     // Group recipes by type
     let mut by_type: HashMap<RecipeType, Vec<&Recipe>> = HashMap::new();
@@ -223,6 +237,59 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn test_ct_emits_removes_before_adds() {
+        let recipe = Recipe {
+            id: "minecraft:stick".to_string(),
+            r#type: RecipeType::Shapeless,
+            name: "Sticks".to_string(),
+            group: None,
+            pattern: None,
+            key: None,
+            ingredients: Some(vec![
+                RecipeIngredient { item: "minecraft:oak_planks".to_string(), count: Some(2), tag: Some(false), nbt: None },
+            ]),
+            output: RecipeOutput { item: "minecraft:stick".to_string(), count: 4, nbt: None },
+            experience: None,
+            cooking_time: None,
+            category: None,
+        };
+        let script = generate_crafttweaker_scripts(
+            &[recipe],
+            &["minecraft:stick".to_string(), "minecraft:ghost".to_string()],
+            "Test Pack",
+        );
+        let remove_pos = script.find("removeByRecipeName").expect("remove present");
+        let add_pos = script.find("recipes.addShapeless").expect("add present");
+        assert!(remove_pos < add_pos, "removes must precede adds");
+        assert!(script.contains("// Disabled by ModCanvas"));
+        assert!(script.contains("recipes.removeByRecipeName(\"minecraft:stick\");"));
+        assert!(!script.contains("minecraft:ghost"), "stale id must be dropped");
+    }
+
+    #[test]
+    fn test_ct_empty_disabled_emits_no_removes() {
+        let recipe = Recipe {
+            id: "minecraft:stick".to_string(),
+            r#type: RecipeType::Shapeless,
+            name: "Sticks".to_string(),
+            group: None,
+            pattern: None,
+            key: None,
+            ingredients: Some(vec![
+                RecipeIngredient { item: "minecraft:oak_planks".to_string(), count: Some(2), tag: Some(false), nbt: None },
+            ]),
+            output: RecipeOutput { item: "minecraft:stick".to_string(), count: 4, nbt: None },
+            experience: None,
+            cooking_time: None,
+            category: None,
+        };
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
+        assert!(!script.contains("removeByRecipeName"));
+        assert!(!script.contains("Disabled by ModCanvas"));
+        assert!(script.contains("recipes.addShapeless"));
+    }
+
+    #[test]
     fn test_ingredient_to_zen() {
         let ing = RecipeIngredient {
             item: "minecraft:diamond".to_string(),
@@ -269,7 +336,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("recipes.addShaped"));
         assert!(script.contains("diamond_sword"));
         assert!(script.contains("<tag:items:ingots/iron>"));
@@ -293,7 +360,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("recipes.addShapeless"));
         assert!(script.contains("iron_block"));
         assert!(script.contains("<item:minecraft:iron_ingot>"));
@@ -317,7 +384,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("furnace.addRecipe"));
         assert!(script.contains("iron_ingot"));
         assert!(script.contains("0.7"));
@@ -342,7 +409,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("furnace.addBlastingRecipe"));
         assert!(script.contains("iron_ingot"));
     }
@@ -366,7 +433,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("smithing.addRecipe"));
         assert!(script.contains("diamond_sword"));
     }
@@ -389,7 +456,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("stonecutter.addRecipe"));
         assert!(script.contains("stone_stairs"));
     }
@@ -420,7 +487,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains(".withTag"));
         assert!(script.contains("Special"));
     }
@@ -462,7 +529,7 @@ mod tests {
             },
         ];
 
-        let script = generate_crafttweaker_scripts(&recipes, "Test Pack");
+        let script = generate_crafttweaker_scripts(&recipes, &[], "Test Pack");
         assert!(script.contains("recipes.addShaped"));
         assert!(script.contains("recipes.addShapeless"));
         assert!(script.contains("diamond_block"));
@@ -471,7 +538,7 @@ mod tests {
 
     #[test]
     fn test_generate_ct_empty_recipes() {
-        let script = generate_crafttweaker_scripts(&[], "Empty Pack");
+        let script = generate_crafttweaker_scripts(&[], &[], "Empty Pack");
         assert!(script.contains("ModCanvas Generated CraftTweaker Scripts"));
         assert!(script.contains("Empty Pack"));
     }
@@ -494,7 +561,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("furnace.addSmokingRecipe"));
         assert!(script.contains("cooked_salmon"));
         assert!(script.contains("0.35"));
@@ -519,7 +586,7 @@ mod tests {
             category: None,
         };
 
-        let script = generate_crafttweaker_scripts(&[recipe], "Test Pack");
+        let script = generate_crafttweaker_scripts(&[recipe], &[], "Test Pack");
         assert!(script.contains("furnace.addCampfireRecipe"));
         assert!(script.contains("cooked_beef"));
         assert!(script.contains("0.35"));

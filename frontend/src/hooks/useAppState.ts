@@ -163,6 +163,7 @@ export function useAppState() {
         origin: r.origin,
         source: r.source,
         editable: r.editable,
+        sourceLines: r.span ?? undefined,
       }))
       useRecipeStore.getState().loadRecipesFromPack(discoveredWithMeta)
 
