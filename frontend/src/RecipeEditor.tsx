@@ -85,6 +85,18 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const [showImport, setShowImport] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [reloadMsg, setReloadMsg] = useState('');
+  // The raw generated-script preview is opt-in for veterans — hidden by default
+  // so beginners never hit code. Sticky across sessions via localStorage.
+  const [showScriptPreview, setShowScriptPreview] = useState(
+    () => localStorage.getItem('modcanvas:recipe-script-preview') === '1',
+  );
+  const toggleScriptPreview = () => {
+    setShowScriptPreview((prev) => {
+      const next = !prev;
+      localStorage.setItem('modcanvas:recipe-script-preview', next ? '1' : '0');
+      return next;
+    });
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -275,6 +287,14 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
             <button className={activeSearchTab === 'tags' ? 'active' : ''}
               onClick={() => setActiveSearchTab('tags')}>Tags</button>
           </div>
+          <button
+            type="button"
+            className={`script-toggle ${showScriptPreview ? 'active' : ''}`}
+            onClick={toggleScriptPreview}
+            title="Show the raw generated KubeJS/CraftTweaker script (opt-in)"
+          >
+            Script
+          </button>
           <button className="btn-secondary" onClick={reloadRecipes} disabled={reloading} title="Re-scan the pack for recipes (cache-aware)">
             {reloading ? 'Reloading…' : 'Reload Recipes'}
           </button>
@@ -334,10 +354,10 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         </main>
 
         <aside className="recipe-detail">
-          {selectedRecipe && projectId && (
+          {showScriptPreview && projectId && (
             <RecipeScriptPreview
               projectId={projectId}
-              recipe={selectedRecipe}
+              recipes={recipes}
               loader={adapter.loader}
             />
           )}

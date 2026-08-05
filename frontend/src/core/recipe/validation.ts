@@ -161,6 +161,13 @@ export function hasErrors(issues: RecipeIssue[]): boolean {
   return issues.some((i) => i.severity === 'error');
 }
 
+/** The exact set of recipes the save and preview pipelines emit: must have an
+ *  output item and no blocking errors. Single source of truth so the preview
+ *  matches the on-disk script byte-for-byte. */
+export function selectSaveableRecipes(recipes: Recipe[]): Recipe[] {
+  return recipes.filter((r) => r.output.item && !hasErrors(validateRecipe(r)));
+}
+
 /** Group issues by their `path` for field-level badges. */
 export function issuesByPath(issues: RecipeIssue[]): Record<string, RecipeIssue[]> {
   const map: Record<string, RecipeIssue[]> = {};

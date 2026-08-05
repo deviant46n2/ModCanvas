@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateRecipe, hasErrors } from './validation'
+import { validateRecipe, hasErrors, selectSaveableRecipes } from './validation'
 import { patternToGrid, gridToPattern, ingredientsToGrid, gridToIngredients } from './grid'
 import { normalizeLoader } from './loader'
 import { readSlot, writeSlot, slotsForType } from './specialized'
@@ -248,6 +248,22 @@ describe('JSON import', () => {
     const res = importRecipeJson('this is not json')
     expect(res.recipes).toHaveLength(0)
     expect(res.errors[0].message).toContain('Invalid JSON')
+  })
+})
+
+
+describe('selectSaveableRecipes', () => {
+  it('keeps only recipes with an output item and no blocking errors', () => {
+    const valid = baseRecipe()
+    const emptyOutput = baseRecipe({ output: { item: '', count: 1 } })
+    const broken = baseRecipe({ pattern: ['AA', 'B'] })
+    const out = selectSaveableRecipes([valid, emptyOutput, broken])
+    expect(out.map((r) => r.name)).toEqual(['Test'])
+  })
+
+  it('keeps recipes with only warnings', () => {
+    const warnOnly = baseRecipe({ pattern: ['A'], key: { A: ing('minecraft:stone'), B: ing('minecraft:dirt') } })
+    expect(selectSaveableRecipes([warnOnly])).toHaveLength(1)
   })
 })
 

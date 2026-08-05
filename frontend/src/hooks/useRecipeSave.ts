@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { generateRecipeScripts, writeScriptFiles, wsIpcSendEvent } from '../services/api'
-import { validateRecipe, hasErrors } from '../core/recipe/validation'
+import { selectSaveableRecipes } from '../core/recipe/validation'
 import type { Recipe } from '../core/recipe/recipe-store'
 import { HOTSWAP_FROZEN } from '../core/sync/config'
 
@@ -13,7 +13,7 @@ export function useRecipeSave(projectId: string, recipeScriptPath: string) {
     try {
       setShowSaveDialog(true)
       setSaveMessage('Generating scripts...')
-      const valid = recipes.filter((r) => r.output.item && !hasErrors(validateRecipe(r)))
+      const valid = selectSaveableRecipes(recipes)
       if (valid.length !== recipes.length) {
         setSaveMessage(`Saving ${valid.length}/${recipes.length} recipes (skipped invalid).`)
       }

@@ -59,7 +59,14 @@ The "Core" wave below describes the rest of the editor:
   (smelting/blasting/smoking/campfire with input + output + experience + cooking
   time), stonecutting (single input → output), and smithing (base + addition).
 - Paste-in JSON import (vanilla / KubeJS recipe JSON → editable recipes).
-- Raw generated-script preview sash (read-only KubeJS .js / CraftTweaker .zs).
+- Raw generated-script preview sash (read-only KubeJS .js / CraftTweaker .zs),
+  **opt-in and hidden by default** — beginners never see code. The header
+  **Script** toggle reveals it and the choice is persisted in
+  localStorage (`modcanvas:recipe-script-preview`). It shows the **full
+  on-disk script** (the same `generate_recipe_scripts` output the save button
+  writes, over the same `selectSaveableRecipes` set, debounced ~400ms) with the
+  target file path and a Copy button, so an experienced dev can work directly
+  with the generated code instead of the UI.
 - Recipe-list polish: inline rename, per-recipe validation-status badges.
 - Bulk ops: multi-select delete and drag-to-reorder recipes.
 - Emitter correctness pass: camelCase serde for the recipe model + `ScriptOutput`
@@ -215,9 +222,11 @@ backend-facing data-access layer, re-exported via `services/api.ts`).
   (`event.smithing(base, addition, result)`); there is no template slot.
 - Drag from the palette sets a structured `dataTransfer` payload so drops land
   reliably in any slot regardless of component state.
-- The import modal, the raw-script preview, and the list bulk/reorder/rename
-  are all additive; validation from `validation.ts` drives the list status
-  dots and the save gate.
+- The import modal and the list bulk/reorder/rename are additive; validation
+  from `validation.ts` drives the list status dots and the save gate.
+  `selectSaveableRecipes` is the single source of truth for which recipes the
+  save and the script preview emit, so the preview always matches the on-disk
+  file byte-for-byte.
 
 ## Definition of done
 
