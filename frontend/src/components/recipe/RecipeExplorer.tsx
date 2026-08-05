@@ -33,8 +33,11 @@ export interface RecipeExplorerProps {
   onSelectRecipe: (id: string) => void;
   onNewRecipe: () => void;
   onEditCopy: (id: string) => void;
+  onToggleDisable: (recipe: Recipe) => void;
   getTextureUrl: (itemId: string) => string | null;
   isDisabled: (r: Recipe) => boolean;
+  /** Comment-out manifest pseudo-recipes, shown in the Disabled filter. */
+  manifestRecipes: Recipe[];
   itemRegistry: ItemRegistryEntry[];
 }
 
@@ -47,6 +50,7 @@ type ExplorerCellData = {
   getTextureUrl: (itemId: string) => string | null;
   onSelectRecipe: (id: string) => void;
   onEditCopy: (id: string) => void;
+  onToggleDisable: (recipe: Recipe) => void;
   statusOf: (r: Recipe) => RowStatus;
   isDisabled: (r: Recipe) => boolean;
 };
@@ -75,6 +79,13 @@ function ExplorerCell({ columnIndex, rowIndex, style, ...d }: CellComponentProps
           <span className={`recipe-status recipe-status-${status === 'none' ? 'ok' : status}`}
             title={status === 'none' ? undefined : `Validation ${status}`} />
         )}
+        <button
+          type="button"
+          className={`recipe-disable-toggle ${disabled ? 'on' : ''}`}
+          onClick={(e) => { e.stopPropagation(); d.onToggleDisable(recipe); }}
+          title={disabled ? 'Re-enable this recipe' : 'Disable this recipe'}
+          aria-label={disabled ? 'Re-enable recipe' : 'Disable recipe'}
+        />
       </div>
       <div className="recipe-grid-output">
         {recipe.output.item && (
@@ -132,8 +143,10 @@ export function RecipeExplorer({
   onSelectRecipe,
   onNewRecipe,
   onEditCopy,
+  onToggleDisable,
   getTextureUrl,
   isDisabled,
+  manifestRecipes,
   itemRegistry,
 }: RecipeExplorerProps) {
   const [query, setQuery] = useState('');
@@ -176,11 +189,26 @@ export function RecipeExplorer({
 
   const getTagMembers = useMemo(() => (tag: string) => getTagItems(tag) ?? [], []);
 
+  // When the Disabled filter is active, merge in the comment-out manifest's
+  // pseudo-recipes (calls commented out of scripts are gone from the pack scan
+  // but must stay visible + re-enable-able), skipping any already represented.
+  const merged = useMemo(() => {
+    if (status !== 'disabled') return recipes;
+    const seen = new Set<string>();
+    for (const r of recipes) {
+      if (r.source && r.sourceLines) seen.add(`${r.source}:${r.sourceLines.start}`);
+    }
+    const extras = manifestRecipes.filter(
+      (m) => m.source && m.sourceLines && !seen.has(`${m.source}:${m.sourceLines.start}`)
+    );
+    return [...recipes, ...extras];
+  }, [recipes, manifestRecipes, status]);
+
   const filtered = useMemo(() => {
     const state: FilterState = { query, ownership, status, attention, changed, type };
     const d: FilterDeps = { isDisabled, getTagMembers, modItemIds, hasIssues };
-    return recipes.filter((r) => matchesFilter(r, state, d));
-  }, [recipes, query, ownership, status, attention, changed, type, isDisabled, getTagMembers, modItemIds, hasIssues]);
+    return merged.filter((r) => matchesFilter(r, state, d));
+  }, [merged, query, ownership, status, attention, changed, type, isDisabled, getTagMembers, modItemIds, hasIssues]);
 
   const { mine, pack, jars } = useMemo(() => groupByProvenance(filtered), [filtered]);
 
@@ -208,6 +236,7 @@ export function RecipeExplorer({
     getTextureUrl,
     onSelectRecipe,
     onEditCopy,
+    onToggleDisable,
     statusOf: (r: Recipe): RowStatus => {
       if (r.editable === false || r.origin !== 'authored') return 'none';
       const i = issuesMap.get(r.id);

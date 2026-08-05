@@ -8,6 +8,7 @@ import { RecipeScriptPreview } from './components/recipe/RecipeScriptPreview';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
+import { useRecipeDisable, manifestRecipesFrom } from './hooks/useRecipeDisable';
 import { usePackHealthStore } from './core/pack-health/pack-health-store';
 import { filterRegistryItems } from './services/item-registry';
 import { filterTagCatalog } from './core/recipe/tag-filter';
@@ -20,7 +21,7 @@ import { patternToGrid, gridToPattern, ingredientsToGrid, gridToIngredients } fr
 import { requestMaterialize, subscribeMaterialized, textureDisplayUrl, isTexturePending } from './services/texture-loader';
 import { AnimationProvider } from './components/quest/animation-context';
 import { ItemPickerModal } from './components/common/ItemPickerModal';
-import type { RecipeIngredient } from './core/recipe/recipe-store';
+import type { Recipe, RecipeIngredient } from './core/recipe/recipe-store';
 import './RecipeEditor.css';
 
 interface RecipeEditorProps {
@@ -44,6 +45,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     getSelectedRecipe,
     loadRecipesFromPack,
     isDisabled,
+    disabledScripts,
   } = useRecipeStore();
 
   // Resolve the adapter for this pack's version + loader so item/tag search and
@@ -57,6 +59,16 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
 
   const { textureIndex, animations, loading: indexLoading } = useInstanceTextures(projectPath);
   const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId, recipeScriptPath);
+  const { toggleDisable } = useRecipeDisable(projectId);
+  const manifestRecipes = useMemo(() => manifestRecipesFrom(disabledScripts), [disabledScripts]);
+
+  const handleToggleDisable = async (recipe: Recipe) => {
+    try {
+      await toggleDisable(recipe);
+    } catch (e) {
+      window.alert(String(e));
+    }
+  };
 
   // Instance item registry + local tag catalog back the two palette tabs. The
   // quest editor may already have scanned this instance; only scan here when
@@ -329,8 +341,10 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
               const copyId = duplicateRecipe(id);
               if (copyId) selectRecipe(copyId);
             }}
+            onToggleDisable={handleToggleDisable}
             getTextureUrl={getTextureUrl}
             isDisabled={isDisabled}
+            manifestRecipes={manifestRecipes}
             itemRegistry={itemRegistry}
           />
 

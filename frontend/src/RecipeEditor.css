@@ -1145,6 +1145,44 @@
   flex-shrink: 0;
 }
 
+/* Power-style per-row disable toggle. */
+.recipe-disable-toggle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-text-tertiary);
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0;
+}
+
+.recipe-disable-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 2px;
+  height: 5px;
+  background: var(--color-text-tertiary);
+  border-radius: 1px;
+}
+
+.recipe-disable-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.recipe-disable-toggle.on {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+}
+
+.recipe-disable-toggle.on::after {
+  background: var(--color-bg-surface-0);
+}
+
 .recipe-edit-copy {
   margin-left: auto;
   font-size: var(--text-xs);

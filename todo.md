@@ -4,9 +4,8 @@ Implementation contract for the **Recipes tab** work: per-recipe disable (all
 origins, incl. script comment-out), RecipeExplorer + filters, authored-only save
 gate, palette right rail, script drawer, type picker, bulk replace.
 
-**Status:** Backends A–C complete (span-aware comment-aware parsers; comment-out/
-uncomment commands + fingerprint integrity; remove-by-id emission). Data D complete
-(store disable state, authored-only save gate, `modified` lifecycle). Working: UI 1.
+**Status:** Backends A–C complete. Data D complete. UI 1 (RecipeExplorer) complete.
+UI 2 (disable toggle + Disabled filter + manifest re-enable) complete. Working: UI 3.
 Locked decisions agreed 2026-08-05. This file is the
 single source of truth for scope + semantics. Read fully before coding; follow
 AGENTS.md (docs are code, 3-layer rule, ≤300 lines/file, rebuild + mtime verify).
