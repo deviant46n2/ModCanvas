@@ -2,6 +2,8 @@ import { RecipeGrid } from './CraftingGrid';
 import { FurnaceEditor } from './FurnaceEditor';
 import { StonecuttingEditor } from './StonecuttingEditor';
 import { SmithingEditor } from './SmithingEditor';
+import { TypePicker } from './TypePicker';
+import { typeSwitchDiscards, typeSwitchConfirmMessage } from '../../core/recipe/type-picker';
 import type { Recipe, RecipeIngredient, RecipeType } from '../../core/recipe/recipe-store';
 import type { RecipeIssue } from '../../core/recipe/validation';
 
@@ -51,24 +53,19 @@ export function CraftingGridPanel({
 
   const isCrafting = selectedRecipe.type === 'shaped' || selectedRecipe.type === 'shapeless';
 
+  const handleTypePick = (type: RecipeType) => {
+    if (type === selectedRecipe.type) return;
+    if (typeSwitchDiscards(selectedRecipe.type, type)) {
+      if (!window.confirm(typeSwitchConfirmMessage(type))) return;
+    }
+    onTypeChange(type);
+  };
+
   return (
     <>
       <div className="crafting-grid-panel">
         <div className="crafting-grid-header">
-          <select
-            value={selectedRecipe.type}
-            onChange={(e) => onTypeChange(e.target.value as RecipeType)}
-            className="recipe-type-select"
-          >
-            <option value="shaped">Shaped</option>
-            <option value="shapeless">Shapeless</option>
-            <option value="smithing">Smithing</option>
-            <option value="stonecutting">Stonecutting</option>
-            <option value="smelting">Smelting</option>
-            <option value="blasting">Blasting</option>
-            <option value="smoking">Smoking</option>
-            <option value="campfire">Campfire</option>
-          </select>
+          <TypePicker value={selectedRecipe.type} onPick={handleTypePick} />
           <input
             type="text"
             placeholder="Recipe group (optional)"

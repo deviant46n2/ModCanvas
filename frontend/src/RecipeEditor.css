@@ -549,10 +549,10 @@
 
 .crafting-grid-header {
   display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
 }
 
-.recipe-type-select,
 .recipe-group-input {
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-border-default);
@@ -562,10 +562,74 @@
   font-size: var(--text-sm);
 }
 
-.recipe-type-select:focus,
 .recipe-group-input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+/* Visual recipe-type picker: a card per type with a mini grid glyph. */
+.recipe-type-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.recipe-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  min-width: 64px;
+  transition: all 0.12s ease;
+}
+
+.recipe-type-card:hover {
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.recipe-type-card.active {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.recipe-type-glyph {
+  display: grid;
+  gap: 2px;
+  height: 20px;
+  align-content: center;
+}
+
+.recipe-type-glyph .glyph-cell {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+}
+
+.recipe-type-card.active .glyph-cell.filled {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.recipe-type-glyph .glyph-cell.filled {
+  background: var(--color-text-secondary);
+  border-color: var(--color-text-secondary);
+}
+
+.recipe-type-card-label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .output-section {
