@@ -8,6 +8,14 @@ and the exact files that own each concern.
 Implementation wave "Core" is complete on the `recipesystem` branch:
 
 - Adapter-aware item/tag search.
+- **Instance Registry tab** (item browser): a third palette tab alongside Items/Tags
+  that browses every item indexed from the instance (`ItemRegistryEntry[]` pushed
+  by the quest editor's scan + engine-render / runtime-texture capture pipeline).
+  Search reuses the header query (`@modid` filter + name/id text, gated so the
+  Registry tab does not fire remote searches). Rows are draggable into the
+  crafting grid and show the item's resolved icon (engine-rendered/runtime
+  captured first, else the local texture index). Pure query/filter logic lives in
+  `frontend/src/services/item-registry.ts` (tested).
 - Grid &harr; key conversion bugfix.
 - Ingredient kinds (items + tags).
 - Validation with per-field issues.
@@ -26,13 +34,25 @@ Implementation wave "Core" is complete on the `recipesystem` branch:
   so cooking time / experience survive round-trips; recipes are persisted in
   KubeJS and CraftTweaker formats via the adapter-chosen write target.
 - Bidirectional loading: `scan_pack_recipes` reads existing pack recipes back
-  into the editor. It walks **mod jars** (`mods/*.jar|zip` → `data/*/recipes/*.json`,
+  into the editor. It walks **mod jars** (`mods/*.jar|zip` → `data/*/recipe(s)/*.json`,
   the bulk of any real pack's recipes, marked read-only) plus the pack's own
-  editable sources: vanilla `data/*/recipes/*.json`, KubeJS `server_scripts/**/*.js`
-  event calls, CraftTweaker `scripts/*.zs`. Recipes are deduped by resource id
-  (`ns:file`) so a pack `data/` override shadows a jar recipe with the same id.
-  The Load modal groups by source file with search, source/editable/loaded
-  filters, and per-group toggles.
+  editable sources: vanilla `data/*/recipe(s)/*.json`, KubeJS
+  `server_scripts/**/*.js` event calls, CraftTweaker `scripts/*.zs`. Both datapack
+  folder spellings are scanned — pre-1.21 `data/<ns>/recipes/` and the 1.21+
+  singular rename `data/<ns>/recipe/` (the folder was renamed in MC 1.21; scanning
+  only the plural form silently found ~0 recipes on 1.21+ packs). Recipes are
+  deduped by resource id (`ns:file`) so a pack `data/` override shadows a jar
+  recipe with the same id.
+- **Recipes auto-load on pack open**: the pack-open pipeline (`useAppState`
+  `runLoadPipeline`) ends with a `recipes` stage that scans the pack and loads
+  every discovered recipe into the store (origin/source/editable preserved).
+  The header button is **Reload Recipes** (not a Load modal) — it re-runs the
+  same cache-aware scan and merges, showing "Added N recipes" / "up to date".
+  The old `LoadPackRecipesModal` selection UI was removed.
+- **Multi-column recipe grid**: the recipe list is a virtualized multi-column
+  grid (`react-window` `Grid`) that fills the panel height — column count
+  auto-computes from width (min 260px), so a real pack's tens of thousands of
+  recipes show many-per-row with no giant gap between recipe name and output.
 - Non-clobber saves: authored recipes write to a dedicated
   `kubejs/server_scripts/modcanvas_recipes.js` (and
   `scripts/modcanvas_crafttweaker.zs`) so a save never overwrites a pack-author's
@@ -40,12 +60,13 @@ Implementation wave "Core" is complete on the `recipesystem` branch:
 - Fast rescan: `recipes/cache.rs` fingerprints every recipe-bearing file
   (mods `*.jar`/`*.zip`, `data/*/recipes/*.json`, KubeJS `*.js`, CraftTweaker
   `*.zs` by path+size+mtime) and reuses the previous scan on disk when nothing
-  changed — reopening Load Pack on an unchanged pack is instant.
-- Last-pack persistence: the app remembers the last-selected project
-  (localStorage `modcanvas:last-project-id`) and re-selects it on launch so the
-  workspace returns to the same pack without a manual reopen. Reopen loads
-  mods/configs from cache and the quest graph from the DB — it does NOT re-run
-  the heavy ingest/FTB import.
+  changed — reopening / refreshing an unchanged pack is instant.
+- Last-pack persistence: the app remembers the last-opened project
+  (localStorage `modcanvas:last-project-id`) and re-opens it on launch with the
+  full cache-aware load so the workspace returns to the same pack without a
+  manual reopen. Reopen loads
+  mods/configs/recipes from cache and the quest graph from the DB — it does NOT
+  re-run the heavy ingest/FTB import.
 - Lazy icons in the editor: `RecipeEditor` uses the compact instance texture
   index (`scan_instance_textures`, descriptors only) + the shared
   `texture-loader` lazy materializer instead of the legacy bulk

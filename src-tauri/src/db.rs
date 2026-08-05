@@ -97,14 +97,25 @@ impl Database {
         if !has_icon {
             let _ = conn.execute_batch("ALTER TABLE mods ADD COLUMN icon TEXT;");
         }
+
+        // Migration: projects.source (launcher badge origin). Existing rows
+        // default to "modcanvas"; sync_prism_instances sets "prism" going
+        // forward on every list_projects call.
+        let has_source: bool = {
+            let mut stmt = conn.prepare("SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name = 'source'")?;
+            stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+        };
+        if !has_source {
+            let _ = conn.execute_batch("ALTER TABLE projects ADD COLUMN source TEXT DEFAULT 'modcanvas';");
+        }
         Ok(())
     }
 
     pub fn create_project(&self, project: &Project) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO projects (id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO projects (id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path, source)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 project.id.to_string(),
                 project.name,
@@ -117,6 +128,7 @@ impl Database {
                 project.created_at.to_rfc3339(),
                 project.updated_at.to_rfc3339(),
                 project.path,
+                project.source,
             ],
         )?;
         Ok(())
@@ -125,7 +137,7 @@ impl Database {
     pub fn list_projects(&self) -> SqlResult<Vec<Project>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path FROM projects ORDER BY updated_at DESC"
+            "SELECT id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path, source FROM projects ORDER BY updated_at DESC"
         )?;
 
         let projects = stmt
@@ -152,6 +164,7 @@ impl Database {
                         .map(|dt| dt.with_timezone(&chrono::Utc))
                         .unwrap_or_default(),
                     path: row.get(10)?,
+                    source: row.get::<_, Option<String>>(11)?.unwrap_or_else(crate::models::default_project_source),
                 })
             })?
             .collect::<SqlResult<Vec<_>>>()?;
@@ -246,7 +259,7 @@ impl Database {
     pub fn get_project(&self, project_id: &Uuid) -> SqlResult<Option<Project>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path FROM projects WHERE id = ?1"
+            "SELECT id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path, source FROM projects WHERE id = ?1"
         )?;
         let mut rows = stmt.query(params![project_id.to_string()])?;
         if let Some(row) = rows.next()? {
@@ -272,6 +285,7 @@ impl Database {
                     .map(|dt| dt.with_timezone(&chrono::Utc))
                     .unwrap_or_default(),
                 path: row.get(10)?,
+                source: row.get::<_, Option<String>>(11)?.unwrap_or_else(crate::models::default_project_source),
             }))
         } else {
             Ok(None)
@@ -331,14 +345,14 @@ impl Database {
             if exists {
                 // Update name, mc_version, loader from Prism's live files
                 conn.execute(
-                    "UPDATE projects SET name = ?1, minecraft_version = ?2, mod_loader = ?3, updated_at = ?4
+                    "UPDATE projects SET name = ?1, minecraft_version = ?2, mod_loader = ?3, source = 'prism', updated_at = ?4
                      WHERE path = ?5",
                     params![inst.name, inst.mc_version, loader_str, now, inst.game_dir],
                 )?;
             } else {
                 conn.execute(
-                    "INSERT INTO projects (id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    "INSERT INTO projects (id, name, description, minecraft_version, mod_loader, pack_format, pack_version, author, created_at, updated_at, path, source)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'prism')",
                     params![
                         inst.id,
                         inst.name,
@@ -462,6 +476,7 @@ mod tests {
             created_at: now,
             updated_at: now,
             path: path.to_string(),
+            source: "modcanvas".to_string(),
         }
     }
 

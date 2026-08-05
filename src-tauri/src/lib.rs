@@ -2,6 +2,7 @@ pub mod commands;
 pub mod config_parser;
 pub mod db;
 pub mod engine_renders;
+pub mod runtime_textures;
 pub mod icons;
 pub mod imports;
 pub mod indexer;
@@ -231,6 +232,8 @@ pub fn run() {
             crate::ftb_theme::get_quest_theme_background,
             crate::engine_renders::get_engine_renders_cmd,
             crate::engine_renders::save_engine_renders_cmd,
+            crate::runtime_textures::get_runtime_textures_cmd,
+            crate::runtime_textures::save_runtime_textures_cmd,
             crate::instance_textures::prune_caches_cmd,
         ])
         .run(tauri::generate_context!())

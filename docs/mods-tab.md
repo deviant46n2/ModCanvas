@@ -51,7 +51,7 @@ network traffic is the user-initiated Modrinth/CurseForge search and download.
 
 Notes: after installing, the jar is visible to Prism and the game immediately
 (next launch). Quest-editor textures/items for the new jar appear after the
-next "Load Pack" texture scan (`scan_instance_textures` validates layer
+next Refresh / texture re-index (`scan_instance_textures` validates layer
 metadata so it picks up new jars). Dependencies are not auto-installed yet —
 "Load Dependencies" fills the metadata map for the compat checks.
 

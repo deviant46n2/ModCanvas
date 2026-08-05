@@ -9,6 +9,11 @@ import {
   prefetchAllChapterTextures,
   registerBakedKeysFromIndex,
   isBakedTexture,
+  markBakedKeys,
+  unmarkBakedKeys,
+  subscribeBakedKeys,
+  getBakedTextureCount,
+  __resetBakedKeys,
   subscribeLoadingChange,
   requestMaterialize,
   textureDisplayUrl,
@@ -45,12 +50,16 @@ describe('texture-loader helpers', () => {
       'minecraft:item/stone': 'data:image/png;base64,abc',
       'minecraft:item/iron': 'data:image/png;base64,def',
       'minecraft:item/gold': 'jar:/path/to/mods/a.jar!assets/minecraft/textures/item/gold.png',
+      'minecraft:stone': 'bake:minecraft:block/stone',
     };
     expect(isTexturePending(index, 'minecraft:item/diamond')).toBe(true);
     expect(isTexturePending(index, 'minecraft:item/stone')).toBe(false);
     expect(isTexturePending(index, 'minecraft:item/iron')).toBe(false);
     expect(isTexturePending(index, 'minecraft:item/missing')).toBe(false);
     expect(isTexturePending(index, '')).toBe(false);
+    // `bake:` descriptors never materialize offline — not "pending", they need
+    // the companion engine render instead.
+    expect(isTexturePending(index, 'minecraft:stone')).toBe(false);
   });
 
   it('normalizes keys to texture paths', () => {
@@ -161,6 +170,19 @@ describe('texture materialization loading state', () => {
     unsub();
   });
 
+  it('skips bake: keys — they are never requested for offline materialization', () => {
+    __resetBakedKeys();
+    registerBakedKeysFromIndex({ 'baketest:item/thing': 'bake:baketest:item/thing' });
+    const seen: Array<[boolean, number]> = [];
+    const unsub = subscribeLoadingChange((loading, remaining) => seen.push([loading, remaining]));
+
+    requestMaterialize(['baketest:item/thing'], '/tmp/inst');
+    // The bake key alone queues nothing, so no loading event is emitted.
+    expect(seen).toEqual([]);
+    __resetBakedKeys();
+    unsub();
+  });
+
   it('resolves a display URL from the materialized cache even while the index still holds a compact descriptor', async () => {
     const index: Record<string, string> = {
       'ftbquests:textures/shapes/octagon/outline.png': 'jar:/inst/mods/ftb.jar!assets/ftbquests/textures/shapes/octagon/outline.png',
@@ -209,5 +231,33 @@ describe('texture materialization loading state', () => {
     });
     expect(isBakedTexture('minecraft:stone')).toBe(true);
     expect(isBakedTexture('minecraft:oak_log')).toBe(false);
+  });
+
+  it('subscribes to baked-key changes and reports the engine-needed count', () => {
+    __resetBakedKeys();
+    const fired: number[] = [];
+    const unsub = subscribeBakedKeys(() => fired.push(getBakedTextureCount()));
+
+    markBakedKeys(['banner-test:item/one', 'banner-test:item/two']);
+    expect(fired).toEqual([2]);
+
+    unmarkBakedKeys(['banner-test:item/one']);
+    expect(fired).toEqual([2, 1]);
+    expect(getBakedTextureCount()).toBeGreaterThanOrEqual(1);
+
+    unmarkBakedKeys(['banner-test:item/two']);
+    expect(fired.length).toBe(3);
+
+    // Marking the same key twice in one call emits once; a later mark of an
+    // already-baked key does not emit.
+    markBakedKeys(['banner-test:item/one', 'banner-test:item/one']);
+    expect(fired.length).toBe(4);
+    markBakedKeys(['banner-test:item/one']);
+    expect(fired.length).toBe(4);
+
+    unsub();
+    unmarkBakedKeys(['banner-test:item/one']);
+    expect(fired.length).toBe(4);
+    __resetBakedKeys();
   });
 });

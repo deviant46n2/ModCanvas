@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { generateRecipeScripts, writeScriptFiles, wsIpcSendEvent } from '../services/api'
 import { validateRecipe, hasErrors } from '../core/recipe/validation'
 import type { Recipe } from '../core/recipe/recipe-store'
+import { HOTSWAP_FROZEN } from '../core/sync/config'
 
 export function useRecipeSave(projectId: string, recipeScriptPath: string) {
   const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -20,7 +21,11 @@ export function useRecipeSave(projectId: string, recipeScriptPath: string) {
       await writeScriptFiles(projectId, kubejsScript, crafttweakerScript)
       setSaveMessage('Scripts saved successfully!')
       markClean()
-      await wsIpcSendEvent('RELOAD_KUBEJS_SCRIPTS', recipeScriptPath)
+      // Hotswap frozen (todo.md Phase 3): the RELOAD_KUBEJS_SCRIPTS push stays
+      // dormant behind the flag; scripts are written to disk only.
+      if (!HOTSWAP_FROZEN) {
+        await wsIpcSendEvent('RELOAD_KUBEJS_SCRIPTS', recipeScriptPath)
+      }
       setTimeout(() => { setShowSaveDialog(false); setSaveMessage('') }, 3000)
     } catch (e) {
       console.error('Save failed:', e)

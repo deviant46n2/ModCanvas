@@ -36,6 +36,7 @@ pub fn create_project(
         created_at: now,
         updated_at: now,
         path,
+        source: "modcanvas".to_string(),
     };
 
     db.create_project(&project).map_err(|e| e.to_string())?;
@@ -225,7 +226,7 @@ pub fn deploy_companion_mod_for_project(
 }
 
 #[tauri::command]
-pub fn sync_instance_mods(
+pub async fn sync_instance_mods(
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<usize, String> {

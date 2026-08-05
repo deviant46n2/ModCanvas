@@ -1,6 +1,6 @@
-// Workspace header: project identity on the left, a single primary action
-// (Load Pack when unloaded, Test when loaded) plus the overflow Project menu
-// on the right. Rare/destructive actions live in the menu, not the toolbar.
+// Workspace header: a Projects back button + project identity on the left,
+// and the primary Test action plus the overflow Project menu on the right.
+// Rare/destructive actions live in the menu, not the toolbar.
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDownIcon } from '../ui/icons'
 import { HistoryDrawer } from '../history/HistoryDrawer'
@@ -17,7 +17,9 @@ interface TopBarProps {
   onExport: () => void
   onDelete: () => void
   packLoaded: boolean
-  onLoadPack: () => void
+  onBackToProjects: () => void
+  onRefresh: () => void
+  onForceReindex: () => void
   onClosePack: () => void
 }
 
@@ -33,7 +35,9 @@ export function TopBar({
   onExport,
   onDelete,
   packLoaded,
-  onLoadPack,
+  onBackToProjects,
+  onRefresh,
+  onForceReindex,
   onClosePack,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -55,6 +59,9 @@ export function TopBar({
   return (
     <div className="workspace-header">
       <div className="workspace-title-cluster">
+        <button className="btn-secondary btn-back" onClick={onBackToProjects} title="Back to projects">
+          Projects
+        </button>
         <h2>{projectName}</h2>
         <span className="workspace-meta">
           MC {minecraftVersion} &bull; {modLoader} &bull; v{packVersion}
@@ -64,15 +71,9 @@ export function TopBar({
         <button className="btn-secondary" onClick={onSave} title="Save project metadata">
           Save
         </button>
-        {!packLoaded && (
-          <button
-            className="btn-primary"
-            onClick={onLoadPack}
-            title="Scan textures, import FTB Quests, and load mods + configs"
-          >
-            Load Pack
-          </button>
-        )}
+        <button className="btn-secondary" onClick={onRefresh} title="Re-scan textures, quests, mods, and configs (cache-aware)" disabled={!packLoaded}>
+          Refresh
+        </button>
         <button
           className={packLoaded ? 'btn-primary' : 'btn-secondary'}
           onClick={onTest}
@@ -100,6 +101,22 @@ export function TopBar({
               {packLoaded && (
                 <div className="project-menu-group">
                   <div className="project-menu-group-title">Pack</div>
+                  <button
+                    className="project-menu-item"
+                    role="menuitem"
+                    onClick={() => { onRefresh(); closeMenu() }}
+                  >
+                    <span className="project-menu-item-title">Refresh</span>
+                    <span className="project-menu-item-desc">Re-scan textures, quests, mods, configs (cache-aware)</span>
+                  </button>
+                  <button
+                    className="project-menu-item"
+                    role="menuitem"
+                    onClick={() => { onForceReindex(); closeMenu() }}
+                  >
+                    <span className="project-menu-item-title">Force Full Re-index</span>
+                    <span className="project-menu-item-desc">Bypass caches — catches same-size/same-mtime file changes</span>
+                  </button>
                   <button
                     className="project-menu-item"
                     role="menuitem"

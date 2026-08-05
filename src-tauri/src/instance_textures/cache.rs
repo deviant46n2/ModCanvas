@@ -81,10 +81,15 @@ fn path_hash(instance_path: &Path) -> String {
 /// currently-known instances. Stale scans (deleted instances, re-ingests of
 /// moved paths, tests) otherwise accumulate as junk — one user had 1,315
 /// texture caches totalling ~4.9 GB for two real instances.
-pub fn prune_caches(known_instance_paths: &[PathBuf], known_mods_dirs: &[PathBuf]) -> usize {
-    let Some(cache_dir) = dirs_cache_dir() else {
-        return 0;
-    };
+///
+/// `cache_dir` is passed in (rather than re-deriving from the process-global
+/// `XDG_CACHE_HOME`) so the prune test can isolate a temp dir without mutating
+/// the env var — which would race every concurrently-running cache test.
+pub fn prune_caches(
+    known_instance_paths: &[PathBuf],
+    known_mods_dirs: &[PathBuf],
+    cache_dir: &std::path::Path,
+) -> usize {
     let mut keep = std::collections::HashSet::new();
     for p in known_instance_paths {
         keep.insert(path_hash(p));
@@ -93,10 +98,10 @@ pub fn prune_caches(known_instance_paths: &[PathBuf], known_mods_dirs: &[PathBuf
         keep.insert(path_hash(m));
     }
     let mut removed = 0usize;
-    let Ok(entries) = fs::read_dir(&cache_dir) else {
+    let Ok(entries) = fs::read_dir(cache_dir) else {
         return 0;
     };
-    let prefixes = ["instance_textures", "items", "engine_renders", "ingest", "textures"];
+    let prefixes = ["instance_textures", "items", "engine_renders", "runtime_textures", "ingest", "textures"];
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
@@ -128,8 +133,7 @@ mod tests {
     fn prune_removes_only_non_kept_hashes() {
         let dir = std::env::temp_dir().join(format!("modcanvas_prune_test_{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        std::env::set_var("XDG_CACHE_HOME", dir.join("cache"));
-        let cache_dir = dirs_cache_dir().unwrap();
+        let cache_dir = dir.join("cache");
         fs::create_dir_all(&cache_dir).unwrap();
 
         // A real (existing) known instance whose path-hash goes into the keep set.
@@ -148,7 +152,7 @@ mod tests {
         let keep_hash = path_hash(&known_instance);
         fs::write(cache_dir.join(format!("instance_textures_{}.json", keep_hash)), b"{}").unwrap();
 
-        let removed = prune_caches(&[known_instance.clone()], &[known_mods]);
+        let removed = prune_caches(&[known_instance.clone()], &[known_mods], &cache_dir);
 
         // Multi-word prefixes must be pruned too (this is the bug regression).
         assert_eq!(removed, 4, "removed {removed}");

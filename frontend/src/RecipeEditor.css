@@ -188,6 +188,20 @@
   text-overflow: ellipsis;
 }
 
+.palette-item-mod {
+  font-size: var(--text-2xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.palette-empty {
+  padding: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
 .palette-item-tags {
   display: flex;
   gap: var(--space-1);
@@ -213,6 +227,8 @@
 }
 
 .recipe-list-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-surface-0);
@@ -264,11 +280,62 @@
 }
 
 .recipe-list {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Multi-column recipe grid cell: compact card with name (top) and output
+   (bottom) so the panel shows many recipes without a wide empty gap between
+   the recipe name and its output. */
+.recipe-grid-item {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: var(--space-half);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.recipe-grid-item:hover {
+  background: var(--color-bg-surface-1);
+}
+
+.recipe-grid-item.selected {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+}
+
+.recipe-grid-item.bulk-selected {
+  background: var(--color-accent-subtle);
+}
+
+.recipe-grid-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.recipe-grid-output {
+  display: flex;
+  align-items: center;
   gap: var(--space-1);
-  max-height: 240px;
-  overflow-y: auto;
+  padding-left: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  min-width: 0;
+}
+
+.recipe-grid-output span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .recipe-list-item {
@@ -899,6 +966,18 @@
 
 .load-pack-modal {
   width: 720px;
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.load-pack-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
 }
 
 .load-group {
@@ -930,6 +1009,18 @@
 .load-group-list {
   max-height: 240px;
   overflow-y: auto;
+}
+
+/* Virtualized recipe browser container (load modal) — the list itself owns
+   scrolling; this box flexes to fill the modal body (bounded by the modal's
+   max-height so the whole modal always fits on screen). */
+.load-pack-list {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-2);
 }
 
 .load-recipe-item {

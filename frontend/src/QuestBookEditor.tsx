@@ -32,6 +32,8 @@ import {
   isBakedTexture,
   getBakedTextureKeys,
   unmarkBakedKeys,
+  subscribeBakedKeys,
+  getBakedTextureCount,
 } from './services/texture-loader'
 import { requestResolveTags } from './services/smart-filter-tags'
 import {
@@ -46,7 +48,17 @@ import {
 } from './services/engine-render'
 import { JeiDrawer } from './components/jei/JeiDrawer'
 import { TextureLoadingBar } from './components/quest/TextureLoadingBar'
+import { EngineRenderPrompt } from './components/quest/EngineRenderPrompt'
 import { AnimationProvider } from './components/quest/animation-context'
+import {
+  initRuntimeTextureListener,
+  subscribeRuntimeTextures,
+  getRuntimeTextureCache,
+  saveRuntimeTextureCache,
+  mergeRuntimeTextures,
+  questRuntimeNamespaces,
+  requestRuntimeTextures,
+} from './services/runtime-textures'
 import './components/quest/editor-theme.css'
 import type { ProgressState } from './core/quest/progress'
 import { usePackHealthStore } from './core/pack-health/pack-health-store'
@@ -57,11 +69,13 @@ interface QuestBookEditorProps {
   wsConnected?: boolean
   ingestResult?: IngestResult | null
   packLoaded?: boolean
+  onTest?: () => void
+  isTesting?: boolean
 }
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, wsConnected, ingestResult, packLoaded }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, wsConnected, ingestResult, packLoaded, onTest, isTesting }: QuestBookEditorProps) {
   const [graph, setGraph] = useState<QuestGraphData | null>(null)
   const [activeChapter, setActiveChapter] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -75,6 +89,8 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
   const [textureTick, setTextureTick] = useState(0)
   const [texturesLoading, setTexturesLoading] = useState(false)
   const [texturesRemaining, setTexturesRemaining] = useState(0)
+  const [bakedCount, setBakedCount] = useState(() => getBakedTextureCount())
+  const [enginePromptDismissed, setEnginePromptDismissed] = useState(false)
   const [questBackgroundUrl, setQuestBackgroundUrl] = useState<string | null>(null)
   const [items, setItems] = useState<ItemRegistryEntry[]>([])
   const [itemPickerTarget, setItemPickerTarget] = useState<{
@@ -186,6 +202,19 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
   // in-game and cached. Injected into the live texture index (quest tiles) and
   // the item registry (JEI view), and persisted to the Rust disk cache.
   const instancePath = ingestResult?.active_instance || projectPath || ''
+
+  // Track software-baked keys reactively so the "run the instance to capture
+  // textures" prompt appears/clears as bakes are replaced by real engine icons.
+  useEffect(() => subscribeBakedKeys(() => setBakedCount(getBakedTextureCount())), [])
+  // Switching packs must never leak the previous pack's graph or active
+  // chapter (a stale active chapter would filter the new pack to the wrong
+  // quests). The graph-load effect below re-selects the first chapter.
+  useEffect(() => {
+    setGraph(null)
+    setActiveChapter(null)
+    setSelectedNodeId(null)
+    setEnginePromptDismissed(false)
+  }, [projectId])
   useEffect(() => {
     let disposed = false
     initEngineRenderListener()
@@ -253,6 +282,48 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
     }
   }, [instancePath, wsConnected])
 
+  // ── Runtime texture extraction (non-item gaps) ────────────────────────────
+  // Quest backgrounds / chapter images / GUI + theme assets that only exist at
+  // runtime are captured from the companion's ResourceManager and merged into
+  // the texture index (runtime wins) + persisted to the Rust disk cache. Loads
+  // the cached captures on open, and requests a fresh extraction once per pack
+  // when the companion is connected and the graph is available.
+  const runtimeRequestedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!wsConnected || !graph) return
+    if (runtimeRequestedRef.current === projectId) return
+    runtimeRequestedRef.current = projectId
+    const namespaces = questRuntimeNamespaces(graph)
+    requestRuntimeTextures(namespaces).catch((e) =>
+      console.error('[QuestBookEditor] requestRuntimeTextures failed:', e),
+    )
+  }, [wsConnected, graph, projectId])
+
+  useEffect(() => {
+    let disposed = false
+    initRuntimeTextureListener()
+    if (instancePath) {
+      getRuntimeTextureCache(instancePath)
+        .then((cached) => {
+          if (disposed || !cached || Object.keys(cached).length === 0) return
+          setTextureIndex((prev) => mergeRuntimeTextures(prev, cached))
+        })
+        .catch((e) => console.error('[QuestBookEditor] getRuntimeTextureCache failed:', e))
+    }
+    const unsub = subscribeRuntimeTextures((textures) => {
+      setTextureIndex((prev) => mergeRuntimeTextures(prev, textures))
+      if (instancePath) {
+        saveRuntimeTextureCache(instancePath, textures).catch((e) =>
+          console.error('[QuestBookEditor] saveRuntimeTextureCache failed:', e),
+        )
+      }
+    })
+    return () => {
+      disposed = true
+      unsub()
+    }
+  }, [instancePath])
+
   // Queue engine renders once the companion is connected:
   //  - software-baked item ids (replaced with real GUI renders, cached forever)
   //  - registry items with no baked texture (JEI "?" slots)
@@ -307,10 +378,25 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
     return () => { cancelled = true }
   }, [ingestResult, projectPath, modsDir])
 
+  // Materialization resolves in batches (500 keys each). Bumping textureTick on
+  // every batch would rebuild the whole quest canvas hundreds of times and
+  // stutter the UI, so re-renders are coalesced into a single pass per ~120ms.
   useEffect(() => {
-    return subscribeMaterialized((added) => {
-      if (added.length > 0) setTextureTick(t => t + 1)
-    })
+    let timer: number | undefined
+    let pending = false
+    const schedule = () => {
+      if (pending) return
+      pending = true
+      timer = window.setTimeout(() => {
+        pending = false
+        setTextureTick(t => t + 1)
+      }, 120)
+    }
+    const unsub = subscribeMaterialized(schedule)
+    return () => {
+      unsub()
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
   }, [])
 
   useEffect(() => {
@@ -857,6 +943,15 @@ export default function QuestBookEditor({ projectId, projectPath, wsConnected, i
         setModsDir={setModsDir}
         onReady={onReady}
       />
+      {packLoaded && !!instancePath && bakedCount > 0 && (!!wsConnected || !enginePromptDismissed) && (
+        <EngineRenderPrompt
+          bakedCount={bakedCount}
+          connected={!!wsConnected}
+          isTesting={isTesting ?? false}
+          onRunInstance={() => onTest?.()}
+          onDismiss={() => setEnginePromptDismissed(true)}
+        />
+      )}
       <div className="quest-editor-body">
         <aside className="quest-editor-chapters" role="navigation" aria-label="Chapters">
           <ChapterTree

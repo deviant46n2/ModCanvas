@@ -9,6 +9,8 @@ export interface Project {
   created_at: string
   updated_at: string
   path: string
+  /** Origin: `"modcanvas"` (manual / imported) or `"prism"` (Prism-synced). */
+  source: string
 }
 
 export interface ImportResult {
@@ -130,7 +132,7 @@ export interface DiscoveredRecipe {
 }
 
 export interface LoadPackProgress {
-  stage: 'idle' | 'textures' | 'quests' | 'mods' | 'complete' | 'error'
+  stage: 'idle' | 'textures' | 'quests' | 'mods' | 'recipes' | 'complete' | 'error'
   message: string
   progress: number
   error?: string

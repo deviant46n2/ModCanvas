@@ -61,6 +61,15 @@ pub struct Project {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub path: String,
+    /// Origin of this project row: `"modcanvas"` (manual / imported packs) or
+    /// `"prism"` (synced from a live Prism Launcher instance). Drives the
+    /// source badge in the launcher list.
+    #[serde(default = "default_project_source")]
+    pub source: String,
+}
+
+pub fn default_project_source() -> String {
+    "modcanvas".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

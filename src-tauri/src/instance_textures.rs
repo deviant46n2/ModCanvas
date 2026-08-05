@@ -27,9 +27,9 @@ static INDEX_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashMap<String, String>>>>
 /// never has to re-scan for animation data.
 static ANIM_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashMap<String, String>>>>> = OnceLock::new();
 
-/// Memo of the per-instance merged item/block model set, used to bake 3D
-/// icons at materialization time. Populated either by the cache-miss scan or
-/// lazily on first `bake:` request.
+/// Memo of the per-instance merged item/block model set, used to classify item
+/// ids as flat textures vs `bake:` (needs in-game render) at scan time.
+/// Populated by the cache-miss scan.
 static MODEL_MEMO: OnceLock<Mutex<HashMap<String, Arc<models::Models>>>> = OnceLock::new();
 
 fn memo_cache() -> &'static Mutex<HashMap<String, Arc<HashMap<String, String>>>> {
@@ -73,7 +73,8 @@ fn compact_index(instance_path: &Path) -> Arc<HashMap<String, String>> {
 }
 
 /// Per-instance merged item/block model set (memoized per instance path).
-/// Used by the 3D icon baker; scanned once per process per instance.
+/// Used to classify item ids into flat textures vs `bake:` descriptors during
+/// the scan; scanned once per process per instance.
 fn models_for(instance_path: &Path) -> Arc<models::Models> {
     let key = instance_path.to_string_lossy().to_string();
     if let Some(arc) = model_memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
@@ -206,7 +207,8 @@ fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<S
 
     // Resolve item ids that only exist as JSON models (apotheosis gems, seeds,
     // tools, block-parented items) into bare keys so direct lookups hit.
-    // Block items resolve to `bake:` descriptors that materialize lazily.
+    // Block/3D items resolve to `bake:` descriptors that signal the companion
+    // engine-render pipeline (they are never materialized offline).
     let models = models_for(instance_path);
     for (key, url) in models.resolve_bare_keys(&out) {
         out.insert(key, url);
@@ -262,10 +264,17 @@ fn json_has_animation(json: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn scan_instance_textures_cmd(instance_path: String) -> Result<HashMap<String, String>, String> {
-    let path = std::path::Path::new(&instance_path);
-    let by_id = scan_instance_textures(path);
-    Ok(by_id)
+pub async fn scan_instance_textures_cmd(
+    instance_path: String,
+) -> Result<HashMap<String, String>, String> {
+    // First scan of an instance does a full jar + model pass (tens of seconds
+    // on a large pack). Run it off the main thread so the UI stays responsive.
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::Path::new(&instance_path);
+        Ok(scan_instance_textures(path))
+    })
+    .await
+    .map_err(|e| format!("Texture scan task failed: {e}"))?
 }
 
 /// Delete stale per-instance cache files (texture/items/engine-render/ingest)
@@ -278,15 +287,26 @@ pub fn prune_caches_cmd(
 ) -> Result<usize, String> {
     let keep_instances: Vec<PathBuf> = instance_paths.into_iter().map(PathBuf::from).collect();
     let keep_mods: Vec<PathBuf> = mods_dirs.into_iter().map(PathBuf::from).collect();
-    Ok(crate::instance_textures::cache::prune_caches(&keep_instances, &keep_mods))
+    let Some(cache_dir) = crate::instance_textures::cache::dirs_cache_dir() else {
+        return Ok(0);
+    };
+    Ok(crate::instance_textures::cache::prune_caches(&keep_instances, &keep_mods, &cache_dir))
 }
 
 /// Return the per-instance animation metadata map: texture key → raw `.mcmeta`
 /// JSON for every animated texture (adjacent `<texture>.png.mcmeta` files).
 #[tauri::command]
-pub fn scan_instance_animations_cmd(instance_path: String) -> Result<HashMap<String, String>, String> {
-    let path = std::path::Path::new(&instance_path);
-    Ok(build_animation_index(path).as_ref().clone())
+pub async fn scan_instance_animations_cmd(
+    instance_path: String,
+) -> Result<HashMap<String, String>, String> {
+    // Shares the same heavy first scan as the texture index; keep it off the
+    // main thread (the disk cache makes repeat calls fast).
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::Path::new(&instance_path);
+        Ok(build_animation_index(path).as_ref().clone())
+    })
+    .await
+    .map_err(|e| format!("Animation scan task failed: {e}"))?
 }
 
 #[tauri::command]

@@ -1,6 +1,7 @@
 import { getAdapter } from '../../adapters';
 import type { LoaderType } from '../../adapters/types';
 import { globalSyncLock, formatSyncEvent } from './loop-guard';
+import { HOTSWAP_FROZEN } from './config';
 import type { SyncSource, SyncState, SyncStatus } from './types';
 
 type WsIpcSendEvent = (eventType: string, path?: string, payload?: unknown) => Promise<number>;
@@ -10,6 +11,8 @@ export interface PipelineConfig {
   mcVersion: string;
   loader: LoaderType;
   onStateChange?: (state: SyncState) => void;
+  /** When true (default), the post-save reload broadcast is suppressed. */
+  hotswapFrozen?: boolean;
 }
 
 export class SyncPipeline {
@@ -24,7 +27,10 @@ export class SyncPipeline {
   };
 
   constructor(config: PipelineConfig) {
-    this.config = config;
+    this.config = {
+      ...config,
+      hotswapFrozen: config.hotswapFrozen ?? HOTSWAP_FROZEN,
+    };
   }
 
   get state(): SyncState {
@@ -65,7 +71,11 @@ export class SyncPipeline {
 
     try {
       await fn();
-      await this.broadcastReload();
+      // Hotswap is frozen (todo.md Phase 3): the reload broadcast after a save
+      // is suppressed. broadcastReload() stays defined/dormant for re-enable.
+      if (!this.config.hotswapFrozen) {
+        await this.broadcastReload();
+      }
       this._state.lastWorkbenchSave = Date.now();
       this.setSource('WORKBENCH');
     } catch (err) {

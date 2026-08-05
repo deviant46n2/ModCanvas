@@ -427,9 +427,17 @@ pub fn scan_instance_items(instance_path: &Path) -> Result<Vec<ItemRegistryEntry
 }
 
 #[tauri::command]
-pub fn scan_instance_items_cmd(instance_path: String) -> Result<Vec<ItemRegistryEntry>, String> {
-    let path = Path::new(&instance_path);
-    scan_instance_items(path)
+pub async fn scan_instance_items_cmd(
+    instance_path: String,
+) -> Result<Vec<ItemRegistryEntry>, String> {
+    // Jar walk + lang/model parsing can take a while on a large pack; run off
+    // the main thread so the webview stays responsive.
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = Path::new(&instance_path);
+        scan_instance_items(path)
+    })
+    .await
+    .map_err(|e| format!("Item scan task failed: {e}"))?
 }
 
 #[cfg(test)]

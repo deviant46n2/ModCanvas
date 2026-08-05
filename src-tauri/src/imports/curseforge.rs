@@ -156,6 +156,7 @@ impl CurseForgeImporter {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             path: dest.to_string_lossy().to_string(),
+            source: "modcanvas".to_string(),
         };
 
         let mut unresolved_mods = Vec::new();

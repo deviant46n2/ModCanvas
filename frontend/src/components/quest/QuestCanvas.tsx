@@ -179,11 +179,24 @@ function QuestCanvasInner({
   const [bezierEditEdgeId, setBezierEditEdgeId] = useState<string | null>(null);
 
   const filteredNodeIds = useMemo(() => {
-    if (!activeChapter) return new Set(questGraph.nodes.map((n: QuestNodeData) => n.id));
+    if (!activeChapter) {
+      // Never render "every chapter at once": fall back to the first chapter
+      // when one exists. This guards against a stale/null active chapter
+      // (e.g. switching packs) showing all quests superimposed.
+      const fallback = chapters[0]?.id;
+      if (fallback) {
+        return new Set(
+          questGraph.nodes
+            .filter((n: QuestNodeData) => n.chapter_id === fallback)
+            .map((n: QuestNodeData) => n.id)
+        );
+      }
+      return new Set(questGraph.nodes.map((n: QuestNodeData) => n.id));
+    }
     return new Set(
       questGraph.nodes.filter((n: QuestNodeData) => n.chapter_id === activeChapter).map((n: QuestNodeData) => n.id)
     );
-  }, [questGraph.nodes, activeChapter]);
+  }, [questGraph.nodes, activeChapter, chapters]);
 
   const filteredEdges = useMemo(() => {
     return questGraph.edges.filter(

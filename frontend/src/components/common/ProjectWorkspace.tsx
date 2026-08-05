@@ -8,13 +8,11 @@ import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
 import ProgressionGraph from '../../ProgressionGraph'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
-import { LoadPackModal } from './LoadPackModal'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIcon } from '../../services/mods'
 import type { WsConnectionStatus, IngestResult } from '../../services/api'
-import type { LoadPackProgress } from '../../services/types'
 
 
 export interface ProjectWorkspaceProps {
@@ -43,6 +41,9 @@ export interface ProjectWorkspaceProps {
   onDeployCompanion: () => void
   onExport: () => void
   onDelete: () => void
+  onBackToProjects: () => void
+  onRefresh: () => void
+  onForceReindex: () => void
 
   modsTab: ModsTabProps
   configsTab: ConfigsTabProps
@@ -52,25 +53,15 @@ export interface ProjectWorkspaceProps {
   ingestError: string
 
   packLoaded: boolean
-  loadPackProgress: LoadPackProgress
-  showLoadPack: boolean
-  setShowLoadPack: (show: boolean) => void
-  onLoadPack: () => void
-  onClosePack: () => void
 }
 
 export function ProjectWorkspace(props: ProjectWorkspaceProps) {
-  const { 
-    activeTab, 
-    onTabChange, 
-    project, 
+  const {
+    activeTab,
+    onTabChange,
+    project,
     ingestResult,
     packLoaded,
-    loadPackProgress,
-    showLoadPack,
-    setShowLoadPack,
-    onLoadPack,
-    onClosePack,
   } = props
 
   // Tabs are always navigable (all panels stay mounted and handle their own
@@ -117,8 +108,10 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onExport={props.onExport}
         onDelete={props.onDelete}
         packLoaded={packLoaded}
-        onLoadPack={onLoadPack}
-        onClosePack={onClosePack}
+        onBackToProjects={props.onBackToProjects}
+        onRefresh={props.onRefresh}
+        onForceReindex={props.onForceReindex}
+        onClosePack={props.onBackToProjects}
       />
 
             <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
@@ -137,18 +130,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </button>
         ))}
       </div>
-
-      {!packLoaded && activeTab === 'mods' && (
-        <div className="load-pack-prompt">
-          <div className="prompt-content">
-            <h3>Load Modpack</h3>
-            <p>Click "Load Pack" to scan textures, import FTB Quests, and load mods from the instance.</p>
-            <button className="btn-primary" onClick={onLoadPack} disabled={props.ingesting}>
-              {props.ingesting ? 'Loading...' : 'Load Pack'}
-            </button>
-          </div>
-        </div>
-      )}
 
       <PackHealthProvider project={project} packLoaded={packLoaded}>
         <div className="workspace-content">
@@ -180,6 +161,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                   wsConnected={props.wsStatus.connected}
                   ingestResult={ingestResult}
                   packLoaded={packLoaded}
+                  onTest={props.onTest}
+                  isTesting={props.isTesting}
                 />
               </CanvasThemeProvider>
             </ErrorBoundary>
@@ -204,12 +187,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         testProgress={props.testProgress}
         testError={props.testError}
         deployCompanionMessage={props.deployCompanionMessage}
-      />
-
-      <LoadPackModal
-        show={showLoadPack}
-        onClose={() => setShowLoadPack(false)}
-        progress={loadPackProgress}
       />
     </div>
   )

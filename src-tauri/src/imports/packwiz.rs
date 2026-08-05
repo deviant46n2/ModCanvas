@@ -246,6 +246,7 @@ impl PackwizImporter {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             path: path.to_string_lossy().to_string(),
+            source: "modcanvas".to_string(),
         };
 
         let mut mods = Vec::new();

@@ -34,11 +34,9 @@ urlencoding = "2"
 anyhow = "1"
 regex = "1"
 base64 = "0.22"
-png = "0.17"
 json5 = "0.4"
 dirs-next = "2"
 dotenvy = "0.15"
-rayon = "1.10"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -17,6 +17,7 @@ import type { QuestGraphData, PrismInstance } from '../services/api'
 import { defaultQuestNodeData } from '../components/quest/quest-helpers'
 import { stripMcFormatting } from '../core/theme/font-formatter'
 import { pickDir } from '../components/quest/pick-dir'
+import { HOTSWAP_FROZEN } from '../core/sync/config'
 
 export interface QuestToolbarActions {
   saveMessage: { text: string; ok: boolean } | null
@@ -78,6 +79,13 @@ export function useQuestToolbarActions({
     if (!graph) return
     setSaveMessage({ text: 'Saving...', ok: true })
     await saveGraphRef.current?.()
+    // Hotswap frozen (todo.md Phase 3): the save/export above is all we push;
+    // the RELOAD_QUESTS send below stays dormant behind the flag.
+    if (HOTSWAP_FROZEN) {
+      const texCount = Object.keys(textureIndex).length
+      setSaveMessage({ text: `Saved (${texCount} textures)`, ok: true })
+      return
+    }
     if (!wsStatus.connected) await handleReconnect()
     try {
       await wsIpcSendEvent('RELOAD_QUESTS')

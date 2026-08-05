@@ -12,6 +12,7 @@ const stageLabels: Record<LoadPackProgress['stage'], string> = {
   textures: 'Indexing Textures',
   quests: 'Importing FTB Quests',
   mods: 'Loading Mods & Configs',
+  recipes: 'Loading Recipes',
   complete: 'Complete',
   error: 'Error',
 }
@@ -36,6 +37,11 @@ const stageDetails: Record<LoadPackProgress['stage'], string[]> = {
     'Reading mod metadata',
     'Loading mod dependencies',
     'Loading config files...'
+  ],
+  recipes: [
+    'Scanning mod jars for recipes',
+    'Reading vanilla / KubeJS / CraftTweaker recipes',
+    'Loading recipes into the editor...'
   ],
   complete: ['Ready!'],
   error: ['An error occurred during loading']

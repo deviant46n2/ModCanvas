@@ -16,6 +16,8 @@ describe('SyncPipeline — Workbench Save & Broadcast', () => {
       wsIpcSendEvent: mockWsSend as unknown as (eventType: string, path?: string, payload?: unknown) => Promise<number>,
       mcVersion: '1.21.1',
       loader: 'neoforge',
+      // These tests exercise the (re-enabled) broadcast path explicitly.
+      hotswapFrozen: false,
       onStateChange: (s) => { stateChanges.push(s); },
     });
   });
@@ -24,6 +26,29 @@ describe('SyncPipeline — Workbench Save & Broadcast', () => {
     expect(pipeline.state.status).toBe('IDLE');
     expect(pipeline.state.lastWorkbenchSave).toBe(0);
     expect(pipeline.state.sourceOfLastChange).toBeNull();
+  });
+
+  it('should NOT broadcast reload when hotswap is frozen (default)', async () => {
+    vi.useFakeTimers();
+    const frozen = new SyncPipeline({
+      wsIpcSendEvent: mockWsSend as unknown as (eventType: string, path?: string, payload?: unknown) => Promise<number>,
+      mcVersion: '1.21.1',
+      loader: 'neoforge',
+      onStateChange: () => {},
+    });
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+
+    frozen.scheduleSave(saveFn, 100);
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(saveFn).toHaveBeenCalledTimes(1);
+    expect(mockWsSend).not.toHaveBeenCalled();
+    // The save still records a workbench write even without a broadcast.
+    expect(frozen.state.lastWorkbenchSave).toBeGreaterThan(0);
+    expect(frozen.state.status).toBe('IDLE');
+    expect(frozen.state.sourceOfLastChange).toBe('WORKBENCH');
+
+    vi.useRealTimers();
   });
 
   it('should mark DIRTY_WORKBENCH on markDirty()', () => {

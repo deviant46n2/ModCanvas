@@ -7,7 +7,7 @@ brought into ModCanvas. Applies to the **Import Modal**
 
 ## Opening the modal
 
-- **Project list / sidebar** → "Import" opens the Import Modal.
+- **Launcher** → "Import" opens the Import Modal (see `docs/launcher.md`).
 - **Drag-and-drop** — dropping a `.zip`, `.mrpack`, or `.toml` file anywhere
   on the window opens the modal pre-filled with that file's absolute path
   (`useAppState.ts` listens to `getCurrentWindow().onDragDropEvent`).

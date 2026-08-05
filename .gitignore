@@ -12,4 +12,9 @@ workbench-companion*/build/
 workbench-companion*/net/
 workbench-companion*/run/
 workbench-companion*/out/
+workbench-companion-archived/*/.gradle/
+workbench-companion-archived/*/build/
+workbench-companion-archived/*/net/
+workbench-companion-archived/*/run/
+workbench-companion-archived/*/out/
 *.jar.backup

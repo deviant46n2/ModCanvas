@@ -120,7 +120,7 @@ pub(super) fn load_quest_from_pack(project_id: &str, pack_dir: &PathBuf) -> Resu
 /// Scan an instance's mods folder and populate the database with mod info.
 /// This allows mods from imported Prism instances to appear in the Mods tab.
 #[tauri::command]
-pub fn scan_instance_mods(
+pub async fn scan_instance_mods(
     db: State<'_, Database>,
     project_id: String,
 ) -> Result<Vec<ModEntry>, String> {
@@ -205,9 +205,13 @@ pub fn get_all_kubejs_scripts(game_dir: String) -> Result<Vec<KubeJSScript>, Str
 }
 
 #[tauri::command]
-pub fn generate_recipe_scripts(project_id: String, recipes: Vec<Recipe>) -> Result<ScriptOutput, String> {
-    let (kubejs, ct) = crate::scriptgen::generate_script_strings(&recipes, "ModCanvas Pack");
-    Ok(ScriptOutput { kubejs, crafttweaker: ct })
+pub async fn generate_recipe_scripts(project_id: String, recipes: Vec<Recipe>) -> Result<ScriptOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (kubejs, ct) = crate::scriptgen::generate_script_strings(&recipes, "ModCanvas Pack");
+        Ok(ScriptOutput { kubejs, crafttweaker: ct })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

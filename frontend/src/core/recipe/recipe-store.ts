@@ -259,8 +259,13 @@ export const useRecipeStore = create<RecipeState>()(
     }),
     {
       name: 'modcanvas-recipe-store',
+      // Only authored recipes are persisted. Discovered pack recipes (vanilla /
+      // kubejs / crafttweaker) are reloadable from the pack scan and must never
+      // be serialized — a real pack has tens of thousands of recipes, which
+      // would exceed localStorage quota and synchronously serialize on every
+      // store write (freezing the UI during a large import).
       partialize: (state) => ({
-        recipes: state.recipes,
+        recipes: state.recipes.filter((r) => !r.origin || r.origin === 'authored'),
         selectedRecipeId: state.selectedRecipeId,
       }),
     }

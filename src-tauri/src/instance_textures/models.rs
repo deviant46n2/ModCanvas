@@ -32,16 +32,14 @@ const BLOCK_FALLBACK: [&str; 12] = [
     "texture", "stem", "planks",
 ];
 
-pub(super) mod baker;
-pub(super) mod merge;
-pub(super) mod raster;
 pub(super) mod scan;
 
 /// Result of resolving one item id against its model chain.
 enum Resolved {
     /// A flat texture source descriptor (jar:… or an absolute path).
     Texture(String),
-    /// A model reference (`ns:item/…` or `ns:block/…`) to bake in 3D.
+    /// A model reference (`ns:item/…` or `ns:block/…`) that needs a real
+    /// in-game render (3D geometry) — never materialized offline.
     Bake(String),
 }
 
@@ -80,8 +78,9 @@ impl Models {
 
     /// Resolve every indexable item model to either a flat texture or a 3D
     /// bake descriptor and return new bare keys (`ns:id`) not already covered
-    /// by the PNG scan. Bake descriptors are `bake:<ns>:<kind>/<path>` and are
-    /// materialized lazily by the rasterizer at resolve time.
+    /// by the PNG scan. `bake:<ns>:<kind>/<path>` descriptors are not
+    /// materialized offline — they flag items that need a real in-game render
+    /// by the companion mod (engine-render pipeline).
     pub fn resolve_bare_keys(&self, by_id: &HashMap<String, String>) -> HashMap<String, String> {
         let mut out: HashMap<String, String> = HashMap::new();
         let mut ids: Vec<&(String, String)> = self.item.keys().collect();
@@ -141,8 +140,9 @@ impl Models {
         if depth > 64 || !seen.insert((1, ns.to_string(), path.to_string())) {
             return None;
         }
-        // Block items with 3D geometry (in this model or any ancestor) bake
-        // into isometric renders instead of a single flat face texture.
+        // Block items with 3D geometry (in this model or any ancestor) are
+        // flagged as `bake:` descriptors for the engine-render pipeline instead
+        // of a single flat face texture.
         if self.chain_has_elements("block", ns, path) {
             let mut tseen: HashSet<(u8, String, String)> = HashSet::new();
             if self.block_texture_in_chain(ns, path, by_id, &mut tseen, 0).is_some() {

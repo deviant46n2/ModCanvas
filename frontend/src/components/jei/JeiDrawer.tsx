@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { XIcon } from '../ui/icons'
 import { Grid, type CellComponentProps } from 'react-window'
 import type { ItemRegistryEntry } from '../../services/api'
+import { parseItemQuery } from '../../services/item-registry'
 import './JeiDrawer.css'
 
 interface JeiDrawerProps {
@@ -45,16 +46,7 @@ function ItemCell({ columnIndex, rowIndex, items, onSelectRef, onHoverRef, style
 }
 
 function parseSearch(query: string): { modFilter?: string; textSearch: string } {
-  let remaining = query.trim()
-  let modFilter: string | undefined
-
-  const modMatch = remaining.match(/@(\S+)/)
-  if (modMatch) {
-    modFilter = modMatch[1].toLowerCase()
-    remaining = remaining.replace(modMatch[0], '').trim()
-  }
-
-  return { modFilter, textSearch: remaining.toLowerCase() }
+  return parseItemQuery(query)
 }
 
 export function JeiDrawer({ items, onSelect, onClose }: JeiDrawerProps) {

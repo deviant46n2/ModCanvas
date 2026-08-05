@@ -3,7 +3,7 @@ import type { QuestGraphData, QuestNodeData } from './quest-types'
 import { smartFilterMembers, memberKey } from '../core/quest/smart-filter'
 import { shapeTextureKeys } from '../core/quest/quest-shapes'
 
-const BATCH_SIZE = 200
+const BATCH_SIZE = 500
 
 export function isUsableTextureValue(value: string | null | undefined): boolean {
   return (
@@ -16,6 +16,8 @@ export function isUsableTextureValue(value: string | null | undefined): boolean 
  * True when a key exists in the texture index but is not displayable yet
  * (i.e. its compact source hasn't been materialized into a data URL). Only
  * keys that WILL resolve qualify, so unresolvable icons never shimmer forever.
+ * `bake:` descriptors are excluded: they are 3D models that can only be
+ * rendered in-game by the companion mod and never materialize offline.
  */
 export function isTexturePending(
   textureIndex: Record<string, string>,
@@ -24,7 +26,9 @@ export function isTexturePending(
   if (!key) return false
   if (isUsableTextureValue(textureIndex[key])) return false
   if (getMaterialized(key)) return false
-  return textureIndex[key] !== undefined
+  const src = textureIndex[key]
+  if (typeof src === 'string' && src.startsWith('bake:')) return false
+  return src !== undefined
 }
 
 export function keyPathOf(key: string): string {
@@ -173,6 +177,36 @@ const loadingSubscribers = new Set<(loading: boolean, remaining: number) => void
 /// UI — nearest-neighbor downscaling of a 3D render looks aliased, whereas
 /// smooth scaling keeps it clean.
 const bakedKeys = new Set<string>()
+const bakedSubscribers = new Set<() => void>()
+
+function bumpBakedKeys(): void {
+  for (const fn of [...bakedSubscribers]) fn()
+}
+
+/**
+ * Subscribe to changes in the set of software-baked (engine-needed) keys.
+ * Fires when keys are marked baked (new `bake:` descriptors) and when engine
+ * renders replace them. Returns an unsubscribe function.
+ */
+export function subscribeBakedKeys(fn: () => void): () => void {
+  bakedSubscribers.add(fn)
+  return () => {
+    bakedSubscribers.delete(fn)
+  }
+}
+
+/** Number of texture keys still awaiting a real in-game engine render. */
+export function getBakedTextureCount(): number {
+  return bakedKeys.size
+}
+
+/** Test-only: clear baked-key tracking state. */
+export function __resetBakedKeys(): void {
+  if (bakedKeys.size > 0) {
+    bakedKeys.clear()
+    bumpBakedKeys()
+  }
+}
 
 export function isBakedTexture(key: string): boolean {
   return bakedKeys.has(key)
@@ -186,19 +220,32 @@ export function getBakedTextureKeys(): string[] {
 /** Stop treating keys as baked (e.g. after the companion renders a real engine
  * icon for them) so the UI renders them pixelated like regular item icons. */
 export function unmarkBakedKeys(keys: Iterable<string>): void {
-  for (const k of keys) bakedKeys.delete(k)
+  let changed = false
+  for (const k of keys) {
+    if (bakedKeys.delete(k)) changed = true
+  }
+  if (changed) bumpBakedKeys()
 }
 
 export function markBakedKeys(keys: Iterable<string>): void {
-  for (const k of keys) bakedKeys.add(k)
+  let changed = false
+  for (const k of keys) {
+    if (!bakedKeys.has(k)) {
+      bakedKeys.add(k)
+      changed = true
+    }
+  }
+  if (changed) bumpBakedKeys()
 }
 
 /** Scan a texture index for `bake:` descriptors and register them as baked so
  *  their rendered icons are scaled smoothly in the UI. */
 export function registerBakedKeysFromIndex(textureIndex: Record<string, string>): void {
-  for (const [key, src] of Object.entries(textureIndex)) {
-    if (src.startsWith('bake:')) bakedKeys.add(key)
-  }
+  markBakedKeys(
+    Object.entries(textureIndex)
+      .filter(([, src]) => src.startsWith('bake:'))
+      .map(([key]) => key),
+  )
 }
 
 export function subscribeMaterialized(fn: (added: string[]) => void): () => void {
@@ -263,6 +310,8 @@ export function textureDisplayUrl(
 export function requestMaterialize(keys: string[], instancePath: string): void {
   let added = false
   for (const key of keys) {
+    // `bake:` keys can never materialize offline — they need the engine.
+    if (bakedKeys.has(key)) continue
     if (materialized.has(key) || queuedSet.has(key)) continue
     const attempts = notFound.get(key) ?? 0
     if (attempts >= MAX_NOT_FOUND_RETRIES) continue

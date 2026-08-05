@@ -154,6 +154,7 @@ impl MrPackImporter {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
             path: temp_dir.to_string_lossy().to_string(),
+            source: "modcanvas".to_string(),
         };
         
         let mods = Vec::new();

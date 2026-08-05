@@ -11,11 +11,13 @@ import {
   scanInstanceMods as apiScanInstanceMods,
   importFtbQuestsFromDir as apiImportFtbQuests,
   saveQuestGraph as apiSaveQuestGraph,
+  scanPackRecipes as apiScanPackRecipes,
 } from '../services/api'
 import { useProjectState, type Project } from './useProjectState'
 import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
+import { useRecipeStore } from '../core/recipe/recipe-store'
 import type { IngestResult } from '../services/quest-types'
 import type { LoadPackProgress } from '../services/types'
 
@@ -32,10 +34,10 @@ export interface ImportResult {
 
 export function useAppState() {
   const projectState = useProjectState()
-  const { selectedProject } = projectState
-  const modState = useModState(selectedProject)
-  const configState = useConfigState(selectedProject)
-  const launchState = useLaunchState(selectedProject)
+  const { openProject } = projectState
+  const modState = useModState(openProject)
+  const configState = useConfigState(openProject)
+  const launchState = useLaunchState(openProject)
 
   const [activeTab, setActiveTab] = useState<'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'>('mods')
 
@@ -61,6 +63,8 @@ export function useAppState() {
     progress: 0,
   })
   const [packLoaded, setPackLoaded] = useState(false)
+  // Save / Discard / Cancel guard shown when leaving a dirty pack.
+  const [showLeavePack, setShowLeavePack] = useState(false)
   const autoReopenDone = useRef(false)
 
   // Listen for granular progress events emitted by the backend during ingest
@@ -100,12 +104,15 @@ export function useAppState() {
     }
   }, [])
 
-  async function loadPack(project: Project) {
-    if (!project.path) return
+  /** Shared cache-aware load pipeline: texture ingest → FTB import → save graph
+   *  → scan + load mods → load configs. `force` bypasses the ingest cache.
+   *  Returns true on success. */
+  const runLoadPipeline = useCallback(async (project: Project, force: boolean, wasLoaded: boolean): Promise<boolean> => {
+    if (!project.path) return false
     setPackLoaded(false)
     setShowLoadPack(true)
-    setLoadPackProgress({ stage: 'textures', message: 'Preparing to scan textures...', progress: 2 })
-    
+    setLoadPackProgress({ stage: 'idle', message: 'Preparing to scan textures...', progress: 2 })
+
     // Yield to let modal render first
     await new Promise(r => setTimeout(r, 0))
 
@@ -113,7 +120,7 @@ export function useAppState() {
       // Stage 1: Ingest textures (backend emits per-jar progress events that
       // the listener above forwards into the load bar).
       setLoadPackProgress({ stage: 'textures', message: 'Scanning mod jars for textures...', progress: 5 })
-      const ingestResult = await apiIngestActiveInstance(project.path)
+      const ingestResult = await apiIngestActiveInstance(project.path, force)
       setIngestResult(ingestResult)
       setLoadPackProgress({ stage: 'textures', message: `Indexed ${ingestResult.textures_indexed} textures from ${ingestResult.jars_scanned} mods`, progress: 32 })
 
@@ -140,19 +147,85 @@ export function useAppState() {
       setLoadPackProgress({ stage: 'mods', message: 'Loading config files...', progress: 86 })
       await configState.loadConfigFiles()
 
-      // Stage 5: Prepare quest/progression/recipe data
-      setLoadPackProgress({ stage: 'mods', message: 'Preparing editor data...', progress: 94 })
+      // Stage 5: Scan pack recipes (mod jars + vanilla data + KubeJS/CT) into
+      // the recipe store. Cache-aware, so repeat opens are instant.
+      setLoadPackProgress({ stage: 'recipes', message: 'Scanning pack recipes...', progress: 88 })
+      const discovered = await apiScanPackRecipes(project.path)
+      setLoadPackProgress({
+        stage: 'recipes',
+        message: `Found ${discovered.length} recipes across the pack`,
+        progress: 92,
+      })
+      // Preserve origin/source/editable so read-only jar recipes are marked and
+      // pack-health skips them.
+      const discoveredWithMeta = discovered.map((r) => ({
+        ...r.recipe,
+        origin: r.origin,
+        source: r.source,
+        editable: r.editable,
+      }))
+      useRecipeStore.getState().loadRecipesFromPack(discoveredWithMeta)
+
+      // Stage 6: Prepare quest/progression/recipe data
+      setLoadPackProgress({ stage: 'recipes', message: 'Preparing editor data...', progress: 94 })
 
       // Complete
       setLoadPackProgress({ stage: 'complete', message: 'Pack loaded successfully!', progress: 100 })
       setPackLoaded(true)
-      
+
       // Auto-close modal after brief delay
       setTimeout(() => setShowLoadPack(false), 1500)
+      return true
     } catch (e: any) {
       const msg = typeof e === 'string' ? e : e?.message || String(e)
       console.error('[Frontend] Load pack failed:', msg)
       setLoadPackProgress({ stage: 'error', message: 'Failed to load pack', progress: 0, error: msg })
+      // Restore the prior loaded state so a failed refresh does not strand the
+      // workspace in a half-loaded state.
+      setPackLoaded(wasLoaded)
+      return false
+    }
+  }, [modState, configState])
+
+  /** Open a pack: enter the workspace and run the full cache-aware load. */
+  async function openPack(project: Project) {
+    if (!project.path) return
+    projectState.openPack(project)
+    const ok = await runLoadPipeline(project, false, false)
+    if (!ok) {
+      // Roll back to the launcher; the modal keeps showing the error.
+      projectState.closePack()
+      setPackLoaded(false)
+      setIngestResult(null)
+      setIngestError('')
+      modState.resetModState()
+      modState.setSearchQuery('')
+      modState.setSearchResults([])
+      configState.resetConfigState()
+    }
+  }
+
+  /** Re-run the load pipeline against the open pack (manual Refresh). */
+  async function refreshPack(force: boolean) {
+    const project = projectState.openProject
+    if (!project) return
+    await runLoadPipeline(project, force, true)
+  }
+
+  /** Create a project, then open it (full cache-aware load). */
+  async function handleCreateProject() {
+    const project = await projectState.handleCreateProject()
+    if (project) {
+      setActiveTab('mods')
+      await openPack(project)
+    }
+  }
+
+  /** Dismiss the load modal. If a fresh open failed, also leave the workspace. */
+  function dismissLoadModal() {
+    setShowLoadPack(false)
+    if (!packLoaded && projectState.openProject) {
+      closePack()
     }
   }
 
@@ -160,9 +233,37 @@ export function useAppState() {
     setPackLoaded(false)
     setIngestResult(null)
     setIngestError('')
-    projectState.handleCloseProject()
+    projectState.closePack()
+    modState.resetModState()
     modState.setSearchQuery('')
     modState.setSearchResults([])
+    configState.resetConfigState()
+  }
+
+  /** Leave the pack, guarding against a dirty config editor. */
+  function requestClosePack() {
+    if (configState.configDirty) {
+      setShowLeavePack(true)
+    } else {
+      closePack()
+    }
+  }
+
+  async function saveAndClosePack() {
+    setShowLeavePack(false)
+    if (configState.configDirty) {
+      await configState.saveConfigFile()
+    }
+    closePack()
+  }
+
+  function discardAndClosePack() {
+    setShowLeavePack(false)
+    closePack()
+  }
+
+  function cancelLeavePack() {
+    setShowLeavePack(false)
   }
 
   useEffect(() => {
@@ -193,22 +294,10 @@ export function useAppState() {
     })
   }, [projectState.projects])
 
-  useEffect(() => {
-    if (selectedProject) {
-      // NOTE: mods/configs are intentionally NOT auto-loaded here — that
-      // happens only when the user clicks "Load Pack" (which scans the
-      // instance and loads mods + configs). Loading them on project open made
-      // the app start slow.
-      modState.resetModState()
-      configState.resetConfigState()
-    }
-  }, [selectedProject])
-
   // Auto-reopen the last-opened pack on launch: after the project list loads,
-  // if a last-project id was stored and matches a known project, select it so
-  // the workspace returns to that pack. Mods/configs load from their caches and
-  // the quest graph loads from the DB — we do NOT re-run the heavy ingest +
-  // FTB import that `loadPack` performs, so reopen is instant.
+  // if a last-project id was stored and matches a known project, open it (full
+  // cache-aware load). The heavy stages are cache-validated, so reopen is fast
+  // when caches are warm. Otherwise stay on the launcher.
   useEffect(() => {
     if (autoReopenDone.current) return
     const id = projectState.getLastProjectId()
@@ -224,8 +313,8 @@ export function useAppState() {
       return
     }
     autoReopenDone.current = true
-    projectState.setSelectedProject(target)
     setActiveTab('mods')
+    openPack(target)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectState.projects])
 
@@ -274,11 +363,11 @@ export function useAppState() {
   }
 
   async function exportMrpack() {
-    if (!selectedProject) return
+    if (!openProject) return
     setIsExporting(true)
     setExportError('')
     try {
-      const path = await exportModrinthMrpack(selectedProject.id)
+      const path = await exportModrinthMrpack(openProject.id)
       setExportPath(path)
       setExportError('')
     } catch (e: any) {
@@ -289,11 +378,11 @@ export function useAppState() {
   }
 
   async function exportCurseforge() {
-    if (!selectedProject) return
+    if (!openProject) return
     setIsExporting(true)
     setExportError('')
     try {
-      const path = await exportCurseforgeZip(selectedProject.id)
+      const path = await exportCurseforgeZip(openProject.id)
       setExportPath(path)
       setExportError('')
     } catch (e: any) {
@@ -305,7 +394,7 @@ export function useAppState() {
 
   function handleTabChange(tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') {
     setActiveTab(tab)
-    if (tab === 'configs' && selectedProject) {
+    if (tab === 'configs' && openProject) {
       configState.loadConfigFiles()
     }
   }
@@ -334,11 +423,16 @@ export function useAppState() {
   }
 
   async function handleConfirmDelete() {
+    const wasOpen = !!projectState.openProject
     const success = await projectState.handleConfirmDelete()
     if (success) {
+      if (wasOpen) {
+        closePack()
+      } else {
+        modState.setSearchQuery('')
+        modState.setSearchResults([])
+      }
       setActiveTab('mods')
-      modState.setSearchQuery('')
-      modState.setSearchResults([])
     }
   }
 
@@ -376,7 +470,15 @@ export function useAppState() {
     setShowLoadPack,
     loadPackProgress,
     packLoaded,
-    loadPack,
+    openPack,
+    refreshPack,
     closePack,
+    dismissLoadModal,
+    showLeavePack,
+    requestClosePack,
+    saveAndClosePack,
+    discardAndClosePack,
+    cancelLeavePack,
+    handleCreateProject,
   }
 }

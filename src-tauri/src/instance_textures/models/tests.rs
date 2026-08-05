@@ -1,11 +1,9 @@
-use super::*;
 use crate::instance_textures::{resolve_texture_urls, scan_instance_textures};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use tempfile::tempdir;
 
-pub(super) mod bake;
 pub(super) mod resolve;
 
 pub(super) fn write_jar_entries(path: &Path, entries: &[(&str, &[u8])]) {
@@ -39,22 +37,4 @@ pub(super) fn new_instance() -> (tempfile::TempDir, std::path::PathBuf) {
     fs::create_dir_all(dir.path().join("versions")).unwrap();
     let instance = dir.path().to_path_buf();
     (dir, instance)
-}
-
-/// A real 16×16 opaque RGBA PNG (the bake path must decode actual bytes, so the
-/// 8-byte `fake_png` header is not enough).
-pub(super) fn real_png(seed: u8) -> Vec<u8> {
-    let mut out = Vec::new();
-    {
-        let mut enc = png::Encoder::new(&mut out, 16, 16);
-        enc.set_color(png::ColorType::Rgba);
-        enc.set_depth(png::BitDepth::Eight);
-        let mut writer = enc.write_header().unwrap();
-        let mut rgba = vec![seed; 16 * 16 * 4];
-        for px in rgba.chunks_exact_mut(4) {
-            px[3] = 255;
-        }
-        writer.write_image_data(&rgba).unwrap();
-    }
-    out
 }

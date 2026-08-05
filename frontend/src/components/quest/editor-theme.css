@@ -754,6 +754,44 @@
   white-space: nowrap;
 }
 
+/* "Run the instance to capture textures" prompt (engine-render pipeline).
+ * Shown while some item icons can't be resolved offline and the companion mod
+ * is not connected; replaced by a capture-progress label while it is. */
+.engine-render-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--ftb-surface, #1e1e24);
+  border: 1px solid #8a6d3b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.engine-render-prompt-icon {
+  color: #e6b45c;
+  font-size: 14px;
+}
+
+.engine-render-prompt-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ftb-text);
+}
+
+.engine-render-prompt-btn {
+  flex: none;
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.engine-render-prompt-dismiss {
+  flex: none;
+  font-size: 14px;
+  color: var(--ftb-text-muted, #9a9aa2);
+}
+
 /* Minecraft `.mcmeta` animated textures: the full sprite strip is laid out as
  * a background sized so each frame fills the box, then stepped 0% → 100% of
  * the strip height (last frame) once per frame. The step count, duration and

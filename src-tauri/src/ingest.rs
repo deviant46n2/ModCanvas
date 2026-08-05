@@ -191,7 +191,7 @@ fn cache_path(mods_dir: &Path) -> PathBuf {
 /// Ingest an active modpack instance: scan all `.jar` files, build a
 /// `VirtualAssetRegistry`, cache the result, and return it along with counts.
 pub fn ingest_active_instance(instance_path: &Path) -> IngestResult {
-    ingest_active_instance_with_progress(instance_path, &mut |_| {})
+    ingest_active_instance_with_progress(instance_path, false, &mut |_| {})
 }
 
 /// Emit an `IngestProgress` event to the frontend window.
@@ -201,8 +201,13 @@ fn emit_ingest(app: &tauri::AppHandle, progress: &IngestProgress) {
 }
 
 /// Ingest an instance, reporting granular progress along the way.
+///
+/// When `force` is set the on-disk cache is bypassed (and discarded) so a
+/// same-size/same-mtime file replacement is still picked up on the next full
+/// re-index.
 pub fn ingest_active_instance_with_progress(
     instance_path: &Path,
+    force: bool,
     progress: &mut dyn FnMut(&IngestProgress),
 ) -> IngestResult {
     let act = instance_path.to_string_lossy().to_string();
@@ -280,8 +285,16 @@ pub fn ingest_active_instance_with_progress(
     let jars_scanned = current_jars.len();
     eprintln!("[Ingestion] Found {} jar files in {:?}", jars_scanned, mods_dir);
 
-    // Check cache
+    // Check cache (skipped entirely for a forced full re-index, whose cache is
+    // discarded below so the next load does not resurrect it).
     const CACHE_VERSION: u32 = 3;
+    if force {
+        let cp = cache_path(&mods_dir);
+        if cp.exists() {
+            let _ = fs::remove_file(&cp);
+            eprintln!("[Ingestion] Forced re-index: discarded cache for {}", act);
+        }
+    }
     let cache_hit = {
         let cp = cache_path(&mods_dir);
         if cp.exists() {
@@ -479,13 +492,21 @@ struct IngestCache {
 // ── Tauri command ──────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn ingest_active_instance_cmd(
+pub async fn ingest_active_instance_cmd(
     app: tauri::AppHandle,
     instance_path: String,
+    force: Option<bool>,
 ) -> Result<IngestResult, String> {
-    let path = std::path::Path::new(&instance_path);
-    let mut emit = |p: &IngestProgress| emit_ingest(&app, p);
-    Ok(ingest_active_instance_with_progress(path, &mut emit))
+    // Heavy scan: run off the main thread so the webview stays responsive and
+    // per-jar progress events can actually reach the frontend while it runs.
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::Path::new(&instance_path);
+        let force = force.unwrap_or(false);
+        let mut emit = |p: &IngestProgress| emit_ingest(&app, p);
+        Ok(ingest_active_instance_with_progress(path, force, &mut emit))
+    })
+    .await
+    .map_err(|e| format!("Ingest task failed: {e}"))?
 }
 
 /// Progress event payload streamed to the frontend during ingest.
@@ -710,6 +731,41 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().starts_with("ingest_"))
             .collect();
         // Cache is stored in system cache dir, not in instance
+    }
+
+    #[test]
+    fn test_force_reindex_discards_valid_cache() {
+        let instance = setup_test_instance();
+        let mods_dir = instance.path().join("mods");
+
+        let result1 = ingest_active_instance(instance.path());
+        assert!(result1.textures_indexed > 0);
+
+        let cp = cache_path(&mods_dir);
+        assert!(cp.exists(), "cache must be written after first ingest");
+        let mtime = |p: &std::path::Path| {
+            fs::metadata(p)
+                .and_then(|m| m.modified())
+                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())
+                .unwrap()
+        };
+        let mtime1 = mtime(&cp);
+
+        // A normal re-ingest on an unchanged pack is a cache hit: identical
+        // result and the cache file is NOT rewritten.
+        let result2 = ingest_active_instance(instance.path());
+        assert_eq!(result2.textures_indexed, result1.textures_indexed);
+        assert_eq!(mtime(&cp), mtime1, "cache hit must not rewrite the cache file");
+
+        // A forced re-index discards the valid cache and rescans from scratch
+        // (the cache file is rewritten), so in-place same-size/same-mtime
+        // replacements are still picked up.
+        let result3 = ingest_active_instance_with_progress(instance.path(), true, &mut |_| {});
+        assert_eq!(result3.textures_indexed, result1.textures_indexed);
+        assert!(
+            mtime(&cp) > mtime1,
+            "force must discard and rewrite the cache"
+        );
     }
 
     #[test]

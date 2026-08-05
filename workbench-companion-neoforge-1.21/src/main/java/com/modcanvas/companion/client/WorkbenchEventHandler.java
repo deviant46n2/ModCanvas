@@ -25,6 +25,12 @@ public class WorkbenchEventHandler {
             return;
         }
 
+        if (event.eventType.equals("EXTRACT_TEXTURES_REQUEST")) {
+            // ResourceManager lookup + PNG encode does not need a world/player.
+            AssetExporter.extract(event);
+            return;
+        }
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             LOGGER.warn("[WorkbenchEventHandler] Player is null, cannot execute command");

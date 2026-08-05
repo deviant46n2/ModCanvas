@@ -43,6 +43,13 @@ pub mod events {
     /// companion → ModCanvas: base64 PNG data URLs for rendered items
     /// (payload: `requestId`, `rendered: {itemId: dataUrl}`).
     pub const RENDER_ITEMS_RESULT: &str = "RENDER_ITEMS_RESULT";
+    /// ModCanvas → companion: extract runtime-resolvable textures for the given
+    /// namespaces via the in-game ResourceManager (payload: `requestId`,
+    /// `namespaces[]`, optional `maxTextures`).
+    pub const EXTRACT_TEXTURES_REQUEST: &str = "EXTRACT_TEXTURES_REQUEST";
+    /// companion → ModCanvas: base64 PNG data URLs keyed by full resource
+    /// location (payload: `requestId`, `textures: {ns:textures/path.png: url}`).
+    pub const EXTRACT_TEXTURES_RESULT: &str = "EXTRACT_TEXTURES_RESULT";
 }
 
 impl ModEvent {

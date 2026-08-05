@@ -208,7 +208,13 @@ The MVP's job is to build the **guided wrapper** that hides the power that alrea
 
 ### 8.4 Companion mod status
 
-- Multiple companion variants exist in the repo (`workbench-companion`, `-forge`, `-neoforge`, `-neoforge-1.21`). **One canonical target must be declared** — the 1.21.1 NeoForge variant — and the others reconciled or removed.
+- **Canonical companion resolved (todo.md Phase 3):** the 1.21.1 NeoForge
+  variant (`workbench-companion-neoforge-1.21`) is the sole supported target.
+  The fabric/forge/legacy-neoforge variants are archived under
+  `workbench-companion-archived/` and the deploy matrix
+  (`src-tauri/src/minecraft.rs`) deploys NeoForge only. Hotswap reload commands
+  (`RELOAD_*`) are frozen; the WS server, engine-render capture, and runtime
+  texture extraction remain live.
 - **The companion is MVP-adjacent, not endgame**: the beginner's final act ("Launch your pack") depends on it. Companion install + basic hot-reload stability is a v1 blocker.
 
 ---

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { searchItems, searchTags } from '../services/api'
 import type { SearchResult, TagInfo } from '../services/api'
 
-export function useItemSearch(loader: string, mcVersion: string) {
+export function useItemSearch(loader: string, mcVersion: string, enabled = true) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [tagResults, setTagResults] = useState<TagInfo[]>([])
@@ -30,9 +30,12 @@ export function useItemSearch(loader: string, mcVersion: string) {
   }, [loader, mcVersion])
 
   useEffect(() => {
+    // When disabled (e.g. the instance Registry tab is active) the query is
+    // filtered locally and must not trigger remote searches.
+    if (!enabled) return
     const t = setTimeout(() => search(query), 300)
     return () => clearTimeout(t)
-  }, [query, search])
+  }, [query, search, enabled])
 
   return { query, setQuery, results, tagResults, searching }
 }

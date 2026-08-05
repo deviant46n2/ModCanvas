@@ -552,19 +552,21 @@ pub struct LaunchProgress {
 
 /// Deploy the Workbench Companion mod to a game directory.
 /// Standalone function callable from anywhere (not tied to InstanceManager).
+///
+/// v1 target is **1.21.1 NeoForge only** (todo.md Phase 3): fabric/forge
+/// variants are archived and not deployed. Unknown loaders return an error.
 pub fn deploy_companion_mod_to_dir(game_dir: &PathBuf, loader: &str, _mc_version: &str) -> Result<(), String> {
     let mods_dir = game_dir.join("mods");
     std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
 
     let loader_lower = loader.to_lowercase();
     let companion_dirs: &[&str] = match loader_lower.as_str() {
-        "neoforge" => &[
-            "workbench-companion-neoforge-1.21",
-            "workbench-companion-neoforge",
-        ],
-        "forge" => &["workbench-companion-forge"],
-        "fabric" | "quilt" => &["workbench-companion"],
-        other => return Err(format!("Unknown loader for companion mod: {other}")),
+        "neoforge" => &["workbench-companion-neoforge-1.21"],
+        other => {
+            return Err(format!(
+                "Companion mod v1 targets 1.21.1 NeoForge only (loader was {other}); no companion is deployed."
+            ))
+        }
     };
 
     let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
@@ -950,8 +952,7 @@ mod tests {
     }
 
     /// Instances spread across several roots (native + Flatpak Prism) must
-    /// all be discovered and merged, not just the ones in one root.
-    #[test]
+    /// all be discovered and merged, not just the ones in one root.    #[test]
     fn scans_all_instance_roots() {
         let temp = std::env::temp_dir().join(format!("modcanvas_inst_{}", Uuid::new_v4()));
         let root_a = temp.join("a");
@@ -997,5 +998,29 @@ mod tests {
         assert!(!root_b.join("My New Pack").exists(), "instance NOT created under secondary root");
 
         let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    /// The deploy matrix targets 1.21.1 NeoForge only (todo.md Phase 3): every
+    /// archived loader is rejected with a clear message before any jar lookup.
+    #[test]
+    fn deploy_matrix_is_neoforge_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let game_dir = dir.path().join("game");
+
+        for loader in ["forge", "fabric", "quilt", "neoforge1.20"] {
+            let err = deploy_companion_mod_to_dir(&game_dir, loader, "1.20.1").unwrap_err();
+            assert!(
+                err.contains("NeoForge only"),
+                "loader `{loader}` must be rejected, got: {err}"
+            );
+        }
+
+        // NeoForge stays in the matrix: it must either deploy or fail only on a
+        // missing built jar — never on the loader being rejected.
+        let res = deploy_companion_mod_to_dir(&game_dir, "neoforge", "1.21.1");
+        match res {
+            Ok(()) => {}
+            Err(e) => assert!(e.contains("not found"), "neoforge must not be rejected: {e}"),
+        }
     }
 }

@@ -83,8 +83,8 @@ export async function logDebug(message: string): Promise<void> {
   return invoke('log_debug', { message })
 }
 
-export async function ingestActiveInstance(instancePath: string): Promise<IngestResult> {
-  return invoke<IngestResult>('ingest_active_instance_cmd', { instancePath })
+export async function ingestActiveInstance(instancePath: string, force = false): Promise<IngestResult> {
+  return invoke<IngestResult>('ingest_active_instance_cmd', { instancePath, force })
 }
 
 export async function getTextureFiles(

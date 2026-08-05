@@ -2,8 +2,8 @@
 
 Minecraft items, chapter icons and decorations that animate in-game (vertical frame-strip PNG + adjacent `*.png.mcmeta` animation metadata) play in the editor instead of showing as a flat sprite strip.
 
-> **Engine-rendered icons:** icons ModCanvas's software rasterizer cannot bake
-> (custom mod models, fluids, NBT-dependent looks) can be rendered by the
+> **Engine-rendered icons:** icons that can't be shown as a flat texture (3D
+> block/hand-modeled items, custom mod models, fluids) are rendered by the
 > in-game companion mod and cached — see [`engine-renders.md`](engine-renders.md).
 
 ## Background prefetch of all chapters
@@ -101,6 +101,12 @@ Duplicate edges and self-loops are rejected by the editor.
 
 Edges are only shown when both endpoint quests belong to the active chapter (filtered together with their nodes).
 
+The canvas **never** renders quests from every chapter at once: if the active
+chapter is null or stale (e.g. after switching packs), the canvas falls back to
+the first chapter instead of superimposing all quests. `QuestBookEditor` also
+resets the graph / active chapter to null on every `projectId` change so a
+previous pack's selection can't leak into the next one.
+
 ## Source Files
 
 - `frontend/src/components/quest/quest-edges.tsx` — `DependencyEdge` renderer, `detectCycles`, `edgeTypes`.
@@ -153,13 +159,15 @@ Assets").
 If the active instance has no FTB Quests jar, shape keys are absent from the
 index and nodes render with plain styling — no bundled fallbacks exist.
 
-# Quest Editor — 3D Icon Baking
+# Quest Editor — 3D Icon Resolution
 
-Block items and hand-modeled 3D items resolve to in-game-style isometric icons
-instead of a flat single-face texture. A **software rasterizer in Rust** bakes
-item/block models (parent chains, `elements`, per-face MC lighting, `display.gui`
-transform) into PNG data URLs **at materialization time** — offline, deterministic,
-no GPU, and no game assets ever bundled (per AGENTS.md).
+Block items and hand-modeled 3D items cannot be shown as a flat single-face
+texture. They resolve to `bake:<ns>:<kind>/<path>` descriptors that flag the
+item as needing a real in-game render by the companion mod. **These are never
+materialized offline** — there is no software rasterizer placeholder; the icon
+stays blank until the game runs and the companion renders it (see
+[`engine-renders.md`](engine-renders.md)), and the editor shows a "run the
+instance to capture textures" prompt while any remain.
 
 ## Resolution rules
 
@@ -167,22 +175,23 @@ no GPU, and no game assets ever bundled (per AGENTS.md).
   to `bake:<ns>:item/<path>` (hand-modeled 3D items like apotheosis gems).
 - A **block** item whose model *chain* (this model or any `parent` ancestor) has
   `elements` resolves to `bake:<ns>:block/<path>` — but only when a texture is
-  findable in the chain first (`block_texture_in_chain`), so an unbakeable
-  descriptor is never emitted.
+  findable in the chain first (`block_texture_in_chain`), so a descriptor is only
+  emitted when the model is actually texture-backed.
 - Flat `item/generated` models still resolve to a single texture (unchanged).
 
 ### Parent references and namespaces
 
 A model `parent` reference without an explicit namespace (`"parent": "block/cube"`)
 is resolved against the **vanilla `minecraft:` namespace** — never the child
-model's namespace. `Models::resolve_*`, `chain_has_elements`,
-`block_texture_in_chain` and `baker::resolve` all use `split_parent_ns`
+model's namespace. `Models::resolve_*`, `chain_has_elements` and
+`block_texture_in_chain` all use `split_parent_ns`
 (`instance_textures/models.rs`), which defaults namespace-less parent refs to
 `minecraft`. This is what lets a mod block like
 `industrialforegoing:fluid_placer` parent through `base_block` into
-`block/cube` (vanilla geometry) and bake into a 3D icon instead of degrading to
-a flat 16px face. `split_ref` (texture refs) still inherits the child namespace —
-only *parents* use the vanilla default, matching Minecraft's own resolver.
+`block/cube` (vanilla geometry) and be flagged for a 3D render instead of
+degrading to a flat 16px face. `split_ref` (texture refs) still inherits the
+child namespace — only *parents* use the vanilla default, matching Minecraft's
+own resolver.
 
 ## Texture slot resolution
 
@@ -196,67 +205,34 @@ Block/plant models resolve icons from these `textures` slots, in order:
 cross-model plants (saplings, crops, flowers) would fall back to a flat texture.
 
 Merged texture slots follow **Minecraft semantics**: the deepest (child) model in
-a parent chain overrides an ancestor on the same slot. `baker::resolve` walks
+a parent chain overrides an ancestor on the same slot. `Models::resolve_*` walks
 child → root and keeps the *first* definition it sees for each slot.
 
 ## Materialization flow
 
 1. Cache miss → `models_for` + `resolve_bare_keys` insert `bake:<model_ref>` keys
    into the compact index (bare `ns:id` forms), persisted to the disk cache.
-2. Frontend asks for keys → `resolve_texture_urls` sees `bake:` → `bake_icon`.
-3. `bake_icon` (`materialize.rs`) resolves the merged model, decodes the textures
-   it needs from the *same* index, renders via `raster::render`, and base64-encodes
-   into a `data:image/png` URL.
-4. No image bytes are ever stored in the cache — only `bake:` descriptor strings.
-   `attach_animations` skips `bake:` keys (baked icons have no `.png.mcmeta`).
-
-Never-materialized keys are **retried**, not permanently dropped: the frontend
-texture loader tracks failure attempts per key and re-requests them on later
-passes (`requestMaterialize`), so a key that failed once (e.g. because a bake
-couldn't resolve its textures) can succeed after the index is refreshed.
-
-## Rendering
-
-`raster::render` (`instance_textures/models/raster.rs`) builds quads from faces,
-backface-culls, applies `display.gui` scale→rotate→translate (center at 8,8,8),
-shades per face, and alpha-composites with a z-buffer. Two quality details make
-the icons look close to in-game Minecraft blocks:
-
-- **Correct lighting**: per-face brightness matches Minecraft's block-model
-  constants exactly — up 1.0, north/south 0.8, west/east 0.6, down 0.5
-  (`shade:false`→1.0). The west/east darker-than-north/south contrast is what
-  gives the isometric view its recognizable 3D depth; the old constants
-  (north/west 1.0, east 0.8) made side faces over-bright and the cube look flat.
-- **Supersampling + crisp texels**: rendering happens at 4× resolution
-  (`SUPERSAMPLE`), then a **coverage-based downsample** collapses the
-  `ss×ss` subsamples down to the 96×96 output. Alpha is the solid-subpixel
-  coverage (anti-aliasing only the silhouette edge); the color is taken from
-  the nearest solid subsample to the pixel center, so the 16px texture texels
-  stay hard and pixelated instead of being smeared by a box-average. The bake
-  size (96px, `OUTPUT_SIZE`) is close to the display sizes used in the UI —
-  a large supersampled PNG gets smoothed by the browser's downscale and the
-  pixel-art blurs.
-
-**Display pipeline**: baked icons are crisp isometric renders baked near the
-app's display sizes (64px `OUTPUT_SIZE`), and the UI renders **all** icons
-(flat textures and bakes) with `image-rendering: pixelated` — nearest-neighbor
-scaling. That is exactly how Minecraft icons look: small, hard, pixelated
-pixels. Rendering bakes with smooth (`auto`) scaling was the source of the
-"blurry 3D" report — bilinear downscale/upscale smears the 16px texels into
-gradients.
-
-Element rotations support single-axis `angle` and multi-axis `x/y/z` forms,
-including the `rescale` flag (shrink by 1/√2, vanilla plant/crop behavior).
+2. `resolve_texture_urls` (`materialize.rs`) **skips** `bake:` keys — they never
+   become data URLs. Flat `jar:`/filesystem sources are materialized as before.
+3. The frontend registers `bake:` keys (`registerBakedKeysFromIndex`) and treats
+   them as engine-needed: when the companion connects, `queueEngineRenders`
+   sends them to the in-game renderer; the returned PNGs replace the descriptor
+   in the live index and are persisted to the engine-render cache
+   (`engine_renders.rs`), so they survive restarts.
+4. No image bytes are ever stored in the index cache — only `bake:` descriptor
+   strings. `attach_animations` skips `bake:` keys (3D renders have no
+   `.png.mcmeta`).
 
 ## Source files
 
-- `src-tauri/src/instance_textures/models.rs` — `Resolved::Bake` + `resolve_bare_keys`.
-- `src-tauri/src/instance_textures/models/baker.rs` — merged model resolution.
-- `src-tauri/src/instance_textures/models/merge.rs` — model parsing helpers.
-- `src-tauri/src/instance_textures/models/raster.rs` (+ `raster/tests.rs`) — software rasterizer.
-- `src-tauri/src/instance_textures/materialize.rs` — `resolve_texture_urls` / `bake_icon`.
-- `frontend/src/components/quest/QuestIcon.tsx` + `AnimatedSprite.tsx` — icon
-  rendering (always `image-rendering: pixelated`).
+- `src-tauri/src/instance_textures/models.rs` — `Resolved::Bake` + `resolve_bare_keys`
+  (classification only; no rendering).
+- `src-tauri/src/instance_textures/materialize.rs` — `resolve_texture_urls`
+  (skips `bake:` keys).
+- `frontend/src/services/texture-loader.ts` — baked-key tracking + prompt count.
+- `frontend/src/components/quest/EngineRenderPrompt.tsx` — "run the instance to
+  capture textures" banner.
+- See [`engine-renders.md`](engine-renders.md) for the companion render path.
 
 ## Edge-hover rendering note
 

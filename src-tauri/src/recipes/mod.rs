@@ -179,11 +179,12 @@ pub fn scan_pack_recipes(project_path: &std::path::Path) -> Vec<DiscoveredRecipe
             if path.extension().map_or(true, |e| e != "json") {
                 continue;
             }
-            // Must be under data/<ns>/recipes/.
+            // Must be under data/<ns>/recipe(s)/ (pre-1.21 `recipes`, 1.21+
+            // datapack rename to singular `recipe`).
             let rel = path.strip_prefix(&data_dir).unwrap_or(path);
             let in_recipes = rel
                 .components()
-                .any(|c| c.as_os_str() == "recipes");
+                .any(|c| c.as_os_str() == "recipes" || c.as_os_str() == "recipe");
             if !in_recipes {
                 continue;
             }
@@ -364,12 +365,13 @@ fn scan_jar_recipes(jar_path: &std::path::Path, root: &std::path::Path, out: &mu
             Err(_) => continue,
         };
         let name = entry.name().replace('\\', "/");
-        // data/<ns>/recipes/<name>.json — exactly three path segments after data/.
+        // data/<ns>/recipe(s)/<name>.json — three path segments after data/.
+        // Pre-1.21 datapacks used `recipes`; 1.21+ renamed it to `recipe`.
         if !name.starts_with("data/") || !name.ends_with(".json") {
             continue;
         }
         let parts: Vec<&str> = name.split('/').collect();
-        if parts.len() < 4 || parts[2] != "recipes" {
+        if parts.len() < 4 || (parts[2] != "recipes" && parts[2] != "recipe") {
             continue;
         }
         let file_name = parts[3].strip_suffix(".json").unwrap_or(parts[3]);
@@ -400,13 +402,19 @@ fn scan_jar_recipes(jar_path: &std::path::Path, root: &std::path::Path, out: &mu
 }
 
 /// Tauri command: scan a project path for discoverable recipes.
+/// Heavy (reads every jar's recipe JSONs on a real pack) — runs off the main
+/// thread so the webview stays responsive during the first scan.
 #[tauri::command]
-pub fn scan_pack_recipes_cmd(project_path: String) -> Result<Vec<DiscoveredRecipe>, String> {
-    let path = std::path::Path::new(&project_path);
-    if !path.is_dir() {
-        return Err("project path is not a directory".to_string());
-    }
-    Ok(scan_pack_recipes(path))
+pub async fn scan_pack_recipes_cmd(project_path: String) -> Result<Vec<DiscoveredRecipe>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::Path::new(&project_path);
+        if !path.is_dir() {
+            return Err("project path is not a directory".to_string());
+        }
+        Ok(scan_pack_recipes(path))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
@@ -608,6 +616,39 @@ mod tests {
 
         let found = scan_pack_recipes(dir.path());
         assert_eq!(found.len(), 3, "all recipes from all jars should load");
+    }
+
+    #[test]
+    fn loads_recipes_from_121_singular_recipe_folder() {
+        use zip::CompressionMethod;
+        use zip::write::FileOptions;
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let mods = dir.path().join("mods");
+        std::fs::create_dir_all(&mods).unwrap();
+
+        // MC 1.21+ datapacks use data/<ns>/recipe/ (singular).
+        let jar_path = mods.join("moda.jar");
+        let file = std::fs::File::create(&jar_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options: FileOptions<'_, ()> =
+            FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file(
+            "data/mod_a/recipe/diamond_block.json",
+            options,
+        )
+        .unwrap();
+        zip.write_all(
+            br#"{"type":"minecraft:crafting_shaped","pattern":["AA","AA"],"key":{"A":{"item":"minecraft:diamond"}},"result":{"id":"minecraft:diamond_block","count":1}}"#,
+        )
+        .unwrap();
+        zip.finish().unwrap();
+
+        let found = scan_pack_recipes(dir.path());
+        assert_eq!(found.len(), 1, "1.21 singular `recipe` folder must be scanned");
+        assert_eq!(found[0].id, "mod_a:diamond_block");
+        assert_eq!(found[0].recipe.output.item, "minecraft:diamond_block");
     }
 }
 

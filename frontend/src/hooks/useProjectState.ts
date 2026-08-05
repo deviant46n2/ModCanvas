@@ -12,12 +12,19 @@ export interface Project {
   created_at: string
   updated_at: string
   path: string
+  /** Origin: `"modcanvas"` (manual / imported) or `"prism"` (Prism-synced). */
+  source: string
 }
 
 const LAST_PROJECT_KEY = 'modcanvas:last-project-id'
 
 export function useProjectState() {
   const [projects, setProjects] = useState<Project[]>([])
+  // The pack currently open in the workspace. When null the launcher is shown;
+  // opening = full load (see useAppState.openPack).
+  const [openProject, setOpenProject] = useState<Project | null>(null)
+  // The project highlighted in the launcher for the metadata preview. This is
+  // purely a selection concept — it never triggers a load.
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -34,10 +41,32 @@ export function useProjectState() {
     }
   }
 
-  /** Remember the selected project so it can be reopened on next launch. */
-  function rememberProject(project: Project | null) {
+  /** Return the last-opened project id, if any. */
+  function getLastProjectId(): string | null {
+    try {
+      return localStorage.getItem(LAST_PROJECT_KEY)
+    } catch {
+      return null
+    }
+  }
+
+  /** Open a pack: enters the workspace. The full cache-aware load pipeline is
+   *  run by useAppState.openPack. */
+  function openPack(project: Project) {
+    setOpenProject(project)
     setSelectedProject(project)
-    persistSelection(project?.id ?? null)
+    persistSelection(project.id)
+  }
+
+  /** Close the open pack and return to the launcher. */
+  function closePack() {
+    setOpenProject(null)
+    persistSelection(null)
+  }
+
+  /** Launcher preview highlight only — does not open the pack. */
+  function selectProject(project: Project | null) {
+    setSelectedProject(project)
   }
 
   async function loadProjects() {
@@ -51,16 +80,7 @@ export function useProjectState() {
     }
   }
 
-  /** Return the last-selected project id, if any. */
-  function getLastProjectId(): string | null {
-    try {
-      return localStorage.getItem(LAST_PROJECT_KEY)
-    } catch {
-      return null
-    }
-  }
-
-  async function handleCreateProject() {
+  async function handleCreateProject(): Promise<Project | null> {
     try {
       const project = await createProject(
         newProjectName,
@@ -69,28 +89,40 @@ export function useProjectState() {
         `~/modpacks/${newProjectName.toLowerCase().replace(/\s+/g, '-')}`,
       )
       setProjects([project, ...projects])
-      rememberProject(project)
+      // Select it in the launcher; useAppState.handleCreateProject decides
+      // whether to open it (which runs the full load pipeline).
+      setSelectedProject(project)
       setShowNewProject(false)
       setNewProjectName('')
+      return project
     } catch (e) {
       console.error('Failed to create project:', e)
+      return null
     }
   }
 
   async function handleSaveProject() {
-    if (!selectedProject) return
+    if (!openProject) return
     try {
-      await saveProject(selectedProject.id)
+      await saveProject(openProject.id)
     } catch (e) {
       console.error('Failed to save project:', e)
     }
   }
 
   async function handleConfirmDelete(): Promise<boolean> {
+    const target = openProject ?? selectedProject
+    if (!target) return false
     try {
-      await deleteProject(selectedProject!.id)
+      await deleteProject(target.id)
       await loadProjects()
-      rememberProject(null)
+      if (openProject?.id === target.id) {
+        setOpenProject(null)
+        setSelectedProject(null)
+        persistSelection(null)
+      } else {
+        setSelectedProject(null)
+      }
       return true
     } catch (e) {
       console.error('Failed to delete project:', e)
@@ -104,14 +136,13 @@ export function useProjectState() {
     setConfirmCloseProject(false)
   }
 
-  function handleCloseProject() {
-    rememberProject(null)
-  }
-
   return {
     projects,
+    openProject,
     selectedProject,
-    setSelectedProject: rememberProject,
+    selectProject,
+    openPack,
+    closePack,
     showNewProject, setShowNewProject,
     newProjectName, setNewProjectName,
     mcVersion, setMcVersion,
@@ -123,6 +154,5 @@ export function useProjectState() {
     handleSaveProject,
     handleConfirmDelete,
     handleCloseDelete,
-    handleCloseProject,
   }
 }
