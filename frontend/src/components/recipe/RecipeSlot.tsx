@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { RecipeIngredient } from '../../core/recipe/recipe-store'
 import { setDragPayload, clearDragPayload, readDragPayload, recipeIngredientFromPayload } from '../../core/recipe/dnd'
 import { AnimatedSprite } from '../quest/AnimatedSprite'
@@ -84,7 +85,10 @@ export function RecipeSlot({
       onContextMenu={(e) => {
         if (!filled) return
         e.preventDefault()
-        setMenu({ x: e.clientX, y: e.clientY })
+        // Clamp so the portaled menu stays on-screen near the right/bottom edge.
+        const x = Math.max(0, Math.min(e.clientX, window.innerWidth - 160))
+        const y = Math.max(0, Math.min(e.clientY, window.innerHeight - 120))
+        setMenu({ x, y })
       }}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -142,28 +146,30 @@ export function RecipeSlot({
         </div>
       )}
 
-      {menu && (
-        <div
-          className="recipe-slot-menu"
-          style={{ left: menu.x, top: menu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button type="button" onClick={() => { onPick(); setMenu(null) }}>Replace…</button>
-          {shapeless && (
-            <button
-              type="button"
-              onClick={() => {
-                setCountDraft(String(ingredient?.count ?? 1))
-                setCountEditing(true)
-                setMenu(null)
-              }}
-            >
-              Set count…
-            </button>
-          )}
-          <button type="button" className="danger" onClick={() => { onClear(); setMenu(null) }}>Clear</button>
-        </div>
-      )}
+      {menu &&
+        createPortal(
+          <div
+            className="recipe-slot-menu"
+            style={{ left: menu.x, top: menu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" onClick={() => { onPick(); setMenu(null) }}>Replace…</button>
+            {shapeless && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCountDraft(String(ingredient?.count ?? 1))
+                  setCountEditing(true)
+                  setMenu(null)
+                }}
+              >
+                Set count…
+              </button>
+            )}
+            <button type="button" className="danger" onClick={() => { onClear(); setMenu(null) }}>Clear</button>
+          </div>,
+          document.body,
+        )}
 
       {countEditing && (
         <div className="recipe-slot-count-editor" onClick={(e) => e.stopPropagation()}>
