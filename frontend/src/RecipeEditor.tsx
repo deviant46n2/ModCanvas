@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRecipeStore } from './core/recipe/recipe-store';
 import { RecipePalette } from './components/recipe/RecipePalette';
-import { RecipeList } from './components/recipe/RecipeList';
+import { RecipeExplorer } from './components/recipe/RecipeExplorer';
 import { CraftingGridPanel } from './components/recipe/CraftingGridPanel';
 import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
 import { RecipeScriptPreview } from './components/recipe/RecipeScriptPreview';
@@ -38,13 +38,12 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     addRecipe,
     updateRecipe,
     deleteRecipe,
-    bulkDeleteRecipes,
-    reorderRecipes,
     selectRecipe,
     duplicateRecipe,
     markClean,
     getSelectedRecipe,
     loadRecipesFromPack,
+    isDisabled,
   } = useRecipeStore();
 
   // Resolve the adapter for this pack's version + loader so item/tag search and
@@ -321,15 +320,18 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         />
 
         <main className="recipe-canvas">
-          <RecipeList
+          <RecipeExplorer
             recipes={recipes}
             selectedRecipeId={selectedRecipeId}
             onSelectRecipe={selectRecipe}
             onNewRecipe={handleNewRecipe}
+            onEditCopy={(id) => {
+              const copyId = duplicateRecipe(id);
+              if (copyId) selectRecipe(copyId);
+            }}
             getTextureUrl={getTextureUrl}
-            onRename={(id, name) => updateRecipe(id, { name })}
-            onBulkDelete={bulkDeleteRecipes}
-            onReorder={reorderRecipes}
+            isDisabled={isDisabled}
+            itemRegistry={itemRegistry}
           />
 
           {selectedRecipe && (
