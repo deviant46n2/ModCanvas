@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useRecipeScripts } from '../../hooks/useRecipeScripts';
 import type { Recipe } from '../../core/recipe/recipe-store';
+import { selectSaveableRecipes } from '../../core/recipe/validation';
 
 interface RecipeScriptDrawerProps {
   projectId: string;
@@ -20,7 +21,10 @@ export function RecipeScriptDrawer({ projectId, recipes, selectedRecipe, loader 
 
   const full = useRecipeScripts(projectId, recipes, isCraftTweaker);
   const single = useMemo(() => (selectedRecipe ? [selectedRecipe] : []), [selectedRecipe]);
-  const one = useRecipeScripts(projectId, single, isCraftTweaker, []);
+  // Stable [] so the this-recipe hook's effect doesn't re-run (and cancel its
+  // own debounce) on every render.
+  const noRemoves = useMemo<string[]>(() => [], []);
+  const one = useRecipeScripts(projectId, single, isCraftTweaker, noRemoves);
 
   const active = tab === 'full' ? full : one;
   const filePath = isCraftTweaker
@@ -35,6 +39,22 @@ export function RecipeScriptDrawer({ projectId, recipes, selectedRecipe, loader 
     } catch {
       /* clipboard unavailable — ignore */
     }
+  };
+
+  const saveableCount = useMemo(() => selectSaveableRecipes(recipes).length, [recipes]);
+
+  const emptyMessage = (): string => {
+    if (tab === 'recipe') {
+      if (!selectedRecipe) return '// nothing to emit — select a recipe to preview.';
+      if (selectedRecipe.origin !== 'authored')
+        return '// nothing to emit — this is a pack/discovered recipe. Use “Edit a copy” to make an editable one.';
+      if (selectedRecipe.disabled) return '// nothing to emit — this recipe is disabled.';
+      if (!selectedRecipe.output.item) return '// nothing to emit — set an output item first.';
+      return '// nothing to emit — fix the recipe validation errors first.';
+    }
+    if (saveableCount === 0)
+      return '// nothing to emit — no authored recipes with an output. Create one, or “Edit a copy” of a discovered recipe.';
+    return '// nothing to emit';
   };
 
   return (
@@ -72,7 +92,7 @@ export function RecipeScriptDrawer({ projectId, recipes, selectedRecipe, loader 
       {active.loading && <div className="preview-loading">Rendering…</div>}
       {active.error && <div className="preview-error">{active.error}</div>}
       {!active.loading && !active.error && (
-        <pre className="preview-code">{active.script || '// nothing to emit'}</pre>
+        <pre className="preview-code">{active.script || emptyMessage()}</pre>
       )}
     </div>
   );

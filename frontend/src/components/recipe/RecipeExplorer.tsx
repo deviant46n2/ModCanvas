@@ -127,16 +127,15 @@ function ExplorerCell({ columnIndex, rowIndex, style, ...d }: CellComponentProps
   );
 }
 
-function SectionGrid({ items, cellData, maxHeight }: {
+function SectionGrid({ items, cellData, height }: {
   items: Recipe[];
   cellData: Omit<ExplorerCellData, 'filtered'>;
-  maxHeight: number;
+  height: number;
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 || height <= 0) return null;
   const columns = Math.max(1, Math.floor(cellData.columns / COLUMN_WIDTH));
   const columnWidth = cellData.columns / columns;
   const rows = Math.ceil(items.length / columns);
-  const height = Math.min(rows * GRID_ROW_HEIGHT, maxHeight);
   return (
     <Grid
       className="recipe-explorer-grid"
@@ -243,18 +242,51 @@ export function RecipeExplorer({
   const showPack = showAll || ownership === 'pack';
   const showJars = showAll || ownership === 'jars';
 
-  // Measure the panel so the virtualized grids fill its width.
+  // Measure the panel so the virtualized grids fill its width, and the groups
+  // area so the list can expand to fill the panel height.
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelW, setPanelW] = useState(600);
+  const groupsRef = useRef<HTMLDivElement>(null);
+  const [groupsH, setGroupsH] = useState(400);
   useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
+    const panel = panelRef.current;
+    const groups = groupsRef.current;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) setPanelW(entry.contentRect.width);
+      for (const entry of entries) {
+        if (entry.target === panel) setPanelW(entry.contentRect.width);
+        else setGroupsH(entry.contentRect.height);
+      }
     });
-    ro.observe(el);
+    if (panel) ro.observe(panel);
+    if (groups) ro.observe(groups);
     return () => ro.disconnect();
   }, []);
+
+  // Per-section heights: natural (capped), then give the leftover panel height
+  // to the last rendered grid so the list fills instead of leaving an empty
+  // lower half.
+  const columns = Math.max(1, Math.floor(panelW / COLUMN_WIDTH));
+  const gridH = (count: number, cap: number) =>
+    Math.min(Math.ceil(count / columns) * GRID_ROW_HEIGHT, cap);
+  const SECTION_TITLE_H = 26;
+  const SECTION_GAP = 8;
+
+  const mineGrid = showMine && mine.length > 0;
+  const packGrid = showPack && pack.length > 0;
+  const jarsExpandedGrid = showJars && jars.length > 0 && !jarsCollapsed;
+
+  let mineH = mineGrid ? gridH(mine.length, MINE_MAX_H) : 0;
+  let packH = packGrid ? gridH(pack.length, PACK_MAX_H) : 0;
+  let jarsH = jarsExpandedGrid ? gridH(jars.length, JARS_MAX_H) : 0;
+
+  const titleRows =
+    (mineGrid ? 1 : 0) + (packGrid ? 1 : 0) + (showJars && jars.length > 0 ? 1 : 0);
+  const fixedH =
+    titleRows * SECTION_TITLE_H + Math.max(0, titleRows - 1) * SECTION_GAP;
+  const leftover = Math.max(0, groupsH - fixedH - (mineH + packH + jarsH));
+  if (jarsExpandedGrid) jarsH += leftover;
+  else if (packGrid) packH += leftover;
+  else if (mineGrid) mineH += leftover;
 
   const cellBase = {
     columns: panelW,
@@ -339,7 +371,7 @@ export function RecipeExplorer({
         </div>
       )}
 
-      <div className="recipe-explorer-groups">
+      <div className="recipe-explorer-groups" ref={groupsRef}>
         {noRecipesAtAll && (
           <div className="empty-state">
             No recipes yet — start one
@@ -349,26 +381,26 @@ export function RecipeExplorer({
         {nothingMatches && (
           <div className="empty-state">No recipes match your filters.</div>
         )}
-        {showMine && mine.length > 0 && (
+        {mineGrid && (
           <section className="recipe-group">
             <h4 className="recipe-group-title">Mine <span>{mine.length}</span></h4>
-            <SectionGrid items={mine} cellData={cellBase} maxHeight={MINE_MAX_H} />
+            <SectionGrid items={mine} cellData={cellBase} height={mineH} />
           </section>
         )}
-        {showPack && pack.length > 0 && (
+        {packGrid && (
           <section className="recipe-group">
             <h4 className="recipe-group-title">Pack <span>{pack.length}</span></h4>
-            <SectionGrid items={pack} cellData={cellBase} maxHeight={PACK_MAX_H} />
+            <SectionGrid items={pack} cellData={cellBase} height={packH} />
           </section>
         )}
-        {showJars && (
+        {showJars && jars.length > 0 && (
           <section className="recipe-group recipe-group-jars">
             <h4 className="recipe-group-title recipe-group-toggle" onClick={() => setJarsCollapsed((c) => !c)}>
               <span className="recipe-group-caret">{jarsCollapsed ? '▸' : '▾'}</span>
               Jars <span>{jars.length}</span>
             </h4>
             {!jarsCollapsed && (
-              <SectionGrid items={jars} cellData={cellBase} maxHeight={JARS_MAX_H} />
+              <SectionGrid items={jars} cellData={cellBase} height={jarsH} />
             )}
           </section>
         )}
