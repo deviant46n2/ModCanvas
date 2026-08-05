@@ -4,9 +4,9 @@ Implementation contract for the **Recipes tab** work: per-recipe disable (all
 origins, incl. script comment-out), RecipeExplorer + filters, authored-only save
 gate, palette right rail, script drawer, type picker, bulk replace.
 
-**Status:** Backends A–C complete. Data D complete. UI 1–6 complete (explorer,
+**Status:** Backends A–C complete. Data D complete. UI 1–7 complete (explorer,
 disable+manifest, header cleanup, palette rail + recipes-using-this, type picker,
-script drawer). Working: UI 7.
+script drawer, bulk replace). Working: VERIFY (docs rewrite, rebuild).
 Locked decisions agreed 2026-08-05. This file is the
 single source of truth for scope + semantics. Read fully before coding; follow
 AGENTS.md (docs are code, 3-layer rule, ≤300 lines/file, rebuild + mtime verify).

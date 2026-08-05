@@ -37,6 +37,8 @@ export interface RecipeExplorerProps {
   /** Controlled search query (lifted so "recipes using this" can drive it). */
   query: string;
   onQueryChange: (q: string) => void;
+  /** Open the bulk-replace modal for the multi-selected recipe ids. */
+  onBulkReplace: (ids: string[]) => void;
   getTextureUrl: (itemId: string) => string | null;
   isDisabled: (r: Recipe) => boolean;
   /** Comment-out manifest pseudo-recipes, shown in the Disabled filter. */
@@ -56,6 +58,8 @@ type ExplorerCellData = {
   onToggleDisable: (recipe: Recipe) => void;
   statusOf: (r: Recipe) => RowStatus;
   isDisabled: (r: Recipe) => boolean;
+  selected: Set<string>;
+  toggleSelect: (id: string) => void;
 };
 
 function ExplorerCell({ columnIndex, rowIndex, style, ...d }: CellComponentProps<ExplorerCellData>) {
@@ -74,6 +78,14 @@ function ExplorerCell({ columnIndex, rowIndex, style, ...d }: CellComponentProps
       title={readOnly ? 'Read-only (from a mod jar)' : 'Click to open'}
     >
       <div className="recipe-grid-info">
+        <input
+          type="checkbox"
+          className="recipe-select-checkbox"
+          checked={d.selected.has(recipe.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => d.toggleSelect(recipe.id)}
+          title="Multi-select for bulk actions"
+        />
         <span className="recipe-type-badge">{recipe.type}</span>
         <span className="recipe-name">{recipe.name}</span>
         {readOnly ? (
@@ -149,6 +161,7 @@ export function RecipeExplorer({
   onToggleDisable,
   query,
   onQueryChange,
+  onBulkReplace,
   getTextureUrl,
   isDisabled,
   manifestRecipes,
@@ -160,6 +173,15 @@ export function RecipeExplorer({
   const [changed, setChanged] = useState(false);
   const [type, setType] = useState<RecipeTypeFilter>('all');
   const [jarsCollapsed, setJarsCollapsed] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Validation status memoized over authored recipes only; read-only rows are
   // skipped entirely (neutral lock glyph, no validation cost).
@@ -250,6 +272,8 @@ export function RecipeExplorer({
       return 'ok';
     },
     isDisabled,
+    selected,
+    toggleSelect,
   };
 
   const noRecipesAtAll = recipes.length === 0;
@@ -302,6 +326,18 @@ export function RecipeExplorer({
           </select>
         </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="recipe-bulk-bar">
+          <span>{selected.size} selected</span>
+          <button type="button" className="btn-secondary" onClick={() => onBulkReplace([...selected])}>
+            Replace ingredient…
+          </button>
+          <button type="button" className="bulk-clear" onClick={() => setSelected(new Set())}>
+            Clear
+          </button>
+        </div>
+      )}
 
       <div className="recipe-explorer-groups">
         {noRecipesAtAll && (

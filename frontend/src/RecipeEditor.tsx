@@ -5,6 +5,8 @@ import { RecipeExplorer } from './components/recipe/RecipeExplorer';
 import { CraftingGridPanel } from './components/recipe/CraftingGridPanel';
 import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
 import { RecipeScriptDrawer } from './components/recipe/RecipeScriptDrawer';
+import { BulkReplaceModal } from './components/recipe/BulkReplaceModal';
+import { replaceIngredient, type IngredientRef } from './core/recipe/bulk-replace';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
@@ -179,6 +181,17 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     setExplorerQuery(itemOrTagId.startsWith('#') ? itemOrTagId : `>${itemOrTagId}`);
   }, []);
 
+  const [bulkReplaceIds, setBulkReplaceIds] = useState<string[] | null>(null);
+
+  const handleBulkReplace = useCallback((from: IngredientRef, to: IngredientRef, affectedIds: string[]) => {
+    for (const id of affectedIds) {
+      const recipe = useRecipeStore.getState().recipes.find((r) => r.id === id);
+      if (!recipe || recipe.origin !== 'authored') continue;
+      updateRecipe(id, replaceIngredient(recipe, from, to));
+    }
+    setBulkReplaceIds(null);
+  }, [updateRecipe]);
+
   const handleGridChange = useCallback((grid: (RecipeIngredient | null)[][]) => {
     const current = getSelectedRecipe();
     if (!current) return;
@@ -319,6 +332,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           onToggleDisable={handleToggleDisable}
           query={explorerQuery}
           onQueryChange={setExplorerQuery}
+          onBulkReplace={setBulkReplaceIds}
           getTextureUrl={getTextureUrl}
           isDisabled={isDisabled}
           manifestRecipes={manifestRecipes}
@@ -378,6 +392,18 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           getTextureUrl={getTextureUrl}
           onSelect={handlePickItem}
           onClose={() => setPickTarget(null)}
+        />
+      )}
+
+      {bulkReplaceIds && (
+        <BulkReplaceModal
+          recipes={recipes}
+          selectedIds={bulkReplaceIds}
+          items={itemRegistry}
+          tags={tagCatalog}
+          getTextureUrl={getTextureUrl}
+          onClose={() => setBulkReplaceIds(null)}
+          onApply={handleBulkReplace}
         />
       )}
 

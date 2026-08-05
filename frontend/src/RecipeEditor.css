@@ -1309,6 +1309,202 @@
   color: var(--color-text-tertiary);
 }
 
+/* Bulk multi-select bar */
+.recipe-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-subtle);
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
+}
+
+.recipe-bulk-bar .btn-secondary {
+  margin-left: auto;
+}
+
+.bulk-clear {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.bulk-clear:hover {
+  color: var(--color-text-primary);
+}
+
+/* Bulk-replace modal */
+.bulk-replace-panel {
+  width: 520px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.bulk-replace-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.bulk-replace-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bulk-replace-field-label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.bulk-replace-selected {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+}
+
+.bulk-replace-selected .is-tag {
+  color: var(--color-accent);
+}
+
+.bulk-replace-selected-name {
+  font-family: var(--font-sans);
+  color: var(--color-text-tertiary);
+}
+
+.bulk-replace-clear {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.bulk-replace-clear:hover {
+  color: var(--color-text-primary);
+}
+
+.bulk-replace-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-1);
+  box-shadow: var(--shadow-modal);
+}
+
+.bulk-replace-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bulk-replace-option:hover {
+  background: var(--color-bg-surface-2);
+}
+
+.bulk-replace-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.bulk-replace-option-fallback,
+.bulk-replace-tag-glyph {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.bulk-replace-tag-glyph {
+  color: var(--color-accent);
+}
+
+.bulk-replace-option-id {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-replace-option-name {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.bulk-replace-note {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.bulk-replace-preview {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.bulk-replace-preview-empty {
+  color: var(--color-text-tertiary);
+}
+
+.bulk-replace-affected {
+  margin: var(--space-1) 0 0 0;
+  padding-left: var(--space-4);
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--color-text-secondary);
+}
+
+.item-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
 /* ---- Skeleton loader ---- */
 
 .recipe-skeleton {
