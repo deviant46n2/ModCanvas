@@ -1,5 +1,5 @@
 // Quest dependency-requirement modes. Values are the canonical SNBT keys used
-// by the quest format and match src-tauri/src/quest/types.rs as_lower.
+// by the quest format and match src-tauri/src/quest/types as_lower.
 // `all_completed` is the in-game default.
 export const DEPENDENCY_REQUIREMENTS = [
   { value: 'all_completed', label: 'All completed' },

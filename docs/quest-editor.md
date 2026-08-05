@@ -110,7 +110,7 @@ previous pack's selection can't leak into the next one.
 ## Source Files
 
 - `frontend/src/components/quest/quest-edges.tsx` — `DependencyEdge` renderer, `detectCycles`, `edgeTypes`.
-- `frontend/src/components/quest/QuestCanvas.tsx` — connect mode, selection, reconnect, deletion, cycle styling.
+- `frontend/src/components/quest/QuestCanvas.tsx` — canvas composer. Connect mode, selection, reconnect, deletion and cycle styling handlers live in `useQuestCanvasInteractions.ts`; the toolbar in `CanvasToolbar.tsx`; the canvas/overlay JSX in `CanvasArea.tsx`.
 - `frontend/src/QuestBookEditor.tsx` — graph mutations (`onAddEdge` / `onUpdateEdge` / `onDeleteEdge`).
 - `frontend/src/components/quest/QuestCanvas.css` — edge/port/connect-mode styles.
 
@@ -130,7 +130,7 @@ Assets").
 2. **Materialization** — `collectNeededTargets` (`texture-loader.ts`) includes the
    shape keys of every visible node, so they flow through the same
    `requestMaterialize` → `get_texture_files` batch pipeline as item icons.
-3. **Rendering** — `QuestCanvas.tsx` resolves the keys against the materialized
+3. **Rendering** — `quest-canvas-model.ts` (`buildCanvasNodes`/`getShapeTextures`, driven by the `useQuestCanvasModel.ts` hook) resolves the keys against the materialized
    `textureIndex` via `textureDisplayUrl` (usable index value, else the
    `getMaterialized` data URL) and passes the URLs to `quest-nodes.tsx`. When all
    layers resolve, `bakeShapeTile` (`shape-textures.ts`) rasterizes the whole
@@ -263,18 +263,19 @@ the in-game quest editor's placement behavior:
 
 ## Data flow
 
-- `src-tauri/src/quest/types.rs` — `QuestGraph.grid_scale` (default 0.5).
-- `src-tauri/src/imports/ftb_quests/import.rs` — parses `grid_scale` from
+- `src-tauri/src/quest/types/graph.rs` — `QuestGraph.grid_scale` (default 0.5).
+- `src-tauri/src/imports/ftb_quests/import/global.rs` — parses `grid_scale` from
   `data.snbt` in `parse_global_settings`.
 - `src-tauri/src/imports/ftb_quests/export.rs` — writes `grid_scale` back to
   `data.snbt` on export.
 - `frontend/src/services/quest-types.ts` — `QuestGraphData.grid_scale`.
 - `frontend/src/components/quest/quest-form-constants.ts` — pure
   `snapToGridStep(value, gridScale, minSize)` helper.
-- `frontend/src/components/quest/QuestCanvas.tsx` — `handleNodeDragStop`
-  computes the dragged selection, minSize, and group-anchor snap; commits via
-  the batched `onUpdateNodes` prop (single `setGraph`, so multi-select drags
-  don't clobber each other).
+- `frontend/src/components/quest/useQuestCanvasInteractions.ts` — `handleNodeDragStop`
+  computes the dragged selection, minSize, and group-anchor snap via
+  `snapDragUpdates` (`quest-canvas-model.ts`); commits via the batched
+  `onUpdateNodes` prop (single `setGraph`, so multi-select drags don't clobber
+  each other).
 - `frontend/src/QuestBookEditor.tsx` — `onUpdateNodes` batched node updater.
 
 ## Icon scale (`icon_scale`) import/export
@@ -282,12 +283,12 @@ the in-game quest editor's placement behavior:
 - The quest format stores the per-quest appearance field as `icon_scale` in
   both flat-chapter and subdirs layouts, with the editor allowing 0.1 – 2.0
   (default 1.0).
-- `src-tauri/src/imports/ftb_quests/import.rs` reads `icon_scale`, falling back
+- `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` read `icon_scale`, falling back
   to the legacy `icon_scaling` key the app once emitted for subdirs layouts,
   and clamps to 0.1 – 2.0.
 - `src-tauri/src/imports/ftb_quests/export.rs` always writes `icon_scale` (both
   layouts), so FTB picks the value up.
-- `src-tauri/src/quest/types.rs` stores it as `icon_scaling: f64` (default 1.0);
+- `src-tauri/src/quest/types/node.rs` stores it as `icon_scaling: f64` (default 1.0);
   the node renderer multiplies the 2/3 icon size by it (see above).
 
 ## Smart filter icons (FTB Filter System parity)
@@ -332,9 +333,8 @@ Chapter-level settings mirror the in-game chapter editor:
   button, or `onEditChapter`).
 - `frontend/src/QuestBookEditor.tsx` — `onUpdateChapter` / `onDeleteChapter` /
   `onMoveChapter` (reorders `order_index`), wired to the modal.
-- `src-tauri/src/quest/types.rs` — `QuestChapter` carries all the fields above.
-- `src-tauri/src/imports/ftb_quests/import.rs` — reads the keys in both SNBT and
-  JSON5 chapter parsers; chapter `default_quest_size` (a scalar multiplier in
+- `src-tauri/src/quest/types/chapter.rs` — `QuestChapter` carries all the fields above.
+- `src-tauri/src/imports/ftb_quests/import/chapter.rs` (SNBT) and `import/chapter_json5.rs` read the keys in both; chapter `default_quest_size` (a scalar multiplier in
   FTB) is converted to `QuestSize` grid units (24 = 1.0x).
 - `src-tauri/src/imports/ftb_quests/export.rs` — `build_subdirs_chapter` writes
   the fields back (booleans as SNBT `Byte(1/0)`, matching FTB's output), and
@@ -360,7 +360,7 @@ An editor-only, ephemeral preview of FTB's in-game progression. The sim state
     `hide_quest_until_deps_visible` applies to new quests only and is not evaluated.
   - `isLocked(questId, edges, progress)` — true while any prerequisite is
     incomplete (ALL requirement).
-- **Canvas (`QuestCanvas.tsx`)** — a **Simulate** toolbar toggle arms the mode;
+- **Canvas (`CanvasToolbar.tsx`)** — a **Simulate** toolbar toggle arms the mode;
   hidden quests are dimmed (`sim-hidden`), locked ones get an orange badge
   (`sim-locked`), completed ones a green check (`sim-complete`). Complete All /
   Reset All act on the active chapter. Double-clicking a quest toggles its
@@ -376,7 +376,7 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
 `default_consume_items: 0b`, `default_autoclaim_rewards: "disabled"`,
 `detection_delay: 20`).
 
-- Fields on `QuestGraph` (`src-tauri/src/quest/types.rs`):
+- Fields on `QuestGraph` (`src-tauri/src/quest/types/graph.rs`):
   `default_reward_team`, `default_consume_items`, `default_autoclaim_rewards`
   (FTB `RewardAutoClaim` id: `disabled`/`enabled`/`no_toast`/`invisible`),
   `detection_delay` (int, default 20).
@@ -388,7 +388,7 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
   `verify_on_load`, `default_quest_disable_jei`, and `loot_crate_no_drop`
   (`LootCrateNoDrop` — boss/monster/passive percentages). Helpers
   `EmergencyItem` and `LootCrateNoDrop` live in the same types file.
-- `src-tauri/src/imports/ftb_quests/import.rs` — `parse_global_settings` reads
+- `src-tauri/src/imports/ftb_quests/import/global.rs` — `parse_global_settings` reads
   them from both `data.snbt` and `data.json5`.
 - `src-tauri/src/imports/ftb_quests/export.rs` — `export_ftb_quests_snbt` writes
   the graph's values back to `data.snbt`.
@@ -408,14 +408,14 @@ Quest link nodes reference another quest by id (the `linked_quest` key).
 ModCanvas stores them as quest nodes with
 `node_type: quest_link` and a `link_target` id.
 
-- `src-tauri/src/quest/types.rs` — `QuestNodeType::QuestLink` variant and
+- `src-tauri/src/quest/types/node.rs` — `QuestNodeType::QuestLink` variant and
   `QuestNode.link_target`.
-- `src-tauri/src/imports/ftb_quests/import.rs` — both the SNBT and JSON5 quest
+- `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` — both quest
   parsers detect `linked_quest` and produce `QuestLink` nodes.
 - `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes
   `linked_quest` (plus position/title/size) for link nodes in both subdirs and
   flat-chapters layouts; link nodes are included in the per-chapter quest map.
-- `frontend/src/components/quest/QuestCanvas.tsx` — the **Add Link** button on the
+- `frontend/src/components/quest/CanvasArea.tsx` — the **Add Link** button on the
   canvas; link nodes render with a dashed shape and a text link badge
   (`quest-nodes.tsx`).
 - `frontend/src/components/quest/QuestDetailModal.tsx` — the "Quest Link"
@@ -450,10 +450,10 @@ in one click from the sticky nav chips at the top of the modal body
 - **Hide lock icon / repeat cooldown / guide page / max dependents** shown in
   the Visibility / Misc sections of `QuestDetailModal.tsx`.
 
-- `src-tauri/src/quest/types.rs` — `QuestNode` carries `repeat_cooldown`,
+- `src-tauri/src/quest/types/node.rs` — `QuestNode` carries `repeat_cooldown`,
   `hide_lock_icon`, `guide_page`, `max_completable_dependents`,
   `min_required_dependencies`, `dependency_requirement`.
-- `src-tauri/src/imports/ftb_quests/import.rs` — SNBT and JSON5 quest parsers
+- `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` — quest parsers
   read the keys above (including `dependency_requirement` dialect mapping
   `one`→`one_completed`, `started`→`all_started`).
 - `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes them
@@ -550,7 +550,7 @@ matching SNBT/JSON5 import + export in the Rust backend:
   `exclude_from_claim_all: 1b` / `ignore_reward_blocking: 1b` /
   `disable_reward_screen_blur: 1b`.
 
-Backend: `src-tauri/src/quest/types.rs` (new `QuestObjective` / `QuestReward`
+Backend: `src-tauri/src/quest/types/` (objective.rs / reward.rs) (new `QuestObjective` / `QuestReward`
 fields), `import.rs` (SNBT reads for kill tag/custom_name, item task
 task_screen_only/only_from_crafting/match_components, item reward
 random_bonus/only_one, command permission_level/silent/feedback_message,
@@ -570,7 +570,7 @@ common reward fields via SNBT + JSON5 struct literal), `export.rs` (kill
 ## Right-click canvas context menus
 
 Right-clicking a quest node or the empty pane opens a context menu
-(`QuestContextMenu.tsx`, rendered by `QuestCanvas`), mirroring FTB's in-game
+(`QuestContextMenu.tsx`, rendered by `CanvasArea`), mirroring FTB's in-game
 editing UX:
 
 - **Node context menu** — Edit Quest, Rename (starts an inline rename on the

@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { SyncPipeline } from '../../core/sync';
 import { FileWatcher } from '../../core/sync';
-import { globalAssetCache } from '../../core/theme';
+import { globalAssetCache } from '../../services/asset-cache';
 import type { SyncState } from '../../core/sync/types';
 
 export interface QuestSyncConfig {

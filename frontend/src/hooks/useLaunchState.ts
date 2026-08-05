@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { testProject, deployCompanionMod, wsIpcGetStatus, wsIpcRestart, type WsConnectionStatus } from '../services/api'
-import { globalAssetCache } from '../core/theme'
+import { globalAssetCache } from '../services/asset-cache'
 import type { Project } from './useProjectState'
 
 export function useLaunchState(selectedProject: Project | null) {

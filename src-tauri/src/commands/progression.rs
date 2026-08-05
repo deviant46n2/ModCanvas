@@ -333,8 +333,9 @@ pub fn write_quest_graph_to_instance(
     // Get the quest graph from database
     let graph = get_quest_graph(db.clone(), project_id.clone())?;
 
-    // Export to SNBT files in the instance
-    crate::imports::ftb_quests::export::export_ftb_quests_snbt(&graph, &quests_dir, &std::collections::HashMap::new())
+    // Export to SNBT files in the instance. Pass the instance root (not the
+    // quests dir) — the exporter appends config/ftbquests/quests itself.
+    crate::imports::ftb_quests::export::export_ftb_quests_snbt(&graph, &instance_path, &std::collections::HashMap::new())
         .map_err(|e| format!("Failed to export quest SNBT: {}", e))?;
 
     eprintln!("[ModCanvas] Wrote quest graph to SNBT files at {:?}", quests_dir);

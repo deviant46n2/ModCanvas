@@ -2,10 +2,14 @@ use std::collections::HashMap;
 use crate::imports::snbt::{SnbtValue, CommentedSnbt, parse_snbt};
 
 /// Type alias for the raw-SNBT sidecar map returned by import.
-/// Keys are `"chapter:{id}"` or `"quest:{id}"`; values are the original raw SNBT
-/// strings.  Export re-parses these to recover comments and merge with updated
-/// values.
+/// Keys are `"chapter:{id}"`, `"quest:{id}"`, or `"book:{name}"` (book-level
+/// files: `data`, `chapter_groups`, `reward_table:{hex_id}`); values are the
+/// original raw SNBT strings.  Export re-parses these to recover comments and
+/// merge with updated values.
 pub type SnbtSidecar = HashMap<String, String>;
+
+pub mod disk;
+pub use disk::build_sidecar_from_quests_dir;
 
 /// Store raw chapter SNBT into the sidecar map.
 pub fn store_chapter(sidecar: &mut SnbtSidecar, chapter_id: &str, raw_snbt: &str) {
@@ -91,6 +95,25 @@ pub fn merge_quests_in_chapter(
     Some(result)
 }
 
+/// Merge a book-level file (data.snbt / chapter_groups.snbt / reward table)
+/// compound into its on-disk original, preserving comments on unchanged keys.
+///
+/// Returns `Some` when a sidecar entry exists for `key`; `None` otherwise so
+/// callers fall back to a fresh build.
+pub fn merge_book_comments(
+    sidecar: &SnbtSidecar,
+    key: &str,
+    new_compound: &HashMap<String, CommentedSnbt>,
+) -> Option<HashMap<String, CommentedSnbt>> {
+    let raw = sidecar.get(key)?;
+    let orig = parse_snbt(raw).ok()?;
+    let new_val = SnbtValue::Compound(new_compound.clone());
+    match merge_compound_comments(&orig.value, &new_val) {
+        SnbtValue::Compound(m) => Some(m),
+        _ => None,
+    }
+}
+
 /// Merge a new SNBT compound into an original, preserving comments on keys
 /// whose values have not changed.
 fn merge_compound_comments(orig: &SnbtValue, new: &SnbtValue) -> SnbtValue {
@@ -160,63 +183,6 @@ fn values_equal(a: &SnbtValue, b: &SnbtValue) -> bool {
     }
 }
 
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::imports::snbt::{SnbtValue, CommentedSnbt, compound_to_snbt};
-
-    #[test]
-    fn store_and_lookup() {
-        let mut sidecar = SnbtSidecar::new();
-        store_chapter(&mut sidecar, "ch1", "{id: \"ch1\"}");
-        assert_eq!(sidecar.get("chapter:ch1").unwrap(), "{id: \"ch1\"}");
-        assert!(!sidecar.contains_key("chapter:ch2"));
-    }
-
-    #[test]
-    fn merge_preserves_comments_on_unchanged_fields() {
-        // The parser's `collect_trailing_comment()` grabs the first Comment token
-        // after a value as that field's trailing comment.  A comment between two
-        // fields is trailing on the *preceding* field, not leading on the next.
-        //
-        // In this input:
-        //   `/* a */` becomes leading comment on `x`
-        //   `/* b */` becomes trailing comment on `x` (consumed after x's value)
-        //   `y` has no comments.
-        //
-        // To test: x unchanged → both comments survive. y changed → no comment.
-
-        let raw = r#"{
-  /* a */
-  x: 100.0d
-  /* b */
-  y: 200.0d
-  quests: []
-}"#;
-        let mut chapter = HashMap::new();
-        chapter.insert("x".to_string(), CommentedSnbt::new(SnbtValue::Double(100.0)));
-        chapter.insert("y".to_string(), CommentedSnbt::new(SnbtValue::Double(999.0))); // changed
-
-        let new_quests: Vec<SnbtValue> = vec![];
-
-        let mut sidecar = SnbtSidecar::new();
-        store_chapter(&mut sidecar, "merge_test_ch", raw);
-
-        let merged = merge_quests_in_chapter(&sidecar, "merge_test_ch", &chapter, &new_quests).unwrap();
-        let s = compound_to_snbt(&merged);
-
-        // x unchanged → original entry preserved (includes leading "/* a */" and trailing "/* b */")
-        assert!(s.contains("/* a */"), "x leading comment preserved");
-        assert!(s.contains("/* b */"), "x trailing comment preserved");
-        // y changed → original entry not used, no comments on y
-        assert!(!s.contains("200.0d"), "y uses new value");
-        assert!(s.contains("999.0d"), "y uses new value");
-    }
-
-    #[test]
-    fn values_equal_cross_type() {
-        assert!(values_equal(&SnbtValue::Byte(1), &SnbtValue::Int(1)));
-        assert!(values_equal(&SnbtValue::Long(42), &SnbtValue::Int(42)));
-        assert!(!values_equal(&SnbtValue::Int(1), &SnbtValue::Int(2)));
-    }
-}
+mod tests;

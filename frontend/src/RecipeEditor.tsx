@@ -1,27 +1,38 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRecipeStore } from './core/recipe/recipe-store';
-import { RecipePalette } from './components/recipe/RecipePalette';
-import { RecipeExplorer } from './components/recipe/RecipeExplorer';
-import { CraftingGridPanel } from './components/recipe/CraftingGridPanel';
-import { ImportRecipesModal } from './components/recipe/ImportRecipesModal';
-import { RecipeScriptDrawer } from './components/recipe/RecipeScriptDrawer';
-import { BulkReplaceModal } from './components/recipe/BulkReplaceModal';
-import { replaceIngredient, type IngredientRef } from './core/recipe/bulk-replace';
+import { RecipeEditorHeader } from './components/recipe/RecipeEditorHeader';
+import { RecipeEditorBody } from './components/recipe/RecipeEditorBody';
+import { RecipeEditorModals } from './components/recipe/RecipeEditorModals';
+import type { IngredientRef } from './core/recipe/bulk-replace';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
 import { useRecipeDisable, manifestRecipesFrom } from './hooks/useRecipeDisable';
 import { usePackHealthStore } from './core/pack-health/pack-health-store';
-import { scanPackRecipes, scanInstanceItems, listItemTags } from './services/api';
 import type { ItemRegistryEntry, ItemTagInfo } from './services/api';
 import { getAdapter } from './adapters';
 import { normalizeLoader } from './core/recipe/loader';
 import { validateRecipe, hasErrors, issuesByPath } from './core/recipe/validation';
-import { patternToGrid, gridToPattern, ingredientsToGrid, gridToIngredients } from './core/recipe/grid';
-import { requestMaterialize, subscribeMaterialized, textureDisplayUrl, isTexturePending } from './services/texture-loader';
+import { subscribeMaterialized } from './services/texture-loader';
 import { AnimationProvider } from './components/quest/animation-context';
-import { ItemPickerModal } from './components/common/ItemPickerModal';
-import type { Recipe, RecipeIngredient } from './core/recipe/recipe-store';
+import type { RecipeIngredient } from './core/recipe/recipe-store';
+import {
+  readScriptPreviewPref,
+  writeScriptPreviewPref,
+  buildRegistryUrlMap,
+  makeTextureUrlGetter,
+  createNewRecipe,
+  recipeFromImported,
+  buildGridCells,
+  applyCellEdit,
+  applyCellCount,
+  applyGridToRecipe,
+  applyBulkReplace,
+  createToggleDisableHandler,
+  createRecipesUsingHandler,
+  reloadPackRecipes,
+  scanItemRegistry,
+} from './components/recipe/recipe-editor-utils';
 import './RecipeEditor.css';
 
 interface RecipeEditorProps {
@@ -47,7 +58,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     isDisabled,
     disabledScripts,
   } = useRecipeStore();
-
   // Resolve the adapter for this pack's version + loader so item/tag search and
   // the hotswap reload path are correct instead of hardcoded neoforge/1.21.1.
   const adapter = getAdapter(minecraftVersion, normalizeLoader(modLoader));
@@ -63,62 +73,40 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const { toggleDisable } = useRecipeDisable(projectId);
   const manifestRecipes = useMemo(() => manifestRecipesFrom(disabledScripts), [disabledScripts]);
 
-  const handleToggleDisable = async (recipe: Recipe) => {
-    try {
-      await toggleDisable(recipe);
-    } catch (e) {
-      window.alert(String(e));
-    }
-  };
-
+  const handleToggleDisable = createToggleDisableHandler(toggleDisable);
   // Instance item registry + local tag catalog back the two palette tabs. The
   // quest editor may already have scanned this instance; only scan here when
   // the store is empty so the two editors share one scan.
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry) ?? ([] as ItemRegistryEntry[]);
   const setItemRegistry = usePackHealthStore((s) => s.setItemRegistry);
   const [tagCatalog, setTagCatalog] = useState<ItemTagInfo[]>([]);
-  const registryUrlById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const item of itemRegistry) {
-      if (item.texture_data_url) map.set(item.id, item.texture_data_url)
-    }
-    return map
-  }, [itemRegistry]);
+  const registryUrlById = useMemo(() => buildRegistryUrlMap(itemRegistry), [itemRegistry]);
   const [, setTextureTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [reloadMsg, setReloadMsg] = useState('');
   // The raw generated-script preview is opt-in for veterans — hidden by default
   // so beginners never hit code. Sticky across sessions via localStorage.
-  const [showScriptPreview, setShowScriptPreview] = useState(
-    () => localStorage.getItem('modcanvas:recipe-script-preview') === '1',
-  );
+  const [showScriptPreview, setShowScriptPreview] = useState(readScriptPreviewPref);
   const toggleScriptPreview = () => {
     setShowScriptPreview((prev) => {
       const next = !prev;
-      localStorage.setItem('modcanvas:recipe-script-preview', next ? '1' : '0');
+      writeScriptPreviewPref(next);
       return next;
     });
   };
 
   useEffect(() => {
     let disposed = false;
-    const load = async () => {
-      try {
-        const [registry, tags] = await Promise.all([
-          scanInstanceItems(projectPath, kubejsNamespace),
-          listItemTags(projectPath),
-        ]);
+    scanItemRegistry(projectPath, kubejsNamespace)
+      .then(({ registry, tags }) => {
         if (disposed) return;
         setTagCatalog(tags);
         if (usePackHealthStore.getState().itemRegistry === null) {
           setItemRegistry(registry);
         }
-      } catch (e) {
-        console.error('[RecipeEditor] Failed to load item registry:', e);
-      }
-    };
-    load();
+      })
+      .catch((e) => console.error('[RecipeEditor] Failed to load item registry:', e));
     return () => {
       disposed = true;
     };
@@ -131,16 +119,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     setReloading(true);
     setReloadMsg('');
     try {
-      const discovered = await scanPackRecipes(projectPath);
-      const withMeta = discovered.map((r) => ({
-        ...r.recipe,
-        origin: r.origin,
-        source: r.source,
-        editable: r.editable,
-        sourceLines: r.span ?? undefined,
-      }));
-      const added = loadRecipesFromPack(withMeta);
-      setReloadMsg(added > 0 ? `Added ${added} recipes` : 'Recipes are up to date');
+      setReloadMsg(await reloadPackRecipes(projectPath, loadRecipesFromPack));
     } catch (e) {
       setReloadMsg(`Reload failed: ${String(e)}`);
     } finally {
@@ -158,17 +137,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     return subscribeMaterialized(() => setTextureTick((t) => t + 1));
   }, []);
 
-  const getTextureUrl = (itemId: string): string | null => {
-    if (!itemId) return null;
-    const key = itemId.replace(/^#/, '');
-    const url = textureDisplayUrl(textureIndex, key);
-    if (url) return url;
-    // Lazy-materialize on demand; show a placeholder until it resolves.
-    if (isTexturePending(textureIndex, key)) {
-      requestMaterialize([key], projectPath);
-    }
-    return null;
-  };
+  const getTextureUrl = makeTextureUrlGetter(textureIndex, projectPath);
 
   // Registry rows show the item's resolved icon (engine-rendered / runtime
   // captured) when available, else fall back to the local texture index.
@@ -177,72 +146,37 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   }, [registryUrlById, getTextureUrl]);
 
   // "recipes using this" drives the explorer search: `>item` / `#tag`.
-  const handleShowRecipesUsing = useCallback((itemOrTagId: string) => {
-    setExplorerQuery(itemOrTagId.startsWith('#') ? itemOrTagId : `>${itemOrTagId}`);
-  }, []);
-
+  const handleShowRecipesUsing = createRecipesUsingHandler(setExplorerQuery);
   const [bulkReplaceIds, setBulkReplaceIds] = useState<string[] | null>(null);
 
   const handleBulkReplace = useCallback((from: IngredientRef, to: IngredientRef, affectedIds: string[]) => {
-    for (const id of affectedIds) {
-      const recipe = useRecipeStore.getState().recipes.find((r) => r.id === id);
-      if (!recipe || recipe.origin !== 'authored') continue;
-      updateRecipe(id, replaceIngredient(recipe, from, to));
-    }
+    applyBulkReplace(useRecipeStore.getState().recipes, affectedIds, from, to, updateRecipe);
     setBulkReplaceIds(null);
   }, [updateRecipe]);
-
   const handleGridChange = useCallback((grid: (RecipeIngredient | null)[][]) => {
     const current = getSelectedRecipe();
     if (!current) return;
-    if (current.type === 'shaped') {
-      const { pattern, key } = gridToPattern(grid, current.key ?? {});
-      updateRecipe(current.id, { pattern, key });
-    } else if (current.type === 'shapeless') {
-      updateRecipe(current.id, { ingredients: gridToIngredients(grid) });
-    }
+    const updates = applyGridToRecipe(current, grid);
+    if (updates) updateRecipe(current.id, updates);
   }, [getSelectedRecipe, updateRecipe]);
-
   // The editor owns the 3×3 cell grid. For shaped recipes cells come from the
   // keyed pattern; for shapeless the ingredient list is laid out 3-wide.
-  const gridCells = useMemo((): (RecipeIngredient | null)[][] => {
-    if (!selectedRecipe) return [];
-    if (selectedRecipe.type === 'shaped') {
-      return patternToGrid(selectedRecipe.pattern ?? [], selectedRecipe.key ?? {});
-    }
-    if (selectedRecipe.type === 'shapeless') {
-      return ingredientsToGrid(selectedRecipe.ingredients ?? []);
-    }
-    return [];
-  }, [selectedRecipe]);
-
+  const gridCells = useMemo(
+    (): (RecipeIngredient | null)[][] => buildGridCells(selectedRecipe),
+    [selectedRecipe],
+  );
   const handleCellChange = useCallback((row: number, col: number, ing: RecipeIngredient | null) => {
-    const next = gridCells.map(r => [...r]);
-    if (row < next.length && col < next[row].length) next[row][col] = ing;
-    handleGridChange(next);
+    handleGridChange(applyCellEdit(gridCells, row, col, ing));
   }, [gridCells, handleGridChange]);
-
   const handleSetCount = useCallback((row: number, col: number, count: number) => {
-    const next = gridCells.map(r => [...r]);
-    const cell = next[row]?.[col];
-    if (cell) next[row][col] = { ...cell, count };
-    handleGridChange(next);
+    handleGridChange(applyCellCount(gridCells, row, col, count));
   }, [gridCells, handleGridChange]);
-
   const handleSaveRecipes = () => {
     saveRecipes(recipes, markClean);
   };
 
   const handleNewRecipe = () => {
-    const id = addRecipe({
-      type: 'shaped',
-      name: 'New Recipe',
-      group: '',
-      pattern: ['   ', '   ', '   '],
-      key: {},
-      ingredients: [],
-      output: { item: '', count: 1 },
-    });
+    const id = addRecipe(createNewRecipe());
     selectRecipe(id);
   };
 
@@ -252,17 +186,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       const { recipe, warnings } = entry;
       // eslint-disable-next-line no-console
       if (warnings.length) console.warn('Import warnings:', recipe.name, warnings);
-      lastId = addRecipe({
-        type: recipe.type,
-        name: recipe.name,
-        group: recipe.group,
-        pattern: recipe.pattern,
-        key: recipe.key,
-        ingredients: recipe.ingredients,
-        output: recipe.output,
-        experience: recipe.experience,
-        cookingTime: recipe.cookingTime,
-      });
+      lastId = addRecipe(recipeFromImported(entry));
     }
     if (lastId) selectRecipe(lastId);
   };
@@ -296,145 +220,78 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   return (
     <AnimationProvider animations={animations}>
     <div className="recipe-editor">
-      <header className="recipe-editor-header">
-        <h2>Recipe Editor <span className="recipe-adapter-badge">{adapter.mcVersion}/{adapter.loader}</span></h2>
-        <div className="header-actions">
-          <button
-            type="button"
-            className={`script-toggle ${showScriptPreview ? 'active' : ''}`}
-            onClick={toggleScriptPreview}
-            title="Show the raw generated KubeJS/CraftTweaker script (opt-in)"
-          >
-            Script
-          </button>
-          <button className="btn-secondary" onClick={reloadRecipes} disabled={reloading} title="Re-scan the pack for recipes (cache-aware)">
-            {reloading ? 'Reloading…' : 'Reload Recipes'}
-          </button>
-          {reloadMsg && <span className="search-loading">{reloadMsg}</span>}
-          <button className="btn-secondary" onClick={() => setShowImport(true)}>Import JSON</button>
-        </div>
-      </header>
+      <RecipeEditorHeader
+        mcVersion={adapter.mcVersion}
+        loader={adapter.loader}
+        showScriptPreview={showScriptPreview}
+        onToggleScriptPreview={toggleScriptPreview}
+        reloading={reloading}
+        reloadMsg={reloadMsg}
+        onReload={reloadRecipes}
+        onImport={() => setShowImport(true)}
+      />
 
-      <div className="recipe-editor-body">
-        {indexLoading ? (
-          <RecipeEditorSkeleton />
-        ) : (
-          <>
-        <RecipeExplorer
-          recipes={recipes}
-          selectedRecipeId={selectedRecipeId}
-          onSelectRecipe={selectRecipe}
-          onNewRecipe={handleNewRecipe}
-          onEditCopy={(id) => {
-            const copyId = duplicateRecipe(id);
-            if (copyId) selectRecipe(copyId);
-          }}
-          onToggleDisable={handleToggleDisable}
-          query={explorerQuery}
-          onQueryChange={setExplorerQuery}
-          onBulkReplace={setBulkReplaceIds}
-          getTextureUrl={getTextureUrl}
-          isDisabled={isDisabled}
-          manifestRecipes={manifestRecipes}
-          itemRegistry={itemRegistry}
-        />
+      <RecipeEditorBody
+        indexLoading={indexLoading}
+        recipes={recipes}
+        selectedRecipeId={selectedRecipeId}
+        onSelectRecipe={selectRecipe}
+        onNewRecipe={handleNewRecipe}
+        onEditCopy={(id) => {
+          const copyId = duplicateRecipe(id);
+          if (copyId) selectRecipe(copyId);
+        }}
+        onToggleDisable={handleToggleDisable}
+        explorerQuery={explorerQuery}
+        onQueryChange={setExplorerQuery}
+        onBulkReplace={setBulkReplaceIds}
+        getTextureUrl={getTextureUrl}
+        isDisabled={isDisabled}
+        manifestRecipes={manifestRecipes}
+        itemRegistry={itemRegistry}
+        selectedRecipe={selectedRecipe}
+        onUpdateRecipe={updateRecipe}
+        gridCells={gridCells}
+        projectPath={projectPath}
+        onCellChange={handleCellChange}
+        onSetCount={handleSetCount}
+        onRequestPick={(row, col) => setPickTarget({ kind: 'cell', row, col })}
+        onPickOutput={() => setPickTarget({ kind: 'output' })}
+        onSave={handleSaveRecipes}
+        onDelete={handleDeleteRecipe}
+        onDuplicate={handleDuplicateRecipe}
+        dirty={dirty}
+        issues={issues}
+        hasBlockingErrors={hasBlockingErrors}
+        showScriptPreview={showScriptPreview}
+        projectId={projectId}
+        loader={adapter.loader}
+        tagCatalog={tagCatalog}
+        getRegistryTextureUrl={getRegistryTextureUrl}
+        onShowRecipesUsing={handleShowRecipesUsing}
+      />
 
-        <main className="recipe-canvas">
-          {selectedRecipe && (
-            <CraftingGridPanel
-              selectedRecipe={selectedRecipe}
-              onTypeChange={(type) => updateRecipe(selectedRecipe.id, { type })}
-              onUpdateRecipe={updateRecipe}
-              cells={gridCells}
-              instancePath={projectPath}
-              getTextureUrl={getTextureUrl}
-              onCellChange={handleCellChange}
-              onSetCount={handleSetCount}
-              onRequestPick={(row, col) => setPickTarget({ kind: 'cell', row, col })}
-              onPickOutput={() => setPickTarget({ kind: 'output' })}
-              onSave={handleSaveRecipes}
-              onDelete={handleDeleteRecipe}
-              onDuplicate={handleDuplicateRecipe}
-              dirty={dirty}
-              issues={issues}
-              hasBlockingErrors={hasBlockingErrors}
-            />
-          )}
-
-          {showScriptPreview && projectId && (
-            <RecipeScriptDrawer
-              projectId={projectId}
-              recipes={recipes}
-              selectedRecipe={selectedRecipe}
-              loader={adapter.loader}
-            />
-          )}
-        </main>
-
-        <RecipePalette
-          items={itemRegistry}
-          tags={tagCatalog}
-          instancePath={projectPath}
-          getTextureUrl={getRegistryTextureUrl}
-          onShowRecipesUsing={handleShowRecipesUsing}
-        />
-        </>
-          )}
-      </div>
-
-      {showImport && (
-        <ImportRecipesModal onClose={() => setShowImport(false)} onImport={handleImport} />
-      )}
-
-      {pickTarget && (
-        <ItemPickerModal
-          items={itemRegistry}
-          getTextureUrl={getTextureUrl}
-          onSelect={handlePickItem}
-          onClose={() => setPickTarget(null)}
-        />
-      )}
-
-      {bulkReplaceIds && (
-        <BulkReplaceModal
-          recipes={recipes}
-          selectedIds={bulkReplaceIds}
-          items={itemRegistry}
-          tags={tagCatalog}
-          getTextureUrl={getTextureUrl}
-          onClose={() => setBulkReplaceIds(null)}
-          onApply={handleBulkReplace}
-        />
-      )}
+      <RecipeEditorModals
+        showImport={showImport}
+        onCloseImport={() => setShowImport(false)}
+        onImport={handleImport}
+        pickTarget={pickTarget}
+        onPickItem={handlePickItem}
+        onClosePick={() => setPickTarget(null)}
+        bulkReplaceIds={bulkReplaceIds}
+        recipes={recipes}
+        itemRegistry={itemRegistry}
+        tags={tagCatalog}
+        getTextureUrl={getTextureUrl}
+        onCloseBulk={() => setBulkReplaceIds(null)}
+        onApplyBulk={handleBulkReplace}
+      />
 
       {showSaveDialog && (
         <div className="save-toast">{saveMessage}</div>
       )}
     </div>
     </AnimationProvider>
-  );
-}
-
-/** Placeholder shown while the compact texture index loads. */
-function RecipeEditorSkeleton() {
-  return (
-    <div className="recipe-skeleton">
-      <div className="skeleton-palette">
-        <div className="skeleton-line w60" />
-        <div className="skeleton-block" />
-        <div className="skeleton-block" />
-        <div className="skeleton-block" />
-        <div className="skeleton-block" />
-      </div>
-      <div className="skeleton-canvas">
-        <div className="skeleton-line w40" />
-        <div className="skeleton-block tall" />
-        <div className="skeleton-block tall" />
-      </div>
-      <div className="skeleton-detail">
-        <div className="skeleton-block" />
-      </div>
-    </div>
   );
 }
 

@@ -1187,3 +1187,53 @@ fn comment_preservation_roundtrip() {
         "quest x position comment survives (trailing on unchanged id)");
 }
 
+/// A live export path (empty sidecar) must still preserve comments that exist
+/// on disk: the exporter recovers a sidecar from the existing quests directory
+/// before merging. Regression for `export_ftb_quests_to_dir` /
+/// `write_quest_graph_to_instance` which passed `HashMap::new()`.
+#[test]
+fn live_export_without_sidecar_recovers_comments_from_disk() {
+    // Build a pack on disk with comments, then import it.
+    let tmp = tempfile::tempdir().unwrap();
+    let pack_root = tmp.path().to_path_buf();
+    let quests_dir = pack_root.join("config").join("ftbquests").join("quests");
+    std::fs::create_dir_all(&quests_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13L /* book version */}").unwrap();
+    let ch_dir = quests_dir.join("Chapter_One");
+    std::fs::create_dir_all(&ch_dir).unwrap();
+    std::fs::write(ch_dir.join("chapter.snbt"), r#"{
+        id = "ch1"
+        title = "Chapter One"
+        /* quest position */
+        quests = [
+            {
+                id = "q1"
+                title = "Quest One"
+                x = 0
+                y = 0
+            }
+        ]
+    }"#).unwrap();
+
+    let import_result = crate::imports::ftb_quests::import_ftb_quests(&pack_root).unwrap();
+    let mut graph = import_result.graph;
+
+    // Simulate the live path: export to the SAME directory with an empty sidecar.
+    let node = graph.nodes.iter_mut().find(|n| n.id == "q1").unwrap();
+    node.label = "Renamed Quest".to_string();
+
+    let empty_sidecar: snbt_sidecar::SnbtSidecar = std::collections::HashMap::new();
+    export_ftb_quests_snbt(&graph, &pack_root, &empty_sidecar).unwrap();
+
+    // Chapter comment must survive (unchanged), and the renamed title is present.
+    let chapter_path = quests_dir.join("Chapter_One").join("chapter.snbt");
+    let exported = std::fs::read_to_string(&chapter_path).unwrap();
+    assert!(exported.contains("/* quest position */"),
+        "chapter quest-list comment recovered from disk: {exported}");
+    assert!(exported.contains("Renamed Quest"), "renamed title exported: {exported}");
+
+    // Book-level data.snbt comment must survive too.
+    let data = std::fs::read_to_string(quests_dir.join("data.snbt")).unwrap();
+    assert!(data.contains("/* book version */"), "data.snbt comment recovered: {data}");
+}
+

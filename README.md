@@ -23,13 +23,13 @@ ModCanvas removes both: **no code required, and no boot-to-discover-errors.** It
 | **Recipes** | Visual editing for KubeJS, CraftTweaker, and vanilla datapacks — including scanning existing pack recipes and non-clobber saves. |
 | **Configs** | Structured, typed forms over raw TOML/JSON/Properties/YAML — comment-preserving, atomic, in place. |
 | **Progression** | A node-graph editor for mapping your pack's content flow, with a research-grounded vanilla template. |
-| **Health** | *(planned)* A project-wide go/no-go panel — "recipes: 3 errors", "cover image missing" — so you know the pack is sound before you boot. |
+| **Health** | A project-wide go/no-go panel — "recipes: 3 errors", "cover image missing", dead references — so you know the pack is sound before you boot. Tier 1 (reference integrity + coverage) is shipped. |
 
 Everything reads and writes the **real formats the modding ecosystem already uses** — real `.snbt`, real `.js`, real `.json`. No black-box save format, no lock-in: leave ModCanvas tomorrow and keep everything you made.
 
 ## Status
 
-**Early development.** The veteran workbench core is functional on **Minecraft 1.21.1 / NeoForge** (FTB Quests). The beginner layer — first-pack wizard, pack health panel, beginner mode — is the active focus.
+**Early development.** The veteran workbench core is functional on **Minecraft 1.21.1 / NeoForge** (FTB Quests), including the pack-health go/no-go panel. The beginner layer — first-pack wizard, beginner mode — is the active focus.
 
 - **Supported:** 1.21.1 NeoForge · FTB Quests
 - **Planned:** rest of the 1.21.1 loader matrix → newer stable versions (demand-driven)

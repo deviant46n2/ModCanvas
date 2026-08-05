@@ -231,7 +231,7 @@ export function useQuestToolbarActions({
     const dir = modsDir || (projectPath ? `${projectPath}/mods` : '')
     if (!dir) { alert('No mods directory set'); return }
     try {
-      const keysToRemove = ['modcanvas_mods_dir', 'modcanvas_asset_cache_version']
+      const keysToRemove = ['modcanvas_mods_dir']
       for (const key of keysToRemove) { localStorage.removeItem(key) }
       console.log('[ModCanvas] Cleared localStorage cache keys')
 

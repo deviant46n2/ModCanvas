@@ -201,8 +201,8 @@ the write target, and resolves the default KubeJS namespace via
 
 ## Definition of done
 
-- `pnpm test`, `pnpm lint`, `tsc -b` all green (520 frontend tests).
-- `cargo test`/`cargo build` in `src-tauri/` green (258 lib tests).
+- `pnpm test`, `pnpm lint`, `tsc -b` all green (533 frontend tests).
+- `cargo test`/`cargo build` in `src-tauri/` green (265 lib tests).
 - Any CLI flag, IPC channel, or UI node parameter added must be reflected here
   and in the matching backend/UI module.
 - The release binary is rebuilt after `src-tauri/**` or `frontend/**` edits

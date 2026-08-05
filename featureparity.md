@@ -10,6 +10,8 @@ FTB source references (`/tmp/ftbq/common/...` or the FTBTeam/FTB-Quests repo) ar
 
 _Last audited against `d5e233a` (branch `drunk-coding`). Audit note: file-size cap (>300 lines) is violated by 41 non-test files; quest import/export rebuilds SNBT comment-free (comment-preserving AST exists but is unused for quest content); Rust serializers gate Data Components by hardcoded `1.20.5+` heuristics with no adapter — see AGENTS.md._
 
+_Updated 2026-08-05: quest import/export now preserves SNBT comments via the raw-SNBT sidecar (`imports/ftb_quests/snbt_sidecar.rs`), including on live export paths and book-level files (`data.snbt`, `chapter_groups.snbt`, `reward_tables/*.snbt`). The file-size cap sweep split 11 of the 12 worst offenders under 300 lines; `imports/ftb_quests/import.rs` (2536 lines) remains monolithic — see `docs/audit-2026-08-05.md`._
+
 ---
 
 ## 1. File / global settings (`data.snbt`)

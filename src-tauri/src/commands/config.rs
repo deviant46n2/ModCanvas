@@ -169,7 +169,16 @@ pub fn save_structured_config(
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("toml");
-    let content = crate::config_parser::config_value_to_string(&config, format);
+    // For TOML, update the existing file in place so table headers, block
+    // comments, ordering, and layout survive for keys the editor didn't touch.
+    let content = if format.eq_ignore_ascii_case("toml") {
+        match std::fs::read_to_string(&safe_path) {
+            Ok(existing) => crate::config_parser::apply_config_to_toml(&existing, &config),
+            Err(_) => crate::config_parser::config_value_to_string(&config, format),
+        }
+    } else {
+        crate::config_parser::config_value_to_string(&config, format)
+    };
     if let Some(parent) = safe_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }

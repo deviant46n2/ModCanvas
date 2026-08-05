@@ -1,7 +1,5 @@
 import type { AssetCacheManifest, AssetCacheEntry, ExtractedTheme, NodeBorderSpec } from './types';
 
-const CACHE_VERSION_KEY = 'modcanvas_asset_cache_version';
-
 export class AssetCacheManager {
   private manifest: AssetCacheManifest | null = null;
   private listeners: Array<(theme: ExtractedTheme | null) => void> = [];
@@ -36,7 +34,6 @@ export class AssetCacheManager {
 
     const manifest = this.buildManifest(raw);
     this.manifest = manifest;
-    this.persistManifest(manifest);
 
     const theme = this.extractTheme(manifest);
     this.notify(theme);
@@ -170,21 +167,6 @@ export class AssetCacheManager {
 
   clear(): void {
     this.manifest = null;
-    try { localStorage.removeItem(CACHE_VERSION_KEY); } catch {}
     this.notify(null);
   }
-
-  private persistManifest(manifest: AssetCacheManifest): void {
-    try {
-      localStorage.setItem(CACHE_VERSION_KEY, JSON.stringify({
-        version: manifest.sourceVersion,
-        loader: manifest.sourceLoader,
-        loadedAt: manifest.loadedAt,
-      }));
-    } catch {
-      // storage full or unavailable; non-critical
-    }
-  }
 }
-
-export const globalAssetCache = new AssetCacheManager();

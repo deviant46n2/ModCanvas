@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { globalAssetCache } from '../../core/theme/asset-cache';
+import { globalAssetCache } from '../../services/asset-cache';
 import { ThemeContext } from './theme-context';
 import type { ThemeContextValue } from './theme-context';
 import type { ExtractedTheme } from '../../core/theme/types';

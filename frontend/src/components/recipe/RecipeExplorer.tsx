@@ -1,18 +1,22 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Grid, type CellComponentProps } from 'react-window';
 import type { Recipe } from '../../core/recipe/recipe-store';
 import {
   matchesFilter,
   groupByProvenance,
   type FilterState,
-  type OwnershipFilter,
-  type StatusFilter,
-  type RecipeTypeFilter,
   type FilterDeps,
 } from '../../core/recipe/filter';
+import type { OwnershipFilter, StatusFilter, RecipeTypeFilter } from '../../core/recipe/filter';
 import type { ItemRegistryEntry } from '../../services/quest-types';
-import { getTagItems } from '../../services/smart-filter-tags';
-import { validateRecipe } from '../../core/recipe/validation';
+import { SectionGrid } from './explorer-grid';
+import {
+  buildIssuesMap,
+  buildModItemLookup,
+  getTagMembers,
+  mergeManifestRecipes,
+  rowStatusOf,
+  computeGridLayout,
+} from './recipe-explorer-utils';
 
 const TYPE_OPTIONS: RecipeTypeFilter[] = [
   'all', 'shaped', 'shapeless', 'smithing', 'stonecutting',
@@ -20,12 +24,6 @@ const TYPE_OPTIONS: RecipeTypeFilter[] = [
 ];
 const OWNERSHIP_OPTIONS: OwnershipFilter[] = ['all', 'mine', 'pack', 'jars'];
 const STATUS_OPTIONS: StatusFilter[] = ['all', 'enabled', 'disabled'];
-
-const COLUMN_WIDTH = 260;
-const GRID_ROW_HEIGHT = 52;
-const MINE_MAX_H = 260;
-const PACK_MAX_H = 400;
-const JARS_MAX_H = 320;
 
 export interface RecipeExplorerProps {
   recipes: Recipe[];
@@ -44,111 +42,6 @@ export interface RecipeExplorerProps {
   /** Comment-out manifest pseudo-recipes, shown in the Disabled filter. */
   manifestRecipes: Recipe[];
   itemRegistry: ItemRegistryEntry[];
-}
-
-type RowStatus = 'error' | 'warning' | 'ok' | 'none';
-
-type ExplorerCellData = {
-  filtered: Recipe[];
-  columns: number;
-  selectedRecipeId: string | null | undefined;
-  getTextureUrl: (itemId: string) => string | null;
-  onSelectRecipe: (id: string) => void;
-  onEditCopy: (id: string) => void;
-  onToggleDisable: (recipe: Recipe) => void;
-  statusOf: (r: Recipe) => RowStatus;
-  isDisabled: (r: Recipe) => boolean;
-  selected: Set<string>;
-  toggleSelect: (id: string) => void;
-};
-
-function ExplorerCell({ columnIndex, rowIndex, style, ...d }: CellComponentProps<ExplorerCellData>) {
-  const flat = rowIndex * d.columns + columnIndex;
-  const recipe = d.filtered[flat];
-  if (!recipe) return <div style={style} />;
-  const readOnly = recipe.editable === false;
-  const status = d.statusOf(recipe);
-  const disabled = d.isDisabled(recipe);
-  return (
-    <div
-      style={style}
-      key={recipe.id}
-      className={`recipe-grid-item recipe-explorer-item ${d.selectedRecipeId === recipe.id ? 'selected' : ''} ${disabled ? 'is-disabled' : ''}`}
-      onClick={() => d.onSelectRecipe(recipe.id)}
-      title={readOnly ? 'Read-only (from a mod jar)' : 'Click to open'}
-    >
-      <div className="recipe-grid-info">
-        <input
-          type="checkbox"
-          className="recipe-select-checkbox"
-          checked={d.selected.has(recipe.id)}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => d.toggleSelect(recipe.id)}
-          title="Multi-select for bulk actions"
-        />
-        <span className="recipe-type-badge">{recipe.type}</span>
-        <span className="recipe-name">{recipe.name}</span>
-        {readOnly ? (
-          <span className="recipe-readonly-glyph" title="Read-only (from a mod jar)">⛃</span>
-        ) : (
-          <span className={`recipe-status recipe-status-${status === 'none' ? 'ok' : status}`}
-            title={status === 'none' ? undefined : `Validation ${status}`} />
-        )}
-        <button
-          type="button"
-          className={`recipe-disable-toggle ${disabled ? 'on' : ''}`}
-          onClick={(e) => { e.stopPropagation(); d.onToggleDisable(recipe); }}
-          title={disabled ? 'Re-enable this recipe' : 'Disable this recipe'}
-          aria-label={disabled ? 'Re-enable recipe' : 'Disable recipe'}
-        />
-      </div>
-      <div className="recipe-grid-output">
-        {recipe.output.item && (
-          <>
-            {d.getTextureUrl(recipe.output.item) && (
-              <img src={d.getTextureUrl(recipe.output.item)!} alt="" className="recipe-output-icon" />
-            )}
-            <span>{recipe.output.item} ×{recipe.output.count}</span>
-          </>
-        )}
-        {!readOnly && recipe.origin !== 'authored' && (
-          <button
-            type="button"
-            className="recipe-edit-copy"
-            onClick={(e) => { e.stopPropagation(); d.onEditCopy(recipe.id); }}
-            title="Edit a copy (pack recipes are not persisted in place)"
-          >
-            Edit a copy
-          </button>
-        )}
-        {disabled && <span className="recipe-disabled-chip">Disabled</span>}
-      </div>
-    </div>
-  );
-}
-
-function SectionGrid({ items, cellData, height }: {
-  items: Recipe[];
-  cellData: Omit<ExplorerCellData, 'filtered'>;
-  height: number;
-}) {
-  if (items.length === 0 || height <= 0) return null;
-  const columns = Math.max(1, Math.floor(cellData.columns / COLUMN_WIDTH));
-  const columnWidth = cellData.columns / columns;
-  const rows = Math.ceil(items.length / columns);
-  return (
-    <Grid
-      className="recipe-explorer-grid"
-      style={{ width: cellData.columns, height }}
-      cellComponent={ExplorerCell}
-      columnCount={columns}
-      columnWidth={columnWidth}
-      rowCount={rows}
-      rowHeight={GRID_ROW_HEIGHT}
-      cellProps={{ ...cellData, filtered: items, columns }}
-      overscanCount={6}
-    />
-  );
 }
 
 export function RecipeExplorer({
@@ -184,56 +77,28 @@ export function RecipeExplorer({
 
   // Validation status memoized over authored recipes only; read-only rows are
   // skipped entirely (neutral lock glyph, no validation cost).
-  const issuesMap = useMemo(() => {
-    const map = new Map<string, { hasError: boolean; hasWarning: boolean }>();
-    for (const r of recipes) {
-      if (r.origin !== 'authored') continue;
-      const issues = validateRecipe(r);
-      map.set(r.id, {
-        hasError: issues.some((i) => i.severity === 'error'),
-        hasWarning: issues.some((i) => i.severity === 'warning'),
-      });
-    }
-    return map;
-  }, [recipes]);
+  const issuesMap = useMemo(() => buildIssuesMap(recipes), [recipes]);
 
   const hasIssues = useMemo(() => (r: Recipe) => {
     const i = issuesMap.get(r.id);
     return !!i && (i.hasError || i.hasWarning);
   }, [issuesMap]);
 
-  const modItemIds = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const item of itemRegistry) {
-      let set = map.get(item.mod_id);
-      if (!set) { set = new Set(); map.set(item.mod_id, set); }
-      set.add(item.id);
-    }
-    return (mod: string) => map.get(mod) ?? new Set<string>();
-  }, [itemRegistry]);
-
-  const getTagMembers = useMemo(() => (tag: string) => getTagItems(tag) ?? [], []);
+  const modItemIds = useMemo(() => buildModItemLookup(itemRegistry), [itemRegistry]);
 
   // When the Disabled filter is active, merge in the comment-out manifest's
   // pseudo-recipes (calls commented out of scripts are gone from the pack scan
   // but must stay visible + re-enable-able), skipping any already represented.
-  const merged = useMemo(() => {
-    if (status !== 'disabled') return recipes;
-    const seen = new Set<string>();
-    for (const r of recipes) {
-      if (r.source && r.sourceLines) seen.add(`${r.source}:${r.sourceLines.start}`);
-    }
-    const extras = manifestRecipes.filter(
-      (m) => m.source && m.sourceLines && !seen.has(`${m.source}:${m.sourceLines.start}`)
-    );
-    return [...recipes, ...extras];
-  }, [recipes, manifestRecipes, status]);
+  const merged = useMemo(
+    () => (status !== 'disabled' ? recipes : mergeManifestRecipes(recipes, manifestRecipes)),
+    [recipes, manifestRecipes, status]
+  );
 
   const filtered = useMemo(() => {
     const state: FilterState = { query, ownership, status, attention, changed, type };
     const d: FilterDeps = { isDisabled, getTagMembers, modItemIds, hasIssues };
     return merged.filter((r) => matchesFilter(r, state, d));
-  }, [merged, query, ownership, status, attention, changed, type, isDisabled, getTagMembers, modItemIds, hasIssues]);
+  }, [merged, query, ownership, status, attention, changed, type, isDisabled, modItemIds, hasIssues]);
 
   const { mine, pack, jars } = useMemo(() => groupByProvenance(filtered), [filtered]);
 
@@ -265,28 +130,17 @@ export function RecipeExplorer({
   // Per-section heights: natural (capped), then give the leftover panel height
   // to the last rendered grid so the list fills instead of leaving an empty
   // lower half.
-  const columns = Math.max(1, Math.floor(panelW / COLUMN_WIDTH));
-  const gridH = (count: number, cap: number) =>
-    Math.min(Math.ceil(count / columns) * GRID_ROW_HEIGHT, cap);
-  const SECTION_TITLE_H = 26;
-  const SECTION_GAP = 8;
-
-  const mineGrid = showMine && mine.length > 0;
-  const packGrid = showPack && pack.length > 0;
-  const jarsExpandedGrid = showJars && jars.length > 0 && !jarsCollapsed;
-
-  let mineH = mineGrid ? gridH(mine.length, MINE_MAX_H) : 0;
-  let packH = packGrid ? gridH(pack.length, PACK_MAX_H) : 0;
-  let jarsH = jarsExpandedGrid ? gridH(jars.length, JARS_MAX_H) : 0;
-
-  const titleRows =
-    (mineGrid ? 1 : 0) + (packGrid ? 1 : 0) + (showJars && jars.length > 0 ? 1 : 0);
-  const fixedH =
-    titleRows * SECTION_TITLE_H + Math.max(0, titleRows - 1) * SECTION_GAP;
-  const leftover = Math.max(0, groupsH - fixedH - (mineH + packH + jarsH));
-  if (jarsExpandedGrid) jarsH += leftover;
-  else if (packGrid) packH += leftover;
-  else if (mineGrid) mineH += leftover;
+  const { mineH, packH, jarsH, mineGrid, packGrid } = computeGridLayout({
+    panelW,
+    groupsH,
+    mineCount: mine.length,
+    packCount: pack.length,
+    jarsCount: jars.length,
+    showMine,
+    showPack,
+    showJars,
+    jarsCollapsed,
+  });
 
   const cellBase = {
     columns: panelW,
@@ -295,14 +149,7 @@ export function RecipeExplorer({
     onSelectRecipe,
     onEditCopy,
     onToggleDisable,
-    statusOf: (r: Recipe): RowStatus => {
-      if (r.editable === false || r.origin !== 'authored') return 'none';
-      const i = issuesMap.get(r.id);
-      if (!i) return 'ok';
-      if (i.hasError) return 'error';
-      if (i.hasWarning) return 'warning';
-      return 'ok';
-    },
+    statusOf: (r: Recipe) => rowStatusOf(r, issuesMap),
     isDisabled,
     selected,
     toggleSelect,
