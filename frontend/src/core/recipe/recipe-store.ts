@@ -7,7 +7,9 @@ export type RecipeOrigin = 'vanilla' | 'kubejs' | 'crafttweaker' | 'authored';
 
 export interface RecipeIngredient {
   item: string;
-  count?: number;
+  /** Absent counts arrive as `undefined` (authored) or `null` (loaded pack
+   *  recipes — Rust `Option<i32>::None` serializes to null). */
+  count?: number | null;
   tag?: boolean;
   nbt?: Record<string, unknown>;
 }

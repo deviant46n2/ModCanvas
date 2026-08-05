@@ -47,7 +47,9 @@ function ingredientIssues(ing: RecipeIngredient | undefined, path: string): Reci
   } else if (!isValidItemId(raw)) {
     issues.push({ severity: 'error', code: 'bad_item', path, message: `"${raw}" is not a valid item id.` });
   }
-  if (ing.count !== undefined && (!Number.isFinite(ing.count) || ing.count < 1 || ing.count > 64)) {
+  // `count` is optional: undefined, null (Rust `Option::None`), and an
+  // in-range number are all valid. Only an explicit out-of-range number warns.
+  if (ing.count != null && (!Number.isFinite(ing.count) || ing.count < 1 || ing.count > 64)) {
     issues.push({ severity: 'warning', code: 'bad_count', path, message: 'Count must be between 1 and 64.' });
   }
   return issues;

@@ -56,6 +56,18 @@ describe('validateRecipe', () => {
     const r = baseRecipe({ pattern: ['AA', 'B'] })
     expect(validateRecipe(r).some((i) => i.code === 'ragged_pattern')).toBe(true)
   })
+  it('does not warn on a null (Rust None) ingredient count', () => {
+    // Loaded pack recipes serialize `count: Option` as null; absent counts are
+    // valid, only an explicit out-of-range number warns.
+    const r = baseRecipe({ pattern: ['A'], key: { A: { item: 'minecraft:stone', count: null, tag: false } } })
+    expect(validateRecipe(r).some((i) => i.code === 'bad_count')).toBe(false)
+  })
+  it('warns when an explicit ingredient count is out of range', () => {
+    const r = baseRecipe({ pattern: ['A'], key: { A: { item: 'minecraft:stone', count: 0, tag: false } } })
+    expect(validateRecipe(r).some((i) => i.code === 'bad_count')).toBe(true)
+    const r2 = baseRecipe({ pattern: ['A'], key: { A: { item: 'minecraft:stone', count: 65, tag: false } } })
+    expect(validateRecipe(r2).some((i) => i.code === 'bad_count')).toBe(true)
+  })
   it('flags shapeless with no ingredients', () => {
     const r = baseRecipe({ type: 'shapeless', pattern: undefined, key: undefined })
     expect(validateRecipe(r).some((i) => i.code === 'empty_shapeless')).toBe(true)
