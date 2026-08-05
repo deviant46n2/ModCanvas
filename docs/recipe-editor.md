@@ -5,233 +5,206 @@ and the exact files that own each concern.
 
 ## Status
 
-Implementation wave "Core" is complete on the `recipesystem` branch. The
-**palette / item-picker / crafting-grid redesign** (2026-08-04) is also complete
-on top of it:
+The recipes backlog (todo.md) is **complete**: per-recipe disable across all
+origins, the RecipeExplorer with provenance groups + JEI-grammar search, an
+authored-only save gate, the palette right rail with "recipes using this", a
+non-destructive type picker, a script drawer with full-file/per-recipe tabs, and
+bulk "Replace ingredient…". The sections below describe the surface as it is
+now; the earlier "Core" wave is folded into the same file layout.
 
-- **Modrinth-backed palette search removed.** `search_items`/`search_tags`
-  returned Modrinth *project* slugs, not Minecraft item ids, and were
-  network-dependent. Frontend usage is gone (`services/recipes.ts` no longer
-  exposes them; `hooks/useItemSearch.ts` deleted). The Rust Modrinth module
-  stays — it still backs modpack import.
-- **2-tab palette (Items + Tags), 100% local.**
-  - **Items**: the instance item registry (`scan_instance_items_cmd`),
-    virtualized, `@mod` filter, draggable rows. The old third `registry` tab
-    merged into this tab.
-  - **Tags**: the local tag catalog (`list_item_tags_cmd`), virtualized rows
-    with id + expanded member count, draggable as `#tag`, click-to-expand
-    members resolved through `requestResolveTags`/`requestMaterialize`.
-  - Pure tag filtering lives in `frontend/src/core/recipe/tag-filter.ts` (tested).
-- **KubeJS items indexed too.** `src-tauri/src/indexer_kubejs.rs` parses
-  `event.create`/`event.register` inside `onEvent('item.registry', …)` and
-  `StartupEvents.registry('item', …)` blocks (capturing chained
-  `.displayName()`/`.texture()`), walking `kubejs/startup_scripts/**/*.js` +
-  `server_scripts/**/*.js`. Bare ids are namespaced via the adapter's
-  `getKubejsDefaultNamespace()` (default `kubejs`). The item index cache
-  fingerprints these scripts, so editing one invalidates the scan.
-- **Shared `ItemPickerModal`** (extracted from the deleted `JeiDrawer`): the
-  item picker used by BOTH the quest editor and the recipe editor's grid/output
-  slots. Items only — no tag mode. Icons resolve lazily through the texture
-  index first (`textureDisplayUrl`), falling back to the registry's
-  `texture_data_url`.
-- **Crafting grid redesign, MC-authentic look in pure CSS** — no Minecraft
-  textures bundled (AGENTS.md §6). `RecipeSlot` (48px beveled slot via borders +
-  inset box-shadows + self-authored CSS dither, 32px pixel icons via
-  `AnimatedSprite`, count badge **shapeless only**, `#` ribbon + member tooltip
-  for tag cells, click → picker, double-click → clear, drag/drop, filled-cell
-  context menu with replace/set-count/clear) + `OutputSlotField`. `RecipeGrid`
-  is stateless: the editor owns cell state (`patternToGrid` for shaped,
-  `ingredientsToGrid` for shapeless) and writes through
-  `gridToPattern`/`gridToIngredients`. The old `syncKey`/`suppressNextEmit`
-  grid hack, the duplicate output editor, the dead "Shapeless" checkbox, the
-  second group input, and the 2×2 size branch are all deleted.
+### Layout
 
-The "Core" wave below describes the rest of the editor:
+The editor body is **Explorer (left) | Editor (center) | Palette (right)**. The
+header holds the adapter badge, the opt-in **Script** drawer toggle, **Reload
+Recipes**, and **Import JSON** — there is no header search (each pane owns its
+own).
 
-- Adapter-aware item/tag search (now superseded by the local-only 2-tab palette).
-- Ingredient kinds (items + tags).
-- Validation with per-field issues.
-- Duplicate recipe.
-- Per-recipe save (KubeJS recipes.js / CraftTweaker zs).
-- Recipe list search + type filter.
-- Backend `write_script_files` path fix.
-- Specialized editors for the non-crafting recipe types: furnace family
-  (smelting/blasting/smoking/campfire with input + output + experience + cooking
-  time), stonecutting (single input → output), and smithing (base + addition).
-- Paste-in JSON import (vanilla / KubeJS recipe JSON → editable recipes).
-- Raw generated-script preview sash (read-only KubeJS .js / CraftTweaker .zs),
-  **opt-in and hidden by default** — beginners never see code. The header
-  **Script** toggle reveals it and the choice is persisted in
-  localStorage (`modcanvas:recipe-script-preview`). It shows the **full
-  on-disk script** (the same `generate_recipe_scripts` output the save button
-  writes, over the same `selectSaveableRecipes` set, debounced ~400ms) with the
-  target file path and a Copy button, so an experienced dev can work directly
-  with the generated code instead of the UI.
-- Recipe-list polish: inline rename, per-recipe validation-status badges.
-- Bulk ops: multi-select delete and drag-to-reorder recipes.
-- Emitter correctness pass: camelCase serde for the recipe model + `ScriptOutput`
-  so cooking time / experience survive round-trips; recipes are persisted in
-  KubeJS and CraftTweaker formats via the adapter-chosen write target.
-- Bidirectional loading: `scan_pack_recipes` reads existing pack recipes back
-  into the editor. It walks **mod jars** (`mods/*.jar|zip` → `data/*/recipe(s)/*.json`,
-  the bulk of any real pack's recipes, marked read-only) plus the pack's own
-  editable sources: vanilla `data/*/recipe(s)/*.json`, KubeJS
-  `server_scripts/**/*.js` event calls, CraftTweaker `scripts/*.zs`. Both datapack
-  folder spellings are scanned — pre-1.21 `data/<ns>/recipes/` and the 1.21+
-  singular rename `data/<ns>/recipe/` (the folder was renamed in MC 1.21; scanning
-  only the plural form silently found ~0 recipes on 1.21+ packs). Recipes are
-  deduped by resource id (`ns:file`) so a pack `data/` override shadows a jar
-  recipe with the same id.
-- **Recipes auto-load on pack open**: the pack-open pipeline (`useAppState`
-  `runLoadPipeline`) ends with a `recipes` stage that scans the pack and loads
-  every discovered recipe into the store (origin/source/editable preserved).
-  The header button is **Reload Recipes** (not a Load modal) — it re-runs the
-  same cache-aware scan and merges, showing "Added N recipes" / "up to date".
-  The old `LoadPackRecipesModal` selection UI was removed.
-- **Multi-column recipe grid**: the recipe list is a virtualized multi-column
-  grid (`react-window` `Grid`) that fills the panel height — column count
-  auto-computes from width (min 260px), so a real pack's tens of thousands of
-  recipes show many-per-row with no giant gap between recipe name and output.
-- Non-clobber saves: authored recipes write to a dedicated
-  `kubejs/server_scripts/modcanvas_recipes.js` (and
-  `scripts/modcanvas_crafttweaker.zs`) so a save never overwrites a pack-author's
-  own recipe files.
-- Fast rescan: `recipes/cache.rs` fingerprints every recipe-bearing file
-  (mods `*.jar`/`*.zip`, `data/*/recipes/*.json`, KubeJS `*.js`, CraftTweaker
-  `*.zs` by path+size+mtime) and reuses the previous scan on disk when nothing
-  changed — reopening / refreshing an unchanged pack is instant.
-- Last-pack persistence: the app remembers the last-opened project
-  (localStorage `modcanvas:last-project-id`) and re-opens it on launch with the
-  full cache-aware load so the workspace returns to the same pack without a
-  manual reopen. Reopen loads
-  mods/configs/recipes from cache and the quest graph from the DB — it does NOT
-  re-run the heavy ingest/FTB import.
-- Lazy icons in the editor: `RecipeEditor` uses the compact instance texture
-  index (`scan_instance_textures`, descriptors only) + the shared
-  `texture-loader` lazy materializer instead of the legacy bulk
-  `scanModJarTextures` base64 path. Opening the Recipes tab no longer pulls
-  every mod texture into memory; icons resolve in batches, and a shimmer
-  skeleton shows while the index loads.
-- All-recipe loading: `loadRecipesFromPack` dedupes by `origin:source` (resource
-  id) so distinct recipes that share an output item are NOT collapsed — every
-  pack recipe loads.
-- Instant tab switching: all workspace tabs stay mounted (inactive ones are
-  hidden with `display: none` instead of unmounted), so switching between
-  Mods/Configs/Progression/Quests/Recipes never re-runs the heavy load effects
-  (texture scans, quest graph, config reads). State and loaded data persist
-  across switches.
-- Per-project scoping: the recipe store is cleared when the selected project
-  changes (`App.tsx` resets `useRecipeStore` on `selectedProject.id` change).
-  Recipes are pack-specific; without this reset, switching packs left the
-  previous pack's recipes in the persisted store, so the Recipes tab and Pack
-  Health reported stale results from the prior pack.
+- **RecipeExplorer** (replaces the old `RecipeList`): splits recipes into
+  **Mine** (`origin === 'authored'`, pinned top), **Pack** (loaded pack recipes
+  that are editable), and **Jars** (read-only mod-jar, collapsed by default, lock
+  glyph, no validation cost). Each group is its own virtualized grid with a
+  count header. Filters:
+  - Ownership segmented (All / Mine / Pack / Jars) and status segmented (All /
+    Enabled / Disabled — "Disabled" = `isDisabled`).
+  - **Needs attention** (validation error/warning) and **Changed** (authored +
+    `modified` since last save) chips.
+  - Type `<select>` + **JEI-grammar search** (see below).
+  - Validation is memoized over authored recipes only; read-only rows get no
+    status dot. Non-authored rows have an **Edit a copy** action.
+- **Palette** (right rail): two tabs (Items / Tags) with its own search input and
+  `filtered/total` counts. It filters the full instance item registry and local
+  tag catalog locally. Every row has a **⇄ recipes using this** action that
+  drives the explorer search to `>item` / `#tag`.
+- **Editor** (center): `CraftingGridPanel` with a visual **type picker** (card
+  per type, mini grid glyph). Switching crafting → non-crafting confirms first
+  ("…keeps only the first ingredient; the pattern will be discarded"); furnace
+  family ↔ stonecutting/smithing swaps are silent. Specialized editors handle the
+  non-crafting types.
 
-Scope stayed in the "Core" wave by explicit user choice; arbitrary-paste-JSON
-import and the full vision remain future work.
+### Unified disable — one toggle, three mechanisms
+
+Every explorer row has a power toggle. The mechanism is chosen by the recipe's
+**origin** (`useRecipeDisable` / the pure `toggleRecipeDisable`):
+
+1. **Authored** → flips the recipe's `disabled` flag (no IPC). Disabled authored
+   recipes are **excluded from script emission**.
+2. **Vanilla / mod-jar** (real registered resource id) → added to `disabledIds`;
+   the emitters write `event.remove({ id: 'ns:file' })` (KubeJS) /
+   `recipes.removeByRecipeName("ns:file")` (CraftTweaker) **before** the adds in
+   `modcanvas_recipes.js` / `modcanvas_crafttweaker.zs`. Stale ids are dropped at
+   emit time and never error.
+3. **KubeJS / CraftTweaker script recipes** (synthetic ids, no in-game id to
+   remove) → **comment-out the call** in the pack's own source script (`// ` on
+   every line of the 1-based `LineSpan`, modifiers included), after a confirm.
+   The command returns a **SHA-256 fingerprint** of the original lines; a
+   **manifest entry** (`disabledScripts` in the store) persists the snapshot
+   (file, lines, name, output, type, fingerprint). Re-enabling runs
+   `uncomment_recipe_call`, which **strips the `//` and verifies the fingerprint
+   first** — if the file was hand-edited, re-enable refuses and the user fixes it
+   by hand. This is the reversible "heavy path".
+
+**Disabled filter sources:** loaded recipes whose disable key matches, **plus**
+the manifest entries themselves — after a rescan a commented-out call is gone
+from the pack list, so the manifest keeps it visible (dimmed, snapshot
+name/output/type) and re-enable-able. KubeJS event ordering: removes apply after
+all adds in the recipe event, so they catch script-added recipes regardless of
+file order (verify in-game via the companion mod — not unit-testable in Rust).
+
+### Save gate (authored-only)
+
+`selectSaveableRecipes` emits **only** `origin === 'authored'`, non-disabled,
+non-invalid recipes. Editing a discovered pack recipe in place does **not**
+persist — use **Edit a copy** first (the intended beginner flow). Saves write to
+dedicated `kubejs/server_scripts/modcanvas_recipes.js` and
+`scripts/modcanvas_crafttweaker.zs`, never clobbering a pack-author's files.
+
+### JEI-grammar search (`core/recipe/filter.ts`, pure)
+
+Whitespace-separated tokens, AND-combined:
+
+| Token | Meaning |
+|-------|---------|
+| `@mod` | namespace **or** registry-mod match over output/ingredients |
+| `#tag` | ingredient tag id match |
+| `>id`  | output id substring |
+| `<id`  | ingredient id substring (tags stripped of `#`) |
+| bare   | name / output / group / type / ingredient substring, **plus tag-expanded** (`getTagMembers`) |
+
+### Script drawer
+
+The opt-in header **Script** button (persisted in localStorage) opens a drawer
+docked under the editor with two tabs: **Full file** (all saveable recipes +
+remove-by-id disables = the exact on-disk bytes the save writes) and **This
+recipe** (emission for the selection only, no removes). Both are debounced
+(~400ms), show the target file path + a badge, have Copy, and fall back to
+`// nothing to emit`.
+
+### Bulk "Replace ingredient…"
+
+Multi-select (checkboxes) on explorer rows opens a bulk bar with **Replace
+ingredient…**. The modal picks a **from** and **to** ingredient (item or `#tag`),
+live-previews "N recipes will change" + the affected list (pure
+`affectedRecipeIds`), skips non-authored selections with a note, and applies
+`replaceIngredient` (every occurrence in `ingredients` and shaped `key` values)
+per affected authored recipe. No new Rust emitter — the existing add-emitter
+handles the mutated values.
+
+### Comment-aware, span-aware parsers
+
+`recipes/kubejs.rs` and `recipes/crafttweaker.rs` no longer match calls inside
+`//` / `/* */` comments or string literals (so a commented-out call never
+re-surfaces as active), and every parsed call returns a 1-based `LineSpan`
+(start/end, modifiers included) threaded through `DiscoveredRecipe.span` and the
+frontend `Recipe.sourceLines`. The shared scanner lives in
+`recipes/scan.rs` (`OpaqueRegions`, line indexing). CraftTweaker's balanced-paren
+matcher was fixed so `>`-terminated `<item:…>` literals no longer swallow the
+closing paren.
+
+### Also in this surface (carried forward)
+
+- Local-only 2-tab palette + shared `ItemPickerModal`, KubeJS item indexing
+  (`indexer_kubejs.rs`), MC-authentic stateless `RecipeGrid`/`RecipeSlot`/
+  `OutputSlotField` (pure CSS, no bundled Minecraft assets).
+- Bidirectional loading: `scan_pack_recipes` walks mod jars + vanilla `data/`
+  (both `recipes/` and 1.21+ `recipe/`), KubeJS `server_scripts`, CraftTweaker
+  `scripts`; dedupes by resource id preferring pack overrides; cache-aware
+  (`recipes/cache.rs`) so rescans are instant. Auto-loads on pack open.
+- Adapter-aware syntax/write targets, validation with per-field issues, JSON
+  import, paste JSON import, duplicate, specialized editors for furnace /
+  stonecutting / smithing.
+- Lazy icons via the compact instance texture index + `texture-loader`;
+  recipes stay per-project (store cleared on project switch).
 
 ## Module layout
 
-Pure, dependency-free helpers live under `frontend/src/core/recipe/` (100%
-unit-testable, no UI / IPC):
+Pure helpers under `frontend/src/core/recipe/` (no UI / IPC):
 
 | File | Responsibility |
 |------|----------------|
-| `recipe-store.ts` | zustand store owning `recipes`, selected recipe, and bulk results. |
-| `loader.ts` | `normalizeLoader` &mdash; folds forge/neoforge/fabric/quilt + version vectors. |
-| `validation.ts` | `validateRecipe`, `hasErrors`, `hasBlockingErrors`, `issuesByPath`. |
-| `grid.ts` | Pure grid &harr; key conversion helpers (shaped/shapeless): `patternToGrid`/`gridToPattern`, plus `ingredientsToGrid`/`gridToIngredients` for the shapeless 3-wide layout. |
-| `tag-filter.ts` | Pure filter for the local tag catalog (`@namespace` + case-insensitive id substring). |
-| `specialized.ts` | Slot &harr; `ingredients[]` mapping for the non-crafting types (furnace `input`, stonecutting `input`, smithing `base`/`addition`). |
-| `dnd.ts` | Drag payload contract (`application/x-modcanvas-recipe-ingredient`) serialized by the palette and read by `IngredientSlot`/`RecipeSlot`. |
-| `json-import.ts` | Pure vanilla/KubeJS recipe JSON → `Recipe` parser (handles pre-1.20.5 `item`/`ingredients` and 1.20.5+ `id`/`ingredient`/`result` spellings; collapses alternative ingredient lists; drops smithing `template`). |
-| `recipe-editor.test.ts` | Tests for validation, grid conversions, loader, specialized slots, and JSON import. |
+| `recipe-store.ts` | zustand store: `recipes`, selection, undo/redo, `disabledIds`, `disabledScripts` manifest, `isDisabled` dispatch, `modified` lifecycle. `partialize` persists authored recipes + disable state. |
+| `filter.ts` | Pure JEI-grammar `matchesFilter` + `groupByProvenance` (Mine/Pack/Jars). |
+| `bulk-replace.ts` | Pure `replaceIngredient` / `affectedRecipeIds` / `refMatches` for bulk replace. |
+| `type-picker.ts` | `TYPE_OPTIONS` / `TYPE_LABELS` / `typeSwitchDiscards` / `typeSwitchConfirmMessage`. |
+| `validation.ts` | `validateRecipe`, `hasErrors`, `selectSaveableRecipes` (authored-only gate). |
+| `grid.ts` | `patternToGrid`/`gridToPattern`, `ingredientsToGrid`/`gridToIngredients`. |
+| `tag-filter.ts` | Pure filter for the local tag catalog. |
+| `specialized.ts` | Slot ↔ `ingredients[]` mapping for non-crafting types. |
+| `dnd.ts` | Drag payload contract. |
+| `json-import.ts` | Vanilla/KubeJS recipe JSON → `Recipe` parser. |
+| `loader.ts` | `normalizeLoader` / adapter loader resolution. |
 
-On the backend, `src-tauri/src/recipes/` owns the reverse direction — turning
-on-disk pack recipes into editable `Recipe`s:
+Backend, `src-tauri/src/recipes/` and `src-tauri/src/recipe_disable.rs`:
 
 | File | Responsibility |
 |------|----------------|
-| `recipes/mod.rs` | `scan_pack_recipes` orchestration (walks data/kubejs/scripts **and mod jars**; dedupes by resource id preferring pack overrides), `DiscoveredRecipe`/`RecipeOrigin` types, `scan_pack_recipes_cmd` Tauri command. |
-| `recipes/vanilla.rs` | Parse `data/*/recipes/*.json` (both `item`/`ingredients` and `id`/`result` spellings; 8 types; skips smithing_trim). |
-| `recipes/kubejs.rs` | Best-effort read of `event.shaped/shapeless/smelting/...` calls (balanced-paren + chain swallow for `.experience()`/`.cookingTime()`). |
-| `recipes/crafttweaker.rs` | Best-effort read of `recipes.addShaped/addShapeless`, `furnace.add*`, `stonecutter.addRecipe`, `smithing.addRecipe`. |
-| `recipes/cache.rs` | On-disk scan cache keyed on a fingerprint of all recipe-bearing files (path+size+mtime); invalidates automatically when any file changes. |
+| `recipes/mod.rs` | `scan_pack_recipes` orchestration, `DiscoveredRecipe` (+ `span`), `RecipeOrigin`, `scan_pack_recipes_cmd`. |
+| `recipes/scan.rs` | Comment/string `OpaqueRegions` scanner + line indexing shared by both script parsers. |
+| `recipes/vanilla.rs` | `data/*/recipes/*.json` parser. |
+| `recipes/kubejs.rs` | Comment-aware, span-aware `event.*` call reader. |
+| `recipes/crafttweaker.rs` | Comment-aware, span-aware ZenScript reader. |
+| `recipes/cache.rs` | On-disk scan cache (path+size+mtime fingerprint). |
+| `recipe_disable.rs` | `comment_out_recipe_call` (returns SHA-256 fingerprint) / `uncomment_recipe_call` (integrity-checked) + Tauri commands. |
 
-The frontend loads them via `services/recipes.ts:scanPackRecipes`, and
-`recipe-store.loadRecipesFromPack` appends + dedupes by
-`origin:source:output.item`. The `LoadPackRecipesModal` groups by source file
-with per-group toggles.
+Emitters: `scriptgen/kubejs.rs` / `scriptgen/crafttweaker.rs` take a
+`disabled_ids` list and emit removes before adds. `generate_recipe_scripts`
+(commands/mod.rs) threads `disabled_ids` through.
 
-`frontend/src/services/recipes.ts` is the data-access layer: `scanPackRecipes`,
-`scanInstanceItems(instancePath, kubejsNamespace?)`, `listItemTags(instancePath)`,
-`scanInstanceTextures`/`scanInstanceAnimations`, `generateRecipeScripts`,
-`writeScriptFiles`. It is consumed through the `services/api.ts` re-exports so
-components never talk to IPC/Tauri directly.
-
-The **item registry + tag catalog** backends:
-- `src-tauri/src/indexer.rs` + `src-tauri/src/indexer_kubejs.rs` — `scan_instance_items_cmd`
-  indexes jar/lang items AND KubeJS script registrations (`event.create`/`register`
-  with chained `.displayName()`/`.texture()`), with a versioned on-disk cache
-  fingerprinted on jars + KubeJS scripts. `mod_id` is `kubejs` for script items.
-- `src-tauri/src/instance_textures/tags.rs` — `list_item_tags_cmd` returns the
-  sorted `{id, member_count}` catalog (member counts expanded); `resolve_item_tags`
-  stays for member expansion.
-
-Rust backend lives under `src-tauri/src/`: `scriptgen/kubejs.rs` and `models.rs`
-define the recipe model and KubeJS emission; `write_script_files` is registered
-in `src-tauri/src/commands/mod.rs` and now writes through `validate_project_write`
-into the project's `kubejs/server_scripts/modcanvas_recipes.js` (previously a bug wrote to
-a `/tmp` scratch path).
+Services: `frontend/src/services/recipes.ts` exposes `scanPackRecipes`,
+`generateRecipeScripts(projectId, recipes, disabledIds)`, `writeScriptFiles`,
+`commentOutRecipeCall`, `uncommentRecipeCall`, item/tag/texture access. The
+disable logic is in `frontend/src/hooks/useRecipeDisable.ts` (pure core +
+React wrapper).
 
 ## Version / loader awareness
 
-Adapters are resolved at runtime via the adapter matrix
-(`frontend/src/adapters/index.ts` + `base/defaults.ts`). The UI passes the
-instance's `minecraftVersion` and `modLoader` down through
-`ProjectWorkspace.tsx`, and RecipeEditor uses these to:
-
-- Choose the correct KubeJS recipe syntax paths.
-- Pick the write target script (`kubejs/server_scripts/modcanvas_recipes.js` vs
-  CraftTweaker `scripts/modcanvas_crafttweaker.zs`).
-- Resolve the default KubeJS item namespace via
-  `getKubejsDefaultNamespace()` (default `kubejs`), passed to
-  `scan_instance_items_cmd` so bare KubeJS ids get namespaced.
-
-The adapter surface is queried by the helper `services/recipes.ts` (the
-backend-facing data-access layer, re-exported via `services/api.ts`).
+Adapters are resolved via the adapter matrix
+(`frontend/src/adapters/index.ts` + `base/defaults.ts`). `RecipeEditor` uses the
+instance's `minecraftVersion`/`modLoader` to pick KubeJS/CraftTweaker syntax and
+the write target, and resolves the default KubeJS namespace via
+`getKubejsDefaultNamespace()`.
 
 ## Key behaviors
 
-- New recipe from an ingredient: dragging a palette item into the grid and
-  then Save binds it; the grid reads back compact.
-- The crafting grid is **stateless** (`RecipeGrid`): `RecipeEditor` owns the
-  3×3 `cells` (memoized `patternToGrid` for shaped, `ingredientsToGrid` for
-  shapeless) and writes every cell edit back through
-  `gridToPattern`/`gridToIngredients` into the recipe store. There is no
-  internal grid state or sync hack, so opening a recipe can never mark it dirty.
-- Grid cells and the output slot open the shared `ItemPickerModal` on click;
-  filled cells also get a right-click context menu (replace / set count —
-  shapeless only / clear). Double-click clears a cell.
-- Duplicate: clones the selected recipe with a fresh id.
-- Per-item validation is non-blocking except grid-shape errors (marking them
-  "blocking" prevents saving a broken recipe).
-- Non-crafting types route to dedicated editors through `CraftingGridPanel`
-  (furnace family / stonecutting / smithing), which reuse a shared
-  `IngredientSlot` drop-and-type widget backed by the `specialized.ts` helpers.
-- Smithing is emitted as `[base, addition]` by the KubeJS backend
-  (`event.smithing(base, addition, result)`); there is no template slot.
-- Drag from the palette sets a structured `dataTransfer` payload so drops land
-  reliably in any slot regardless of component state.
-- The import modal and the list bulk/reorder/rename are additive; validation
-  from `validation.ts` drives the list status dots and the save gate.
-  `selectSaveableRecipes` is the single source of truth for which recipes the
-  save and the script preview emit, so the preview always matches the on-disk
-  file byte-for-byte.
+- **Disable** dispatch, **save gate**, **JEI-grammar search**, **bulk replace**,
+  and **type-picker confirm** semantics are as described in Status above; the
+  pure logic (`filter.ts`, `bulk-replace.ts`, `type-picker.ts`) is fully tested.
+- The crafting grid is stateless (`RecipeGrid`): the editor owns the 3×3 `cells`
+  and writes back through `gridToPattern`/`gridToIngredients`. Grid cells and the
+  output slot open the shared `ItemPickerModal`; filled cells get a right-click
+  context menu; double-click clears.
+- Comment-out caveat: after commenting a call, the next `scan_pack_recipes` no
+  longer returns it — the `disabledScripts` manifest keeps it in the Disabled
+  filter and enables Re-enable. If the user hand-edits the file, the fingerprint
+  check refuses re-enable.
+- `selectSaveableRecipes` is the single source of truth for save + the Full-file
+  preview tab, so the preview always matches the on-disk script byte-for-byte.
 
 ## Definition of done
 
-- `pnpm test`, `pnpm lint`, `tsc -b` all green (466 frontend tests).
-- `cargo test`/`cargo build` in `src-tauri/` green (229 lib tests).
+- `pnpm test`, `pnpm lint`, `tsc -b` all green (520 frontend tests).
+- `cargo test`/`cargo build` in `src-tauri/` green (258 lib tests).
 - Any CLI flag, IPC channel, or UI node parameter added must be reflected here
   and in the matching backend/UI module.
-- The release binary is rebuilt after `src-tauri/**` or `frontend/**` edits.
+- The release binary is rebuilt after `src-tauri/**` or `frontend/**` edits
+  (`cargo tauri build --no-bundle`, the only path that embeds `frontend/dist`),
+  and the binary mtime is newer than the newest changed source.
