@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { RecipeIngredient } from '../../core/recipe/recipe-store'
-import { SLOT_DRAG_MIME, recipeIngredientFromPayload, type SlotDragPayload } from '../../core/recipe/dnd'
+import { setDragPayload, clearDragPayload, readDragPayload, recipeIngredientFromPayload } from '../../core/recipe/dnd'
 import { AnimatedSprite } from '../quest/AnimatedSprite'
 import { getTagItems, requestResolveTags, subscribeTagChanges } from '../../services/smart-filter-tags'
 
@@ -62,13 +62,8 @@ export function RecipeSlot({
   const tagMembers = tag ? getTagItems(tag) ?? [] : []
 
   const readPayload = (e: React.DragEvent): RecipeIngredient | null => {
-    const raw = e.dataTransfer.getData(SLOT_DRAG_MIME)
-    if (!raw) return null
-    try {
-      return recipeIngredientFromPayload(JSON.parse(raw) as SlotDragPayload)
-    } catch {
-      return null
-    }
+    const payload = readDragPayload(e.dataTransfer)
+    return payload ? recipeIngredientFromPayload(payload) : null
   }
 
   const commitCount = () => {
@@ -100,9 +95,10 @@ export function RecipeSlot({
       onDragStart={(e) => {
         if (!filled) return
         const p = ingredient!
-        e.dataTransfer.setData(SLOT_DRAG_MIME, JSON.stringify({ item: p.item, name: p.item, tag: p.tag }))
+        setDragPayload(e.dataTransfer, { item: p.item, name: p.item, tag: p.tag })
         e.dataTransfer.effectAllowed = 'copyMove'
       }}
+      onDragEnd={() => clearDragPayload()}
       onDrop={(e) => {
         e.preventDefault()
         const ing = readPayload(e)

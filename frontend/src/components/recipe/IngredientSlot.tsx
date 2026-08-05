@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { XIcon } from '../ui/icons'
 import type { RecipeIngredient } from '../../core/recipe/recipe-store';
-import { recipeIngredientFromPayload, SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
+import { readDragPayload, recipeIngredientFromPayload } from '../../core/recipe/dnd';
 
 interface IngredientSlotProps {
   label: string;
@@ -41,13 +41,9 @@ export function IngredientSlot({
       onDrop={(e) => {
         e.preventDefault();
         setOver(false);
-        const raw = e.dataTransfer.getData(SLOT_DRAG_MIME);
-        if (raw) {
-          try {
-            onDrop(recipeIngredientFromPayload(JSON.parse(raw) as SlotDragPayload));
-          } catch {
-            /* non-JSON drop ignored */
-          }
+        const payload = readDragPayload(e.dataTransfer);
+        if (payload) {
+          onDrop(recipeIngredientFromPayload(payload));
         }
       }}
       onDoubleClick={() => { setEditing(true); setDraft(display); }}

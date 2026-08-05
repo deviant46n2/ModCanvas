@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 import type { ItemRegistryEntry, ItemTagInfo } from '../../services/api';
 import { PackageIcon, ChevronRightIcon, ChevronDownIcon } from '../ui/icons'
-import { SLOT_DRAG_MIME, type SlotDragPayload } from '../../core/recipe/dnd';
+import { setDragPayload, clearDragPayload } from '../../core/recipe/dnd';
 import { getTagItems, requestResolveTags, subscribeTagChanges } from '../../services/smart-filter-tags';
 import { filterRegistryItems } from '../../services/item-registry';
 import { filterTagCatalog } from '../../core/recipe/tag-filter';
@@ -24,11 +24,6 @@ const TAG_ROW_HEIGHT = 48;
 const MEMBER_ROW_HEIGHT = 24;
 const MAX_MEMBERS_SHOWN = 40;
 
-function setDragPayload(e: React.DragEvent, payload: SlotDragPayload) {
-  e.dataTransfer?.setData(SLOT_DRAG_MIME, JSON.stringify(payload));
-  e.dataTransfer.effectAllowed = 'copy';
-}
-
 type ItemRowData = {
   items: ItemRegistryEntry[];
   getUrl: (id: string) => string | null;
@@ -45,8 +40,9 @@ function ItemRow({ index, style, items, getUrl, onShowRecipesUsing }: RowCompone
         className="palette-item"
         draggable
         onDragStart={(e) => {
-          setDragPayload(e, { item: item.id, name: item.name });
+          setDragPayload(e.dataTransfer, { item: item.id, name: item.name });
         }}
+        onDragEnd={() => clearDragPayload()}
       >
         <div className="palette-item-icon">
           {url ? (
@@ -103,8 +99,9 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShow
           className="palette-item tag-item"
           draggable
           onDragStart={(e) => {
-            setDragPayload(e, { item: `#${row.tag.id}`, name: row.tag.id, tag: true });
+            setDragPayload(e.dataTransfer, { item: `#${row.tag.id}`, name: row.tag.id, tag: true });
           }}
+          onDragEnd={() => clearDragPayload()}
           onClick={() => onToggle(row.tag.id)}
           title={isOpen ? 'Collapse tag members' : `Expand ${row.tag.id} members`}
         >
@@ -142,7 +139,7 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShow
         className="tag-member-row"
         draggable
         onDragStart={(e) => {
-          setDragPayload(e, { item: row.item, name: row.item });
+          setDragPayload(e.dataTransfer, { item: row.item, name: row.item });
         }}
         title={`Drag ${row.item} into the grid`}
       >
