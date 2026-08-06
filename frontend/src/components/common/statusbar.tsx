@@ -2,13 +2,13 @@
 // Deploy Companion feedback on the right. System state lives here so the
 // toolbar and banners don't have to grow to carry it.
 import { useEffect, useState } from 'react'
-import type { WsConnectionStatus } from '../../services/api'
+import type { ConnectionStateView } from '../../services/connection-status'
 import { getEngineStats, subscribeEngineStats } from '../../services/engine-render'
 import { getBakedTextureKeys } from '../../services/texture-loader'
 import { RefreshIcon } from '../ui/icons'
 
 interface WorkspaceStatusBarProps {
-  wsStatus: WsConnectionStatus
+  connection: ConnectionStateView
   onRestartWebSocket: () => void
   isTesting: boolean
   testProgress: string
@@ -19,7 +19,7 @@ interface WorkspaceStatusBarProps {
 const DEPLOY_GLYPHS = /^[\u2713\u2714\u2717\u2718]\s*/
 
 export function WorkspaceStatusBar({
-  wsStatus,
+  connection,
   onRestartWebSocket,
   isTesting,
   testProgress,
@@ -45,11 +45,11 @@ export function WorkspaceStatusBar({
     <footer className="workspace-statusbar">
       <div className="workspace-statusbar-group">
         <span
-          className={`ws-status ${wsStatus.connected ? 'connected' : 'disconnected'}`}
-          title={`WebSocket server \u2022 Port ${wsStatus.port} \u2022 ${wsStatus.clientCount} client${wsStatus.clientCount === 1 ? '' : 's'}`}
+          className={`ws-status ${connection.className}`}
+          title={connection.detail}
         >
-          <span className={`status-dot ${wsStatus.connected ? 'running' : 'stopped'}`} />
-          <span>{wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'}</span>
+          <span className={`status-dot ${connection.dotClass}`} />
+          <span>{connection.label}</span>
         </span>
         <button
           className="ws-action-btn"

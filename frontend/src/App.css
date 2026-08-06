@@ -646,6 +646,12 @@ body {
   color: var(--color-text-tertiary);
 }
 
+.workspace-statusbar .ws-status.attention {
+  background: var(--color-warning-subtle, var(--color-bg-surface-1));
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
 .ws-action-btn {
   display: flex;
   align-items: center;
@@ -2011,6 +2017,7 @@ body {
 .status-dot.stopped   { background: var(--color-text-tertiary); }
 .status-dot.installing { background: var(--color-warning); }
 .status-dot.crashed   { background: var(--color-error); }
+.status-dot.attention { background: var(--color-warning); }
 
 /* ================================================================
    UTILITY: Spinner

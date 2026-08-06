@@ -8,7 +8,10 @@ mod loader;
 mod prism;
 mod progress;
 
-pub use companion::deploy_companion_mod_to_dir;
+pub use companion::{
+    companion_deploy_status, deploy_companion_mod_to_dir, resolve_companion_source_jar,
+    CompanionDeployStatus,
+};
 pub use instances::{InstanceManager, InstanceMetadata};
 pub use kubejs::{detect_kubejs_scripts, get_all_kubejs_scripts, KubeJSScript, KubeJSScriptDir};
 pub use loader::resolve_loader_version;

@@ -14,7 +14,7 @@ and `frontend/src/components/common/statusbar.tsx`.
 ├──────────────────────────────────────────────────────────────┤
 │ content (mods / configs / progression / quests / recipes)    │
 ├──────────────────────────────────────────────────────────────┤
-│ status bar: [● Minecraft Connected][⟳]   [run / deploy feedback] │
+│ status bar: [● Instance Connected][⟳]   [run / deploy feedback] │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,9 +62,13 @@ debounced auto-save, so they are not a blocking dirty surface.
 The bottom `workspace-statusbar` carries *system state* instead of toolbar
 chrome:
 
-- **Left** — WebSocket server pill (`Minecraft Connected` / `Offline / Idle`,
-  port + client count in the title tooltip) and a compact **Restart** icon
-  button (`ws-action-btn`).
+- **Left** — the connection pill: a five-state ladder (`Instance Connected` /
+  `Instance Offline` / `Companion not deployed` / `Bridge offline` /
+  `Instance running, companion missing`) derived in
+  `frontend/src/services/connection-status.ts` from socket + deployment +
+  launch-tracking signals, with the "how to reach green" manual in the title
+  tooltip. A compact **Restart** icon button (`ws-action-btn`) next to it
+  restarts the bridge server.
 - **Right** — live run feedback: `Testing… <progress>` with a spinner while a
   test is launching, the final test outcome, a truncated `Test failed: <first
   line>` with a **Copy** button when a launch errors (full trace in the title

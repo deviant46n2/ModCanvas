@@ -166,6 +166,7 @@ pub fn run() {
             commands::get_mc_logs,
             commands::resolve_mc_loader_version,
             commands::deploy_companion_mod_for_project,
+            commands::get_project_companion_status,
             commands::import_modrinth_mrpack,
             commands::import_instance_folder,
             commands::import_packwiz,

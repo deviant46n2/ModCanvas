@@ -12,7 +12,8 @@ import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIcon } from '../../services/mods'
-import type { WsConnectionStatus, IngestResult } from '../../services/api'
+import { useConnectionPill } from '../../hooks/useConnectionPill'
+import type { IngestResult } from '../../services/api'
 
 
 export interface ProjectWorkspaceProps {
@@ -28,7 +29,6 @@ export interface ProjectWorkspaceProps {
     updated_at: string
     path: string
   }
-  wsStatus: WsConnectionStatus
   activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'
   onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') => void
   onRestartWebSocket: () => void
@@ -63,6 +63,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
     ingestResult,
     packLoaded,
   } = props
+  const { view: connectionView, signals: connectionSignals } = useConnectionPill(project)
 
   // Tabs are always navigable (all panels stay mounted and handle their own
   // empty state), so no disabled gating is needed here.
@@ -160,7 +161,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                   projectPath={project.path} 
                   minecraftVersion={project.minecraft_version}
                   modLoader={project.mod_loader}
-                  wsConnected={props.wsStatus.connected}
+                  wsConnected={connectionSignals.companionConnected}
                   ingestResult={ingestResult}
                   packLoaded={packLoaded}
                   onTest={props.onTest}
@@ -183,7 +184,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
       </PackHealthProvider>
 
       <WorkspaceStatusBar
-        wsStatus={props.wsStatus}
+        connection={connectionView}
         onRestartWebSocket={props.onRestartWebSocket}
         isTesting={props.isTesting}
         testProgress={props.testProgress}

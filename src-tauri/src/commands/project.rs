@@ -226,6 +226,28 @@ pub fn deploy_companion_mod_for_project(
 }
 
 #[tauri::command]
+pub fn get_project_companion_status(
+    db: State<'_, Database>,
+    manager: State<'_, InstanceManager>,
+    project_id: String,
+) -> Result<crate::minecraft::CompanionDeployStatus, String> {
+    let pid = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let project = db.get_project(&pid).map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let instances = manager.list_instances();
+    let instance = instances.iter()
+        .find(|i| i.game_dir == project.path)
+        .ok_or_else(|| format!("No Prism instance found for '{}'", project.name))?;
+
+    let source_jar = crate::minecraft::resolve_companion_source_jar(&instance.loader);
+    Ok(crate::minecraft::companion_deploy_status(
+        std::path::Path::new(&instance.game_dir),
+        source_jar.as_deref(),
+    ))
+}
+
+#[tauri::command]
 pub async fn sync_instance_mods(
     db: State<'_, Database>,
     project_id: String,

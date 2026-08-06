@@ -1,7 +1,8 @@
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use crate::launcher::LauncherDriver;
-use crate::models::InstanceStatus;
+use crate::models::{InstanceStatus, MinecraftInstance};
 
 use super::instances::InstanceManager;
 use super::progress::{LaunchProgress, ProgressEmitter};
@@ -61,10 +62,13 @@ _username: &str,
         let instances_arc = self.instances.clone();
 
         let driver = self._driver.clone();
+        let instances_for_launch = self.instances.clone();
         tokio::spawn(async move {
             let result = do_launch(
                 &*emitter,
                 driver.as_ref(),
+                &instances_for_launch,
+                &id_owned,
                 &prism_folder_name,
                 &min_mem,
                 &max_mem,
@@ -96,6 +100,8 @@ _username: &str,
 async fn do_launch(
     emitter: &dyn ProgressEmitter,
     driver: &dyn LauncherDriver,
+    instances: &Arc<Mutex<Vec<MinecraftInstance>>>,
+    instance_id: &str,
     prism_folder_name: &str,
     min_mem: &str,
     max_mem: &str,
@@ -126,6 +132,15 @@ async fn do_launch(
     // Prism finds the instance by name in its instances directory
     let mut child = driver.spawn_launch(prism_folder_name, None)?;
     let pid = child.id().unwrap_or(0);
+
+    // The child is up: mark the instance Running so the UI can distinguish
+    // "launched from ModCanvas, game alive, companion missing" from plain
+    // offline. Cleared back to Stopped/Crashed when the child exits below.
+    if let Ok(mut insts) = instances.lock() {
+        if let Some(inst) = insts.iter_mut().find(|i| i.id == instance_id) {
+            inst.status = InstanceStatus::Running;
+        }
+    }
 
     eprintln!("[ModCanvas] Prism Launcher spawned with PID {}", pid);
 

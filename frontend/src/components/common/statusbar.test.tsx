@@ -1,12 +1,26 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WorkspaceStatusBar } from './statusbar'
+import type { ConnectionStateView } from '../../services/connection-status'
 
-const wsConnected = { connected: true, clientCount: 1, port: 9876 }
-const wsOffline = { connected: false, clientCount: 0, port: 9876 }
+const connectedView: ConnectionStateView = {
+  state: 'connected',
+  label: 'Instance Connected',
+  detail: 'The companion mod is connected to the bridge.',
+  className: 'connected',
+  dotClass: 'running',
+}
+
+const offlineView: ConnectionStateView = {
+  state: 'offline',
+  label: 'Instance Offline',
+  detail: 'No instance launched from ModCanvas. Launch the instance here to connect the companion.',
+  className: 'disconnected',
+  dotClass: 'stopped',
+}
 
 const base = {
-  wsStatus: wsOffline,
+  connection: offlineView,
   onRestartWebSocket: vi.fn(),
   isTesting: false,
   testProgress: '',
@@ -15,14 +29,33 @@ const base = {
 }
 
 describe('WorkspaceStatusBar', () => {
-  it('renders the offline WebSocket state', () => {
+  it('renders the offline connection state with guidance in the tooltip', () => {
     render(<WorkspaceStatusBar {...base} />)
-    expect(screen.getByText('Offline / Idle')).toBeInTheDocument()
+    const pill = screen.getByText('Instance Offline')
+    expect(pill).toBeInTheDocument()
+    expect(pill.closest('.ws-status')).toHaveAttribute('title', offlineView.detail)
   })
 
   it('renders the connected state', () => {
-    render(<WorkspaceStatusBar {...base} wsStatus={wsConnected} />)
-    expect(screen.getByText('Minecraft Connected')).toBeInTheDocument()
+    render(<WorkspaceStatusBar {...base} connection={connectedView} />)
+    expect(screen.getByText('Instance Connected')).toBeInTheDocument()
+  })
+
+  it('renders the attention state for running-but-missing', () => {
+    render(
+      <WorkspaceStatusBar
+        {...base}
+        connection={{
+          ...connectedView,
+          state: 'running-no-companion',
+          label: 'Instance running, companion missing',
+          className: 'attention',
+          dotClass: 'attention',
+        }}
+      />
+    )
+    const pill = screen.getByText('Instance running, companion missing')
+    expect(pill.closest('.ws-status')!.className).toContain('attention')
   })
 
   it('shows a restart action for the WebSocket server', () => {

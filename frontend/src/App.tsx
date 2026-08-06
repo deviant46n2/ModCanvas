@@ -85,7 +85,6 @@ function AppRoot() {
       {openProject ? (
         <ProjectWorkspace
           project={openProject}
-          wsStatus={s.wsStatus}
           activeTab={s.activeTab}
           onTabChange={s.handleTabChange}
           onRestartWebSocket={s.restartWebSocket}
