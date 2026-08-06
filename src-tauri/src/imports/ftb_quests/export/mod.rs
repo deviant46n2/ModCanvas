@@ -145,10 +145,30 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
     // We read the existing file, replace the quests array, and preserve all other chapter metadata.
     let chapters_dir = quests_dir.join("chapters");
     std::fs::create_dir_all(&chapters_dir)?;
+    // Build a map of chapter id → existing flat file stem so we write to the
+    // pack's own filenames instead of creating title-sanitized duplicates
+    // that lack the `group` key.
+    let mut existing_flat_names: HashMap<String, String> = HashMap::new();
+    if let Ok(entries) = std::fs::read_dir(&chapters_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("snbt") {
+                continue;
+            }
+            let content = std::fs::read_to_string(&path).unwrap_or_default();
+            if let Ok(map) = crate::imports::snbt::parse_snbt_compound(&content) {
+                if let Some(id) = map.get("id").and_then(|v| v.as_str()) {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        existing_flat_names.insert(id.to_string(), stem.to_string());
+                    }
+                }
+            }
+        }
+    }
     for chapter_node in graph.nodes.iter().filter(|n| matches!(n.node_type, QuestNodeType::Chapter)) {
         let chapter_meta = graph.chapters.iter().find(|c| c.id == chapter_node.id);
-        let filename = chapter_meta
-            .map(|c| sanitize_filename(&c.title))
+        let filename = existing_flat_names.get(&chapter_node.id).cloned()
+            .or_else(|| chapter_meta.map(|c| sanitize_filename(&c.title)))
             .unwrap_or_else(|| sanitize_filename(&chapter_node.label));
 
         let chapter_path = chapters_dir.join(format!("{filename}.snbt"));

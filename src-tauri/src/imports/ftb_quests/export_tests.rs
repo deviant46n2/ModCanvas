@@ -1239,3 +1239,32 @@ fn live_export_without_sidecar_recovers_comments_from_disk() {
     assert!(data.contains("/* book version */"), "data.snbt comment recovered: {data}");
 }
 
+#[test]
+fn test_flat_export_preserves_existing_filenames_and_group() {
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+
+    // The pack's own file: lowercase name + group key + a title with a
+    // formatting code that sanitizes to a DIFFERENT name ("fLoot") — the
+    // exact trap that produced the duplicate chapters in real packs.
+    std::fs::write(chapters_dir.join("loot.snbt"), r#"{
+        id: "ch_loot"
+        filename: "loot"
+        title: "§fLoot"
+        group: "grp_1"
+        quests: []
+    }"#).unwrap();
+    let import_result = import_ftb_quests(tmp.path()).unwrap();
+    // Export back into the SAME dir — the app always writes into the pack
+    // itself (in-place), never into a fresh folder.
+    export_ftb_quests_snbt(&import_result.graph, tmp.path(), &import_result.sidecar).unwrap();
+
+    let out_chapters = tmp.path().join("config").join("ftbquests").join("quests").join("chapters");
+    assert!(!out_chapters.join("fLoot.snbt").exists(), "no title-sanitized duplicate created");
+    let exported = std::fs::read_to_string(out_chapters.join("loot.snbt")).unwrap();
+    assert!(exported.contains("order_index"), "export must rewrite the pack's own file: {exported}");
+    assert!(exported.contains("group:"), "group key must survive the rewrite: {exported}");
+}
