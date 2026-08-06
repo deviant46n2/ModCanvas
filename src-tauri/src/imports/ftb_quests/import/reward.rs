@@ -38,6 +38,7 @@ pub(super) fn parse_snbt_single_reward(m: &SnbtValue) -> Result<QuestReward> {
         description,
         item_id: String::new(),
         item_count: 1,
+        count: m.get_i64("count").unwrap_or(0) as i32,
         item_tag: String::new(),
         nbt_data: String::new(),
         smart_filter: String::new(),

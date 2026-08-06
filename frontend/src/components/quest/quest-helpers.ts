@@ -57,7 +57,7 @@ export function defaultReward(): QuestRewardData {
     reward_type: 'item',
     items: [],
     description: '',
-    item_id: '', item_tag: '', item_count: 1, nbt_data: '', smart_filter: '',
+    item_id: '', item_tag: '', item_count: 1, count: 1, nbt_data: '', smart_filter: '',
     xp_amount: 0, xp_levels: 0, command: '', loot_table: '',
     game_stage: '', weight: 1.0, reward_chests: [], team_reward: false,
     toast_message: '', table_id: '', choices: [], advancement_id: '',

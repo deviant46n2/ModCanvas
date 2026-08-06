@@ -81,7 +81,7 @@ export function RewardTablesModal({
       ...defaultReward(),
       reward_type: 'item',
       weight: 1.0,
-      item_count: 1,
+      item_count: 1, count: 1,
     }
     const table = tables.find(t => t.id === tableId)
     if (!table) return

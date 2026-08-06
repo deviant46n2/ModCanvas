@@ -112,6 +112,7 @@ export interface QuestRewardData {
   item_id: string
   item_tag: string
   item_count: number
+  count: number
   nbt_data: string
   smart_filter: string
   xp_amount: number

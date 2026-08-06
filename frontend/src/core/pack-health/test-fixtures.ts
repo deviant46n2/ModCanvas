@@ -68,7 +68,7 @@ export const makeReward = (overrides: Partial<QuestRewardData>): QuestRewardData
   description: '',
   item_id: 'minecraft:diamond',
   item_tag: '',
-  item_count: 1,
+  item_count: 1, count: 1,
   nbt_data: '',
   smart_filter: '',
   xp_amount: 0,

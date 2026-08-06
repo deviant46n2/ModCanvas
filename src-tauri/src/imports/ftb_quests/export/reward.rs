@@ -89,6 +89,12 @@ pub(super) fn reward_to_snbt(reward: &QuestReward, flat_chapters: bool) -> Resul
         m.insert(key, val);
     }
 
+    // FTB reads the reward quantity from the top-level `count` field.
+    if reward.count > 1
+        && matches!(reward.reward_type, RewardType::Item | RewardType::ItemWithWeight) {
+        m.insert("count".to_string(), ce(SnbtValue::Int(reward.count)));
+    }
+
     // Choice/random/all rewards reference a reward table by id. When the reward
     // carries inline items but no resolved table, embed the pool as an internal
     // table (`table_data`), which the game treats as an embedded pool.

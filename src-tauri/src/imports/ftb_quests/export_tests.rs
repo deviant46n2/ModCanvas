@@ -652,6 +652,7 @@ fn reward_table_roundtrips_through_export() {
     assert_eq!(table.rewards.len(), 2);
     assert_eq!(table.rewards[0].item_id, "minecraft:diamond");
     assert_eq!(table.rewards[0].weight, 2.0);
+    assert_eq!(table.rewards[0].count, 3, "top-level reward count captured on import");
 
     let node = graph.nodes.iter().find(|n| n.id == "q1").expect("quest imported");
     assert_eq!(node.rewards.len(), 2);
@@ -667,6 +668,7 @@ fn reward_table_roundtrips_through_export() {
 
     let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
     assert_eq!(graph2.reward_tables.len(), 1, "reward table survived export");
+    assert_eq!(graph2.reward_tables[0].rewards[0].count, 3, "top-level reward count survived export");
     assert_eq!(graph2.reward_tables[0].rewards[0].item_id, "minecraft:diamond");
     let node2 = graph2.nodes.iter().find(|n| n.id == "q1").expect("quest re-imported");
     assert_eq!(node2.rewards[0].table_id, "00E1FAFD0EF07752", "table_id reference survived export");

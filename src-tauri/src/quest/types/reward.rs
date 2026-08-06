@@ -10,13 +10,14 @@ pub struct QuestReward {
     pub items: Vec<String>,
     #[serde(default)]
     pub description: String,
-
     #[serde(default)]
     pub item_id: String,
     #[serde(default)]
     pub item_tag: String,
     #[serde(default)]
     pub item_count: i32,
+    #[serde(default)]
+    pub count: i32,
     #[serde(default)]
     pub nbt_data: String,
     #[serde(default)]
@@ -80,6 +81,7 @@ impl Default for QuestReward {
             item_id: String::new(),
             item_tag: String::new(),
             item_count: 1,
+            count: 0,
             nbt_data: String::new(),
             smart_filter: String::new(),
             xp_amount: 0,
