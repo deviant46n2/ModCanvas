@@ -77,8 +77,16 @@ rename). Commands:
 
 - `subscribeEngineRenders` — result callback (injects into the live texture
   index + item registry).
-- `queueEngineRenders` — deduped queue; sends `RENDER_ITEMS_REQUEST` when the
-  companion is connected, batches of 32, ≤2 attempts per item.
+- `queueEngineRenders` — deduped queue (O(1) membership via a Set mirror — the
+  queue can hold full instance registries, so array scans are never allowed);
+  sends `RENDER_ITEMS_REQUEST` when the companion is connected, batches of 32,
+  ≤2 attempts per item. An id that exhausts its attempts is marked **failed
+  for the session** — both when the companion stays silent (30s timeout) and
+  when a batch comes back without it (the companion skips unrenderable ids,
+  so a partial result is still a failed attempt for the missing ids). Without
+  a terminal state, the effects re-offer missing ids on every state change
+  and the pipeline churns unrenderable items forever. A dropped companion
+  (broadcast failure) is *not* terminal — a reconnect may legitimately retry.
 - `getEngineRenderCache` / `persistEngineRenders` — Rust-backed load/save.
 - `initEngineRenderListener` — subscribes to the companion socket for
   `RENDER_ITEMS_RESULT` (was: Tauri `ws-ipc:event` listener).
@@ -88,11 +96,14 @@ rename). Commands:
 - On mount loads the cached renders into `textureIndex` (quest tiles) and the
   item registry (JEI view).
 - When the companion connects, queues **all software-baked (`bake:`) item ids**
-  plus registry items with no baked texture (the JEI "?" slots) and any texture
-  keys that exhausted materialization retries (`subscribeNotFound` in
-  `texture-loader.ts`). Keys are normalized to canonical item ids via
+  plus registry items with **no texture entry at all** (the JEI "?" slots) and
+  any texture keys that exhausted materialization retries (`subscribeNotFound`
+  in `texture-loader.ts`). Keys are normalized to canonical item ids via
   `normalizeItemId`. Baked items **in the current view** are queued with
-  `queueEngineRendersPriority` so the visible page upgrades first.
+  `queueEngineRendersPriority` so the visible page upgrades first. The "no
+  entry at all" test is checked against the live texture index — items with a
+  `jar:`/`kubejs:` descriptor materialize offline and are never sent to the
+  engine, and `bake:` entries are covered by the baked-keys queue.
 - On each result, injects data URLs into `textureIndex` + `items`, persists, and
   **unmarks the keys as baked** (`unmarkBakedKeys`) so they render pixelated
   (in-game look) instead of smooth-scaled.

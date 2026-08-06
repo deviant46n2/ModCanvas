@@ -20,6 +20,14 @@ const BATCH_TIMEOUT_MS = 30_000
 
 let connected = false
 let queue: string[] = []
+/** O(1) membership mirror of `queue` — the queue can hold tens of thousands
+ * of ids (full instance registries), and `queue.includes` is O(n), so the
+ * dedupe must never scan the array. */
+const queueSet = new Set<string>()
+/** Ids whose render attempts are spent (never answered by the companion).
+ * Terminal for the session: effects re-offering them must not resurrect
+ * them, or each re-offer stalls the pipeline for BATCH_TIMEOUT_MS. */
+const failed = new Set<string>()
 let inFlight = false
 let seq = 0
 const attempts = new Map<string, number>()
@@ -89,8 +97,9 @@ export function queueEngineRendersPriority(ids: string[]): void {
 
 function enqueue(ids: string[], priority: boolean): void {
   if (!ids.length) return
-  const fresh = ids.filter((id) => id && !queue.includes(id) && !inflightIds.has(id))
+  const fresh = ids.filter((id) => id && !queueSet.has(id) && !inflightIds.has(id) && !failed.has(id))
   if (fresh.length === 0) return
+  for (const id of fresh) queueSet.add(id)
   if (priority) {
     queue.unshift(...fresh)
   } else {
@@ -104,6 +113,7 @@ function flush(): void {
   if (!connected || inFlight || queue.length === 0) return
   const batch = queue.splice(0, BATCH_SIZE)
   if (batch.length === 0) return
+  for (const id of batch) queueSet.delete(id)
   inFlight = true
   bumpStats()
   const requestId = `er-${++seq}`
@@ -127,23 +137,32 @@ function flush(): void {
     })
 
   // Safety: if the companion never answers (dropped mid-reconnect), free the
-  // batch so the queue keeps moving. Retries are capped by MAX_ATTEMPTS.
+  // batch so the queue keeps moving. Retries are capped by MAX_ATTEMPTS; an
+  // unanswered id is terminal so re-offers can't stall the pipeline.
   window.setTimeout(() => {
     if (inflightByReq.has(requestId)) {
-      releaseBatch(requestId, batch)
+      releaseBatch(requestId, batch, true)
     }
   }, BATCH_TIMEOUT_MS)
 }
 
-function releaseBatch(requestId: string, batch: string[]): void {
+function releaseBatch(requestId: string, batch: string[], terminalOnExhaust = false): void {
   inflightByReq.delete(requestId)
   for (const id of batch) inflightIds.delete(id)
   for (const id of batch) {
     const a = attempts.get(id) ?? 0
     if (a < MAX_ATTEMPTS) {
       attempts.set(id, a + 1)
+      queueSet.add(id)
       queue.push(id)
+    } else if (terminalOnExhaust) {
+      // Companion is connected but never answered this id — it is not
+      // renderable. Mark it failed so the effects re-offering it on every
+      // state change can't resurrect it and stall the pipeline.
+      failed.add(id)
     }
+    // else: non-terminal exhaustion (companion dropped mid-batch). Drop the
+    // id quietly; a reconnect may legitimately retry it.
   }
   inFlight = false
   flush()
@@ -196,6 +215,18 @@ export async function initEngineRenderListener(): Promise<() => void> {
       inflightByReq.delete(requestId)
       for (const id of batch) inflightIds.delete(id)
       inFlight = false
+      // The companion answered this batch — ids it did NOT render are failed
+      // attempts. Without this accounting they stay baked/"?", the hook's
+      // effects re-offer them on every state change, and the pipeline churns
+      // unrenderable ids forever: sent climbs, done crawls. Exhausted ids go
+      // terminal (enqueue filters `failed`) exactly like the timeout path.
+      const renderedKeys = new Set(Object.keys(p.rendered ?? {}))
+      for (const id of batch) {
+        if (renderedKeys.has(id)) continue
+        const a = attempts.get(id) ?? 0
+        if (a < MAX_ATTEMPTS) attempts.set(id, a + 1)
+        else failed.add(id)
+      }
     }
     // A stale result (already released by timeout) still carries icons worth
     // surfacing, but must not clear the current batch's in-flight flag.
@@ -214,12 +245,14 @@ export async function initEngineRenderListener(): Promise<() => void> {
 
 /** True when an id is currently queued or in flight. */
 export function isEngineRenderPending(id: string): boolean {
-  return queue.includes(id) || inflightIds.has(id)
+  return queueSet.has(id) || inflightIds.has(id)
 }
 
 /** Test-only: clear module state. */
 export function __resetEngineRenderState(): void {
   queue = []
+  queueSet.clear()
+  failed.clear()
   inFlight = false
   seq = 0
   attempts.clear()

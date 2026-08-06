@@ -191,14 +191,25 @@ export function useQuestAssetPipeline({
   }, [instancePath])
   useEffect(() => {
     if (!wsConnected) return
-    const missingRegistry = items.filter((i) => !i.texture_data_url).map((i) => i.id)
+    // Wait for the texture index to land before treating registry items as
+    // textureless — at boot the index is empty, and a naive run here would
+    // dump the entire registry into the engine queue.
+    if (Object.keys(textureIndex).length === 0) return
+    // Registry items with NO texture entry at all — the true "?" slots. Any
+    // index entry means the item is known: jar:/kubejs: descriptors
+    // materialize offline, bake: descriptors are queued by the baked-keys
+    // effect below, data URLs are already rendered. Only fully-unknown items
+    // need the engine. (Re-scoped from the items array's texture_data_url,
+    // which the flat materializer never populates — that made every item
+    // look textureless and dumped the whole registry into the engine queue.)
+    const missingRegistry = items.filter((i) => !textureIndex[i.id]).map((i) => i.id)
     if (missingRegistry.length > 0) queueEngineRenders(missingRegistry)
     const unsub = subscribeNotFound((keys) => {
       const itemLike = keys.map(normalizeItemId).filter((k): k is string => !!k)
       if (itemLike.length > 0) queueEngineRenders(itemLike)
     })
     return unsub
-  }, [wsConnected, instancePath, items])
+  }, [wsConnected, instancePath, items, textureIndex])
   useEffect(() => {
     if (!wsConnected) return
     const baked = getBakedTextureKeys()
