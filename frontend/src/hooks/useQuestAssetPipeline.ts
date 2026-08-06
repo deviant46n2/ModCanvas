@@ -7,6 +7,7 @@ import {
   subscribeLoadingChange,
   subscribeNotFound,
   getMaterialized,
+  isUsableTextureValue,
   requestMaterialize,
   buildTexturePathIndex,
   prefetchAllChapterTextures,
@@ -67,8 +68,60 @@ function mergeIndex(prev: Record<string, string>, updates: Record<string, string
   return changed ? merged : prev
 }
 
+/// Merge only entries that are NEW or unknown — never overwrite an existing
+/// displayable data URL with a compact descriptor. The scan/ingest indexes
+/// carry `jar:`/`kubejs:`/`bake:` descriptors; blindly spreading them over
+/// already-rendered data URLs would flip rendered icons back to placeholders
+/// (the texture blink), and re-queue them through the baked-keys effects.
+function mergeIndexNoDowngrade(
+  prev: Record<string, string>,
+  updates: Record<string, string>,
+): Record<string, string> {
+  let changed = false
+  const merged = { ...prev }
+  for (const [k, v] of Object.entries(updates)) {
+    const existing = prev[k]
+    if (existing !== undefined) continue
+    if (existing === v) continue
+    merged[k] = v
+    changed = true
+  }
+  return changed ? merged : prev
+}
+
+/// Upgrade-only merge for materialized data URLs: write when the key is
+/// missing or still a compact descriptor, but never clobber an existing
+/// displayable value (an engine render may have landed between plan build and
+/// apply — overwriting it with a different base64 string would blink the icon).
+function mergeIndexUpgradeOnly(
+  prev: Record<string, string>,
+  updates: Record<string, string>,
+): Record<string, string> {
+  let changed = false
+  const merged = { ...prev }
+  for (const [k, v] of Object.entries(updates)) {
+    const existing = prev[k]
+    if (isUsableTextureValue(existing)) continue
+    if (existing === v) continue
+    merged[k] = v
+    changed = true
+  }
+  return changed ? merged : prev
+}
+
 function withItemTextures(items: ItemRegistryEntry[], updates: Record<string, string>): ItemRegistryEntry[] {
-  return items.map((i) => (i.texture_data_url ? i : { ...i, texture_data_url: updates[i.id] ?? null }))
+  let changed = false
+  const next = items.map((i) => {
+    if (i.texture_data_url) return i
+    const url = updates[i.id] ?? null
+    if (url === i.texture_data_url) return i
+    changed = true
+    return { ...i, texture_data_url: url }
+  })
+  // Reference-stable: return `prev` when nothing changed so consumers that
+  // depend on `items` identity (the missing-registry effect, the canvas) do
+  // not re-run on every engine batch result.
+  return changed ? next : items
 }
 
 export function useQuestAssetPipeline({
@@ -108,7 +161,9 @@ export function useQuestAssetPipeline({
     if (ingestResult?.asset_registry?.by_id) {
       registerBakedKeysFromIndex(ingestResult.asset_registry.by_id)
       setIngestIndex(ingestResult.asset_registry.by_id)
-      setTextureIndex(prev => ({ ...prev, ...ingestResult.asset_registry.by_id }))
+      // No-downgrade: ingest carries compact descriptors; never clobber an
+      // already-rendered data URL back to a placeholder.
+      setTextureIndex(prev => mergeIndexNoDowngrade(prev, ingestResult.asset_registry.by_id))
     }
     if (ingestResult?.active_instance) {
       scanInstanceItems(ingestResult.active_instance, kubejsNamespace).then((registry) => {
@@ -202,26 +257,53 @@ export function useQuestAssetPipeline({
     // need the engine. (Re-scoped from the items array's texture_data_url,
     // which the flat materializer never populates — that made every item
     // look textureless and dumped the whole registry into the engine queue.)
+    // Runs whenever items/textureIndex change, but queueEngineRenders is
+    // idempotent (queueSet/inflight/failed dedupe), so re-runs are cheap.
     const missingRegistry = items.filter((i) => !textureIndex[i.id]).map((i) => i.id)
     if (missingRegistry.length > 0) queueEngineRenders(missingRegistry)
+  }, [wsConnected, items, textureIndex])
+  useEffect(() => {
+    if (!wsConnected) return
+    // Materialization not-found keys (offline materializer gave up) are the
+    // engine's job. Subscribed ONCE — this is a subscription, not a queue
+    // computation, so it must not re-establish itself on every index change.
     const unsub = subscribeNotFound((keys) => {
       const itemLike = keys.map(normalizeItemId).filter((k): k is string => !!k)
       if (itemLike.length > 0) queueEngineRenders(itemLike)
     })
     return unsub
-  }, [wsConnected, instancePath, items, textureIndex])
+  }, [wsConnected])
+  // Track which baked keys we've already offered to the engine, keyed per
+  // instance. Retries are the engine-render failed-set's job (MAX_ATTEMPTS),
+  // so each baked key is queued exactly once per registration — never
+  // re-queued by textureIndex churn during the drain.
+  const queuedBakedRef = useRef<{ instance: string | null; keys: Set<string> }>({
+    instance: null,
+    keys: new Set(),
+  })
   useEffect(() => {
     if (!wsConnected) return
-    const baked = getBakedTextureKeys()
-    if (baked.length > 0) queueEngineRenders(baked)
-  }, [wsConnected, textureIndex])
+    if (queuedBakedRef.current.instance !== instancePath) {
+      queuedBakedRef.current = { instance: instancePath, keys: new Set() }
+    }
+    const offerBaked = () => {
+      const pending = getBakedTextureKeys().filter((k) => !queuedBakedRef.current.keys.has(k))
+      if (pending.length === 0) return
+      for (const k of pending) queuedBakedRef.current.keys.add(k)
+      queueEngineRenders(pending)
+    }
+    offerBaked()
+    // Fires on both mark (scan/ingest register bake: keys) and unmark (engine
+    // render replaces them); the queuedBakedRef guard keeps this idempotent.
+    return subscribeBakedKeys(offerBaked)
+  }, [wsConnected, instancePath])
   useEffect(() => {
     let cancelled = false
     if (instancePath) {
       scanInstanceTextures(instancePath).then((idx) => {
         if (cancelled || !idx || Object.keys(idx).length === 0) return
         registerBakedKeysFromIndex(idx)
-        setTextureIndex(prev => ({ ...prev, ...idx }))
+        setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
       }).catch(() => {})
       scanInstanceAnimations(instancePath).then((map) => {
         if (cancelled || !map || Object.keys(map).length === 0) return
@@ -230,7 +312,7 @@ export function useQuestAssetPipeline({
     } else if (modsDir) {
       scanModJarTextures(modsDir).then((idx) => {
         if (cancelled || !idx || Object.keys(idx).length === 0) return
-        setTextureIndex(prev => ({ ...prev, ...idx }))
+        setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
       }).catch(() => {})
     }
     return () => { cancelled = true }
@@ -285,7 +367,9 @@ export function useQuestAssetPipeline({
     if (!instancePath) return
     const plan = buildMaterializationPlan({ graph, activeChapter, selectedNode, scanPathIndex, ingestPathIndex, textureIndex, wsConnected })
     if (Object.keys(plan.inject).length > 0) {
-      setTextureIndex(prev => ({ ...prev, ...plan.inject }))
+      // Upgrade-only: injects are materialized data URLs for keys whose index
+      // value is still a descriptor; never clobber an engine-rendered value.
+      setTextureIndex(prev => mergeIndexUpgradeOnly(prev, plan.inject))
     }
     if (plan.toFetch.size > 0) {
       requestMaterialize([...plan.toFetch], instancePath)

@@ -108,6 +108,27 @@ rename). Commands:
   **unmarks the keys as baked** (`unmarkBakedKeys`) so they render pixelated
   (in-game look) instead of smooth-scaled.
 
+### Merge discipline & once-per-instance offering
+
+`useQuestAssetPipeline.ts` guards the live texture index against churn. The
+index holds two kinds of values — compact descriptors (`jar:`/`kubejs:`/`bake:`)
+from scans/ingests and displayable data URLs (offline materializer + engine
+renders) — and all merges are directional:
+
+- Scan/ingest merges are **no-downgrade**: an existing entry is never
+  overwritten, so a rendered data URL can't be flipped back to a descriptor
+  (which would blink the icon to a placeholder and re-queue it).
+- Offline-materializer injects are **upgrade-only**: a data URL is written only
+  where the current value isn't already displayable, so a render that landed
+  between plan-build and apply wins.
+- Baked (`bake:`) keys are offered to the engine **once per instance
+  registration** (`queuedBakedRef`); retries after that belong to the
+  engine-render failed-set (`MAX_ATTEMPTS`), not to index-churn re-offers.
+- The "registry item with no texture entry" queue is gated until the texture
+  index lands, so boot can't dump the whole registry into the engine queue.
+- `withItemTextures` is reference-stable: it returns the previous `items` array
+  when nothing changed, so identity-based consumers don't re-run per batch.
+
 ### Hide until engine-rendered (no offline placeholder)
 
 `bake:` descriptors (3D block/hand-modeled items) are never materialized
