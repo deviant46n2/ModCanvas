@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Handle, Position as RFPosition } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { ReactFlow, Controls, Background, MiniMap, MarkerType, useReactFlow } from '@xyflow/react'
+import { ReactFlow, Controls, Background, MiniMap, MarkerType, useReactFlow, ReactFlowProvider } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange, ReactFlowInstance } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { CSSProperties, ReactNode } from 'react'
@@ -92,7 +92,10 @@ interface ProgressionCanvasProps {
   onFlowReady?: (api: ReactFlowInstance) => void
 }
 
-export default function ProgressionCanvas({
+/** `useReactFlow` requires the ReactFlowProvider context, which only exists
+ *  below a `<ReactFlow>` element — so the flow body must be a child component
+ *  and the provider must wrap it from outside. */
+function ProgressionFlow({
   nodes, edges, onNodesChange, onEdgesChange, onConnect,
   onNodeClick, onPaneClick, onDeleteEdge, fitViewKey, onFlowReady,
 }: ProgressionCanvasProps) {
@@ -154,5 +157,13 @@ export default function ProgressionCanvas({
       />
       <Background color="#2b2b30" gap={18} size={1} />
     </ReactFlow>
+  )
+}
+
+export default function ProgressionCanvas(props: ProgressionCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <ProgressionFlow {...props} />
+    </ReactFlowProvider>
   )
 }
