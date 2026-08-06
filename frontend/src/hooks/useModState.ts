@@ -184,11 +184,34 @@ export function useModState(selectedProject: Project | null) {
 
   async function removeModFromProject(modId: string) {
     if (!selectedProject) return
+    const row = projectMods.find((m) => m.mod_id === modId)
+    const label = row?.name || modId
     try {
-      await removeMod(selectedProject.id, modId)
+      const result = await removeMod(selectedProject.id, modId)
+      if (result.fileMissing) {
+        showToast({
+          type: 'warning',
+          title: `Removed ${label}`,
+          message: 'Its jar was already missing from the instance.',
+          duration: 6000,
+        })
+      } else {
+        showToast({
+          type: 'success',
+          title: `Removed ${label}`,
+          message: result.message,
+        })
+      }
       await loadProjectMods(selectedProject.id)
-    } catch (e) {
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || String(e)
       console.error('Failed to remove mod:', e)
+      showToast({
+        type: 'error',
+        title: `Failed to remove ${label}`,
+        message: msg,
+        duration: 8000,
+      })
     }
   }
 

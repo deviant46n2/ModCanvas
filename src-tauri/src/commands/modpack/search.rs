@@ -98,6 +98,9 @@ pub async fn install_mod_from_search(
         enabled: true,
         added_at: chrono::Utc::now(),
         icon: real_icon,
+        file_name: std::path::Path::new(&jar_path)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string()),
     };
 
     db.add_mod(&entry).map_err(|e| e.to_string())?;

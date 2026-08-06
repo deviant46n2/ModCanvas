@@ -53,6 +53,7 @@ pub async fn import_curseforge_zip(
                 enabled: true,
                 added_at: chrono::Utc::now(),
                 icon: None,
+                file_name: Some(d.file_name.clone()),
             };
             db.add_mod(&entry).map_err(|e| e.to_string())?;
             resolved_mods.push(crate::imports::ResolvedMod {
@@ -61,6 +62,7 @@ pub async fn import_curseforge_zip(
                 name: d.name.clone(),
                 version: d.version.clone(),
                 source: "curseforge".to_string(),
+                file_name: d.file_name.clone(),
             });
         }
     } else {
@@ -88,6 +90,9 @@ pub async fn import_curseforge_zip(
                 enabled: true,
                 added_at: chrono::Utc::now(),
                 icon: None,
+                // No download happened (no API key / failure) — there is no
+                // file on disk to delete, so the row carries no file link.
+                file_name: None,
             };
             db.add_mod(&entry).map_err(|e| e.to_string())?;
         }
@@ -123,6 +128,8 @@ struct CurseForgeDownload {
     slug: String,
     name: String,
     version: String,
+    /// Bare jar file name written into `<game_dir>/mods/`.
+    file_name: String,
 }
 
 /// Download every mod declared in a CurseForge manifest into the game dir's
@@ -213,7 +220,7 @@ async fn download_curseforge_manifest_mods(
                 .file_name()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| format!("mod-{}.jar", file.id));
-            let out_path = mods_dir.join(safe_name);
+            let out_path = mods_dir.join(&safe_name);
 
             let dl_resp = client
                 .get(&url)
@@ -231,6 +238,7 @@ async fn download_curseforge_manifest_mods(
                 slug: file.display_name.clone(),
                 name: file.display_name,
                 version: file.file_name,
+                file_name: safe_name,
             })
         }));
     }

@@ -52,6 +52,7 @@ impl Database {
                     enabled INTEGER DEFAULT 1,
                     added_at TEXT NOT NULL,
                     icon TEXT,
+                    file_name TEXT,
                     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
                 );
 
@@ -96,6 +97,19 @@ impl Database {
         };
         if !has_icon {
             let _ = conn.execute_batch("ALTER TABLE mods ADD COLUMN icon TEXT;");
+        }
+
+        // Migration: mods.file_name (jar path for remove-from-disk). Existing
+        // rows are NULL — they predate the column and cannot be backfilled
+        // reliably (that would mean re-deriving the row→file link by scanning
+        // jars, which is the aliasing trap). remove_mod treats NULL as
+        // "no file to delete; row-only removal".
+        let has_file_name: bool = {
+            let mut stmt = conn.prepare("SELECT COUNT(*) FROM pragma_table_info('mods') WHERE name = 'file_name'")?;
+            stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap_or(0) > 0
+        };
+        if !has_file_name {
+            let _ = conn.execute_batch("ALTER TABLE mods ADD COLUMN file_name TEXT;");
         }
 
         // Migration: projects.source (launcher badge origin). Existing rows
@@ -175,8 +189,8 @@ impl Database {
     pub fn add_mod(&self, entry: &ModEntry) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            "INSERT INTO mods (id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon, file_name)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
              ON CONFLICT(project_id, mod_id) DO UPDATE SET
                slug = excluded.slug,
                name = excluded.name,
@@ -186,6 +200,10 @@ impl Database {
                source = excluded.source,
                enabled = excluded.enabled,
                icon = excluded.icon",
+            // NOTE: file_name is deliberately NOT in the DO UPDATE SET list:
+            // the toggle-as-add path upserts a row with no file handle, and
+            // adding file_name = excluded.file_name would wipe the stored name
+            // on every toggle. New inserts carry it; conflicts preserve it.
             params![
                 entry.id.to_string(),
                 entry.project_id.to_string(),
@@ -199,6 +217,7 @@ impl Database {
                 entry.enabled as i32,
                 entry.added_at.to_rfc3339(),
                 entry.icon,
+                entry.file_name,
             ],
         )?;
         Ok(())
@@ -207,7 +226,7 @@ impl Database {
     pub fn get_project_mods(&self, project_id: &Uuid) -> SqlResult<Vec<ModEntry>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon FROM mods WHERE project_id = ?1"
+            "SELECT id, project_id, mod_id, slug, name, version, description, author, source, enabled, added_at, icon, file_name FROM mods WHERE project_id = ?1"
         )?;
 
         let mods = stmt
@@ -231,6 +250,7 @@ impl Database {
                         .map(|dt| dt.with_timezone(&chrono::Utc))
                         .unwrap_or_default(),
                     icon: row.get(11).unwrap_or_default(),
+                    file_name: row.get(12).unwrap_or_default(),
                 })
             })?
             .collect::<SqlResult<Vec<_>>>()?;
@@ -527,5 +547,97 @@ mod tests {
         assert_eq!(projects.len(), 4, "expected all 4 projects after additive sync: {paths:?}");
 
         let _ = std::fs::remove_file(&db_path);
+    }
+
+    /// file_name must survive the add_mod upsert and come back through
+    /// get_project_mods — remove_mod depends on the stored link.
+    #[test]
+    fn mod_file_name_round_trips_through_upsert() {
+        let (db, db_path) = temp_db();
+
+        let project = make_project("P", "/tmp/nonexistent-instance");
+        db.create_project(&project).unwrap();
+
+        let mut entry = crate::models::ModEntry {
+            id: Uuid::new_v4(),
+            project_id: project.id,
+            mod_id: "my_mod".to_string(),
+            slug: "my-mod".to_string(),
+            name: "My Mod".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            author: String::new(),
+            source: crate::models::ModSource::Local,
+            enabled: true,
+            added_at: chrono::Utc::now(),
+            icon: None,
+            file_name: Some("MyMod-1.0.0.jar".to_string()),
+        };
+        db.add_mod(&entry).unwrap();
+
+        let rows = db.get_project_mods(&project.id).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].file_name.as_deref(), Some("MyMod-1.0.0.jar"));
+
+        // Toggle-as-add upserts a row with NO file handle; the stored name must
+        // survive (the DO UPDATE list deliberately omits file_name).
+        entry.file_name = None;
+        entry.enabled = false;
+        db.add_mod(&entry).unwrap();
+        let rows = db.get_project_mods(&project.id).unwrap();
+        assert_eq!(rows[0].enabled, false);
+        assert_eq!(
+            rows[0].file_name.as_deref(),
+            Some("MyMod-1.0.0.jar"),
+            "upsert must preserve file_name when the new row has none"
+        );
+
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    /// The schema migration must add mods.file_name to a DB created before the
+    /// column existed (old rows stay NULL — no backfill, by design).
+    #[test]
+    fn migration_adds_file_name_to_old_schema() {
+        let path = std::env::temp_dir().join(format!(
+            "modcanvas_db_test_legacy_{}.db",
+            Uuid::new_v4()
+        ));
+        {
+            // Create a DB with the OLD mods schema (no file_name column).
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS mods (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    mod_id TEXT NOT NULL,
+                    slug TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    version TEXT DEFAULT '',
+                    description TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    source TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    added_at TEXT NOT NULL,
+                    icon TEXT
+                );",
+            )
+            .unwrap();
+        }
+
+        // Opening through the app path runs the migration.
+        let db = Database::open(&path).expect("open legacy db");
+        {
+            let conn = db.conn.lock().unwrap();
+            let has_col: bool = conn
+                .prepare("SELECT COUNT(*) FROM pragma_table_info('mods') WHERE name = 'file_name'")
+                .unwrap()
+                .query_row([], |r| r.get::<_, i64>(0))
+                .unwrap()
+                > 0;
+            assert!(has_col, "migration must add mods.file_name");
+        }
+
+        let _ = std::fs::remove_file(&path);
     }
 }

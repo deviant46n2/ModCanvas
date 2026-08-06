@@ -89,6 +89,27 @@ pub struct ModEntry {
     /// URL for mods added via search). Null when unavailable.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Bare jar file name inside `<project>/mods/` (e.g. `MyMod-1.2.3.jar`).
+    /// `None` for legacy rows imported before this column existed, for rows
+    /// created by the toggle-as-add path (which has no file handle), and for
+    /// placeholder rows where no download happened. `remove_mod` uses this to
+    /// delete the file together with the DB row; when `None` it can only
+    /// remove the row.
+    #[serde(default)]
+    pub file_name: Option<String>,
+}
+
+/// Normalize an import-time mod file reference to a bare jar file name.
+///
+/// Instance imports record `mods/foo.jar` (relative to the instance root) and
+/// mrpack imports record the zip-internal `mods/foo.jar` path; CurseForge
+/// downloads already produce a bare name. `ModEntry.file_name` stores only the
+/// basename so every site agrees on "<project>/mods/<file_name>" semantics.
+pub fn normalize_mod_file_name(raw: &str) -> String {
+    std::path::Path::new(raw)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| raw.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

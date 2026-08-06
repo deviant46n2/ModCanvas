@@ -34,6 +34,10 @@ pub struct ResolvedMod {
     pub name: String,
     pub version: String,
     pub source: String,
+    /// Bare jar file name carried from the on-disk / zip-internal path so the
+    /// eventual `ModEntry.file_name` can point `remove_mod` at the file.
+    #[serde(default)]
+    pub file_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -242,6 +246,7 @@ pub async fn resolve_mods(
                     name: metadata.name,
                     version: unmod.version.unwrap_or_default(),
                     source: "Modrinth".to_string(),
+                    file_name: unmod.file_name.clone(),
                 });
                 continue;
             }
@@ -261,6 +266,7 @@ pub async fn resolve_mods(
                             name: m.name,
                             version: version.clone(),
                             source: "Modrinth".to_string(),
+                            file_name: unmod.file_name.clone(),
                         });
                         break;
                     }

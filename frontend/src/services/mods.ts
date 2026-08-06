@@ -17,8 +17,17 @@ export async function addMod(
   return invoke('add_mod', args)
 }
 
-export async function removeMod(projectId: string, modId: string): Promise<void> {
-  return invoke('remove_mod', { projectId, modId })
+export interface RemoveModResult {
+  rowRemoved: boolean
+  fileRemoved: boolean
+  /** The stored file name pointed at a jar already gone from disk (deleted
+   *  externally). The row was still removed; surface this as a warning. */
+  fileMissing: boolean
+  message: string
+}
+
+export async function removeMod(projectId: string, modId: string): Promise<RemoveModResult> {
+  return invoke<RemoveModResult>('remove_mod', { projectId, modId })
 }
 
 export async function getProjectMods(projectId: string): Promise<any[]> {

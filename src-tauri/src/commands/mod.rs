@@ -172,6 +172,9 @@ pub async fn scan_instance_mods(
                     enabled: true,
                     added_at: chrono::Utc::now(),
                     icon: mod_info.icon_data_url,
+                    file_name: file_path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string()),
                 };
                 mods.push(entry);
             }

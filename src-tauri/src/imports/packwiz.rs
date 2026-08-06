@@ -286,6 +286,7 @@ impl PackwizImporter {
                     name: meta.as_ref().map(|m| m.name.clone()).unwrap_or_else(|| entry.file.clone()),
                     version: version.clone(),
                     source: "Modrinth".to_string(),
+                    file_name: entry.file.clone(),
                 });
             } else {
                 unresolved_mods.push(UnresolvedMod {

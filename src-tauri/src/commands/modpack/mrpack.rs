@@ -110,6 +110,7 @@ pub async fn download_modpack_modrinth(
         name: r.name,
         version: r.version,
         source: r.source,
+        file_name: r.file_name,
     }).collect();
     
     // Save project
@@ -130,6 +131,7 @@ pub async fn download_modpack_modrinth(
             enabled: true,
             added_at: chrono::Utc::now(),
         icon: None,
+        file_name: Some(crate::models::normalize_mod_file_name(&mod_entry.file_name)),
         };
         db.add_mod(&entry).map_err(|e| e.to_string())?;
     }
@@ -168,6 +170,7 @@ pub async fn import_modrinth_mrpack(
         name: r.name,
         version: r.version,
         source: r.source,
+        file_name: r.file_name,
     }).collect();
     
     // Save project
@@ -188,6 +191,7 @@ pub async fn import_modrinth_mrpack(
             enabled: true,
             added_at: chrono::Utc::now(),
         icon: None,
+        file_name: Some(crate::models::normalize_mod_file_name(&mod_entry.file_name)),
         };
         db.add_mod(&entry).map_err(|e| e.to_string())?;
     }

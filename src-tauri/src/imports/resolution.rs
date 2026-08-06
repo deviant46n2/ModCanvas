@@ -45,6 +45,7 @@ async fn try_resolve_mod(
                 name: metadata.name,
                 version: unmod.version.clone().unwrap_or_else(|| metadata.supported_versions.first().cloned().unwrap_or_default()),
                 source: "Modrinth".to_string(),
+                file_name: unmod.file_name.clone(),
             });
         }
     }
@@ -63,6 +64,7 @@ async fn try_resolve_mod(
                     name: matched.name.clone(),
                     version: unmod.version.clone().unwrap_or_else(|| matched.supported_versions.first().cloned().unwrap_or_default()),
                     source: "Modrinth".to_string(),
+                    file_name: unmod.file_name.clone(),
                 });
             }
         }
@@ -80,6 +82,7 @@ async fn try_resolve_mod(
                         name: matched.name.clone(),
                         version: unmod.version.clone().unwrap_or_default(),
                         source: "CurseForge".to_string(),
+                        file_name: unmod.file_name.clone(),
                     });
                 }
             }

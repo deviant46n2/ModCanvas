@@ -18,6 +18,32 @@ network traffic is the user-initiated Modrinth/CurseForge search and download.
   - source badge (Modrinth/CurseForge), version chip, download count, and a
     warning dot when required dependencies are missing,
   - the per-row ON/OFF pill switch and a remove button.
+
+## Removing mods
+
+The per-row **remove (X)** button deletes the jar from the instance **and** the
+DB row, atomically:
+
+- `remove_mod` (`src-tauri/src/commands/project.rs`) looks up the row's stored
+  `file_name` (bare jar name under `<instance>/mods/`), path-validates it
+  (rejects separators / `..` traversal; `remove_file` on a symlink removes the
+  link, never its target), deletes the file, then deletes the row.
+- **File delete fails** (permissions, Windows JVM lock `EBUSY`): the command
+  errors and the row is **kept** — the mods list never claims a mod whose jar
+  is still present.
+- **File already missing** (deleted outside ModCanvas): the row is still
+  removed and the UI shows a warning toast ("its jar was already missing").
+- **No stored `file_name`** (legacy rows, toggle-as-add, placeholder rows with
+  no download): row-only removal, success toast.
+
+`ModEntry.file_name` is populated at install/import time: instance and mrpack
+imports thread the jar path through `UnresolvedMod → ResolvedMod → ModEntry`;
+CurseForge downloads and search-installs record the written jar's basename.
+The upsert (`db.rs add_mod`) deliberately omits `file_name` from its
+`ON CONFLICT DO UPDATE` list so the toggle-as-add path cannot wipe a stored
+name. Existing DBs get the column via the `pragma_table_info` + `ALTER TABLE`
+migration in `db.rs init_schema`; old rows stay NULL (no backfill — re-deriving
+the row→file link by scanning jars would be the aliasing trap).
 - **Bulk actions** — checking any row reveals the bulk bar with *Enable
   selected* / *Disable selected*; the header checkbox selects/deselects every
   mod in the filtered list. Bulk toggling calls the existing `toggleModEnabled`

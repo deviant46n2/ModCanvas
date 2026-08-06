@@ -76,6 +76,7 @@ pub async fn import_instance_folder(
         name: r.name,
         version: r.version,
         source: r.source,
+        file_name: r.file_name,
     }).collect();
     
     db.create_project(&final_result.project).map_err(|e| e.to_string())?;
@@ -95,6 +96,7 @@ pub async fn import_instance_folder(
             enabled: true,
             added_at: chrono::Utc::now(),
         icon: None,
+        file_name: Some(crate::models::normalize_mod_file_name(&mod_entry.file_name)),
         };
         db.add_mod(&entry).map_err(|e| e.to_string())?;
     }
