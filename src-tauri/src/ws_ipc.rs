@@ -227,6 +227,9 @@ async fn handle_connection(
         );
     }
 
+    // Announce the new peer so app peers update the connection pill.
+    let _ = app_handle.state::<Arc<WsIpcServer>>().emit_status().await;
+
     let forward_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if ws_sender.send(msg).await.is_err() {
