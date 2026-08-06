@@ -125,8 +125,8 @@ function AppRoot() {
             projectModsForDeps: s.projectMods,
             getMissingDependencies: s.getMissingDependencies,
             getModNameById: s.getModNameById,
-            searchSource: s.searchSource,
-            onSearchSourceChange: s.setSearchSource,
+            searchSources: s.searchSources,
+            onSearchSourcesChange: s.setSearchSources,
             installingIds: s.installingIds,
           }}
           configsTab={{

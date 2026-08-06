@@ -44,8 +44,8 @@ function baseProps(overrides: Partial<ModsTabProps> = {}): ModsTabProps {
     projectModsForDeps: mods,
     getMissingDependencies: () => [],
     getModNameById: (id: string) => id,
-    searchSource: 'modrinth',
-    onSearchSourceChange: vi.fn(),
+    searchSources: ['modrinth'],
+    onSearchSourcesChange: vi.fn(),
     installingIds: new Set(),
     ...overrides,
   }
@@ -105,5 +105,23 @@ describe('ModsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OFF' }))
     expect(onToggleMod).toHaveBeenCalledTimes(1)
     expect(onToggleMod).toHaveBeenCalledWith(mods[2])
+  })
+
+  it('renders source toggles reflecting the selection', () => {
+    render(<ModsTab {...baseProps({ searchSources: ['modrinth', 'curseforge'] })} />)
+    expect(screen.getByRole('checkbox', { name: 'Search Modrinth' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Search CurseForge' })).toBeChecked()
+  })
+
+  it('disables search and shows a hint when no source is selected', () => {
+    render(<ModsTab {...baseProps({ searchSources: [] })} />)
+    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+    expect(screen.getByText('Select at least one source to search.')).toBeInTheDocument()
+  })
+
+  it('search button is enabled once at least one source is selected', () => {
+    render(<ModsTab {...baseProps({ searchSources: ['modrinth'] })} />)
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+    expect(screen.queryByText('Select at least one source to search.')).toBeNull()
   })
 })

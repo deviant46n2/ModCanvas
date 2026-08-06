@@ -115,7 +115,7 @@ pub async fn search_mods(
     query: String,
     loader: String,
     mc_version: String,
-    source: String,
+    sources: Vec<String>,
     db: State<'_, Database>,
     intelligence: State<'_, ModIntelligence>,
 ) -> Result<Vec<ModMetadata>, String> {
@@ -126,47 +126,52 @@ pub async fn search_mods(
         _ => ModLoader::Forge,
     };
 
-    let source = source.to_lowercase();
     let mut results = Vec::new();
 
-    // Search Modrinth (always available unless the user pinned CurseForge)
-    if source.is_empty() || source == "all" || source == "modrinth" {
-        match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version).await {
-            Ok(mut mods) => results.append(&mut mods),
-            Err(e) => eprintln!("[ModCanvas] Modrinth mod search failed: {}", e),
-        }
-    }
-
-    // Search CurseForge if API key configured
-    if source.is_empty() || source == "all" || source == "curseforge" {
-        let api_key = resolve_curseforge_api_key(&db)?;
-        if let Some(key) = api_key {
-            match intelligence.search_curseforge(&query, &key).await {
-                Ok(mut mods) => {
-                    // Keep every result but annotate non-matching versions
-                    // instead of dropping them — CurseForge search returns many
-                    // mods whose latest file targets a different MC version,
-                    // and hiding those made the tab look broken/empty.
-                    for m in mods.iter_mut() {
-                        if mc_version.is_empty() {
-                            continue;
-                        }
-                        let compatible = m.supported_versions.is_empty()
-                            || m.supported_versions.iter().any(|v| version_compatible(v, &mc_version));
-                        if !compatible {
-                            let avail = m.supported_versions.iter().take(4).cloned().collect::<Vec<_>>().join(", ");
-                            let avail_desc = if avail.is_empty() {
-                                "unknown version".to_string()
-                            } else {
-                                avail
-                            };
-                            m.mismatch = Some(format!("Version: requires {avail_desc}"));
-                        }
-                    }
-                    results.append(&mut mods);
+    // Search every selected source. Per-source failures are tolerated (logged,
+    // not fatal) so one registry being down or unkeyed never blanks the whole
+    // tab. Unknown source strings are skipped, not errors — that is the seam
+    // a future source (e.g. FTB) plugs into: a new match arm + adapter call.
+    for source in &sources {
+        match source.to_lowercase().as_str() {
+            "modrinth" => {
+                match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version).await {
+                    Ok(mut mods) => results.append(&mut mods),
+                    Err(e) => eprintln!("[ModCanvas] Modrinth mod search failed: {}", e),
                 }
-                Err(e) => eprintln!("[ModCanvas] CurseForge mod search failed: {}", e),
             }
+            "curseforge" => {
+                let api_key = resolve_curseforge_api_key(&db)?;
+                if let Some(key) = api_key {
+                    match intelligence.search_curseforge(&query, &key).await {
+                        Ok(mut mods) => {
+                            // Keep every result but annotate non-matching versions
+                            // instead of dropping them — CurseForge search returns many
+                            // mods whose latest file targets a different MC version,
+                            // and hiding those made the tab look broken/empty.
+                            for m in mods.iter_mut() {
+                                if mc_version.is_empty() {
+                                    continue;
+                                }
+                                let compatible = m.supported_versions.is_empty()
+                                    || m.supported_versions.iter().any(|v| version_compatible(v, &mc_version));
+                                if !compatible {
+                                    let avail = m.supported_versions.iter().take(4).cloned().collect::<Vec<_>>().join(", ");
+                                    let avail_desc = if avail.is_empty() {
+                                        "unknown version".to_string()
+                                    } else {
+                                        avail
+                                    };
+                                    m.mismatch = Some(format!("Version: requires {avail_desc}"));
+                                }
+                            }
+                            results.append(&mut mods);
+                        }
+                        Err(e) => eprintln!("[ModCanvas] CurseForge mod search failed: {}", e),
+                    }
+                }
+            }
+            other => eprintln!("[ModCanvas] Unknown search source: {other}"),
         }
     }
 

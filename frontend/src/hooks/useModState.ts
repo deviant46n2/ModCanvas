@@ -44,7 +44,7 @@ export interface CompatibilityResult {
 export function useModState(selectedProject: Project | null) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
-  const [searchSource, setSearchSource] = useState<'modrinth' | 'curseforge'>('modrinth')
+  const [searchSources, setSearchSources] = useState<Array<'modrinth' | 'curseforge'>>(['modrinth', 'curseforge'])
   const [projectMods, setProjectMods] = useState<any[]>([])
   const [modFilter, setModFilter] = useState('')
   const [modFilterInput, setModFilterInput] = useState('')
@@ -144,7 +144,11 @@ export function useModState(selectedProject: Project | null) {
     if (!selectedProject) return
     const modId = mod.mod_id as string
     const source: 'modrinth' | 'curseforge' =
-      mod.source === 'curseforge' || mod.source === 'modrinth' ? mod.source : searchSource
+      mod.source === 'curseforge' || mod.source === 'modrinth'
+        ? mod.source
+        // Backend stamps `source` on every search result, so this fallback is
+        // defensive only; the first selected source is the deterministic pick.
+        : (searchSources[0] ?? 'modrinth')
     setInstallingIds(prev => new Set(prev).add(modId))
     try {
       const installed = await installModFromSearch({
@@ -236,13 +240,13 @@ export function useModState(selectedProject: Project | null) {
   }
 
   async function handleSearchMods() {
-    if (!searchQuery || !selectedProject) return
+    if (!searchQuery || !selectedProject || searchSources.length === 0) return
     try {
       const results = await searchMods(
         searchQuery,
         selectedProject.mod_loader,
         selectedProject.minecraft_version,
-        searchSource,
+        searchSources,
       )
       setSearchResults(results)
     } catch (e) {
@@ -283,7 +287,7 @@ export function useModState(selectedProject: Project | null) {
     projectMods,
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
-    searchSource, setSearchSource,
+    searchSources, setSearchSources,
     modFilterInput, setModFilterInput,
     modMetadata,
     isLoadingMetadata,

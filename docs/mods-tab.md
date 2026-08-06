@@ -49,9 +49,11 @@ the row→file link by scanning jars would be the aliasing trap).
   mod in the filtered list. Bulk toggling calls the existing `toggleModEnabled`
   IPC path once per selected mod.
 - **Add Mods** — the same compact row layout (thumbnail, name, description,
-  meta, `+ Add` button) with the Modrinth/CurseForge source tabs preserved.
-  The selected tab controls which registry is searched; search results carry a
-  `source` tag from the backend.
+  meta, `+ Add` button) with Modrinth/CurseForge **source toggles** (multi-select,
+  default both on). Search queries every selected registry; results carry a
+  `source` tag from the backend. Deselecting **all** sources disables the search
+  input/button and shows "Select at least one source to search." — an explicit
+  empty state, never a silent no-op.
 
 ## Install Flow
 
@@ -87,9 +89,12 @@ metadata so it picks up new jars). Dependencies are not auto-installed yet —
   `frontend/src/services/types.ts`) now carries `icon: Option<String>` /
   `icon: string | null` and `source: String` / `source: 'modrinth' |
   'curseforge'`. The backend tags each search result with its registry.
-- `search_mods` accepts a `source` arg (`modrinth` | `curseforge` | `all`) and
-  only queries the requested registry (CurseForge is skipped without an API
-  key), then dedupes by `mod_id`.
+- `search_mods` accepts a `sources` array (`["modrinth"]` | `["curseforge"]` |
+  `["modrinth", "curseforge"]`) and queries each selected registry in a loop
+  (CurseForge is skipped without an API key; unknown source strings are logged
+  and skipped — the seam a future source plugs into), then dedupes by `mod_id`.
+  Frontend: `SourceToggles.tsx` (`frontend/src/components/common/`) owns the
+  toggle state shape; `useModState` holds `searchSources`.
 - **CurseForge results are never dropped for a version mismatch.** The search
   response's `gameVersions` are mapped into `supported_versions`, and any
   result whose available versions don't cover the pack's MC version (exact, or

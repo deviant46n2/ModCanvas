@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
 import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
+import { SourceToggles, type ModSource } from './SourceToggles'
 
 interface ModMetadata {
   mod_id: string
@@ -51,7 +52,7 @@ export interface ModsTabProps {
   onCheckCompat: () => void
   searchQuery: string
   onSearchQueryChange: (q: string) => void
-  onSearchMods: (source?: 'modrinth' | 'curseforge') => void
+  onSearchMods: () => void
   searchResults: ModMetadata[]
   onAddMod: (mod: any) => Promise<void>
   onToggleMod: (mod: any) => Promise<void>
@@ -60,8 +61,8 @@ export interface ModsTabProps {
   projectModsForDeps: any[]
   getMissingDependencies: (modId: string) => Array<{ mod_id: string; dependency_type: string }>
   getModNameById: (modId: string) => string
-  searchSource: 'modrinth' | 'curseforge'
-  onSearchSourceChange: (source: 'modrinth' | 'curseforge') => void
+  searchSources: ModSource[]
+  onSearchSourcesChange: (sources: ModSource[]) => void
   installingIds: Set<string>
 }
 
@@ -110,8 +111,15 @@ export function ModsTab(props: ModsTabProps) {
   }, [props.filteredMods, selectedIds, props.onToggleMod, clearSelection])
 
   const handleSearchMods = () => {
-    props.onSearchMods(props.searchSource)
+    props.onSearchMods()
   }
+
+  const canSearch = props.searchSources.length > 0
+  const searchPlaceholder = !canSearch
+    ? 'Select a source to search'
+    : props.searchSources.length === 1
+      ? `Search mods on ${props.searchSources[0] === 'modrinth' ? 'Modrinth' : 'CurseForge'}...`
+      : 'Search mods...'
 
   return (
     <ErrorBoundary>
@@ -237,40 +245,27 @@ export function ModsTab(props: ModsTabProps) {
         <div className="mods-section">
           <div className="section-header">
             <h3>Add Mods</h3>
-            <div className="source-tabs" role="tablist" aria-label="Mod source">
-              <button
-                role="tab"
-                aria-selected={props.searchSource === 'modrinth'}
-                aria-controls="modrinth-panel"
-                id="modrinth-tab"
-                className={`source-tab ${props.searchSource === 'modrinth' ? 'active' : ''}`}
-                onClick={() => props.onSearchSourceChange('modrinth')}
-              >
-                Modrinth
-              </button>
-              <button
-                role="tab"
-                aria-selected={props.searchSource === 'curseforge'}
-                aria-controls="curseforge-panel"
-                id="curseforge-tab"
-                className={`source-tab ${props.searchSource === 'curseforge' ? 'active' : ''}`}
-                onClick={() => props.onSearchSourceChange('curseforge')}
-              >
-                CurseForge
-              </button>
-            </div>
+            <SourceToggles sources={props.searchSources} onChange={props.onSearchSourcesChange} />
           </div>
           <div className="search-bar">
             <input
               type="text"
-              placeholder={`Search mods on ${props.searchSource === 'modrinth' ? 'Modrinth' : 'CurseForge'}...`}
+              placeholder={searchPlaceholder}
               value={props.searchQuery}
               onChange={(e) => props.onSearchQueryChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && props.onSearchMods(props.searchSource)}
-              aria-label={`Search mods on ${props.searchSource}`}
+              onKeyDown={(e) => e.key === 'Enter' && canSearch && props.onSearchMods()}
+              aria-label={canSearch ? 'Search mods' : 'Select a source to search'}
+              disabled={!canSearch}
             />
-            <button onClick={handleSearchMods} aria-label="Search">Search</button>
+            <button onClick={handleSearchMods} aria-label="Search" disabled={!canSearch}>
+              Search
+            </button>
           </div>
+          {!canSearch && (
+            <div className="search-empty-hint" role="status">
+              Select at least one source to search.
+            </div>
+          )}
           <div className="search-results">
             {props.searchResults.length > 0 && (
               <List<SearchResultRowExtraProps>

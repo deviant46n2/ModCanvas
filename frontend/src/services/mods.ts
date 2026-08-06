@@ -60,9 +60,9 @@ export async function searchMods(
   query: string,
   loader: string,
   mcVersion: string,
-  source: 'modrinth' | 'curseforge' | 'all' = 'modrinth',
+  sources: Array<'modrinth' | 'curseforge'>,
 ): Promise<ModMetadata[]> {
-  return invoke<ModMetadata[]>('search_mods', { query, loader, mcVersion, source })
+  return invoke<ModMetadata[]>('search_mods', { query, loader, mcVersion, sources })
 }
 
 export interface InstallModArgs {
