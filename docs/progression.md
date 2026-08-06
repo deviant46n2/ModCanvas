@@ -52,6 +52,29 @@ inspector, and the ReactFlow surface. The canvas gets its height from the
 `height: 100%` flex columns), so the graph is visible without any scroll
 hijacking.
 
+### Visual design (2026-08-06)
+
+- **Node tiles:** each card carries a type-colored left accent bar, a tinted
+  icon chip, the label, an uppercase phase pill, clamped description, and a
+  mod-count badge. Type colors live in
+  `frontend/src/core/progression/phase-bands.ts` (`NODE_TYPE_COLORS`, single
+  source for tiles, edges, minimap); a node's own `color` overrides the type
+  color via the `--node-accent` CSS var.
+- **Phase lanes:** `computePhaseBands` (pure, tested) derives a tinted lane
+  per phase from the real nodes' bounding boxes — added to the canvas as
+  non-selectable, non-draggable `phaseBand` nodes with `zIndex: -1`. Bands are
+  **derived, never persisted**: `saveGraph` iterates the real `nodes` state,
+  so bands can never leak into a save. `phaseColor` maps phase names to a
+  stable palette (hash-based, deterministic across reloads).
+- **Edges:** tinted by their source node's type color (`--edge-color` CSS var
+  + matching `ArrowClosed` marker). The selected state overrides the stroke
+  via CSS; optional edges render as animated dashed lines.
+- **Empty state:** a designed panel (icon, headline, copy, "Load Vanilla
+  Template" + "Load from Pack" CTAs) replaces the canvas when the graph has
+  zero nodes — never a blank void. Auto-load was deliberately rejected: the
+  backend returns an empty `ProgressionGraph::new` for never-saved projects,
+  indistinguishable from a deliberately cleared graph.
+
 ## Tab navigation note
 
 All workspace tabs stay mounted (inactive panels are hidden with `display:

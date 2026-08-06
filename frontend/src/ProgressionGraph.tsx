@@ -21,6 +21,8 @@ import ProgressionToolbar from './components/progression/ProgressionToolbar'
 import ProgressionNodeInspector from './components/progression/ProgressionNodeInspector'
 import ProgressionAnalysisOverlay from './components/progression/ProgressionAnalysisOverlay'
 import { buildVanillaTemplate } from './core/progression/vanilla-template'
+import { computePhaseBands } from './core/progression/phase-bands'
+import { FlagIcon } from './components/ui/icons'
 import './ProgressionGraph.css'
 
 interface ProgressionGraphProps {
@@ -42,6 +44,23 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+
+  // Phase lanes are derived, never persisted: recomputed from real nodes and
+  // merged in front of them so they render behind (zIndex -1). They are not
+  // selectable or draggable, so user changes never touch them.
+  const bandNodes = useMemo(() => {
+    return computePhaseBands(nodes).map((b) => ({
+      id: b.id,
+      type: 'phaseBand',
+      position: { x: b.x, y: b.y },
+      data: { phase: b.phase, color: b.color, width: b.width, height: b.height },
+      selectable: false,
+      draggable: false,
+      zIndex: -1,
+    }))
+  }, [nodes])
+
+  const visibleNodes = useMemo(() => [...bandNodes, ...nodes], [bandNodes, nodes])
 
   const toRfNodes = useCallback((graph: ProgressionGraphData): Node[] => {
     return graph.nodes.map((n) => {
@@ -279,19 +298,35 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
         onAnalyze={loadAnalysis}
       />
       <div className="progression-layout">
-        <div className="progression-canvas">
-          <ProgressionCanvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            onDeleteEdge={handleDeleteEdge}
-          />
-        </div>
-        {selectedNode && (
+        {nodes.length === 0 ? (
+          <div className="progression-empty">
+            <div className="progression-empty-icon"><FlagIcon size={44} /></div>
+            <h3>Plan your pack's progression</h3>
+            <p>
+              Map milestones, unlocks, and phases into a dependency graph. Start from the vanilla
+              template — a hand-crafted journey across all five advancement tabs — or generate one
+              from this pack's mods.
+            </p>
+            <div className="progression-empty-actions">
+              <button className="btn-primary" onClick={loadVanillaTemplate}>Load Vanilla Template</button>
+              <button className="btn-secondary" onClick={autoGenerate}>Load from Pack</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="progression-canvas">
+              <ProgressionCanvas
+                nodes={visibleNodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                onPaneClick={onPaneClick}
+                onDeleteEdge={handleDeleteEdge}
+              />
+            </div>
+            {selectedNode && (
           <ProgressionNodeInspector
             selectedNode={selectedNode}
             graph={graph}
@@ -312,6 +347,8 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
             onApply={updateSelectedNode}
             onDelete={deleteSelectedNode}
           />
+          )}
+          </>
         )}
       </div>
       {showAnalysis && analysis && (

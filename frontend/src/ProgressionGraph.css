@@ -78,18 +78,29 @@
 
 /* Node */
 .progression-node {
-  min-width: 160px;
+  position: relative;
+  min-width: 176px;
   max-width: 220px;
   background: var(--color-bg-surface-1);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
+  border-left: 3px solid var(--node-accent, var(--color-border-default));
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   cursor: grab;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.progression-node:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
 }
 
 .progression-node.selected {
-  box-shadow: 0 0 0 2px var(--color-accent-subtle), 0 0 12px var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle), 0 0 16px var(--color-accent);
 }
 
 .node-header {
@@ -98,9 +109,15 @@
   gap: var(--space-2);
 }
 
+/* Icon chip — tinted rounded square, color-coded per type */
 .node-icon {
-  font-size: 20px;
-  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .node-title {
@@ -115,21 +132,57 @@
   text-overflow: ellipsis;
 }
 
-.node-subtitle {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+.node-phase {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--node-accent, var(--color-text-secondary));
+  opacity: 0.85;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .node-desc {
   margin-top: var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
+  line-height: 1.4;
 }
 
 .node-mod-count {
+  display: inline-block;
   margin-top: var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
+  background: var(--color-bg-surface-2);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* Phase lanes — derived tinted columns behind each phase's nodes */
+.phase-band {
+  position: relative;
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+.phase-band-header {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.9;
+}
+
+.react-flow__node-phaseBand {
+  pointer-events: none;
 }
 
 /* Inspector */
@@ -247,9 +300,88 @@
   color: var(--color-text-primary);
 }
 
-.progression-canvas .react-flow__edge-path {
-  stroke: var(--color-border-default);
-  stroke-width: 2;
+/* Edges — stroke comes from the per-edge --edge-color (source type tint);
+   the selected state overrides via CSS since it beats the var. */
+.react-flow__edge-path {
+  stroke: var(--edge-color, var(--color-border-default));
+  stroke-width: 1.5;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 6 4;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--color-bg-surface-1);
+}
+
+.react-flow__edge-text {
+  fill: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+/* Connection handles */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: var(--color-border-strong);
+  border: 1px solid var(--color-bg-surface-1);
+}
+
+.react-flow__handle:hover {
+  background: var(--color-accent);
+}
+
+/* Empty state — designed, never a blank void */
+.progression-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12) var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--color-bg-sunken);
+  text-align: center;
+}
+
+.progression-empty-icon {
+  color: var(--color-text-tertiary);
+  opacity: 0.7;
+  margin-bottom: var(--space-2);
+}
+
+.progression-empty h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+}
+
+.progression-empty p {
+  margin: 0;
+  max-width: 420px;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.progression-empty-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 /* Glyph-free node type icons */

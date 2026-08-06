@@ -1,10 +1,12 @@
+import { useMemo } from 'react'
 import { Handle, Position as RFPosition } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { ReactFlow, Controls, Background, MiniMap } from '@xyflow/react'
+import { ReactFlow, Controls, Background, MiniMap, MarkerType } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { FlagIcon, LockOpenIcon, ZapIcon, TrophyIcon, PackageIcon } from '../ui/icons'
+import { nodeTypeColor, hexToRgba } from '../../core/progression/phase-bands'
 
 function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const nodeType = (data.nodeType as string) || 'milestone'
@@ -16,29 +18,46 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const label = (data.label as string) || 'Node'
   const desc = (data.description as string) || ''
   const phase = (data.phase as string) || ''
-  const nodeColor = (data.color as string) || ''
-
-  const borderColor = nodeColor || (
-    nodeType === 'phase' ? '#10b981' :
-    nodeType === 'milestone' ? '#3b82f6' :
-    nodeType === 'unlock' ? '#8b5cf6' :
-    nodeType === 'achievement' ? '#f59e0b' :
-    nodeType === 'content' ? '#ef4444' : '#6b7280'
-  )
+  const accent = (data.color as string) || nodeTypeColor(nodeType)
 
   return (
-    <div className={`progression-node ${nodeType}-node ${selected ? 'selected' : ''}`} style={{ borderColor }}>
+    <div
+      className={`progression-node ${nodeType}-node ${selected ? 'selected' : ''}`}
+      style={{ '--node-accent': accent } as CSSProperties}
+    >
       <div className="node-header">
-        <div className="node-icon" style={{ color: borderColor }}>{icons[nodeType]}</div>
+        <div className="node-icon" style={{ color: accent, background: hexToRgba(accent, 0.14) }}>
+          {icons[nodeType]}
+        </div>
         <div className="node-title">
           <div className="node-label">{label}</div>
-          {phase && <div className="node-subtitle">{phase}</div>}
+          {phase && <span className="node-phase">{phase}</span>}
         </div>
       </div>
       {desc && <div className="node-desc">{desc.length > 80 ? desc.slice(0, 80) + '...' : desc}</div>}
-      {modCount > 0 && <div className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</div>}
+      {modCount > 0 && <span className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</span>}
       <Handle type="target" position={RFPosition.Top} />
       <Handle type="source" position={RFPosition.Bottom} />
+    </div>
+  )
+}
+
+/** Tinted lane behind a phase's nodes. Derived data only — rendered from
+ *  `computePhaseBands`, never persisted, never selectable/draggable. */
+function PhaseBandNode({ data }: NodeProps<Node>) {
+  const phase = (data.phase as string) || ''
+  const color = (data.color as string) || '#3b82f6'
+  return (
+    <div
+      className="phase-band"
+      style={{
+        width: data.width as number,
+        height: data.height as number,
+        background: hexToRgba(color, 0.06),
+        border: `1px solid ${hexToRgba(color, 0.25)}`,
+      }}
+    >
+      <div className="phase-band-header" style={{ color }}>{phase}</div>
     </div>
   )
 }
@@ -49,6 +68,7 @@ const nodeTypes = {
   phase: ProgressionNodeComponent,
   achievement: ProgressionNodeComponent,
   content: ProgressionNodeComponent,
+  phaseBand: PhaseBandNode,
 }
 
 interface ProgressionCanvasProps {
@@ -66,10 +86,27 @@ export default function ProgressionCanvas({
   nodes, edges, onNodesChange, onEdgesChange, onConnect,
   onNodeClick, onPaneClick, onDeleteEdge,
 }: ProgressionCanvasProps) {
+  // Tint each edge by its source node's type color so the flow reads at a
+  // glance. The stroke comes from a CSS var so the selected state can override
+  // it; the arrowhead gets the explicit color since markers are SVG defs.
+  const coloredEdges = useMemo(
+    () =>
+      edges.map((e) => {
+        const source = nodes.find((n) => n.id === e.source)
+        const color = nodeTypeColor(source?.data?.nodeType as string)
+        return {
+          ...e,
+          style: { '--edge-color': color } as CSSProperties,
+          markerEnd: { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
+        }
+      }),
+    [edges, nodes]
+  )
+
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={coloredEdges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -89,15 +126,11 @@ export default function ProgressionCanvas({
       <MiniMap
         nodeColor={(node) => {
           const nodeType = (node.data?.nodeType as string) || 'milestone'
-          const colors: Record<string, string> = {
-            phase: '#10b981', milestone: '#3b82f6', unlock: '#8b5cf6',
-            achievement: '#f59e0b', content: '#ef4444',
-          }
-          return colors[nodeType] || '#6b7280'
+          return nodeTypeColor(nodeType)
         }}
         maskColor="rgba(0,0,0,0.7)"
       />
-      <Background color="#374151" gap={15} />
+      <Background color="#2b2b30" gap={18} size={1} />
     </ReactFlow>
   )
 }
