@@ -6,6 +6,12 @@ description = "ModCanvas - Professional development environment for Minecraft mo
 authors = ["deviant"]
 license = "GPL-3.0"
 
+[features]
+# Serve the embedded frontend bundle over the tauri:// custom protocol in
+# release builds. Without this the release binary renders a blank window
+# (the tauri://localhost scheme has no handler) while dev builds work fine.
+custom-protocol = ["tauri/custom-protocol"]
+
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
