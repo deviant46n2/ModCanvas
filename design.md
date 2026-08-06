@@ -1,7 +1,7 @@
 # Modpack Engine — Design System
 
 > **Version:** 1.0
-> **Last Updated:** 2026-07-26
+> **Last Updated:** 2026-08-06
 > **Status:** Active Reference
 
 ---
@@ -36,6 +36,7 @@ Modpack Engine should look and feel like professional game development software 
 3. **Consistent surface language.** Elevation = importance. Higher surfaces are brighter. The eye goes where the light is.
 4. **Feedback always.** Every hover, click, selection, and state change has a visible response. No silent failures.
 5. **Restraint over decoration.** No gradients, no drop shadows on everything, no visual noise. Clean, flat, professional.
+6. **Dark-only. No light mode.** ModCanvas is dark-only by design — there is no light theme and no per-screen exception. A white or near-white background anywhere in the app is a **bug, not a mode**: it means a component shipped unstyled (default browser button/input/select surface). Every component must be styled with the token system before merge; an unstyled control is a review-blocking defect.
 
 ### What We Are NOT
 
