@@ -41,6 +41,7 @@ export interface PhaseBand {
   y: number
   width: number
   height: number
+  count: number
 }
 
 const PAD_X = 28
@@ -82,6 +83,7 @@ export function computePhaseBands(nodes: Node[]): PhaseBand[] {
       y: minY - PAD_TOP,
       width: Math.max(maxX - minX + PAD_X * 2, MIN_BAND_W),
       height: maxY - minY + PAD_TOP + PAD_BOTTOM,
+      count: phaseNodes.length,
     })
   }
   return bands

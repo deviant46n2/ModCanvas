@@ -1,11 +1,11 @@
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   useNodesState,
   useEdgesState,
   addEdge,
   MarkerType,
 } from '@xyflow/react'
-import type { Connection, Node, Edge } from '@xyflow/react'
+import type { Connection, Node, Edge, ReactFlowInstance } from '@xyflow/react'
 import {
   getProgressionGraph,
   saveProgressionGraph,
@@ -44,6 +44,8 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [fitViewKey, setFitViewKey] = useState(0)
+  const flowApiRef = useRef<ReactFlowInstance | null>(null)
 
   // Phase lanes are derived, never persisted: recomputed from real nodes and
   // merged in front of them so they render behind (zIndex -1). They are not
@@ -53,7 +55,7 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
       id: b.id,
       type: 'phaseBand',
       position: { x: b.x, y: b.y },
-      data: { phase: b.phase, color: b.color, width: b.width, height: b.height },
+      data: { phase: b.phase, color: b.color, width: b.width, height: b.height, count: b.count },
       selectable: false,
       draggable: false,
       zIndex: -1,
@@ -112,6 +114,7 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
       setGraph(graph)
       setNodes(toRfNodes(graph))
       setEdges(toRfEdges(graph))
+      setFitViewKey((k) => k + 1)
     } catch (e) {
       console.error('Failed to load progression graph:', e)
     }
@@ -182,6 +185,7 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
       setNodes(toRfNodes(graph))
       setEdges(toRfEdges(graph))
       setSelectedNode(null)
+      setFitViewKey((k) => k + 1)
     } catch (e) {
       console.error('Failed to load progression from pack:', e)
     }
@@ -193,6 +197,7 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
     setNodes(toRfNodes(graph))
     setEdges(toRfEdges(graph))
     setSelectedNode(null)
+    setFitViewKey((k) => k + 1)
   }, [projectId, setNodes, setEdges, toRfNodes, toRfEdges])
 
   const onConnect = useCallback(
@@ -257,12 +262,18 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
   const addNode = useCallback(
     (type: string) => {
       const id = crypto.randomUUID()
-      const x = 200 + Math.random() * 400
-      const y = nodes.length * 120
+      // Spawn where the user is looking: viewport center → flow coords.
+      const center = flowApiRef.current?.screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      })
+      const position = center
+        ? { x: center.x - 88, y: center.y - 40 }
+        : { x: 200 + Math.random() * 400, y: nodes.length * 120 }
       const newNode: Node = {
         id,
         type,
-        position: { x, y },
+        position,
         data: {
           label: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
           description: '',
@@ -324,6 +335,8 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
                 onNodeClick={onNodeClick}
                 onPaneClick={onPaneClick}
                 onDeleteEdge={handleDeleteEdge}
+                fitViewKey={fitViewKey}
+                onFlowReady={(api) => { flowApiRef.current = api }}
               />
             </div>
             {selectedNode && (

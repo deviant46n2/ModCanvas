@@ -18,6 +18,7 @@ describe('computePhaseBands', () => {
     expect(story).toBeDefined()
     expect(story!.x).toBeLessThanOrEqual(0) // left padding
     expect(story!.width).toBeGreaterThanOrEqual(220)
+    expect(story!.count).toBe(2) // per-phase node count
   })
 
   it('skips nodes without a phase', () => {

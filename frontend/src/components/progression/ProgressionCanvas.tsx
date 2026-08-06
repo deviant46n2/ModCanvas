@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Handle, Position as RFPosition } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { ReactFlow, Controls, Background, MiniMap, MarkerType } from '@xyflow/react'
-import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react'
+import { ReactFlow, Controls, Background, MiniMap, MarkerType, useReactFlow } from '@xyflow/react'
+import type { Node, Edge, NodeChange, EdgeChange, ReactFlowInstance } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { CSSProperties, ReactNode } from 'react'
 import { FlagIcon, LockOpenIcon, ZapIcon, TrophyIcon, PackageIcon } from '../ui/icons'
@@ -47,6 +47,7 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
 function PhaseBandNode({ data }: NodeProps<Node>) {
   const phase = (data.phase as string) || ''
   const color = (data.color as string) || '#3b82f6'
+  const count = (data.count as number) || 0
   return (
     <div
       className="phase-band"
@@ -57,7 +58,10 @@ function PhaseBandNode({ data }: NodeProps<Node>) {
         border: `1px solid ${hexToRgba(color, 0.25)}`,
       }}
     >
-      <div className="phase-band-header" style={{ color }}>{phase}</div>
+      <div className="phase-band-header" style={{ color }}>
+        {phase}
+        {count > 0 && <span className="phase-band-count">{count}</span>}
+      </div>
     </div>
   )
 }
@@ -80,12 +84,30 @@ interface ProgressionCanvasProps {
   onNodeClick: (event: React.MouseEvent, node: Node) => void
   onPaneClick: () => void
   onDeleteEdge: (edge: Edge) => void
+  /** Bump to fit the whole graph into view (e.g. after loading a template).
+   *  React Flow's `fitView` prop only runs on mount, so later loads need this. */
+  fitViewKey?: number
+  /** Hands the ReactFlow instance up so the parent can add nodes at the
+   *  viewport center instead of random coordinates. */
+  onFlowReady?: (api: ReactFlowInstance) => void
 }
 
 export default function ProgressionCanvas({
   nodes, edges, onNodesChange, onEdgesChange, onConnect,
-  onNodeClick, onPaneClick, onDeleteEdge,
+  onNodeClick, onPaneClick, onDeleteEdge, fitViewKey, onFlowReady,
 }: ProgressionCanvasProps) {
+  const flowApi = useReactFlow()
+
+  useEffect(() => {
+    onFlowReady?.(flowApi)
+  }, [flowApi, onFlowReady])
+
+  // Fit after graph loads that happen post-mount (template / auto-generate).
+  useEffect(() => {
+    if (fitViewKey === undefined) return
+    const t = setTimeout(() => flowApi.fitView({ padding: 0.12, duration: 300 }), 50)
+    return () => clearTimeout(t)
+  }, [fitViewKey, flowApi])
   // Tint each edge by its source node's type color so the flow reads at a
   // glance. The stroke comes from a CSS var so the selected state can override
   // it; the arrowhead gets the explicit color since markers are SVG defs.
