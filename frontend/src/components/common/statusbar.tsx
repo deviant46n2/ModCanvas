@@ -46,7 +46,7 @@ export function WorkspaceStatusBar({
       <div className="workspace-statusbar-group">
         <span
           className={`ws-status ${wsStatus.connected ? 'connected' : 'disconnected'}`}
-          title={`WebSocket server \u2022 Port ${wsStatus.port} \u2022 ${wsStatus.client_count} client${wsStatus.client_count === 1 ? '' : 's'}`}
+          title={`WebSocket server \u2022 Port ${wsStatus.port} \u2022 ${wsStatus.clientCount} client${wsStatus.clientCount === 1 ? '' : 's'}`}
         >
           <span className={`status-dot ${wsStatus.connected ? 'running' : 'stopped'}`} />
           <span>{wsStatus.connected ? 'Minecraft Connected' : 'Offline / Idle'}</span>

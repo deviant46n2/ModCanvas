@@ -10,6 +10,7 @@ import { LoadPackModal } from './components/common/LoadPackModal'
 import { useAppState } from './hooks/useAppState'
 import { HistoryProvider, useHistory } from './hooks/history-provider'
 import { saveQuestGraph } from './services/quest'
+import { startCompanionSocket, stopCompanionSocket } from './services/companion-socket'
 import { useRecipeStore } from './core/recipe/recipe-store'
 import type { QuestGraphData } from './services/api'
 
@@ -34,6 +35,14 @@ function AppRoot() {
   useEffect(() => {
     history.attachProject(openProject?.id ?? null)
   }, [history, openProject?.id])
+
+  // Join the companion bridge as a peer for the app's lifetime. The socket
+  // carries connection status and companion frames; the Tauri event channel
+  // is unreliable on some Linux/WebKitGTK stacks and is no longer used for it.
+  useEffect(() => {
+    startCompanionSocket()
+    return stopCompanionSocket
+  }, [])
 
   // Scope the recipe store to the active project. Recipes are pack-specific:
   // leaving the previous pack's recipes in the (persisted) store makes the

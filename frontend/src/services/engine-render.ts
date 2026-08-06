@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { wsIpcSendEvent } from './ipc'
+import { onCompanionEvent } from './companion-socket'
 
 /**
  * Engine-render pipeline (companion mod integration).
@@ -185,10 +185,9 @@ export function persistEngineRenders(
 /** Wire the RENDER_ITEMS_RESULT listener once. Returns a cleanup fn. */
 export async function initEngineRenderListener(): Promise<() => void> {
   if (unlisten) return unlisten
-  unlisten = await listen('ws-ipc:event', (event) => {
-    const payload = event.payload as Record<string, unknown> | undefined
-    if (!payload || payload.event !== 'RENDER_ITEMS_RESULT') return
-    const p = (payload.payload ?? {}) as Record<string, unknown>
+  unlisten = onCompanionEvent((frame) => {
+    if (frame.event !== 'RENDER_ITEMS_RESULT') return
+    const p = (frame.payload ?? {}) as Record<string, unknown>
     const rendered = (p.rendered ?? {}) as Record<string, string>
     const requestId = (p.requestId as string) ?? ''
 

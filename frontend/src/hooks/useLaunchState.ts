@@ -1,51 +1,39 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { listen } from '@tauri-apps/api/event'
+import { useState, useEffect, useCallback } from 'react'
 import { testProject, deployCompanionMod, wsIpcGetStatus, wsIpcRestart, type WsConnectionStatus } from '../services/api'
 import { globalAssetCache } from '../services/asset-cache'
+import { onCompanionEvent, onCompanionStatus } from '../services/companion-socket'
 import type { Project } from './useProjectState'
 
 export function useLaunchState(selectedProject: Project | null) {
   const [testProgress, setTestProgress] = useState('')
   const [testError, setTestError] = useState('')
   const [isTesting, setIsTesting] = useState(false)
-  const [wsStatus, setWsStatus] = useState<WsConnectionStatus>({ connected: false, client_count: 0, port: 9876 })
+  const [wsStatus, setWsStatus] = useState<WsConnectionStatus>({ connected: false, clientCount: 0, port: 9876 })
   const [deployCompanionMessage, setDeployCompanionMessage] = useState('')
-  const unlistenRef = useRef<(() => void) | null>(null)
 
+  // Bridge state arrives over the companion socket (CONNECTION_STATUS frames).
+  // The Tauri event channel is unreliable on some Linux/WebKitGTK stacks, so
+  // it is deliberately NOT the source of truth here.
   useEffect(() => {
-    const setupWsListeners = async () => {
-      const unlistenWsStatus = await listen<WsConnectionStatus>('ws-ipc:status', (event) => {
-        setWsStatus(event.payload)
-      })
-      const unlistenWsEvent = await listen('ws-ipc:event', (event) => {
-        const payload = event.payload as Record<string, unknown> | undefined
-        const eventType = payload?.event as string | undefined
-        console.log('[ModCanvas] Received WebSocket event from Minecraft:', eventType, payload)
+    const unsubStatus = onCompanionStatus((status) => {
+      setWsStatus({ connected: status.connected, clientCount: status.clientCount, port: status.port })
+    })
+    const unsubEvent = onCompanionEvent((frame) => {
+      console.log('[ModCanvas] Received WebSocket event from Minecraft:', frame.event, frame)
 
-        if (eventType === 'ASSETS_READY' && payload?.payload) {
-          globalAssetCache.processAssetsReady(payload.payload).catch((err: unknown) => {
-            console.error('[ModCanvas] Failed to process assets:', err)
-          })
-        }
-      })
-
-      const currentStatus = await wsIpcGetStatus()
-      if (!cancelled) setWsStatus(currentStatus)
-
-      return () => {
-        unlistenWsStatus()
-        unlistenWsEvent()
+      if (frame.event === 'ASSETS_READY' && frame.payload) {
+        globalAssetCache.processAssetsReady(frame.payload).catch((err: unknown) => {
+          console.error('[ModCanvas] Failed to process assets:', err)
+        })
       }
-    }
-
-    let cancelled = false
-    setupWsListeners().then(cleanup => {
-      if (cancelled) { cleanup() } else { unlistenRef.current = cleanup }
     })
 
+    // Initial sync for the pill before the first status frame lands.
+    wsIpcGetStatus().then((current) => setWsStatus(current)).catch(() => {})
+
     return () => {
-      cancelled = true
-      unlistenRef.current?.()
+      unsubStatus()
+      unsubEvent()
     }
   }, [])
 

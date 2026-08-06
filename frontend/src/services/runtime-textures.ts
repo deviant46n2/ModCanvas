@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { wsIpcSendEvent } from './ipc'
+import { onCompanionEvent } from './companion-socket'
 import type { QuestGraphData } from './quest-types'
 
 /**
@@ -110,10 +110,9 @@ export function subscribeRuntimeTextures(fn: (textures: Record<string, string>) 
 /** Wire the EXTRACT_TEXTURES_RESULT listener once. Returns a cleanup fn. */
 export async function initRuntimeTextureListener(): Promise<() => void> {
   if (unlisten) return unlisten
-  unlisten = await listen('ws-ipc:event', (event) => {
-    const payload = event.payload as Record<string, unknown> | undefined
-    if (!payload || payload.event !== 'EXTRACT_TEXTURES_RESULT') return
-    const p = (payload.payload ?? {}) as Record<string, unknown>
+  unlisten = onCompanionEvent((frame) => {
+    if (frame.event !== 'EXTRACT_TEXTURES_RESULT') return
+    const p = (frame.payload ?? {}) as Record<string, unknown>
     const textures = (p.textures ?? {}) as Record<string, string>
     if (!textures || Object.keys(textures).length === 0) return
     for (const fn of [...listeners]) fn(textures)

@@ -23,6 +23,7 @@ pub mod recipes;
 pub mod scriptgen;
 pub mod shared;
 pub mod ws_ipc;
+pub mod ws_protocol;
 
 use std::sync::{Arc, OnceLock};
 use tauri::Manager;

@@ -63,7 +63,7 @@ describe('WebSocket IPC API', () => {
 
   describe('wsIpcGetStatus', () => {
     it('should return connection status', async () => {
-      const mockStatus = { connected: true, client_count: 1, port: 9876 }
+      const mockStatus = { connected: true, clientCount: 1, port: 9876 }
       mockInvoke.mockResolvedValue(mockStatus)
       
       const result = await wsIpcGetStatus()
@@ -73,7 +73,7 @@ describe('WebSocket IPC API', () => {
     })
 
     it('should return disconnected status when no clients', async () => {
-      const mockStatus = { connected: false, client_count: 0, port: 9876 }
+      const mockStatus = { connected: false, clientCount: 0, port: 9876 }
       mockInvoke.mockResolvedValue(mockStatus)
       
       const result = await wsIpcGetStatus()

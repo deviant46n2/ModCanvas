@@ -87,7 +87,7 @@ export interface ParsedConfig {
 
 export interface WsConnectionStatus {
   connected: boolean
-  client_count: number
+  clientCount: number
   port: number
 }
 

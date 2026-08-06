@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WorkspaceStatusBar } from './statusbar'
 
-const wsConnected = { connected: true, client_count: 1, port: 9876 }
-const wsOffline = { connected: false, client_count: 0, port: 9876 }
+const wsConnected = { connected: true, clientCount: 1, port: 9876 }
+const wsOffline = { connected: false, clientCount: 0, port: 9876 }
 
 const base = {
   wsStatus: wsOffline,

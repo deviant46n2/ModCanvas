@@ -14,13 +14,22 @@ app prompts the user to run the instance while any such icons remain (see
 
 ## Protocol
 
-Two new events over the existing WebSocket IPC bridge (`src-tauri/src/ws_ipc.rs`,
-`events` module):
+Events over the WebSocket IPC hub (`src-tauri/src/ws_ipc.rs`, protocol types in
+`src-tauri/src/ws_protocol.rs`):
 
 | Event | Direction | Payload |
 |---|---|---|
 | `RENDER_ITEMS_REQUEST` | ModCanvas → game | `{ requestId, size, items: ["modid:item", …] }` |
 | `RENDER_ITEMS_RESULT` | game → ModCanvas | `{ requestId, rendered: { "modid:item": "data:image/png;base64,…" } }` |
+| `CONNECTION_STATUS` | server → app | `{ connected, clientCount, port }` |
+
+The frontend joins the hub itself as a peer (`frontend/src/services/
+companion-socket.ts`, `CLIENT_INFO` role `modcanvas-app`). The server
+classifies peers by role and routes companion frames (results, identity,
+ASSETS_READY) to the app peer over its socket. The Tauri event channel
+(`ws-ipc:status`/`ws-ipc:event`) is still emitted alongside, but the frontend
+no longer depends on it — it silently drops Rust→webview events on some
+Linux/WebKitGTK stacks (evals from async commands never run).
 
 Batches are capped (`engine-render.ts` sends ≤32 per request) and the game
 renders **4 items per client tick** (`ItemRenderQueue.PER_TICK`) so a large
@@ -71,7 +80,8 @@ rename). Commands:
 - `queueEngineRenders` — deduped queue; sends `RENDER_ITEMS_REQUEST` when the
   companion is connected, batches of 32, ≤2 attempts per item.
 - `getEngineRenderCache` / `persistEngineRenders` — Rust-backed load/save.
-- `initEngineRenderListener` — listens for `RENDER_ITEMS_RESULT`.
+- `initEngineRenderListener` — subscribes to the companion socket for
+  `RENDER_ITEMS_RESULT` (was: Tauri `ws-ipc:event` listener).
 
 `QuestBookEditor.tsx` wires it:
 

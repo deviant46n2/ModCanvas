@@ -24,7 +24,7 @@ export interface QuestToolbarActions {
   saveNow: () => Promise<void>
   saveAndHotReload: () => Promise<void>
   scheduleAutoSave: () => void
-  wsStatus: { connected: boolean; client_count: number }
+  wsStatus: { connected: boolean; clientCount: number }
   browseModsDir: () => Promise<void>
   handleImportFtb: () => Promise<void>
   handleImportFromPrism: (instance: PrismInstance) => Promise<void>
@@ -53,7 +53,7 @@ export function useQuestToolbarActions({
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [prismInstances, setPrismInstances] = useState<PrismInstance[] | null>(null)
   const [prismLoading, setPrismLoading] = useState(false)
-  const [wsStatus, setWsStatus] = useState<{ connected: boolean; client_count: number }>({ connected: false, client_count: 0 })
+  const [wsStatus, setWsStatus] = useState<{ connected: boolean; clientCount: number }>({ connected: false, clientCount: 0 })
   const autoSaveRef = useRef<(() => Promise<void>) | null>(null)
   const saveGraphRef = useRef<(() => Promise<void>) | null>(null)
   const importedRef = useRef(false)
@@ -61,7 +61,7 @@ export function useQuestToolbarActions({
   const refreshWsStatus = useCallback(async () => {
     try {
       const status = await wsIpcGetStatus()
-      setWsStatus({ connected: status.connected, client_count: status.client_count })
+      setWsStatus({ connected: status.connected, clientCount: status.clientCount })
     } catch {}
   }, [])
 

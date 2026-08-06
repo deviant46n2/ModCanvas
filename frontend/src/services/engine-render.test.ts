@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('./ipc', () => ({
   wsIpcSendEvent: vi.fn(),
 }))
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
+vi.mock('./companion-socket', () => ({
+  onCompanionEvent: vi.fn(),
 }))
 
 import { wsIpcSendEvent } from './ipc'
-import { listen } from '@tauri-apps/api/event'
+import { onCompanionEvent } from './companion-socket'
 import {
   setEngineRenderConnected,
   queueEngineRenders,
@@ -20,27 +20,25 @@ import {
 } from './engine-render'
 
 const mockSend = vi.mocked(wsIpcSendEvent)
-const mockListen = vi.mocked(listen)
+const mockOnEvent = vi.mocked(onCompanionEvent)
 
 describe('engine-render pipeline', () => {
-  type WsEvent = { event: string; id: number; payload: Record<string, unknown> }
-  const capturedListeners = new Map<string, (event: WsEvent) => void>()
-  const emitWs = (payload: Record<string, unknown>) => {
-    capturedListeners.get('ws-ipc:event')?.({ event: 'ws-ipc:event', id: 0, payload })
+  type WsFrame = { event: string; payload?: Record<string, unknown> }
+  let capturedHandler: ((frame: WsFrame) => void) | undefined
+  const emitWs = (frame: WsFrame) => {
+    capturedHandler?.(frame)
   }
 
   beforeEach(() => {
     __resetEngineRenderState()
-    capturedListeners.clear()
+    capturedHandler = undefined
     mockSend.mockReset()
     mockSend.mockResolvedValue(1 as never)
-    mockListen.mockReset()
-    mockListen.mockImplementation(
-      (channel: string, handler: (event: WsEvent) => void) => {
-        capturedListeners.set(channel, handler)
-        return Promise.resolve(() => {})
-      },
-    )
+    mockOnEvent.mockReset()
+    mockOnEvent.mockImplementation((handler) => {
+      capturedHandler = handler as (frame: WsFrame) => void
+      return () => {}
+    })
   })
 
   it('does not send until connected', () => {

@@ -1,103 +1,44 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
+
+use crate::ws_protocol::{classify_client_info, events, ClientRole, ConnectionStatus, ModEvent};
 
 const DEFAULT_PORT: u16 = 9876;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModEvent {
-    pub event: String,
-    pub timestamp: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload: Option<Value>,
-}
-
-/// Standard event types for ModCanvas <-> Companion Mod communication
-pub mod events {
-    pub const RELOAD_KUBEJS_SCRIPTS: &str = "RELOAD_KUBEJS_SCRIPTS";
-    pub const RELOAD_CRAFTTWEAKER: &str = "RELOAD_CRAFTTWEAKER";
-    pub const RELOAD_CONFIG: &str = "RELOAD_CONFIG";
-    pub const RELOAD_QUESTS: &str = "RELOAD_QUESTS";
-    pub const RELOAD_PROGRESSION: &str = "RELOAD_PROGRESSION";
-    pub const ASSETS_READY: &str = "ASSETS_READY";
-    pub const CLIENT_INFO: &str = "CLIENT_INFO";
-    pub const PING: &str = "PING";
-    pub const PONG: &str = "PONG";
-    /// ModCanvas → companion: render a batch of item ids with the real Minecraft
-    /// renderer (payload: `requestId`, `size`, `items[]`).
-    pub const RENDER_ITEMS_REQUEST: &str = "RENDER_ITEMS_REQUEST";
-    /// companion → ModCanvas: base64 PNG data URLs for rendered items
-    /// (payload: `requestId`, `rendered: {itemId: dataUrl}`).
-    pub const RENDER_ITEMS_RESULT: &str = "RENDER_ITEMS_RESULT";
-    /// ModCanvas → companion: extract runtime-resolvable textures for the given
-    /// namespaces via the in-game ResourceManager (payload: `requestId`,
-    /// `namespaces[]`, optional `maxTextures`).
-    pub const EXTRACT_TEXTURES_REQUEST: &str = "EXTRACT_TEXTURES_REQUEST";
-    /// companion → ModCanvas: base64 PNG data URLs keyed by full resource
-    /// location (payload: `requestId`, `textures: {ns:textures/path.png: url}`).
-    pub const EXTRACT_TEXTURES_RESULT: &str = "EXTRACT_TEXTURES_RESULT";
-}
-
-impl ModEvent {
-    pub fn new(event: impl Into<String>) -> Self {
-        Self {
-            event: event.into(),
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            path: None,
-            payload: None,
-        }
-    }
-
-    pub fn with_path(mut self, path: impl Into<String>) -> Self {
-        self.path = Some(path.into());
-        self
-    }
-
-    pub fn with_payload(mut self, payload: Value) -> Self {
-        self.payload = Some(payload);
-        self
-    }
-
-    pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string(self).context("Failed to serialize ModEvent")
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectionStatus {
-    pub connected: bool,
-    pub client_count: usize,
-    pub port: u16,
-}
-
 #[derive(Debug)]
 struct WsClient {
+    id: String,
     sender: mpsc::UnboundedSender<Message>,
+    role: ClientRole,
 }
 
-#[derive(Debug)]
+/// WebSocket message hub for the companion bridge.
+///
+/// Peers are classified by their CLIENT_INFO frame: the app's frontend
+/// (`modcanvas-app`) and companion mods (`workbench-companion`). Companion
+/// frames are routed to app peers, app commands are broadcast to companions,
+/// and connection-state changes are pushed to app peers as CONNECTION_STATUS
+/// frames. The Tauri event channel (`ws-ipc:status`/`ws-ipc:event`) is still
+/// emitted alongside for environments where it works, but it is no longer the
+/// frontend's source of truth — it silently drops on some Linux/WebKitGTK
+/// stacks (evals from async commands never run).
 pub struct WsIpcServer {
     app_handle: AppHandle,
     port: Arc<RwLock<u16>>,
     clients: Arc<RwLock<HashMap<String, WsClient>>>,
+    /// Most recent companion CLIENT_INFO payload, replayed to late-joining
+    /// app peers so the frontend can show companion identity.
+    last_companion_info: Arc<RwLock<Option<Value>>>,
     shutdown_tx: Arc<RwLock<Option<broadcast::Sender<()>>>>,
     server_task: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
 }
@@ -108,6 +49,7 @@ impl WsIpcServer {
             app_handle,
             port: Arc::new(RwLock::new(DEFAULT_PORT)),
             clients: Arc::new(RwLock::new(HashMap::new())),
+            last_companion_info: Arc::new(RwLock::new(None)),
             shutdown_tx: Arc::new(RwLock::new(None)),
             server_task: Arc::new(RwLock::new(None)),
         }
@@ -127,6 +69,7 @@ impl WsIpcServer {
 
         let app_handle = self.app_handle.clone();
         let clients = self.clients.clone();
+        let last_companion_info = self.last_companion_info.clone();
         let port = self.port.clone();
 
         let server_port = *port.read().await;
@@ -143,7 +86,15 @@ impl WsIpcServer {
                                 debug!("New WebSocket connection from {}", addr);
                                 let clients = clients.clone();
                                 let app_handle = app_handle.clone();
-                                tokio::spawn(handle_connection(stream, addr, clients, app_handle, server_port));
+                                let last_companion_info = last_companion_info.clone();
+                                tokio::spawn(handle_connection(
+                                    stream,
+                                    addr,
+                                    clients,
+                                    last_companion_info,
+                                    app_handle,
+                                    server_port,
+                                ));
                             }
                             Err(e) => {
                                 error!("WebSocket accept error: {}", e);
@@ -172,45 +123,74 @@ impl WsIpcServer {
         self.emit_status().await;
     }
 
+    /// Send an event to companion peers (the frontend's command channel).
     pub async fn broadcast(&self, event: ModEvent) -> Result<usize> {
         let json = event.to_json()?;
         let message = Message::Text(json.into());
-        
+
         let clients = self.clients.read().await;
-        let count = clients.len();
-        
+        let mut count = 0;
         for client in clients.values() {
-            if client.sender.send(message.clone()).is_err() {
-                debug!("Failed to send to client (may be disconnected)");
+            if client.role != ClientRole::App {
+                count += 1;
+                if client.sender.send(message.clone()).is_err() {
+                    debug!("Failed to send to client (may be disconnected)");
+                }
             }
         }
-        
+
         Ok(count)
     }
 
+    /// Send an event to the app peer(s) — companion frames and status pushes.
+    async fn send_to_app_clients(&self, event: ModEvent) {
+        let Ok(json) = event.to_json() else { return };
+        let message = Message::Text(json.into());
+        let clients = self.clients.read().await;
+        for client in clients.values() {
+            if client.role == ClientRole::App {
+                let _ = client.sender.send(message.clone());
+            }
+        }
+    }
+
+    /// Companion bridge state. Counts companion and unidentified peers only —
+    /// the app's own socket never makes the bridge look connected.
     pub async fn get_status(&self) -> ConnectionStatus {
         let clients = self.clients.read().await;
         let port = *self.port.read().await;
+        let companion_clients = clients
+            .values()
+            .filter(|c| c.role != ClientRole::App)
+            .count();
         ConnectionStatus {
-            connected: !clients.is_empty(),
-            client_count: clients.len(),
+            connected: companion_clients > 0,
+            client_count: companion_clients,
             port,
         }
     }
 
     async fn emit_status(&self) {
         let status = self.get_status().await;
-        let _ = self.app_handle.emit("ws-ipc:status", status);
+        // Tauri event channel (works on most stacks; silently dropped on the
+        // Linux/WebKitGTK configurations we no longer depend on it for).
+        let _ = self.app_handle.emit("ws-ipc:status", status.clone());
+        // Primary channel: push the state to app peers over their sockets.
+        let payload = serde_json::to_value(&status).unwrap_or(Value::Null);
+        self.send_to_app_clients(ModEvent::new(events::CONNECTION_STATUS).with_payload(payload))
+            .await;
     }
 
-    pub async fn add_client(&self, client_id: String, sender: mpsc::UnboundedSender<Message>) {
-        self.clients.write().await.insert(client_id, WsClient { sender });
-        self.emit_status().await;
+    async fn cache_companion_info(&self, payload: Value) {
+        *self.last_companion_info.write().await = Some(payload);
     }
 
-    pub async fn remove_client(&self, client_id: &str) {
-        self.clients.write().await.remove(client_id);
-        self.emit_status().await;
+    async fn replay_companion_info_to_app(&self) {
+        let cached = self.last_companion_info.read().await.clone();
+        if let Some(payload) = cached {
+            self.send_to_app_clients(ModEvent::new(events::CLIENT_INFO).with_payload(payload))
+                .await;
+        }
     }
 }
 
@@ -218,11 +198,12 @@ async fn handle_connection(
     stream: tokio::net::TcpStream,
     addr: SocketAddr,
     clients: Arc<RwLock<HashMap<String, WsClient>>>,
+    last_companion_info: Arc<RwLock<Option<Value>>>,
     app_handle: AppHandle,
     actual_port: u16,
 ) {
     let client_id = format!("{}:{}", addr.ip(), addr.port());
-    
+
     let ws_stream = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
@@ -234,16 +215,17 @@ async fn handle_connection(
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-    let client_id_clone = client_id.clone();
-    clients.write().await.insert(client_id.clone(), WsClient { sender: tx.clone() });
-    let _ = app_handle.emit("ws-ipc:status", {
-        let clients = clients.read().await;
-        ConnectionStatus {
-            connected: !clients.is_empty(),
-            client_count: clients.len(),
-            port: actual_port,
-        }
-    });
+    {
+        let mut clients = clients.write().await;
+        clients.insert(
+            client_id.clone(),
+            WsClient {
+                id: client_id.clone(),
+                sender: tx.clone(),
+                role: ClientRole::Unidentified,
+            },
+        );
+    }
 
     let forward_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -253,18 +235,27 @@ async fn handle_connection(
         }
     });
 
-    let client_id_recv = client_id_clone.clone();
+    let client_id_recv = client_id.clone();
     let clients_recv = clients.clone();
     let app_handle_recv = app_handle.clone();
-    let app_handle_cleanup = app_handle.clone(); // Clone for cleanup
+    let last_companion_info_recv = last_companion_info.clone();
     let recv_task = tokio::spawn(async move {
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
                     debug!("Received from {}: {}", client_id_recv, text);
-                    if let Ok(event) = serde_json::from_str::<ModEvent>(&text) {
-                        let _ = app_handle_recv.emit("ws-ipc:event", event);
-                    }
+                    let Ok(event) = serde_json::from_str::<ModEvent>(&text) else {
+                        continue;
+                    };
+                    route_frame(
+                        &client_id_recv,
+                        event,
+                        &clients_recv,
+                        &last_companion_info_recv,
+                        &app_handle_recv,
+                        actual_port,
+                    )
+                    .await;
                 }
                 Ok(Message::Close(_)) => {
                     debug!("Client {} sent close frame", client_id_recv);
@@ -287,20 +278,83 @@ async fn handle_connection(
         _ = recv_task => {},
     }
 
-    let client_id_cleanup = client_id_clone;
-    let clients_cleanup = clients_recv.clone();
-    let app_handle_cleanup = app_handle_cleanup;
-    clients_cleanup.write().await.remove(&client_id_cleanup);
-    let _ = app_handle_cleanup.emit("ws-ipc:status", {
-        let clients = clients_cleanup.read().await;
-        ConnectionStatus {
-            connected: !clients.is_empty(),
-            client_count: clients.len(),
-            port: actual_port,
+    {
+        let mut clients = clients.write().await;
+        clients.remove(&client_id);
+    }
+    let _ = app_handle
+        .state::<Arc<WsIpcServer>>()
+        .emit_status()
+        .await;
+
+    debug!("Client {} disconnected", client_id);
+}
+
+/// Route one parsed frame based on the sender's role.
+async fn route_frame(
+    sender_id: &str,
+    event: ModEvent,
+    clients: &Arc<RwLock<HashMap<String, WsClient>>>,
+    last_companion_info: &Arc<RwLock<Option<Value>>>,
+    app_handle: &AppHandle,
+    actual_port: u16,
+) {
+    // CLIENT_INFO is the handshake: it may change the sender's role.
+    if event.event == events::CLIENT_INFO {
+        let payload = event.payload.clone();
+        let role = classify_client_info(payload.as_ref());
+        {
+            let mut clients = clients.write().await;
+            if let Some(client) = clients.get_mut(sender_id) {
+                client.role = role;
+            }
         }
-    });
-    
-    debug!("Client {} disconnected", client_id_cleanup);
+        match role {
+            ClientRole::App => {
+                // Push the current state so a freshly-connected app peer is
+                // immediately in sync, and replay the last companion identity.
+                let _ = app_handle.state::<Arc<WsIpcServer>>().emit_status().await;
+                let _ = app_handle
+                    .state::<Arc<WsIpcServer>>()
+                    .replay_companion_info_to_app()
+                    .await;
+                return;
+            }
+            ClientRole::Companion => {
+                if let Some(payload) = payload {
+                    let mut cached = last_companion_info.write().await;
+                    *cached = Some(payload.clone());
+                    // forward the identity to the app peer
+                    let _ = app_handle
+                        .state::<Arc<WsIpcServer>>()
+                        .send_to_app_clients(ModEvent::new(events::CLIENT_INFO).with_payload(payload))
+                        .await;
+                }
+                return;
+            }
+            ClientRole::Unidentified => return,
+        }
+    }
+
+    // Non-handshake frames: route by role.
+    let sender_role = {
+        let clients = clients.read().await;
+        clients
+            .get(sender_id)
+            .map(|c| c.role)
+            .unwrap_or(ClientRole::Unidentified)
+    };
+    let server = app_handle.state::<Arc<WsIpcServer>>();
+    match sender_role {
+        // Companion frames flow to the app peer.
+        ClientRole::Companion | ClientRole::Unidentified => {
+            let _ = server.send_to_app_clients(event).await;
+        }
+        // App frames are commands for the companions.
+        ClientRole::App => {
+            let _ = server.broadcast(event).await;
+        }
+    }
 }
 
 #[tauri::command]
@@ -337,36 +391,4 @@ pub async fn ws_ipc_restart(
 
 pub fn register_ws_ipc_commands(app: &mut tauri::App) {
     app.manage(Arc::new(WsIpcServer::new(app.handle().clone())));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_mod_event_serialization() {
-        let event = ModEvent::new("RELOAD_QUESTS")
-            .with_path("config/ftbquests/quests/chapter1.snbt")
-            .with_payload(json!({"reason": "file_changed"}));
-        
-        let json = event.to_json().unwrap();
-        let parsed: ModEvent = serde_json::from_str(&json).unwrap();
-        
-        assert_eq!(parsed.event, "RELOAD_QUESTS");
-        assert_eq!(parsed.path, Some("config/ftbquests/quests/chapter1.snbt".to_string()));
-        assert_eq!(parsed.payload, Some(json!({"reason": "file_changed"})));
-        assert!(parsed.timestamp > 0);
-    }
-
-    #[test]
-    fn test_mod_event_minimal() {
-        let event = ModEvent::new("TEST_EVENT");
-        let json = event.to_json().unwrap();
-        let parsed: ModEvent = serde_json::from_str(&json).unwrap();
-        
-        assert_eq!(parsed.event, "TEST_EVENT");
-        assert_eq!(parsed.path, None);
-        assert_eq!(parsed.payload, None);
-    }
 }
