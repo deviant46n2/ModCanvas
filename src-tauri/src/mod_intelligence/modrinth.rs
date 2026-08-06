@@ -315,11 +315,37 @@ impl ModIntelligence {
         Ok(metadata)
     }
 
+    /// Fetch one mod's metadata, dispatching on the id form: `curseforge:{id}`
+    /// goes to the CurseForge API (needs a key), everything else to Modrinth.
+    /// CurseForge results are re-keyed to the `curseforge:{id}` form so the
+    /// frontend's `mod_id` map lookup matches the DB row.
+    async fn fetch_metadata_any(
+        client: &Client,
+        mod_id: &str,
+        loader: &str,
+        mc_version: &str,
+        curseforge_api_key: Option<&str>,
+    ) -> anyhow::Result<ModMetadata> {
+        if let Some(cf_id) = mod_id.strip_prefix("curseforge:") {
+            let project_id = cf_id
+                .parse::<u64>()
+                .map_err(|_| anyhow::anyhow!("invalid CurseForge project id: {cf_id}"))?;
+            let key = curseforge_api_key
+                .ok_or_else(|| anyhow::anyhow!("no CurseForge API key for {mod_id}"))?;
+            let mut meta = Self::fetch_curseforge_metadata_static(client, project_id, key).await?;
+            meta.mod_id = mod_id.to_string();
+            Ok(meta)
+        } else {
+            Self::fetch_metadata_with_deps_static(client, mod_id, loader, mc_version).await
+        }
+    }
+
     pub async fn batch_get_metadata(
         &self,
         mod_ids: &[String],
         loader: &str,
         mc_version: &str,
+        curseforge_api_key: Option<&str>,
     ) -> Vec<ModMetadata> {
         use std::sync::Arc;
         use tokio::sync::Semaphore;
@@ -329,17 +355,26 @@ impl ModIntelligence {
         let client = self.client.clone();
         let loader = loader.to_string();
         let mc_version = mc_version.to_string();
+        let cf_api_key = curseforge_api_key.map(|s| s.to_string());
 
         let handles: Vec<_> = mod_ids.iter().map(|mod_id| {
             let sem = semaphore.clone();
             let client = client.clone();
             let loader = loader.clone();
             let mc_version = mc_version.clone();
+            let cf_api_key = cf_api_key.clone();
             let mod_id = mod_id.clone();
 
             tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
-                let result = Self::fetch_metadata_with_deps_static(&client, &mod_id, &loader, &mc_version).await;
+                let result = Self::fetch_metadata_any(
+                    &client,
+                    &mod_id,
+                    &loader,
+                    &mc_version,
+                    cf_api_key.as_deref(),
+                )
+                .await;
                 match result {
                     Ok(meta) => Some(meta),
                     Err(e) => {
@@ -443,6 +478,7 @@ impl ModIntelligence {
         mods: &[crate::models::ModEntry],
         loader: &str,
         mc_version: &str,
+        curseforge_api_key: Option<&str>,
     ) -> crate::models::CompatibilityResult {
         use crate::models::DependencyType;
         let mut issues = Vec::new();
@@ -450,7 +486,7 @@ impl ModIntelligence {
 
         let mod_ids: Vec<String> = mods.iter().map(|m| m.mod_id.clone()).collect();
         eprintln!("[ModCanvas] check_compatibility_async: {} mods, loader={}, mc={}", mod_ids.len(), loader, mc_version);
-        let metadata_list = self.batch_get_metadata(&mod_ids, loader, mc_version).await;
+        let metadata_list = self.batch_get_metadata(&mod_ids, loader, mc_version, curseforge_api_key).await;
         eprintln!("[ModCanvas] Got metadata for {}/{} mods", metadata_list.len(), mod_ids.len());
         for m in &metadata_list {
             eprintln!("[ModCanvas]   {} (id={}, deps={})", m.name, m.mod_id, m.dependencies.len());
@@ -481,7 +517,7 @@ impl ModIntelligence {
         if !missing_dep_ids.is_empty() {
             let missing_ids: Vec<String> = missing_dep_ids.into_iter().collect();
             eprintln!("[ModCanvas] Fetching metadata for {} missing dep IDs: {:?}", missing_ids.len(), missing_ids);
-            let missing_metadata = self.batch_get_metadata(&missing_ids, loader, mc_version).await;
+            let missing_metadata = self.batch_get_metadata(&missing_ids, loader, mc_version, curseforge_api_key).await;
             for (i, meta) in missing_metadata.iter().enumerate() {
                 eprintln!("[ModCanvas] Resolved dep: '{}' (slug={}, id={})", meta.name, meta.slug, missing_ids.get(i).unwrap_or(&String::new()));
                 metadata_map.insert(meta.slug.clone(), meta.clone());

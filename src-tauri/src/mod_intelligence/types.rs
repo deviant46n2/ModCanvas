@@ -5,6 +5,9 @@ use crate::models::{DependencyType, ModDependency, ModLoader};
 pub(crate) const MODRINTH_API: &str = "https://api.modrinth.com/v2";
 pub(crate) const CURSEFORGE_API: &str = "https://api.curseforge.com/v1";
 pub(crate) const CURSEFORGE_CDN: &str = "https://mediafilez.forgecdn.net/files";
+/// Minecraft's game id on CurseForge. `/mods/search` rejects requests that
+/// omit `gameId`, so every search must pass it.
+pub(crate) const CURSEFORGE_MINECRAFT_GAME_ID: u32 = 432;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ModrinthSearchResult {

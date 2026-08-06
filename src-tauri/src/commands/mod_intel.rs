@@ -6,6 +6,8 @@ use crate::db::Database;
 use crate::mod_intelligence::ModIntelligence;
 use crate::models::*;
 
+use super::resolve_curseforge_api_key;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SearchResult {
     pub id: String,
@@ -145,7 +147,10 @@ pub async fn get_project_mod_metadata(
     let loader_str = project.mod_loader.to_string();
     let mod_ids: Vec<String> = mods.iter().map(|m| m.mod_id.clone()).collect();
 
-    Ok(intelligence.batch_get_metadata(&mod_ids, &loader_str, &project.minecraft_version).await)
+    let cf_api_key = resolve_curseforge_api_key(&db)?;
+    Ok(intelligence
+        .batch_get_metadata(&mod_ids, &loader_str, &project.minecraft_version, cf_api_key.as_deref())
+        .await)
 }
 
 #[tauri::command]
@@ -163,7 +168,10 @@ pub async fn check_compatibility_async(
         .ok_or_else(|| "Project not found".to_string())?;
 
     let loader_str = project.mod_loader.to_string();
-    Ok(intelligence.check_compatibility_async(&mods, &loader_str, &project.minecraft_version).await)
+    let cf_api_key = resolve_curseforge_api_key(&db)?;
+    Ok(intelligence
+        .check_compatibility_async(&mods, &loader_str, &project.minecraft_version, cf_api_key.as_deref())
+        .await)
 }
 
 #[tauri::command]

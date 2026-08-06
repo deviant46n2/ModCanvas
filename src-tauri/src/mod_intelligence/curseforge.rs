@@ -54,8 +54,21 @@ impl ModIntelligence {
         project_id: u64,
         api_key: &str,
     ) -> anyhow::Result<ModMetadata> {
+        Self::fetch_curseforge_metadata_static(&self.client, project_id, api_key).await
+    }
+
+    /// Static variant of `get_curseforge_mod_metadata` usable from spawned
+    /// batch tasks that only hold a `&Client`.
+    ///
+    /// The returned `mod_id` is the raw numeric CurseForge project id. Callers
+    /// that need to match DB rows keyed as `curseforge:{id}` must re-prefix it.
+    pub(crate) async fn fetch_curseforge_metadata_static(
+        client: &reqwest::Client,
+        project_id: u64,
+        api_key: &str,
+    ) -> anyhow::Result<ModMetadata> {
         let url = format!("{}/mods/{}", CURSEFORGE_API, project_id);
-        let resp = self.client.get(&url)
+        let resp = client.get(&url)
             .header("x-api-key", api_key)
             .header("Accept", "application/json")
             .send()
@@ -169,7 +182,14 @@ impl ModIntelligence {
         query: &str,
         api_key: &str,
     ) -> anyhow::Result<Vec<ModMetadata>> {
-        let url = format!("{}/mods/search?searchFilter={}", CURSEFORGE_API, urlencoding::encode(query));
+        // gameId is required by the API; classId=6 scopes to mods (without it
+        // the search returns modpacks and other project types).
+        let url = format!(
+            "{}/mods/search?gameId={}&classId=6&searchFilter={}",
+            CURSEFORGE_API,
+            CURSEFORGE_MINECRAFT_GAME_ID,
+            urlencoding::encode(query)
+        );
         let resp = self.client.get(&url)
             .header("x-api-key", api_key)
             .header("Accept", "application/json")
@@ -219,8 +239,9 @@ impl ModIntelligence {
         loader: Option<&str>,
     ) -> anyhow::Result<Vec<ModpackMetadata>> {
         let mut url = format!(
-            "{}/mods/search?classId=4471&searchFilter={}",
+            "{}/mods/search?gameId={}&classId=4471&searchFilter={}",
             CURSEFORGE_API,
+            CURSEFORGE_MINECRAFT_GAME_ID,
             urlencoding::encode(query)
         );
         
