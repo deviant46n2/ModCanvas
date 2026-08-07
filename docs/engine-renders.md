@@ -32,7 +32,7 @@ no longer depends on it — it silently drops Rust→webview events on some
 Linux/WebKitGTK stacks (evals from async commands never run).
 
 Batches are capped (`engine-render.ts` sends ≤32 per request) and the game
-renders **4 items per client tick** (`ItemRenderQueue.PER_TICK`) so a large
+renders **16 items per client tick** (`ItemRenderQueue.PER_TICK`) so a large
 batch never freezes a frame; the result is sent as one reply when the queue
 drains.
 
@@ -41,17 +41,35 @@ drains.
 - `workbench-companion-neoforge-1.21/…/client/ItemIconRenderer.java` — the
   actual renderer. On the render thread it:
   1. Mirrors the game's GUI projection exactly (ortho over the target +
-     model-view Z translate `10000 - getGuiFarPlane()` — an identity model-view
-     would clip every item out of the depth range).
-  2. Binds a 64×64 `TextureTarget` (transparent clear), then renders each item
-     via `GuiGraphics.renderItem(stack, -8, -8)` inside a pre-scaled pose (GUI
-     glyph scaled to ~90% of the tile).
-  3. Reads the framebuffer back with `NativeImage.downloadTexture`, flips rows
-     (GL is bottom-up), PNG-encodes (`asByteArray`) and base64-encodes it.
-  4. Restores all GL state (projection, model-view, main framebuffer).
-- `ItemRenderQueue.java` — per-tick throttling + result accumulation.
+     model-view Z translate `10000 - getGuiFarPlane()`; the translate must land
+     geometry in **negative** view-z — the near/far are distances in front of
+     the camera, and positive z is behind it, where every draw clips silently).
+  2. Binds a 64×64 `TextureTarget` (transparent clear), then for each item:
+     collects the model's baked quads (**all 6 directions + null, seed 42** —
+     cube quads are filed by direction, so a null-only query returns nothing
+     for blocks), measures the **projected** bounds through the GUI display
+     transform, and builds a pose that fits those bounds to ~90% of the tile
+     (model spaces vary: 0..16 blocks to 0..1 custom items, and display
+     transforms rotate — the fit must measure post-transform geometry).
+  3. Draws the quads directly (Tesselator + `position_tex` + the block atlas,
+     UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's deferred
+     shader binds never apply in the offscreen tick context. Depth testing is
+     left on so cube faces occlude correctly.
+  4. Reads the framebuffer back with `NativeImage.downloadTexture` (already
+     upright — **no row flip**; a flip inverts every icon), PNG-encodes
+     (`asByteArray`) and base64-encodes it.
+  5. Restores GL state (projection, model-view, main framebuffer).
+- `ItemRenderQueue.java` — per-tick throttling (16/tick) + retry-on-failure:
+  early renders hit un-baked models, so failed items re-queue up to
+  `MAX_ATTEMPTS` (3) before being dropped; result accumulation.
 - `WorkbenchEventHandler.java` — handles `RENDER_ITEMS_REQUEST` (works from the
   main menu too; only reload commands require a player).
+
+Known limits: items whose models never bake (e.g. broken wall-model JSONs in
+some packs) fail permanently and are dropped after the retry cap; models with
+no baked quads at all (custom-renderer blocks) render blank. Rendered icons
+sample the atlas at mip 0 but magnify the 16px sprite to ~58px, so fidelity is
+lower than native flat sprites (supersampling is a pending quality fix).
 
 Build: `cd workbench-companion-neoforge-1.21 && ./gradlew build` →
 `build/libs/workbench-companion-1.0.0.jar`. The app deploys that jar to the
