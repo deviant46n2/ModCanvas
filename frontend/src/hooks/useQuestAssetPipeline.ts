@@ -147,6 +147,9 @@ export function useQuestAssetPipeline({
   const [items, setItems] = useState<ItemRegistryEntry[]>([])
   const prefetchedFor = useRef<string | null>(null)
   const runtimeRequestedRef = useRef<string | null>(null)
+  // Debounced engine-render persist buffer (see the subscribeEngineRenders
+  // handler): results accumulate here and hit the disk on the flush interval.
+  const pendingRendersRef = useRef<Record<string, string>>({})
   useEffect(() => {
     if (!packLoaded || !graph || !graph.chapters.length) return
     if (!instancePath) return
@@ -203,13 +206,35 @@ export function useQuestAssetPipeline({
       setTextureIndex((prev) => mergeIndex(prev, rendered))
       setItems((prev) => withItemTextures(prev, rendered))
       if (instancePath) {
-        persistEngineRenders(instancePath, rendered).catch((e) => console.error('[QuestBookEditor] persistEngineRenders failed:', e))
+        // Debounced disk persist: save_engine_renders_cmd rewrites the WHOLE
+        // cache file per call, so persisting per 256-icon batch would make the
+        // write grow with the drain (O(cache) per batch) and eventually gate
+        // the rate. Live injection above is immediate; only the disk copy lags
+        // by up to the flush interval. Flushed on the interval and on cleanup.
+        if (!pendingRendersRef.current) pendingRendersRef.current = {}
+        Object.assign(pendingRendersRef.current, rendered)
       }
     })
+    const flushInterval = window.setInterval(() => {
+      const pending = pendingRendersRef.current
+      if (!pending || Object.keys(pending).length === 0) return
+      pendingRendersRef.current = {}
+      persistEngineRenders(instancePath, pending).catch((e) => {
+        console.error('[QuestBookEditor] persistEngineRenders failed:', e)
+        // Re-buffer so the next interval retries rather than losing the icons.
+        Object.assign(pendingRendersRef.current, pending)
+      })
+    }, 4000)
 
     return () => {
       disposed = true
       if (pollTimer) clearInterval(pollTimer)
+      window.clearInterval(flushInterval)
+      const pending = pendingRendersRef.current
+      if (pending && Object.keys(pending).length > 0) {
+        pendingRendersRef.current = {}
+        persistEngineRenders(instancePath, pending).catch(() => {})
+      }
       unsubRenders()
     }
   }, [instancePath, wsConnected])
