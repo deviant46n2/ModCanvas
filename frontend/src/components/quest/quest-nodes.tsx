@@ -9,8 +9,8 @@ import { bakeShapeTile } from '../../services/shape-textures';
 import { SmartFilterIcon } from './SmartFilterIcon';
 
 // Fallback shape plate (only when the instance's real shape textures are not
-// available): a neutral grey instead of the editor's accent blue.
-const SHAPE_PLATE_GREY = 'rgba(96, 106, 120, 0.55)';
+// available): a dark tile like the in-game quest book's, instead of a light one.
+const SHAPE_PLATE_GREY = 'rgba(45, 50, 60, 0.85)';
 const SHAPE_OUTLINE_GREY = '#9aa3b2';
 
 const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: NodeProps) {
@@ -35,8 +35,10 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const nodeWidth = pixelSize?.width || 180;
   const nodeHeight = pixelSize?.height || 120;
   // FTB shape tiles are always square, so size the tile off the node's smaller
-  // dimension regardless of the node box.
-  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 0.8));
+  // dimension regardless of the node box. 0.95 fills the tile like the in-game
+  // quest book (where the shape IS the tile), leaving a hair for the outline;
+  // 0.8 rendered the shape visibly small next to its node.
+  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 0.95));
   // In-game the quest icon renders at 2/3 of the quest tile's size, scaled by
   // the quest's `icon_scale` (editor range 0.1 – 2.0). The shape is the
   // editor's tile analog, so size the icon to 2/3 of it, applying the same
@@ -151,8 +153,8 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
       <Handle type="target" position={Position.Bottom} className="ftb-node-handle" id="b" />
       <div className={`ftb-quest-shape-wrap shape-${shape}${hasShapeTextures ? ' has-texture' : ''}`} style={{
         ['--shape-color' as string]: fallbackColor,
-        backgroundColor: hasShapeTextures ? 'transparent' : (hasQuestColor ? `${questColor}22` : SHAPE_PLATE_GREY),
-        borderColor: hasBorderTexture ? undefined : fallbackColor,
+        backgroundColor: shape === 'none' || hasShapeTextures ? 'transparent' : (hasQuestColor ? `${questColor}22` : SHAPE_PLATE_GREY),
+        borderColor: hasBorderTexture || shape === 'none' ? undefined : fallbackColor,
         width: shapeSize,
         height: shapeSize,
         ...(hasBorderTexture ? borderStyle : {}),

@@ -475,6 +475,17 @@
   border-radius: 8px;
 }
 
+.shape-rsquare {
+  border-radius: 8px;
+}
+
+/* shape "none" renders no shape in-game (its textures are empty); the
+   fallback must not draw a plate/border behind the icon either. */
+.shape-none {
+  border: none;
+  background-color: transparent;
+}
+
 .shape-rounded_square {
   border-radius: 8px;
 }

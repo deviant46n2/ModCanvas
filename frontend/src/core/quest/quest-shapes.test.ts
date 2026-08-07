@@ -10,14 +10,14 @@ describe('quest-shapes texture keys', () => {
     expect(shapeFolder('heart')).toBe('heart');
   });
 
-  it('maps rounded_square and its rsquare alias to the rsquare folder', () => {
-    expect(shapeFolder('rounded_square')).toBe('rsquare');
+  it('maps rsquare and the legacy rounded_square spelling to the rsquare folder', () => {
     expect(shapeFolder('rsquare')).toBe('rsquare');
+    expect(shapeFolder('rounded_square')).toBe('rsquare');
   });
 
-  it('falls back to the circle folder for unknown/default shapes', () => {
+  it('maps none to its own (empty) folder, falling back for unknown/default shapes', () => {
+    expect(shapeFolder('none')).toBe('none');
     expect(shapeFolder('default')).toBe('circle');
-    expect(shapeFolder('none')).toBe('circle');
     expect(shapeFolder('')).toBe('circle');
     expect(shapeFolder('bogus')).toBe('circle');
   });

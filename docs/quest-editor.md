@@ -125,8 +125,20 @@ Assets").
 
 1. **Keys, not copies** — `frontend/src/core/quest/quest-shapes.ts` (pure, unit-tested)
    maps each canonical shape to its texture-index keys
-   (`ftbquests:textures/shapes/<folder>/{background,outline,shape}.png`; `rounded_square`
-   maps to the `rsquare` on-disk folder, anything unknown falls back to `circle`).
+   (`ftbquests:textures/shapes/<folder>/{background,outline,shape}.png`; anything
+   unknown falls back to `circle`). The canonical keys ARE the FTB 1.21 shape
+   ids (verified against the mod's bytecode + lang: `circle, square, rsquare,
+   diamond, pentagon, hexagon, octagon, heart, gear, none` — `circle` is the
+   fallback, `rsquare` is the real key for a rounded square, and `none`'s
+   textures are empty so it renders no shape). The legacy spellings
+   `rounded_square`/`rounded`/`roundedsquare` are NOT shapes in FTB 1.21 — the
+   game resolves them to `circle` via `MAP.getOrDefault(id, defaultShape)` — so
+   `normalizeShape` renders them as circle too (fidelity: editor == game). The
+   Rust model mirrors this (`QuestShape`): `rsquare` round-trips as `rsquare`
+   (an old export bug rewrote it to `rounded_square`, flipping in-game rounded
+   squares to circles — the pack-level corruption is why the pristine baseline
+   git repo in the instance exists), and the legacy spellings are preserved
+   verbatim as `LegacyRoundedSquare` so a save never rewrites the pack's data.
 2. **Materialization** — `collectNeededTargets` (`texture-loader.ts`) includes the
    shape keys of every visible node, so they flow through the same
    `requestMaterialize` → `get_texture_files` batch pipeline as item icons.
@@ -134,9 +146,12 @@ Assets").
    `textureIndex` via `textureDisplayUrl` (usable index value, else the
    `getMaterialized` data URL) and passes the URLs to `quest-nodes.tsx`. When all
    layers resolve, `bakeShapeTile` (`shape-textures.ts`) rasterizes the whole
-   tile **once into a single square PNG at the node's display size**: the white
-   `background.png` silhouette is re-filled to a neutral grey via a `source-in`
-   canvas fill (the editor's grey quest background), then `outline.png` is
+   tile **once into a single square PNG at the node's display size** (0.95 of
+   the node's smaller dimension — matching the game, where the shape IS the
+   tile; 0.8 rendered it visibly small): the white
+   `background.png` silhouette is re-filled to a dark tile via a `source-in`
+   canvas fill (the editor's dark quest background, matching the game's dark
+   tiles), then `outline.png` is
    composited on top at ~58% opacity — FTB's `quest_not_started_color` is white
    at 58% alpha. Quests with an explicit `color` have the outline tinted to that
    color first (`tintTexture`, exact hex via `source-in`). The resulting `<img>`

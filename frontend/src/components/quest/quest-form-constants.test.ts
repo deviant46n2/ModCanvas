@@ -62,9 +62,18 @@ describe('setQuestScale', () => {
 });
 
 describe('normalizeShape', () => {
-  it('canonicalizes legacy aliases', () => {
-    expect(normalizeShape('rsquare')).toBe('rounded_square');
-    expect(normalizeShape('rounded')).toBe('rounded_square');
+  it('keeps the real FTB key rsquare as the rounded square', () => {
+    expect(normalizeShape('rsquare')).toBe('rsquare');
+  });
+
+  it('renders legacy wrong-key spellings as circle (FTB getOrDefault parity)', () => {
+    expect(normalizeShape('rounded_square')).toBe('circle');
+    expect(normalizeShape('rounded')).toBe('circle');
+    expect(normalizeShape('roundedsquare')).toBe('circle');
+  });
+
+  it('keeps none as none (renders no shape, matching the game)', () => {
+    expect(normalizeShape('none')).toBe('none');
   });
 
   it('defaults empty values to circle', () => {

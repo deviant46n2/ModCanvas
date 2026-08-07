@@ -114,7 +114,7 @@ export class AssetCacheManager {
       || null;
 
     const nodeBorders: Record<string, NodeBorderSpec> = {};
-    const borderShapes = ['circle', 'square', 'hexagon', 'diamond', 'rounded_square', 'gear', 'heart', 'octagon', 'pentagon'];
+    const borderShapes = ['circle', 'square', 'hexagon', 'diamond', 'rsquare', 'gear', 'heart', 'octagon', 'pentagon'];
     for (const shape of borderShapes) {
       const key = `ui_border_${shape}`;
       const borderImg = manifest.ui[key] || manifest.ui[`border_${shape}.png`] || null;

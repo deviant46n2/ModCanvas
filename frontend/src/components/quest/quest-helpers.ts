@@ -8,7 +8,7 @@ export const SHAPES = [
   { value: 'default', label: 'Default' },
   { value: 'circle', label: 'Circle' },
   { value: 'square', label: 'Square' },
-  { value: 'rounded_square', label: 'Rounded Square' },
+  { value: 'rsquare', label: 'Rounded Square' },
   { value: 'diamond', label: 'Diamond' },
   { value: 'pentagon', label: 'Pentagon' },
   { value: 'hexagon', label: 'Hexagon' },

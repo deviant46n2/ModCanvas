@@ -34,7 +34,7 @@ export const BOOK_THEME_PRESETS: BookThemePreset[] = [
     questColor: '#34d399',
     edgeColor: '#6ee7b7',
     cycleColor: '#f87171',
-    defaultShape: 'rounded_square',
+    defaultShape: 'rsquare',
     defaultSize: { width: 24, height: 24 },
   },
   {

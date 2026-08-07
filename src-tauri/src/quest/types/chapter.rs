@@ -90,7 +90,18 @@ pub enum QuestShape {
     Default,
     Circle,
     Square,
+    /// The real FTB shape key for a rounded square ("rsquare", lang label
+    /// "Rounded Square"). Verified against FTB Quests 1.21 bytecode:
+    /// `QuestShape.reload` registers circle, square, rsquare, theme extras, none.
+    #[serde(rename = "rsquare")]
     RoundedSquare,
+    /// Legacy/wrong-key spellings ("rounded_square", "rounded", "roundedsquare")
+    /// that are NOT shapes in FTB 1.21 — the game resolves them to its default
+    /// (circle) via `MAP.getOrDefault(id, defaultShape)`. Kept as a distinct
+    /// variant so export writes the ORIGINAL string back: rewriting it to
+    /// "rsquare" would flip the in-game rendering from circle to rounded square.
+    #[serde(rename = "rounded_square")]
+    LegacyRoundedSquare,
     Diamond,
     Pentagon,
     Hexagon,
@@ -105,7 +116,8 @@ impl QuestShape {
             QuestShape::Default => "default".to_string(),
             QuestShape::Circle => "circle".to_string(),
             QuestShape::Square => "square".to_string(),
-            QuestShape::RoundedSquare => "rounded_square".to_string(),
+            QuestShape::RoundedSquare => "rsquare".to_string(),
+            QuestShape::LegacyRoundedSquare => "rounded_square".to_string(),
             QuestShape::Diamond => "diamond".to_string(),
             QuestShape::Pentagon => "pentagon".to_string(),
             QuestShape::Hexagon => "hexagon".to_string(),
@@ -119,7 +131,8 @@ impl QuestShape {
         match s.to_lowercase().as_str() {
             "circle" => QuestShape::Circle,
             "square" => QuestShape::Square,
-            "rounded_square" | "rounded" | "rsquare" | "roundedsquare" => QuestShape::RoundedSquare,
+            "rsquare" => QuestShape::RoundedSquare,
+            "rounded_square" | "rounded" | "roundedsquare" => QuestShape::LegacyRoundedSquare,
             "diamond" => QuestShape::Diamond,
             "pentagon" => QuestShape::Pentagon,
             "hexagon" => QuestShape::Hexagon,
@@ -233,7 +246,7 @@ mod quest_shape_tests {
     fn parses_modern_ftb_shape_ids() {
         assert_eq!(QuestShape::from_string("circle"), QuestShape::Circle);
         assert_eq!(QuestShape::from_string("square"), QuestShape::Square);
-        assert_eq!(QuestShape::from_string("rounded_square"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::from_string("rsquare"), QuestShape::RoundedSquare);
         assert_eq!(QuestShape::from_string("diamond"), QuestShape::Diamond);
         assert_eq!(QuestShape::from_string("pentagon"), QuestShape::Pentagon);
         assert_eq!(QuestShape::from_string("hexagon"), QuestShape::Hexagon);
@@ -244,10 +257,16 @@ mod quest_shape_tests {
 
     #[test]
     fn parses_legacy_shape_aliases() {
-        assert_eq!(QuestShape::from_string("rsquare"), QuestShape::RoundedSquare);
-        assert_eq!(QuestShape::from_string("roundedsquare"), QuestShape::RoundedSquare);
-        assert_eq!(QuestShape::from_string("rounded"), QuestShape::RoundedSquare);
+        // The real key round-trips as itself.
         assert_eq!(QuestShape::from_string("RSQUARE"), QuestShape::RoundedSquare);
+        assert_eq!(QuestShape::RoundedSquare.to_string(), "rsquare");
+        // The wrong-key spellings are preserved verbatim on export so a save
+        // never flips the pack's in-game rendering (circle) to a rounded square.
+        assert_eq!(QuestShape::from_string("rounded_square"), QuestShape::LegacyRoundedSquare);
+        assert_eq!(QuestShape::LegacyRoundedSquare.to_string(), "rounded_square");
+        assert_eq!(QuestShape::from_string("roundedsquare"), QuestShape::LegacyRoundedSquare);
+        assert_eq!(QuestShape::from_string("rounded"), QuestShape::LegacyRoundedSquare);
+        assert_eq!(QuestShape::from_string("rounded_square").to_string(), "rounded_square");
     }
 
     #[test]

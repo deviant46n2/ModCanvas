@@ -115,8 +115,9 @@ describe('texture-loader helpers', () => {
     const graph = {
       chapters: [{ id: 'c1', icon: '', background_image: '', images: [] }],
       nodes: [
-        { id: 'n1', chapter_id: 'c1', shape: 'rounded_square', icon: '', objectives: [], rewards: [] },
+        { id: 'n1', chapter_id: 'c1', shape: 'rsquare', icon: '', objectives: [], rewards: [] },
         { id: 'n2', chapter_id: 'c1', shape: 'gear', icon: '', objectives: [], rewards: [] },
+        { id: 'n3', chapter_id: 'c1', shape: 'rounded_square', icon: '', objectives: [], rewards: [] },
       ],
     } as unknown as QuestGraphData;
 
@@ -131,6 +132,10 @@ describe('texture-loader helpers', () => {
         'ftbquests:textures/shapes/gear/shape.png',
       ]),
     );
+    // The legacy wrong-key spelling renders as circle in-game, so the editor
+    // must collect the circle textures for it too (fidelity with the game).
+    expect(targets).toContain('ftbquests:textures/shapes/circle/background.png');
+    expect(targets).toContain('ftbquests:textures/shapes/circle/outline.png');
   });
 });
 

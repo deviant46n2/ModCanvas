@@ -89,7 +89,7 @@ export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
           smartFilter,
           textureIndex,
           pixelSize,
-          shapeTextures: getShapeTextures(node.shape || 'square', textureIndex || {}),
+          shapeTextures: getShapeTextures(node.shape, textureIndex || {}),
           simStatus: simMode ? simStatusById[node.id] : undefined,
           simComplete: simMode ? simProgress[node.id] === 'complete' : false,
           searchStatus: searchActive ? (searchMatchIds?.has(node.id) ? 'match' : 'dim') : undefined,

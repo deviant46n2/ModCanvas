@@ -12,7 +12,7 @@ export const SHAPES = [
   { value: 'default', label: 'Default' },
   { value: 'circle', label: 'Circle' },
   { value: 'square', label: 'Square' },
-  { value: 'rounded_square', label: 'Rounded Square' },
+  { value: 'rsquare', label: 'Rounded Square' },
   { value: 'diamond', label: 'Diamond' },
   { value: 'pentagon', label: 'Pentagon' },
   { value: 'hexagon', label: 'Hexagon' },
@@ -21,16 +21,10 @@ export const SHAPES = [
   { value: 'gear', label: 'Gear' },
 ]
 
-// Canonicalize any shape string (old/new FTB dialects, empty, default) to the
-// frontend's canonical shape keys: circle, square, rounded_square, diamond,
-// pentagon, hexagon, octagon, heart, gear. FTB's built-in default shape is
-// "circle" (QuestShape.DEF_SHAPE), so empty/"default" resolve to circle.
-export function normalizeShape(shape?: string | null): string {
-  const s = (shape || '').trim().toLowerCase()
-  if (!s || s === 'default' || s === 'none') return 'circle'
-  if (s === 'rsquare' || s === 'rounded' || s === 'roundedsquare') return 'rounded_square'
-  return s
-}
+// Shape semantics live in core/quest/quest-shapes.ts (normalizeShape +
+// folder mapping). Re-exported here so components importing from this file
+// keep working — never redefine shape logic in two places.
+export { normalizeShape } from '../../core/quest/quest-shapes';
 
 // FTB Quests stores node size in grid units where a 1.0x node is 24x24 units.
 // `questScaleFromSize` returns the uniform multiplier for a given size (useful
