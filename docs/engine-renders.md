@@ -54,7 +54,10 @@ drains.
   3. Draws the quads directly (Tesselator + `position_tex` + the block atlas,
      UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's deferred
      shader binds never apply in the offscreen tick context. Depth testing is
-     left on so cube faces occlude correctly.
+     left on so cube faces occlude correctly. The atlas's mipmapped filters
+     are overridden to mip-0 `GL_LINEAR` before the batch (captures are pure
+     magnification, so mip sampling can only upscale a downsampled sprite =
+     blur) and restored in `finally` so the game world's sampling is untouched.
   4. Reads the framebuffer back with `NativeImage.downloadTexture` (already
      upright — **no row flip**; a flip inverts every icon), PNG-encodes
      (`asByteArray`) and base64-encodes it.
@@ -68,8 +71,9 @@ drains.
 Known limits: items whose models never bake (e.g. broken wall-model JSONs in
 some packs) fail permanently and are dropped after the retry cap; models with
 no baked quads at all (custom-renderer blocks) render blank. Rendered icons
-sample the atlas at mip 0 but magnify the 16px sprite to ~58px, so fidelity is
-lower than native flat sprites (supersampling is a pending quality fix).
+magnify a 16px sprite to ~58px with mip-0 bilinear sampling — fidelity is
+close to the game's GUI but not pixel-identical; supersampling (render at 2x,
+downscale) is a pending sharpness fix beyond bilinear magnification.
 
 Build: `cd workbench-companion-neoforge-1.21 && ./gradlew build` →
 `build/libs/workbench-companion-1.0.0.jar`. The app deploys that jar to the

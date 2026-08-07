@@ -16,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -28,6 +29,7 @@ import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +89,12 @@ public final class ItemIconRenderer {
         Lighting.setupFor3DItems();
 
         RenderTarget target = null;
+        // Declared at method scope: the finally block restores the filters and
+        // needs these outside the try.
+        int[] savedMinFilter = new int[1];
+        int[] savedMagFilter = new int[1];
+        boolean filterOverridden = false;
+        TextureAtlas blockAtlas = mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS);
         try {
             target = new TextureTarget(size, size, true, Minecraft.ON_OSX);
             target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
@@ -95,6 +103,19 @@ public final class ItemIconRenderer {
             // clear() ends with unbindWrite — re-bind the FBO so draws land in
             // the target, not the main window.
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, target.frameBufferId);
+
+            // The block atlas is mipmapped and filtered for IN-WORLD
+            // minification (smoothing distant terrain). Icon capture is pure
+            // magnification — a 16px sprite stretched over a ~58px FBO — where
+            // mipmap sampling can only corrupt the pixels: when the LOD lands
+            // on mip 1-2 the GPU upscales a downsampled sprite (blur). Force
+            // mip-0 bilinear for the capture, restore the game's filters after.
+            RenderSystem.setShaderTexture(0, blockAtlas.getId());
+            GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter);
+            GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, savedMagFilter);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            filterOverridden = true;
 
             int rendered = 0;
             for (String id : itemIds) {
@@ -133,6 +154,11 @@ public final class ItemIconRenderer {
         } catch (Throwable t) {
             LOGGER.error("[ItemIconRenderer] Render pass failed", t);
         } finally {
+            if (filterOverridden) {
+                RenderSystem.setShaderTexture(0, blockAtlas.getId());
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter[0]);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, savedMagFilter[0]);
+            }
             if (target != null) {
                 target.unbindWrite();
                 target.destroyBuffers();
