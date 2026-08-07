@@ -134,11 +134,20 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
 
   // 1. Plate: the silhouette filled with a radial gradient — DARK charcoal at
   //    the center, LIGHTER toward the border (the game's edge-in gradient,
-  //    vision-verified). The texture's own alpha falloff (0.99 center → 0.32
-  //    corners) keeps the center solid; the outline (step 2) carries the
-  //    light border.
+  //    vision-verified). Quests with an explicit color get the quest color as
+  //    the center fill at ~55% alpha — the game tints the whole shape with
+  //    the quest color, which is why some quests' tiles read lighter in the
+  //    center than others (verified: the pack stores `color:` as a decimal
+  //    int, e.g. 16755200 = #ffa200; 21 quests have it). The texture's own
+  //    alpha falloff (0.99 center → 0.32 corners) keeps the center solid; the
+  //    outline (step 2) carries the light border.
+  let center = PLATE_CENTER
+  if (input.color) {
+    const rgb = parseHexColor(input.color)
+    if (rgb) center = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.55)`
+  }
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.12, size / 2, size / 2, size * 0.75)
-  grad.addColorStop(0, PLATE_CENTER)
+  grad.addColorStop(0, center)
   grad.addColorStop(0.72, PLATE_MID)
   grad.addColorStop(1, PLATE_EDGE)
   ctx.drawImage(bgImg, 0, 0, size, size)
