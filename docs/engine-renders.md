@@ -59,10 +59,13 @@ when the queue drains.
      interfere.
   3. Draws the quads directly (Tesselator + `position_tex_color` + the block
      atlas, UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's
-     deferred shader binds never apply in the offscreen tick context. The
-     vertex color (int 3) carries the per-face directional shade, so cube
-     faces read lit like in-game (a plain `position_tex` render is flat).
-     Block tints (grass/leaves) are applied at render time via
+     deferred shader binds never apply in the offscreen tick context. Vanilla
+     bakes block quads with WHITE vertex colors — the face shade is applied
+     in-game by the entity shaders from quad NORMALS, which this pipeline has
+     no access to — so the per-face directional shade (up 1.0, sides 0.6/0.8,
+     down 0.5) is derived from the packed normal (int 8) and multiplied into
+     the color, replicating the classic lit-cube look. Block tints
+     (grass/leaves) are applied at render time via
      `BlockColors.getColor(state, null, null, tintIndex)` — the world-less
      default color, matching the quest book. Depth testing is left on so cube
      faces occlude correctly. The atlas's mipmapped filters are overridden to

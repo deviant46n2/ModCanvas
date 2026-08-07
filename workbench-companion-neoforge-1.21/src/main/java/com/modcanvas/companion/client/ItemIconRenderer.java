@@ -333,6 +333,14 @@ public final class ItemIconRenderer {
         BlockState tintState = stack.getItem() instanceof BlockItem
             ? Block.byItem(stack.getItem()).defaultBlockState()
             : null;
+        // Per-face directional shade: vanilla bakes block quads with WHITE
+        // vertex colors — the face shade is NOT in the quads. The game applies
+        // it in the entity shaders from the quad NORMALS (Light0/Light1
+        // uniforms), which position_tex_color has no access to. Replicate the
+        // classic block look here: multiply by the direction's shade (up 1.0,
+        // sides 0.6/0.8, down 0.5) derived from the packed normal. Flat item
+        // models (non-blocks) keep full brightness, like the game.
+        boolean shaded = stack.getItem() instanceof BlockItem;
         for (BakedQuad quad : quads) {
             int[] verts = quad.getVertices();
             int tintIndex = quad.getTintIndex();
@@ -344,17 +352,18 @@ public final class ItemIconRenderer {
                 tg = (tint >> 8 & 0xFF) / 255.0F;
                 tb = (tint & 0xFF) / 255.0F;
             }
+            float shade = shaded ? blockShade(directionOfNormal(verts)) : 1.0F;
             for (int i = 0; i < 4; i++) {
                 int o = stride * i;
                 float x = Float.intBitsToFloat(verts[o]);
                 float y = Float.intBitsToFloat(verts[o + 1]);
                 float z = Float.intBitsToFloat(verts[o + 2]);
-                // Vertex color int is 0xAABBGGRR; multiply RGB by the tint.
+                // Vertex color int is 0xAABBGGRR; multiply RGB by tint × shade.
                 int color = verts[o + 3];
                 int a = color >>> 24;
-                int nr = (int) ((color & 0xFF) * tr);
-                int ng = (int) ((color >> 8 & 0xFF) * tg);
-                int nb = (int) ((color >> 16 & 0xFF) * tb);
+                int nr = (int) ((color & 0xFF) * tr * shade);
+                int ng = (int) ((color >> 8 & 0xFF) * tg * shade);
+                int nb = (int) ((color >> 16 & 0xFF) * tb * shade);
                 float u = Float.intBitsToFloat(verts[o + 4]);
                 float v = Float.intBitsToFloat(verts[o + 5]);
                 vb.addVertex(pose, x, y, z)
@@ -365,6 +374,31 @@ public final class ItemIconRenderer {
         BufferUploader.drawWithShader(vb.build());
         mvStack.popMatrix();
         RenderSystem.applyModelViewMatrix();
+    }
+
+    /** Vanilla block face shade by direction (up 1.0, north/south 0.8,
+     *  west/east 0.6, down 0.5). */
+    private static float blockShade(Direction dir) {
+        return switch (dir) {
+            case DOWN -> 0.5F;
+            case UP -> 1.0F;
+            case NORTH, SOUTH -> 0.8F;
+            case WEST, EAST -> 0.6F;
+        };
+    }
+
+    /** Dominant axis of the quad's packed normal (BLOCK-format int 8: three
+     *  signed bytes) → the face direction. Zero normal → null (no shade). */
+    private static Direction directionOfNormal(int[] verts) {
+        int n = verts[8];
+        int nx = (byte) (n & 0xFF);
+        int ny = (byte) ((n >> 8) & 0xFF);
+        int nz = (byte) ((n >> 16) & 0xFF);
+        int ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+        if (ax == 0 && ay == 0 && az == 0) return null;
+        if (ax >= ay && ax >= az) return nx >= 0 ? Direction.EAST : Direction.WEST;
+        if (ay >= az) return ny >= 0 ? Direction.UP : Direction.DOWN;
+        return nz >= 0 ? Direction.SOUTH : Direction.NORTH;
     }
 
     /**
