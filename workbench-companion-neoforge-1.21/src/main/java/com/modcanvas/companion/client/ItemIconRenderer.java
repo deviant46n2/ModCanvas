@@ -63,10 +63,15 @@ import java.util.List;
  */
 public final class ItemIconRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
-    // The game's GUI item lights (Lighting.setupFor3DItems → DIFFUSE_LIGHT_0/1,
-    // verified in the vanilla bytecode + light.glsl).
-    private static final Vector3f GUI_LIGHT_0 = new Vector3f(0.2F, 1.0F, -0.7F).normalize();
-    private static final Vector3f GUI_LIGHT_1 = new Vector3f(-0.2F, 1.0F, 0.7F).normalize();
+    // The game's GUI item lights: Lighting.setupFor3DItems passes
+    // DIFFUSE_LIGHT_0/1 = normalize(0.2,1,-0.7) / normalize(-0.2,1,0.7)
+    // through GlStateManager.setupGui3DDiffuseLighting, which transforms them
+    // by scaling(-1, 1.0821041, 3.2375858) × rotateYXZ(-0.3926991, 2.3561945,
+    // 0) before the per-face dot products (verified in the vanilla bytecode).
+    // That rotation is what produces the game's left≠right asymmetry. The
+    // effective directions were computed numerically:
+    private static final Vector3f GUI_LIGHT_0 = new Vector3f(-0.57995F, 0.66172F, 0.47516F);
+    private static final Vector3f GUI_LIGHT_1 = new Vector3f(0.57995F, 0.13192F, -0.80390F);
 
     /** Icon tile size ModCanvas asks for; matches the baked-icon output size. */
     public static final int DEFAULT_SIZE = 64;
@@ -391,12 +396,15 @@ public final class ItemIconRenderer {
 
     /** The game's GUI item-light factor for a baked quad, from its packed
      *  normal (BLOCK-format int 8: three signed bytes × 127). Mirrors
-     *  light.glsl's minecraft_mix_light with the setupFor3DItems lights. */
+     *  light.glsl's minecraft_mix_light with the setupGui3DDiffuseLighting
+     *  effective lights. The baked normal is negated: the quad normals read
+     *  inverted (measured — the top face got the DOWN-level light), which
+     *  matches the winding the model bakes. */
     private static float guiLightShade(int[] verts) {
         int n = verts[8];
-        float nx = (byte) (n & 0xFF) / 127.0F;
-        float ny = (byte) ((n >> 8) & 0xFF) / 127.0F;
-        float nz = (byte) ((n >> 16) & 0xFF) / 127.0F;
+        float nx = -(byte) (n & 0xFF) / 127.0F;
+        float ny = -(byte) ((n >> 8) & 0xFF) / 127.0F;
+        float nz = -(byte) ((n >> 16) & 0xFF) / 127.0F;
         float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
         float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
         return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);

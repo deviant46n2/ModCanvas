@@ -4,16 +4,16 @@ const bakeCache = new Map<string, Promise<string | null>>()
 
 // Shape backgrounds are white filled silhouettes with a radial alpha falloff
 // (measured: ~0.99 alpha at center → ~0.32 at corners). The tile matches the
-// game: a DARK GREY plate — lightest at the center, darker at the outline
-// (the game's plate is a very dark grey, not bright). The alpha falloff works
-// WITH the look: solid dark center, edges fading darker still.
-const PLATE_CENTER = 'rgba(76, 82, 92, 0.95)'
-const PLATE_MID = 'rgba(46, 51, 60, 0.95)'
-const PLATE_EDGE = 'rgba(20, 24, 30, 0.95)'
-// The game's quest outline is a VERY DARK GREY (not white) — the editor's
-// white outline was the visible divergence. Quests with an explicit color
-// tint the outline to that color instead (like the game).
-const DEFAULT_OUTLINE_COLOR = '#2a2e36'
+// game (vision-verified from an in-game screenshot): a dark charcoal radial
+// gradient, DARKER at the center (~#3E3E3E), LIGHTER toward the border
+// (~#6A6A6A), with a light-grey outline ring. Edge-in, center-out-dark.
+const PLATE_CENTER = 'rgba(62, 62, 62, 0.95)'
+const PLATE_MID = 'rgba(78, 78, 78, 0.95)'
+const PLATE_EDGE = 'rgba(96, 96, 96, 0.95)'
+// The game's outline is a LIGHT GREY (~#6A6A6A–#787878, vision-verified),
+// lighter than the center — NOT white, NOT very dark. Quests with an explicit
+// color tint the outline to that color instead (like the game).
+const DEFAULT_OUTLINE_COLOR = '#6e6e6e'
 
 export function parseHexColor(color: string): { r: number; g: number; b: number; a: number } | null {
   const m6 = /^#?([0-9a-f]{6})$/i.exec(color.trim())
@@ -132,10 +132,11 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   // the 128px source textures are downscaled to small quest tiles.
   ctx.imageSmoothingEnabled = true
 
-  // 1. Plate: the silhouette filled with a radial gradient — DARK GREY, lightest
-  //    at the center, darkest at the outline (the game's plate). The texture's
-  //    own alpha falloff (0.99 center → 0.32 corners) reinforces it: solid
-  //    center, edges fading darker still.
+  // 1. Plate: the silhouette filled with a radial gradient — DARK charcoal at
+  //    the center, LIGHTER toward the border (the game's edge-in gradient,
+  //    vision-verified). The texture's own alpha falloff (0.99 center → 0.32
+  //    corners) keeps the center solid; the outline (step 2) carries the
+  //    light border.
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.12, size / 2, size / 2, size * 0.75)
   grad.addColorStop(0, PLATE_CENTER)
   grad.addColorStop(0.72, PLATE_MID)
