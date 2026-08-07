@@ -57,13 +57,19 @@ when the queue drains.
      `glViewport` (the item-local ortho maps into the cell's pixels), with
      the depth buffer cleared once per pass — disjoint cells never
      interfere.
-  3. Draws the quads directly (Tesselator + `position_tex` + the block atlas,
-     UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's deferred
-     shader binds never apply in the offscreen tick context. Depth testing is
-     left on so cube faces occlude correctly. The atlas's mipmapped filters
-     are overridden to mip-0 `GL_LINEAR` before the batch (captures are pure
-     magnification, so mip sampling can only upscale a downsampled sprite =
-     blur) and restored in `finally` so the game world's sampling is untouched.
+  3. Draws the quads directly (Tesselator + `position_tex_color` + the block
+     atlas, UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's
+     deferred shader binds never apply in the offscreen tick context. The
+     vertex color (int 3) carries the per-face directional shade, so cube
+     faces read lit like in-game (a plain `position_tex` render is flat).
+     Block tints (grass/leaves) are applied at render time via
+     `BlockColors.getColor(state, null, null, tintIndex)` — the world-less
+     default color, matching the quest book. Depth testing is left on so cube
+     faces occlude correctly. The atlas's mipmapped filters are overridden to
+     mip-0 `GL_NEAREST` before the batch (captures are pure magnification and
+     the game's GUI samples the atlas with nearest too, so 16px sprites read
+     crisp like the quest book) and restored in `finally` so the game world's
+     sampling is untouched.
   4. Reads the whole pass back with ONE `NativeImage.downloadTexture`
      (already upright — **no row flip**; a flip inverts every icon), slices
      the cells into per-icon `NativeImage`s, PNG-encodes (`asByteArray`) and

@@ -26,6 +26,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -124,12 +127,14 @@ public final class ItemIconRenderer {
             // magnification — a 16px sprite stretched over a ~58px FBO — where
             // mipmap sampling can only corrupt the pixels: when the LOD lands
             // on mip 1-2 the GPU upscales a downsampled sprite (blur). Force
-            // mip-0 bilinear for the capture, restore the game's filters after.
+            // mip-0 NEAREST for the capture (the game's GUI samples the atlas
+            // with nearest too, so a 16px sprite reads crisp like the quest
+            // book) and restore the game's filters after.
             RenderSystem.setShaderTexture(0, blockAtlas.getId());
             GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter);
             GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, savedMagFilter);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             filterOverridden = true;
 
             // Resolve stacks up front (skipping empties) so each grid pass can
@@ -157,6 +162,7 @@ public final class ItemIconRenderer {
                 // painter's-order artifacts.
                 RenderSystem.enableDepthTest();
                 boolean anyDrawn = false;
+                long tDraw = System.nanoTime();
                 for (int i = 0; i < n; i++) {
                     int cellX = (i % GRID) * size;
                     int cellY = (i / GRID) * size;
@@ -171,6 +177,7 @@ public final class ItemIconRenderer {
                         LOGGER.warn("[ItemIconRenderer] Failed to render item {}: {}", validIds.get(start + i), t.toString());
                     }
                 }
+                long tRead0 = System.nanoTime();
                 if (!anyDrawn) {
                     continue;
                 }
@@ -182,6 +189,7 @@ public final class ItemIconRenderer {
                 RenderSystem.bindTexture(target.getColorTextureId());
                 NativeImage atlas = new NativeImage(atlasSize, atlasSize, false);
                 atlas.downloadTexture(0, false);
+                long tSlice0 = System.nanoTime();
                 for (int i = 0; i < n; i++) {
                     int cellX = (i % GRID) * size;
                     int cellY = (i / GRID) * size;
@@ -198,6 +206,12 @@ public final class ItemIconRenderer {
                     }
                 }
                 atlas.close();
+                long tEnd = System.nanoTime();
+                LOGGER.info("[ItemIconRenderer] pass {} items: draw={}ms readback+slice={}ms total={}ms",
+                    n,
+                    (tRead0 - tDraw) / 1_000_000,
+                    (tEnd - tRead0) / 1_000_000,
+                    (tEnd - tDraw) / 1_000_000);
                 target.bindWrite(false);
             }
         } catch (Throwable t) {
@@ -303,8 +317,14 @@ public final class ItemIconRenderer {
         mvStack.translation(0.0F, 0.0F, 10000.0F - farPlane);
         RenderSystem.applyModelViewMatrix();
         // Texture path: bind the block atlas and draw the quads with their
-        // UVs through position_tex.
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        // UVs AND per-face shade. Baked quads carry directional lighting in
+        // the vertex color (BLOCK-format int 3): blocks are shaded ~0.5 (down)
+        // to 1.0 (up) per face. Dropping it rendered every face full-bright —
+        // the flat "no lighting" look. position_tex_color multiplies the
+        // texture by the vertex color (the text-renderer shader) without
+        // needing the lightmap texture, which the offscreen context never
+        // binds.
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         if (RenderSystem.getShader() != null) {
             RenderSystem.getShader().apply();
         }
@@ -313,17 +333,42 @@ public final class ItemIconRenderer {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
 
         var tess = Tesselator.getInstance();
-        var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        // Block tints (grass/leaves/etc.) are applied at RENDER time, not
+        // baked: the quads carry a tintIndex and vanilla multiplies the vertex
+        // color by BlockColors. Without it, tinted blocks render their
+        // untinted atlas base — grey grass. The world-less default color
+        // (null world/pos) matches the game's GUI/quest-book rendering.
+        BlockState tintState = stack.getItem() instanceof BlockItem
+            ? Block.byItem(stack.getItem()).defaultBlockState()
+            : null;
         for (BakedQuad quad : quads) {
             int[] verts = quad.getVertices();
+            int tintIndex = quad.getTintIndex();
+            float tr = 1.0F, tg = 1.0F, tb = 1.0F;
+            if (tintIndex >= 0 && tintState != null) {
+                int tint = Minecraft.getInstance().getBlockColors()
+                    .getColor(tintState, null, null, tintIndex);
+                tr = (tint >> 16 & 0xFF) / 255.0F;
+                tg = (tint >> 8 & 0xFF) / 255.0F;
+                tb = (tint & 0xFF) / 255.0F;
+            }
             for (int i = 0; i < 4; i++) {
                 int o = stride * i;
                 float x = Float.intBitsToFloat(verts[o]);
                 float y = Float.intBitsToFloat(verts[o + 1]);
                 float z = Float.intBitsToFloat(verts[o + 2]);
+                // Vertex color int is 0xAABBGGRR; multiply RGB by the tint.
+                int color = verts[o + 3];
+                int a = color >>> 24;
+                int nr = (int) ((color & 0xFF) * tr);
+                int ng = (int) ((color >> 8 & 0xFF) * tg);
+                int nb = (int) ((color >> 16 & 0xFF) * tb);
                 float u = Float.intBitsToFloat(verts[o + 4]);
                 float v = Float.intBitsToFloat(verts[o + 5]);
-                vb.addVertex(pose, x, y, z).setUv(u, v);
+                vb.addVertex(pose, x, y, z)
+                    .setUv(u, v)
+                    .setColor(a << 24 | nb << 16 | ng << 8 | nr);
             }
         }
         BufferUploader.drawWithShader(vb.build());

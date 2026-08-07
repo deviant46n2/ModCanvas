@@ -4,7 +4,7 @@ import type { QuestNodeData, QuestEdgeData } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
 import { questIconUrl } from './questIcons';
 import { textureDisplayUrl } from '../../services/texture-loader';
-import { shapeTextureKeys, type ShapeTextures } from '../../core/quest/quest-shapes';
+import { shapeTextureKeys, effectiveShape, type ShapeTextures } from '../../core/quest/quest-shapes';
 import { normalizeShape, questSizeToPixels, snapToGridStep } from './quest-form-constants';
 import { pickEdgeHandles } from '../../core/quest/edge-geometry';
 
@@ -37,6 +37,16 @@ function getShapeTextures(
   return { background: background || '', outline: outline || '', shape: shapeUrl || '' }
 }
 
+/** Resolve the chapter default shape map (chapter id → default_quest_shape)
+ *  from the graph. Quests without an explicit shape inherit it in-game. */
+export function chapterDefaultShapes(chapters: { id: string; default_quest_shape?: string }[]): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const c of chapters) {
+    if (c.id) map[c.id] = c.default_quest_shape || ''
+  }
+  return map
+}
+
 function getNodeSize(node: QuestNodeData): { width: number; height: number } {
   return questSizeToPixels(node.size, NODE_BASE_PX)
 }
@@ -53,12 +63,16 @@ interface BuildNodesArgs {
   searchMatchIds: Set<string> | null
   renameNonce: { nodeId: string; n: number } | null
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
+  /** Chapter id → default_quest_shape. Quests without an explicit shape
+   *  inherit it in-game, so the editor must render it too. */
+  chapterDefaults?: Record<string, string>
 }
 
 export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
   const {
     nodes, filteredNodeIds, textureIndex, selectedIds, simMode, simStatusById,
     simProgress, searchActive, searchMatchIds, renameNonce, onUpdateNode,
+    chapterDefaults,
   } = args
   return nodes
     .filter((n: QuestNodeData) => filteredNodeIds.has(n.id))
@@ -89,7 +103,14 @@ export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
           smartFilter,
           textureIndex,
           pixelSize,
-          shapeTextures: getShapeTextures(node.shape, textureIndex || {}),
+          // The shape the game will render for this node: its own shape when
+          // set, else the chapter default (quests without a shape field
+          // inherit it in-game). Used for the texture bake AND the CSS class.
+          displayShape: effectiveShape(node.shape, chapterDefaults?.[node.chapter_id]),
+          shapeTextures: getShapeTextures(
+            effectiveShape(node.shape, chapterDefaults?.[node.chapter_id]),
+            textureIndex || {},
+          ),
           simStatus: simMode ? simStatusById[node.id] : undefined,
           simComplete: simMode ? simProgress[node.id] === 'complete' : false,
           searchStatus: searchActive ? (searchMatchIds?.has(node.id) ? 'match' : 'dim') : undefined,

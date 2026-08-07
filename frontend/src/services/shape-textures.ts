@@ -2,13 +2,16 @@ import { loadImage } from './sprite-sheet'
 
 const bakeCache = new Map<string, Promise<string | null>>()
 
-// Shape backgrounds are white filled silhouettes (transparent outside the
-// shape). In-game the shapes sit on the quest book's dark tiles; the editor
-// bakes a dark plate so the tile reads like the in-game book (the old light
-// grey fill made shapes look washed-out / background-less on the dark canvas).
-// The fill is baked at high alpha so the silhouette keeps a slight
-// translucency but stays clearly visible on any canvas backdrop.
-const FILL_GREY = 'rgba(45, 50, 60, 0.95)'
+// Shape backgrounds are white filled silhouettes with a radial alpha falloff
+// (measured: ~0.99 alpha at center → ~0.32 at corners). In-game the shape
+// reads as a BRIGHT body on the game's DARK quest-book plate, and the falloff
+// makes the edges darken into the plate. The bake reproduces that in two
+// passes over the same silhouette: a dark plate fill, then the shape body at
+// the game's quest_not_started_color (near-white at 58% alpha) — a bright
+// center fading into the dark plate at the edges, exactly like the book.
+const PLATE_GREY = 'rgba(28, 32, 38, 0.96)'
+// FTB's quest_not_started_color is white at 58% alpha.
+const SHAPE_BODY_OPACITY = 0.58
 // Outline at ~58% opacity, matching the in-game not-started default (near-white
 // at ~58% alpha). Explicit quest colors are tinted onto the near-white outline
 // texture first, then the 58% opacity is applied here.
@@ -129,10 +132,26 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   // the 128px source textures are downscaled to small quest tiles.
   ctx.imageSmoothingEnabled = true
 
-  // Fill: white silhouette -> grey via source-in.
+  // 1. Plate: the silhouette filled DARK — the editor's analog of the game's
+  //    dark quest-book plate behind the shape.
   ctx.drawImage(bgImg, 0, 0, size, size)
   ctx.globalCompositeOperation = 'source-in'
-  ctx.fillStyle = FILL_GREY
+  ctx.fillStyle = PLATE_GREY
+  ctx.fillRect(0, 0, size, size)
+  ctx.globalCompositeOperation = 'source-over'
+
+  // 2. Shape body: the same silhouette filled bright at the game's 58% alpha.
+  //    Its radial falloff makes the edges darken into the plate (bright
+  //    center, darker edges — the in-game look). Quests with a color tint the
+  //    body like in-game; colorless quests use the near-white default.
+  let shapeFill = `rgba(255, 255, 255, ${SHAPE_BODY_OPACITY})`
+  if (input.color) {
+    const rgb = parseHexColor(input.color)
+    if (rgb) shapeFill = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${SHAPE_BODY_OPACITY})`
+  }
+  ctx.drawImage(bgImg, 0, 0, size, size)
+  ctx.globalCompositeOperation = 'source-in'
+  ctx.fillStyle = shapeFill
   ctx.fillRect(0, 0, size, size)
   ctx.globalCompositeOperation = 'source-over'
 

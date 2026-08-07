@@ -6,7 +6,7 @@ import { subscribeEngineConnectChange } from '../../services/engine-render';
 import { NORMAL_COLOR, CYCLE_COLOR, detectCycles } from './quest-edges';
 import { computeVisibility, isLocked, type ProgressState } from '../../core/quest/progress';
 import { searchQuestNodes } from '../../core/quest/search';
-import { buildCanvasNodes, buildCanvasEdges } from './quest-canvas-model'
+import { buildCanvasNodes, buildCanvasEdges, chapterDefaultShapes } from './quest-canvas-model'
 
 interface UseQuestCanvasModelArgs {
   questGraph: QuestGraphData
@@ -127,6 +127,7 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
       searchMatchIds,
       renameNonce,
       onUpdateNode,
+      chapterDefaults: chapterDefaultShapes(questGraph.chapters),
     })
     const newEdges = buildCanvasEdges({
       edges: filteredEdges,

@@ -22,6 +22,22 @@ export function normalizeShape(shape?: string | null): string {
   return s
 }
 
+// A quest's EFFECTIVE shape: its own `shape` field when set, else the
+// chapter's `default_quest_shape`, else empty (which normalizeShape resolves
+// to circle — FTB's global default). FTB omits the shape field when a quest
+// uses the default, so in-game it inherits the chapter default — the editor
+// must render the same effective shape (fidelity: editor == game).
+export function effectiveShape(
+  shape: string | null | undefined,
+  chapterDefault: string | null | undefined,
+): string {
+  const raw = (shape || '').trim()
+  if (raw) return raw
+  const cd = (chapterDefault || '').trim()
+  if (cd && cd !== 'default') return cd
+  return ''
+}
+
 // Canonical FTB Quests shape → on-disk folder name inside the mod jar
 // (`assets/ftbquests/textures/shapes/<folder>/`). `rounded_square` lives in
 // the `rsquare` folder (matches FTB's own asset layout). `none` is a real FTB

@@ -15,7 +15,10 @@ const SHAPE_OUTLINE_GREY = '#9aa3b2';
 
 const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: NodeProps) {
   const d = data as any;
-  const shape = normalizeShape(d.shape);
+  // displayShape carries the EFFECTIVE shape (quest shape, else chapter
+  // default — quests without a shape field inherit it in-game), set by
+  // buildCanvasNodes. Fall back to the raw shape for safety.
+  const shape = normalizeShape(d.displayShape || d.shape);
   const questColor = d.color as string | undefined;
   const hasQuestColor = !!questColor;
   const label = d.label || 'Untitled Quest';

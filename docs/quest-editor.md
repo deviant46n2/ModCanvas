@@ -139,6 +139,12 @@ Assets").
    squares to circles — the pack-level corruption is why the pristine baseline
    git repo in the instance exists), and the legacy spellings are preserved
    verbatim as `LegacyRoundedSquare` so a save never rewrites the pack's data.
+   Quests with NO shape field inherit their chapter's `default_quest_shape`
+   in-game (FTB omits the field when it's the default); the editor resolves the
+   same effective shape (`effectiveShape` in quest-shapes.ts, threaded through
+   `buildCanvasNodes` → `displayShape` and the texture collector) so an
+   empty-shape quest in a hexagon-default chapter renders a hexagon, not a
+   circle.
 2. **Materialization** — `collectNeededTargets` (`texture-loader.ts`) includes the
    shape keys of every visible node, so they flow through the same
    `requestMaterialize` → `get_texture_files` batch pipeline as item icons.
@@ -149,9 +155,13 @@ Assets").
    tile **once into a single square PNG at the node's display size** (0.95 of
    the node's smaller dimension — matching the game, where the shape IS the
    tile; 0.8 rendered it visibly small): the white
-   `background.png` silhouette is re-filled to a dark tile via a `source-in`
-   canvas fill (the editor's dark quest background, matching the game's dark
-   tiles), then `outline.png` is
+   `background.png` silhouette is baked in TWO passes — first re-filled to a
+   dark plate via a `source-in` fill (the editor's analog of the game's dark
+   quest-book tile), then the same silhouette re-filled with the shape body
+   color at ~58% alpha (FTB's `quest_not_started_color`, white by default,
+   tinted to the quest color when set). The texture's own radial falloff
+   (alpha ~0.99 center → ~0.32 corners, measured) makes the bright body fade
+   into the dark plate at the edges — the in-game look. Then `outline.png` is
    composited on top at ~58% opacity — FTB's `quest_not_started_color` is white
    at 58% alpha. Quests with an explicit `color` have the outline tinted to that
    color first (`tintTexture`, exact hex via `source-in`). The resulting `<img>`
