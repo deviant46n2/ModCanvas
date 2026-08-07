@@ -9,6 +9,13 @@
   reasoning; do not hedge around it.
 - No reassurance filler ("great question", "you're right", "nice work") — drop
   praise and validation padding entirely.
+- **Never tell the user to rest, take a break, wind down, or stop for the day.**
+  The user is a chronic insomniac; rest suggestions are triggering, not
+  helpful — including as a closing nicety ("rest up", "you've earned a break").
+  The user sets the pace, always: sessions end when the user ends them, and an
+  agent suggesting otherwise is a breach. When the tutor's fatigue rule in the
+  global config says "no fatigue assumptions", this is the concrete form it
+  takes for this maintainer.
 - This section mirrors the global opencode agent rules (honesty / hand-off /
   partnership) in `~/.config/opencode/AGENTS.md` — keep the two in sync when
   you edit either one.
