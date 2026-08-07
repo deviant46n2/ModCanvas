@@ -345,18 +345,16 @@ public final class ItemIconRenderer {
                 ? Block.byItem(stack.getItem()).defaultBlockState()
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
-            // Per-face shading: the game's GUI item light (Lighting.setupFor3DItems)
-            // = two directional lights transformed by setupGui3DDiffuseLighting
-            // (verified in the vanilla bytecode), blended by light.glsl:
-            //   min(1.0, (max(0,dot(L0,n)) + max(0,dot(L1,n))) * 0.6 + 0.4)
-            // giving top ≈ 1.0, z-faces ≈ 0.74, x-faces ≈ 0.50, bottom 0.4 —
-            // the three distinct cube levels and the left≠right asymmetry.
-            // The face normal comes from the GEOMETRY (cross product of the
-            // quad's own vertices): the baked normal slot (BLOCK int 8) reads
-            // ZERO on this data path (the bake expands the array 8→10 ints per
-            // vertex, leaving the normal slot unpopulated — measured), and the
-            // game itself derives the face from the geometry (calculateFacing).
-            // Quads are wound counter-clockwise viewed from outside.
+            // Per-face shading: REVERTED (s11 close). The game's GUI item light
+            // (setupFor3DItems lights transformed by setupGui3DDiffuseLighting,
+            // light.glsl formula) is known, but the face-normal source is NOT:
+            // the baked normal slot (BLOCK int 8) reads zero on this data path,
+            // and the geometry cross-product's winding sign was guessed wrong —
+            // inverted normals → every face at the 0.4 ambient → super black.
+            // Next session: debug-log the computed normal + light for one item
+            // (e.g. minecraft:stone) BEFORE the next attempt. shade = 1.0 =
+            // the visible flat state.
+            float shade = 1.0F;
             for (BakedQuad quad : quads) {
                 int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
@@ -367,7 +365,6 @@ public final class ItemIconRenderer {
                     tg = (tint >> 8 & 0xFF) / 255.0F;
                     tb = (tint & 0xFF) / 255.0F;
                 }
-                float shade = guiLightShade(verts);
                 for (int i = 0; i < 4; i++) {
                     int o = stride * i;
                     float x = Float.intBitsToFloat(verts[o]);
