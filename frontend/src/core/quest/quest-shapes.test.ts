@@ -37,6 +37,12 @@ describe('effectiveShape (chapter-default inheritance)', () => {
     expect(effectiveShape('gear', '')).toBe('gear');
   });
 
+  it('treats "default" as inherit (the app serializes empty shapes as "default")', () => {
+    expect(effectiveShape('default', 'hexagon')).toBe('hexagon');
+    expect(effectiveShape('DEFAULT', 'rsquare')).toBe('rsquare');
+    expect(effectiveShape('default', '')).toBe('');
+  });
+
   it('falls back to the chapter default when the quest has no shape', () => {
     expect(effectiveShape('', 'hexagon')).toBe('hexagon');
     expect(effectiveShape(undefined, 'rsquare')).toBe('rsquare');

@@ -3,19 +3,15 @@ import { loadImage } from './sprite-sheet'
 const bakeCache = new Map<string, Promise<string | null>>()
 
 // Shape backgrounds are white filled silhouettes with a radial alpha falloff
-// (measured: ~0.99 alpha at center → ~0.32 at corners). In-game the shape
-// reads as a BRIGHT body on the game's DARK quest-book plate, and the falloff
-// makes the edges darken into the plate. The bake reproduces that in two
-// passes over the same silhouette: a dark plate fill, then the shape body at
-// the game's quest_not_started_color (near-white at 58% alpha) — a bright
-// center fading into the dark plate at the edges, exactly like the book.
-const PLATE_GREY = 'rgba(28, 32, 38, 0.96)'
-// FTB's quest_not_started_color is white at 58% alpha.
-const SHAPE_BODY_OPACITY = 0.58
-// Outline at ~58% opacity, matching the in-game not-started default (near-white
-// at ~58% alpha). Explicit quest colors are tinted onto the near-white outline
-// texture first, then the 58% opacity is applied here.
-const OUTLINE_OPACITY = 0.6
+// (measured: ~0.99 alpha at center → ~0.32 at corners). The editor's tile is a
+// DARK plate: the silhouette filled dark, darkest at the center, with the
+// near-white outline rim carrying the edge — so the tile reads "darker
+// center, lighter edges" against the dark canvas.
+const PLATE_GREY = 'rgba(24, 28, 34, 0.96)'
+// Outline opacity: the near-white outline ring IS the bright edge of the
+// plate. Raised from the old 0.6 so the rim reads clearly against the dark
+// body (the "lighter edges" of the reversed gradient).
+const OUTLINE_OPACITY = 0.9
 
 export function parseHexColor(color: string): { r: number; g: number; b: number; a: number } | null {
   const m6 = /^#?([0-9a-f]{6})$/i.exec(color.trim())
@@ -132,30 +128,16 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   // the 128px source textures are downscaled to small quest tiles.
   ctx.imageSmoothingEnabled = true
 
-  // 1. Plate: the silhouette filled DARK — the editor's analog of the game's
-  //    dark quest-book plate behind the shape.
+  // 1. Plate: the silhouette filled DARK — the tile body. The alpha falloff
+  //    naturally makes the center the most solid; the outline (step 2) carries
+  //    the bright edge.
   ctx.drawImage(bgImg, 0, 0, size, size)
   ctx.globalCompositeOperation = 'source-in'
   ctx.fillStyle = PLATE_GREY
   ctx.fillRect(0, 0, size, size)
   ctx.globalCompositeOperation = 'source-over'
 
-  // 2. Shape body: the same silhouette filled bright at the game's 58% alpha.
-  //    Its radial falloff makes the edges darken into the plate (bright
-  //    center, darker edges — the in-game look). Quests with a color tint the
-  //    body like in-game; colorless quests use the near-white default.
-  let shapeFill = `rgba(255, 255, 255, ${SHAPE_BODY_OPACITY})`
-  if (input.color) {
-    const rgb = parseHexColor(input.color)
-    if (rgb) shapeFill = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${SHAPE_BODY_OPACITY})`
-  }
-  ctx.drawImage(bgImg, 0, 0, size, size)
-  ctx.globalCompositeOperation = 'source-in'
-  ctx.fillStyle = shapeFill
-  ctx.fillRect(0, 0, size, size)
-  ctx.globalCompositeOperation = 'source-over'
-
-  // Outline: tinted to the quest color when set, else the near-white texture.
+  // 2. Outline: tinted to the quest color when set, else the near-white texture.
   let outline = olImg
   if (input.color) {
     const tinted = await tintTexture(input.outlineUrl, input.color)

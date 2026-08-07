@@ -26,14 +26,17 @@ export function normalizeShape(shape?: string | null): string {
 // chapter's `default_quest_shape`, else empty (which normalizeShape resolves
 // to circle — FTB's global default). FTB omits the shape field when a quest
 // uses the default, so in-game it inherits the chapter default — the editor
-// must render the same effective shape (fidelity: editor == game).
+// must render the same effective shape (fidelity: editor == game). "default"
+// is the app's serialized form of an empty shape (the Rust QuestShape enum
+// serializes Default as "default") — it means "inherit", NOT an explicit
+// choice.
 export function effectiveShape(
   shape: string | null | undefined,
   chapterDefault: string | null | undefined,
 ): string {
-  const raw = (shape || '').trim()
-  if (raw) return raw
-  const cd = (chapterDefault || '').trim()
+  const raw = (shape || '').trim().toLowerCase()
+  if (raw && raw !== 'default') return raw
+  const cd = (chapterDefault || '').trim().toLowerCase()
   if (cd && cd !== 'default') return cd
   return ''
 }
