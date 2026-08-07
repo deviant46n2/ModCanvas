@@ -346,14 +346,17 @@ public final class ItemIconRenderer {
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
             // Per-face shading: the game's GUI item light (Lighting.setupFor3DItems)
-            // = two directional lights normalize(0.2, 1.0, -0.7) /
-            // normalize(-0.2, 1.0, 0.7), blended by light.glsl:
+            // = two directional lights transformed by setupGui3DDiffuseLighting
+            // (verified in the vanilla bytecode), blended by light.glsl:
             //   min(1.0, (max(0,dot(L0,n)) + max(0,dot(L1,n))) * 0.6 + 0.4)
-            // This gives top 1.0, z-faces ~0.74, x-faces ~0.50, bottom 0.4 —
-            // the three distinct cube levels and the left≠right asymmetry the
-            // game shows (a directional light, not the axis-symmetric vanilla
-            // block shade). The normal comes from the baked quad (BLOCK int 8);
-            // zero normals → ambient 0.4 only (safe).
+            // giving top ≈ 1.0, z-faces ≈ 0.74, x-faces ≈ 0.50, bottom 0.4 —
+            // the three distinct cube levels and the left≠right asymmetry.
+            // The face normal comes from the GEOMETRY (cross product of the
+            // quad's own vertices): the baked normal slot (BLOCK int 8) reads
+            // ZERO on this data path (the bake expands the array 8→10 ints per
+            // vertex, leaving the normal slot unpopulated — measured), and the
+            // game itself derives the face from the geometry (calculateFacing).
+            // Quads are wound counter-clockwise viewed from outside.
             for (BakedQuad quad : quads) {
                 int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
@@ -394,17 +397,29 @@ public final class ItemIconRenderer {
         }
     }
 
-    /** The game's GUI item-light factor for a baked quad, from its packed
-     *  normal (BLOCK-format int 8: three signed bytes × 127). Mirrors
-     *  light.glsl's minecraft_mix_light with the setupGui3DDiffuseLighting
-     *  effective lights. The baked normal is negated: the quad normals read
-     *  inverted (measured — the top face got the DOWN-level light), which
-     *  matches the winding the model bakes. */
+    /** The game's GUI item-light factor for a baked quad. The face normal is
+     *  computed from the quad's GEOMETRY — the baked normal slot reads zero on
+     *  this data path (see drawItemDirect). Quads are wound counter-clockwise
+     *  viewed from outside, so the cross product of edges (v1−v0)×(v2−v0)
+     *  points out of the face; if a model winds differently the sign flips —
+     *  verified per-item via the rendered brightness. */
     private static float guiLightShade(int[] verts) {
-        int n = verts[8];
-        float nx = -(byte) (n & 0xFF) / 127.0F;
-        float ny = -(byte) ((n >> 8) & 0xFF) / 127.0F;
-        float nz = -(byte) ((n >> 16) & 0xFF) / 127.0F;
+        float x0 = Float.intBitsToFloat(verts[0]);
+        float y0 = Float.intBitsToFloat(verts[1]);
+        float z0 = Float.intBitsToFloat(verts[2]);
+        float ax = Float.intBitsToFloat(verts[10]) - x0;
+        float ay = Float.intBitsToFloat(verts[11]) - y0;
+        float az = Float.intBitsToFloat(verts[12]) - z0;
+        float bx = Float.intBitsToFloat(verts[20]) - x0;
+        float by = Float.intBitsToFloat(verts[21]) - y0;
+        float bz = Float.intBitsToFloat(verts[22]) - z0;
+        // n = a × b
+        float nx = ay * bz - az * by;
+        float ny = az * bx - ax * bz;
+        float nz = ax * by - ay * bx;
+        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1.0E-4F) return 0.4F; // degenerate quad → ambient only
+        nx /= len; ny /= len; nz /= len;
         float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
         float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
         return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);
