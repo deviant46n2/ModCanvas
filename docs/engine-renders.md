@@ -31,10 +31,11 @@ ASSETS_READY) to the app peer over its socket. The Tauri event channel
 no longer depends on it — it silently drops Rust→webview events on some
 Linux/WebKitGTK stacks (evals from async commands never run).
 
-Batches are capped (`engine-render.ts` sends ≤32 per request) and the game
-renders **16 items per client tick** (`ItemRenderQueue.PER_TICK`) so a large
-batch never freezes a frame; the result is sent as one reply when the queue
-drains.
+Batches are capped (`engine-render.ts` sends ≤256 per request — one batch in
+flight at a time, so the batch size is the round-trip granularity) and the game
+renders **16 items per client tick** (`ItemRenderQueue.PER_TICK`, one GRID²
+pass) so a large batch never freezes a frame; the result is sent as one reply
+when the queue drains.
 
 ## Companion mod (1.21.1 NeoForge)
 
@@ -44,13 +45,18 @@ drains.
      model-view Z translate `10000 - getGuiFarPlane()`; the translate must land
      geometry in **negative** view-z — the near/far are distances in front of
      the camera, and positive z is behind it, where every draw clips silently).
-  2. Binds a 64×64 `TextureTarget` (transparent clear), then for each item:
-     collects the model's baked quads (**all 6 directions + null, seed 42** —
-     cube quads are filed by direction, so a null-only query returns nothing
-     for blocks), measures the **projected** bounds through the GUI display
-     transform, and builds a pose that fits those bounds to ~90% of the tile
-     (model spaces vary: 0..16 blocks to 0..1 custom items, and display
-     transforms rotate — the fit must measure post-transform geometry).
+  2. Binds a `size×GRID` × `size×GRID` `TextureTarget` (transparent clear) and
+     renders **GRID² items per pass** (GRID=4 → 16 items on a 256×256 FBO):
+     for each item it collects the model's baked quads (**all 6 directions +
+     null, seed 42** — cube quads are filed by direction, so a null-only
+     query returns nothing for blocks), measures the **projected** bounds
+     through the GUI display transform, and builds a pose that fits those
+     bounds to ~90% of the tile (model spaces vary: 0..16 blocks to 0..1
+     custom items, and display transforms rotate — the fit must measure
+     post-transform geometry). Each item is drawn into its own cell via a
+     `glViewport` (the item-local ortho maps into the cell's pixels), with
+     the depth buffer cleared once per pass — disjoint cells never
+     interfere.
   3. Draws the quads directly (Tesselator + `position_tex` + the block atlas,
      UVs at BLOCK-format ints 4-5) — the `GuiGraphics` flush path's deferred
      shader binds never apply in the offscreen tick context. Depth testing is
@@ -58,10 +64,14 @@ drains.
      are overridden to mip-0 `GL_LINEAR` before the batch (captures are pure
      magnification, so mip sampling can only upscale a downsampled sprite =
      blur) and restored in `finally` so the game world's sampling is untouched.
-  4. Reads the framebuffer back with `NativeImage.downloadTexture` (already
-     upright — **no row flip**; a flip inverts every icon), PNG-encodes
-     (`asByteArray`) and base64-encodes it.
-  5. Restores GL state (projection, model-view, main framebuffer).
+  4. Reads the whole pass back with ONE `NativeImage.downloadTexture`
+     (already upright — **no row flip**; a flip inverts every icon), slices
+     the cells into per-icon `NativeImage`s, PNG-encodes (`asByteArray`) and
+     base64-encodes each. Per-item readbacks were the drain bottleneck: a
+     `downloadTexture` is a synchronous GPU sync, so a 29k-item pack used to
+     cost ~29k syncs (≈30 min); GRID=4 cuts that to one sync per 16 items.
+  5. Restores GL state (projection, model-view, viewport, filters, main
+     framebuffer).
 - `ItemRenderQueue.java` — per-tick throttling (16/tick) + retry-on-failure:
   early renders hit un-baked models, so failed items re-queue up to
   `MAX_ATTEMPTS` (3) before being dropped; result accumulation.
@@ -101,7 +111,7 @@ rename). Commands:
   index + item registry).
 - `queueEngineRenders` — deduped queue (O(1) membership via a Set mirror — the
   queue can hold full instance registries, so array scans are never allowed);
-  sends `RENDER_ITEMS_REQUEST` when the companion is connected, batches of 32,
+  sends `RENDER_ITEMS_REQUEST` when the companion is connected, batches of 256,
   ≤2 attempts per item. An id that exhausts its attempts is marked **failed
   for the session** — both when the companion stays silent (30s timeout) and
   when a batch comes back without it (the companion skips unrenderable ids,

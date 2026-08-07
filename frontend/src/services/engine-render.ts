@@ -13,7 +13,12 @@ import { onCompanionEvent } from './companion-socket'
  * cache so it survives restarts.
  */
 
-const BATCH_SIZE = 32
+// One batch in flight at a time (gated by `inFlight`), so the batch size is
+// the round-trip granularity: the companion drains the batch, then the next
+// batch flushes. 256 keeps round trips large enough to amortize the WS/message
+// overhead while still arriving as small per-request results (the companion
+// sends one RENDER_ITEMS_RESULT per drained request).
+const BATCH_SIZE = 256
 const MAX_ATTEMPTS = 2
 const RENDER_SIZE = 64
 const BATCH_TIMEOUT_MS = 30_000

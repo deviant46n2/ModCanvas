@@ -47,9 +47,15 @@ import java.util.List;
  *
  * <p>Must be called on the render thread (the client main thread) while the GL
  * context is current. The companion processes messages on {@code ClientTickEvent.Post},
- * which satisfies that. All GL state (projection matrix, model-view stack, and
- * the bound framebuffer) is backed up and restored so the game's next frame is
- * unaffected.
+ * which satisfies that. All GL state (projection matrix, model-view stack,
+ * viewport, texture filters, and the bound framebuffer) is backed up and
+ * restored so the game's next frame is unaffected.
+ *
+ * <p>Items are rendered in a {@code GRID}×{@code GRID} batch per pass: one
+ * FBO clear, one draw per cell (viewport-confined), ONE readback, then the
+ * cells are sliced into individual PNGs. Per-item readbacks were the drain
+ * bottleneck — a {@code downloadTexture} is a synchronous GPU sync, so a
+ * full-pack drain was ~one sync per icon.
  */
 public final class ItemIconRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
@@ -58,6 +64,11 @@ public final class ItemIconRenderer {
     public static final int DEFAULT_SIZE = 64;
     /** Batch cap: prevents a single tick from rendering an unbounded list. */
     public static final int MAX_BATCH = 64;
+    /** Grid cells per side of the capture FBO. GRID² items share one render
+     *  pass and ONE readback — a `downloadTexture` is a synchronous GPU sync,
+     *  and per-item readbacks were the full-pack drain bottleneck (29k syncs
+     *  for a pack ≈ 30 minutes; GRID=4 cuts that to one sync per 16 items). */
+    public static final int GRID = 4;
 
     private ItemIconRenderer() {}
 
@@ -95,8 +106,12 @@ public final class ItemIconRenderer {
         int[] savedMagFilter = new int[1];
         boolean filterOverridden = false;
         TextureAtlas blockAtlas = mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS);
+        // Cells set the viewport per item; the game's viewport must come back.
+        int[] savedViewport = new int[4];
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, savedViewport);
         try {
-            target = new TextureTarget(size, size, true, Minecraft.ON_OSX);
+            int atlasSize = size * GRID;
+            target = new TextureTarget(atlasSize, atlasSize, true, Minecraft.ON_OSX);
             target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
             target.bindWrite(false);
             target.clear(Minecraft.ON_OSX);
@@ -117,43 +132,78 @@ public final class ItemIconRenderer {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
             filterOverridden = true;
 
-            int rendered = 0;
+            // Resolve stacks up front (skipping empties) so each grid pass can
+            // pair every cell with its original id.
+            List<String> validIds = new ArrayList<>();
+            List<ItemStack> stacks = new ArrayList<>();
             for (String id : itemIds) {
-                if (rendered >= MAX_BATCH) break;
+                if (stacks.size() >= MAX_BATCH) break;
                 ItemStack stack = makeStack(id);
                 if (stack.isEmpty()) continue;
+                validIds.add(id);
+                stacks.add(stack);
+            }
 
+            for (int start = 0; start < stacks.size(); start += GRID * GRID) {
+                int n = Math.min(GRID * GRID, stacks.size() - start);
                 target.clear(Minecraft.ON_OSX);
-                // clear() drops the binding again — re-bind for THIS item.
+                // clear() drops the binding again — re-bind for THIS pass.
                 GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, target.frameBufferId);
-                try {
-                    RenderSystem.disableCull();
-                    RenderSystem.disableBlend();
-                    // Depth ON: the target's depth buffer is cleared per item,
-                    // so faces occlude correctly (cubes need this — no depth
-                    // test means painter's-order artifacts at face overlaps).
-                    RenderSystem.enableDepthTest();
-                    drawItemDirect(stack, size, farPlane);
-
-                    target.unbindWrite();
-                    RenderSystem.bindTexture(target.getColorTextureId());
-                    NativeImage img = new NativeImage(size, size, false);
-                    img.downloadTexture(0, false);
-                    String dataUrl = encodePng(img);
-                    img.close();
-                    if (dataUrl != null) {
-                        out.addProperty(id, dataUrl);
-                        rendered++;
+                RenderSystem.disableCull();
+                RenderSystem.disableBlend();
+                // Depth ON: the buffer is cleared per pass and each cell is
+                // drawn by exactly one item into a disjoint viewport region,
+                // so cube faces occlude correctly per item without
+                // painter's-order artifacts.
+                RenderSystem.enableDepthTest();
+                boolean anyDrawn = false;
+                for (int i = 0; i < n; i++) {
+                    int cellX = (i % GRID) * size;
+                    int cellY = (i / GRID) * size;
+                    // The viewport maps the item-local ortho [0,size] into
+                    // this cell's pixels; the item pose (which centers at
+                    // size/2, size/2) therefore lands in its own cell.
+                    GL30.glViewport(cellX, cellY, size, size);
+                    try {
+                        drawItemDirect(stacks.get(start + i), size, farPlane);
+                        anyDrawn = true;
+                    } catch (Throwable t) {
+                        LOGGER.warn("[ItemIconRenderer] Failed to render item {}: {}", validIds.get(start + i), t.toString());
                     }
-                    target.bindWrite(false);
-                } catch (Throwable t) {
-                    LOGGER.warn("[ItemIconRenderer] Failed to render item {}: {}", id, t.toString());
-                    target.bindWrite(false);
                 }
+                if (!anyDrawn) {
+                    continue;
+                }
+
+                // ONE readback per pass, then slice the cells into individual
+                // icons. The whole pass shares the projection/filter state set
+                // above — no per-item FBO cycle, no per-item GPU sync.
+                target.unbindWrite();
+                RenderSystem.bindTexture(target.getColorTextureId());
+                NativeImage atlas = new NativeImage(atlasSize, atlasSize, false);
+                atlas.downloadTexture(0, false);
+                for (int i = 0; i < n; i++) {
+                    int cellX = (i % GRID) * size;
+                    int cellY = (i / GRID) * size;
+                    NativeImage slice = new NativeImage(size, size, false);
+                    for (int y = 0; y < size; y++) {
+                        for (int x = 0; x < size; x++) {
+                            slice.setPixelRGBA(x, y, atlas.getPixelRGBA(cellX + x, cellY + y));
+                        }
+                    }
+                    String dataUrl = encodePng(slice);
+                    slice.close();
+                    if (dataUrl != null) {
+                        out.addProperty(validIds.get(start + i), dataUrl);
+                    }
+                }
+                atlas.close();
+                target.bindWrite(false);
             }
         } catch (Throwable t) {
             LOGGER.error("[ItemIconRenderer] Render pass failed", t);
         } finally {
+            GL30.glViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
             if (filterOverridden) {
                 RenderSystem.setShaderTexture(0, blockAtlas.getId());
                 GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter[0]);
