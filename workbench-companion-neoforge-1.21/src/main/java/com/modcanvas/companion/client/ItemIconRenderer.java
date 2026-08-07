@@ -13,6 +13,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -305,75 +306,86 @@ public final class ItemIconRenderer {
         );
         var mvStack = RenderSystem.getModelViewStack();
         mvStack.pushMatrix();
-        mvStack.translation(0.0F, 0.0F, 10000.0F - farPlane);
-        RenderSystem.applyModelViewMatrix();
-        // Texture path: bind the block atlas and draw the quads with their
-        // UVs AND per-face shade. Baked quads carry directional lighting in
-        // the vertex color (BLOCK-format int 3): blocks are shaded ~0.5 (down)
-        // to 1.0 (up) per face. Dropping it rendered every face full-bright —
-        // the flat "no lighting" look. position_tex_color multiplies the
-        // texture by the vertex color (the text-renderer shader) without
-        // needing the lightmap texture, which the offscreen context never
-        // binds.
-        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
-        if (RenderSystem.getShader() != null) {
-            RenderSystem.getShader().apply();
-        }
-        RenderSystem.setShaderTexture(0,
-            mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
+        try {
+            mvStack.translation(0.0F, 0.0F, 10000.0F - farPlane);
+            RenderSystem.applyModelViewMatrix();
+            // Texture path: bind the block atlas and draw the quads with their
+            // UVs AND per-face shade. Baked quads carry directional lighting in
+            // the vertex color (BLOCK-format int 3): blocks are shaded ~0.5 (down)
+            // to 1.0 (up) per face. Dropping it rendered every face full-bright —
+            // the flat "no lighting" look. position_tex_color multiplies the
+            // texture by the vertex color (the text-renderer shader) without
+            // needing the lightmap texture, which the offscreen context never
+            // binds.
+            RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+            if (RenderSystem.getShader() != null) {
+                RenderSystem.getShader().apply();
+            }
+            RenderSystem.setShaderTexture(0,
+                mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
 
-        var tess = Tesselator.getInstance();
-        var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        // Block tints (grass/leaves/etc.) are applied at RENDER time, not
-        // baked: the quads carry a tintIndex and vanilla multiplies the vertex
-        // color by BlockColors. Without it, tinted blocks render their
-        // untinted atlas base — grey grass. The world-less default color
-        // (null world/pos) matches the game's GUI/quest-book rendering.
-        BlockState tintState = stack.getItem() instanceof BlockItem
-            ? Block.byItem(stack.getItem()).defaultBlockState()
-            : null;
-        // Per-face directional shade: vanilla bakes block quads with WHITE
-        // vertex colors — the face shade is NOT in the quads. The game applies
-        // it in the entity shaders from the quad NORMALS (Light0/Light1
-        // uniforms), which position_tex_color has no access to. Replicate the
-        // classic block look here: multiply by the direction's shade (up 1.0,
-        // sides 0.6/0.8, down 0.5) derived from the packed normal. Flat item
-        // models (non-blocks) keep full brightness, like the game.
-        boolean shaded = stack.getItem() instanceof BlockItem;
-        for (BakedQuad quad : quads) {
-            int[] verts = quad.getVertices();
-            int tintIndex = quad.getTintIndex();
-            float tr = 1.0F, tg = 1.0F, tb = 1.0F;
-            if (tintIndex >= 0 && tintState != null) {
-                int tint = Minecraft.getInstance().getBlockColors()
-                    .getColor(tintState, null, null, tintIndex);
-                tr = (tint >> 16 & 0xFF) / 255.0F;
-                tg = (tint >> 8 & 0xFF) / 255.0F;
-                tb = (tint & 0xFF) / 255.0F;
+            var tess = Tesselator.getInstance();
+            var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            // Block tints (grass/leaves/etc.) are applied at RENDER time, not
+            // baked: the quads carry a tintIndex and vanilla multiplies the vertex
+            // color by BlockColors. Without it, tinted blocks render their
+            // untinted atlas base — grey grass. The world-less default color
+            // (null world/pos) matches the game's GUI/quest-book rendering.
+            BlockState tintState = stack.getItem() instanceof BlockItem
+                ? Block.byItem(stack.getItem()).defaultBlockState()
+                : null;
+            BlockColors blockColors = Minecraft.getInstance().getBlockColors();
+            // Per-face directional shade: vanilla bakes block quads with WHITE
+            // vertex colors — the face shade is NOT in the quads. The game
+            // applies it in the entity shaders from the quad NORMALS (Light0/
+            // Light1 uniforms), which position_tex_color has no access to.
+            // Replicate the classic block look here: multiply by the
+            // direction's shade (up 1.0, sides 0.6/0.8, down 0.5) derived from
+            // the packed normal. Flat item models (non-blocks) keep full
+            // brightness, like the game. Zero normals (missing models, some
+            // modded quads) → no shade — a null would NPE the switch and leak
+            // the model-view stack (crash: "max stack size of 16 reached").
+            boolean shaded = stack.getItem() instanceof BlockItem;
+            for (BakedQuad quad : quads) {
+                int[] verts = quad.getVertices();
+                int tintIndex = quad.getTintIndex();
+                float tr = 1.0F, tg = 1.0F, tb = 1.0F;
+                if (tintIndex >= 0 && tintState != null) {
+                    int tint = blockColors.getColor(tintState, null, null, tintIndex);
+                    tr = (tint >> 16 & 0xFF) / 255.0F;
+                    tg = (tint >> 8 & 0xFF) / 255.0F;
+                    tb = (tint & 0xFF) / 255.0F;
+                }
+                Direction dir = directionOfNormal(verts);
+                float shade = shaded && dir != null ? blockShade(dir) : 1.0F;
+                for (int i = 0; i < 4; i++) {
+                    int o = stride * i;
+                    float x = Float.intBitsToFloat(verts[o]);
+                    float y = Float.intBitsToFloat(verts[o + 1]);
+                    float z = Float.intBitsToFloat(verts[o + 2]);
+                    // Vertex color int is 0xAABBGGRR; multiply RGB by tint × shade.
+                    int color = verts[o + 3];
+                    int a = color >>> 24;
+                    int nr = (int) ((color & 0xFF) * tr * shade);
+                    int ng = (int) ((color >> 8 & 0xFF) * tg * shade);
+                    int nb = (int) ((color >> 16 & 0xFF) * tb * shade);
+                    float u = Float.intBitsToFloat(verts[o + 4]);
+                    float v = Float.intBitsToFloat(verts[o + 5]);
+                    vb.addVertex(pose, x, y, z)
+                        .setUv(u, v)
+                        .setColor(a << 24 | nb << 16 | ng << 8 | nr);
+                }
             }
-            float shade = shaded ? blockShade(directionOfNormal(verts)) : 1.0F;
-            for (int i = 0; i < 4; i++) {
-                int o = stride * i;
-                float x = Float.intBitsToFloat(verts[o]);
-                float y = Float.intBitsToFloat(verts[o + 1]);
-                float z = Float.intBitsToFloat(verts[o + 2]);
-                // Vertex color int is 0xAABBGGRR; multiply RGB by tint × shade.
-                int color = verts[o + 3];
-                int a = color >>> 24;
-                int nr = (int) ((color & 0xFF) * tr * shade);
-                int ng = (int) ((color >> 8 & 0xFF) * tg * shade);
-                int nb = (int) ((color >> 16 & 0xFF) * tb * shade);
-                float u = Float.intBitsToFloat(verts[o + 4]);
-                float v = Float.intBitsToFloat(verts[o + 5]);
-                vb.addVertex(pose, x, y, z)
-                    .setUv(u, v)
-                    .setColor(a << 24 | nb << 16 | ng << 8 | nr);
-            }
+            BufferUploader.drawWithShader(vb.build());
+        } finally {
+            // The stack MUST come back even when a draw throws: an unbalanced
+            // push leaks one slot per failed item, and 16 leaks fill the
+            // 16-slot Matrix4fStack — the next frame crashes ("max stack size
+            // of 16 reached").
+            mvStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
-        BufferUploader.drawWithShader(vb.build());
-        mvStack.popMatrix();
-        RenderSystem.applyModelViewMatrix();
     }
 
     /** Vanilla block face shade by direction (up 1.0, north/south 0.8,
