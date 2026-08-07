@@ -31,6 +31,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.ClientHooks;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
@@ -319,13 +320,12 @@ public final class ItemIconRenderer {
             mvStack.translation(0.0F, 0.0F, 10000.0F - farPlane);
             RenderSystem.applyModelViewMatrix();
             // Texture path: bind the block atlas and draw the quads with their
-            // UVs AND per-face shade. Baked quads carry directional lighting in
-            // the vertex color (BLOCK-format int 3): blocks are shaded ~0.5 (down)
-            // to 1.0 (up) per face. Dropping it rendered every face full-bright —
-            // the flat "no lighting" look. position_tex_color multiplies the
-            // texture by the vertex color (the text-renderer shader) without
-            // needing the lightmap texture, which the offscreen context never
-            // binds.
+            // UVs AND per-face shade. The baked vertex colors are WHITE for
+            // vanilla block models — the game applies face shading from the
+            // quad normals in its shaders, which position_tex_color has no
+            // access to, so we apply the GUI item light ourselves via the
+            // shade multiplier below (the flat state, shade = 1.0, looked
+            // flat precisely because the colors carry no shade).
             RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
             if (RenderSystem.getShader() != null) {
                 RenderSystem.getShader().apply();
@@ -345,16 +345,32 @@ public final class ItemIconRenderer {
                 ? Block.byItem(stack.getItem()).defaultBlockState()
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
-            // Per-face shading: REVERTED (s11 close). The game's GUI item light
-            // (setupFor3DItems lights transformed by setupGui3DDiffuseLighting,
-            // light.glsl formula) is known, but the face-normal source is NOT:
-            // the baked normal slot (BLOCK int 8) reads zero on this data path,
-            // and the geometry cross-product's winding sign was guessed wrong —
-            // inverted normals → every face at the 0.4 ambient → super black.
-            // Next session: debug-log the computed normal + light for one item
-            // (e.g. minecraft:stone) BEFORE the next attempt. shade = 1.0 =
-            // the visible flat state.
-            float shade = 1.0F;
+            // Per-face shading (s12, probe-validated): the game's GUI item
+            // light (setupFor3DItems lights transformed by
+            // setupGui3DDiffuseLighting, light.glsl formula) with the face
+            // normal from the quad's SEMANTIC direction — BakedQuad.getDirection(),
+            // the face the model baker baked. The LIGHT-PROBE graded three
+            // normal sources against the analytically known per-face table
+            // (UP 0.876, DOWN 0.4, ±X 0.748, ±Z 0.685/0.882) on live data:
+            // the semantic direction reproduced it exactly (6/6); the baked
+            // normal slot reads vertex data on this path (format-dependent,
+            // not authoritative); the geometry cross product is unreadable on
+            // modded quad layouts (probe artifact — the renderer only touches
+            // indices 0-5, which work in any layout). The direction is in
+            // MODEL space; the game's lights are in VIEW space, so the normal
+            // is transformed by the pose's normal matrix (inverse-transpose
+            // of the 3x3) exactly as the game's renderQuadList does — that
+            // keeps identity-pose items on the validated table and rotated
+            // items on the game's shading. Null-direction quads (crosses,
+            // flat cutouts) fall back to the geometry normal, transformed the
+            // same way.
+            // The normal matrix is the INVERSE (not inverse-transpose) here
+            // because JOML's Vector3f.mul(Matrix3f) uses the row-vector
+            // convention (v·M = Mᵀ·v) — it supplies the transpose itself.
+            // Using inverse-transpose would double-transpose and scramble the
+            // light on rotated items (verified against the JOML 1.10.5 jar:
+            // the bottom face of a tilted cube must point up-and-back).
+            Matrix3f poseNormalMatrix = new Matrix3f(pose).invert();
             for (BakedQuad quad : quads) {
                 int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
@@ -365,6 +381,7 @@ public final class ItemIconRenderer {
                     tg = (tint >> 8 & 0xFF) / 255.0F;
                     tb = (tint & 0xFF) / 255.0F;
                 }
+                float shade = guiLightShadeForQuad(quad, verts, poseNormalMatrix);
                 for (int i = 0; i < 4; i++) {
                     int o = stride * i;
                     float x = Float.intBitsToFloat(verts[o]);
@@ -394,13 +411,53 @@ public final class ItemIconRenderer {
         }
     }
 
-    /** The game's GUI item-light factor for a baked quad. The face normal is
-     *  computed from the quad's GEOMETRY — the baked normal slot reads zero on
-     *  this data path (see drawItemDirect). Quads are wound counter-clockwise
-     *  viewed from outside, so the cross product of edges (v1−v0)×(v2−v0)
-     *  points out of the face; if a model winds differently the sign flips —
-     *  verified per-item via the rendered brightness. */
-    private static float guiLightShade(int[] verts) {
+    /** The game's GUI item-light factor for a baked quad (s12): the semantic
+     *  face direction — BakedQuad.getDirection(), the face the model baker
+     *  baked — transformed into VIEW space by the pose's normal matrix and
+     *  run through the light.glsl formula. This reproduces the game's
+     *  per-face table exactly on identity-pose items (probe-validated) and
+     *  follows the game's renderQuadList normal transform on rotated items.
+     *  Null-direction quads (crosses, flat cutouts) fall back to the geometry
+     *  normal, transformed the same way. A degenerate OR non-finite normal
+     *  returns no shade (1.0 = the flat state): the geometry fallback reads
+     *  verts with a BLOCK-layout stride that modded quads can violate, and a
+     *  NaN shade would cast to a black vertex — the super-black failure class
+     *  via a different door. */
+    private static float guiLightShadeForQuad(BakedQuad quad, int[] verts, Matrix3f poseNormalMatrix) {
+        float nx, ny, nz;
+        Direction d = quad.getDirection();
+        if (d != null) {
+            nx = d.getStepX(); ny = d.getStepY(); nz = d.getStepZ();
+        } else {
+            float[] g = guiLightNormalFromGeometry(verts);
+            if (g == null) return 1.0F; // degenerate quad → no face → no shade
+            nx = g[0]; ny = g[1]; nz = g[2];
+        }
+        if (!Float.isFinite(nx) || !Float.isFinite(ny) || !Float.isFinite(nz)) {
+            return 1.0F; // garbage vertex layout → no shade rather than black
+        }
+        Vector3f n = new Vector3f(nx, ny, nz).mul(poseNormalMatrix);
+        n.normalize();
+        return guiLightShadeFromNormal(n.x, n.y, n.z);
+    }
+
+    /** The game's GUI item-light factor for a normalized face normal — the
+     *  light.glsl formula with the setupGui3DDiffuseLighting effective
+     *  directions. This is the LIGHT half; it does not care where the normal
+     *  came from. */
+    private static float guiLightShadeFromNormal(float nx, float ny, float nz) {
+        float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
+        float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
+        return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);
+    }
+
+    /** The face normal from the quad's GEOMETRY: cross product of the edges
+     *  (v1−v0)×(v2−v0), normalized. Quads are wound counter-clockwise viewed
+     *  from outside, so the cross product points out of the face — the sign is
+     *  UNVERIFIED (s11 guessed it wrong → super black; see the LIGHT-PROBE).
+     *  Returns null for a degenerate (zero-area) quad. This is the NORMAL
+     *  half; it does not know about light. */
+    private static float[] guiLightNormalFromGeometry(int[] verts) {
         float x0 = Float.intBitsToFloat(verts[0]);
         float y0 = Float.intBitsToFloat(verts[1]);
         float z0 = Float.intBitsToFloat(verts[2]);
@@ -415,11 +472,8 @@ public final class ItemIconRenderer {
         float ny = az * bx - ax * bz;
         float nz = ax * by - ay * bx;
         float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1.0E-4F) return 0.4F; // degenerate quad → ambient only
-        nx /= len; ny /= len; nz /= len;
-        float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
-        float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
-        return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);
+        if (len < 1.0E-4F) return null; // degenerate quad → no face
+        return new float[] { nx / len, ny / len, nz / len };
     }
 
     /**

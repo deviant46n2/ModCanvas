@@ -14,7 +14,9 @@ use std::path::{Path, PathBuf};
 
 use crate::indexer::find_vanilla_jars;
 
-const CACHE_VERSION: u32 = 2;
+// s14: bump 2→3 — the s12 per-face shading fix changed renderer semantics;
+// a stale cache would serve pre-fix renders.
+const CACHE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct JarMeta {
