@@ -16,7 +16,10 @@ use crate::indexer::find_vanilla_jars;
 
 // s14: bump 2→3 — the s12 per-face shading fix changed renderer semantics;
 // a stale cache would serve pre-fix renders.
-const CACHE_VERSION: u32 = 3;
+// s14: bump 3→4 — the s12 GUI_LIGHT_0/1 constants were wrong (mis-transcribed
+// setupGui3DDiffuseLighting); the corrected constants + game-pose normal
+// matrix change renderer semantics again.
+const CACHE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct JarMeta {

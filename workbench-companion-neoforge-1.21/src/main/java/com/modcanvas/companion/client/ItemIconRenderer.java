@@ -64,15 +64,20 @@ import java.util.List;
  */
 public final class ItemIconRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
-    // The game's GUI item lights: Lighting.setupFor3DItems passes
-    // DIFFUSE_LIGHT_0/1 = normalize(0.2,1,-0.7) / normalize(-0.2,1,0.7)
-    // through GlStateManager.setupGui3DDiffuseLighting, which transforms them
-    // by scaling(-1, 1.0821041, 3.2375858) × rotateYXZ(-0.3926991, 2.3561945,
-    // 0) before the per-face dot products (verified in the vanilla bytecode).
-    // That rotation is what produces the game's left≠right asymmetry. The
-    // effective directions were computed numerically:
-    private static final Vector3f GUI_LIGHT_0 = new Vector3f(-0.57995F, 0.66172F, 0.47516F);
-    private static final Vector3f GUI_LIGHT_1 = new Vector3f(0.57995F, 0.13192F, -0.80390F);
+    // The game's GUI item lights (s14, bytecode-verified): Lighting.setupFor3DItems
+    // passes DIFFUSE_LIGHT_0/1 = normalize(0.2,1,-0.7) / normalize(-0.2,1,0.7)
+    // through GlStateManager.setupGui3DDiffuseLighting, which transforms them by
+    // M = scaling(1, -1, 1).rotateYXZ(1.0821041, 3.2375858, 0).rotateYXZ(
+    // -0.3926991, 2.3561945, 0), then setupLevelDiffuseLighting applies (M⁻¹)ᵀ
+    // (mapped GlStateManager bytecode; the s12 derivation mis-transcribed the
+    // scaling axes — old constants produced the collapsed left/right spread).
+    // The game's pose ALSO carries a y-reflection (GuiGraphics scale(16,-16,16)
+    // -> normal matrix det -1); light-flip x normal-flip cancel in the dot
+    // product, so the correct per-face table (identity pose) is:
+    //   up 1.000, down 0.400, north 0.892, south 0.400, west 0.686, east 0.695
+    // verified against a quest-book screenshot (left/top=0.886, right/top=0.700).
+    private static final Vector3f GUI_LIGHT_0 = new Vector3f(0.10545F, -0.81541F, -0.56920F);
+    private static final Vector3f GUI_LIGHT_1 = new Vector3f(-0.10607F, -0.80138F, 0.58868F);
 
     /** Icon tile size ModCanvas asks for; matches the baked-icon output size. */
     public static final int DEFAULT_SIZE = 64;
@@ -345,32 +350,43 @@ public final class ItemIconRenderer {
                 ? Block.byItem(stack.getItem()).defaultBlockState()
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
-            // Per-face shading (s12, probe-validated): the game's GUI item
+            // Per-face shading (s14, bytecode-verified): the game's GUI item
             // light (setupFor3DItems lights transformed by
             // setupGui3DDiffuseLighting, light.glsl formula) with the face
             // normal from the quad's SEMANTIC direction — BakedQuad.getDirection(),
-            // the face the model baker baked. The LIGHT-PROBE graded three
-            // normal sources against the analytically known per-face table
-            // (UP 0.876, DOWN 0.4, ±X 0.748, ±Z 0.685/0.882) on live data:
-            // the semantic direction reproduced it exactly (6/6); the baked
-            // normal slot reads vertex data on this path (format-dependent,
-            // not authoritative); the geometry cross product is unreadable on
-            // modded quad layouts (probe artifact — the renderer only touches
-            // indices 0-5, which work in any layout). The direction is in
-            // MODEL space; the game's lights are in VIEW space, so the normal
-            // is transformed by the pose's normal matrix (inverse-transpose
-            // of the 3x3) exactly as the game's renderQuadList does — that
-            // keeps identity-pose items on the validated table and rotated
-            // items on the game's shading. Null-direction quads (crosses,
+            // the face the model baker baked. Null-direction quads (crosses,
             // flat cutouts) fall back to the geometry normal, transformed the
             // same way.
-            // The normal matrix is the INVERSE (not inverse-transpose) here
-            // because JOML's Vector3f.mul(Matrix3f) uses the row-vector
-            // convention (v·M = Mᵀ·v) — it supplies the transpose itself.
-            // Using inverse-transpose would double-transpose and scramble the
-            // light on rotated items (verified against the JOML 1.10.5 jar:
-            // the bottom face of a tilted cube must point up-and-back).
-            Matrix3f poseNormalMatrix = new Matrix3f(pose).invert();
+            //
+            // CRITICAL (s14): the shade is a property of the GAME's view, not
+            // our capture view. The game computes it with the pose it renders
+            // the item with: GuiGraphics.renderItem does
+            //   translate(x+8, y+8, 150) -> scale(16,-16,16)
+            // then ItemRenderer.render applies the model's GUI display
+            // transform (block default: rotation [30,225,0], scale 0.625).
+            // The 3x3 normal matrix is (M^-1)^T of THAT pose (PoseStack$Pose.
+            // computeNormalMatrix, mapped bytecode) — which carries a
+            // y-reflection from scale(16,-16,16) (det = -1). The light dirs
+            // from setupGui3DDiffuseLighting carry a y-flip too
+            // (M.scaling(1,-1,1)..., GlStateManager bytecode); the two flips
+            // cancel in the dot product, giving the game's table:
+            //   up 1.000, down 0.400, north 0.892, south 0.400,
+            //   west 0.686, east 0.695
+            // verified against a quest-book screenshot (left/top=0.886,
+            // right/top=0.700). Our capture pose (translate, scale(s,s,1),
+            // GUI transform) is a DIFFERENT view — its normal matrix produces
+            // the wrong shades (all faces ~0.7 — the flat-ish look). So the
+            // normal matrix is NOT derived from our capture pose; it is the
+            // game's, built from the game's pose: the item's OWN GUI display
+            // transform (per-model — blocks inherit the [30,225,0]·0.625
+            // default from block/block, custom models may override) composed
+            // with GuiGraphics' scale(16,-16,16), then inverted. JOML
+            // row-vector mul n·(M⁻¹) ≡ the game's column (M⁻¹)ᵀ·n, so we
+            // store M⁻¹ (verified numerically against the quest book).
+            PoseStack gameStack = new PoseStack();
+            gameStack.scale(16.0F, -16.0F, 16.0F);
+            model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, gameStack);
+            Matrix3f poseNormalMatrix = new Matrix3f(gameStack.last().pose()).invert();
             for (BakedQuad quad : quads) {
                 int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
