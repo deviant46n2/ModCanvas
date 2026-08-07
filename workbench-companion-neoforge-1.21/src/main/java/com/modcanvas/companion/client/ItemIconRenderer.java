@@ -162,7 +162,6 @@ public final class ItemIconRenderer {
                 // painter's-order artifacts.
                 RenderSystem.enableDepthTest();
                 boolean anyDrawn = false;
-                long tDraw = System.nanoTime();
                 for (int i = 0; i < n; i++) {
                     int cellX = (i % GRID) * size;
                     int cellY = (i / GRID) * size;
@@ -177,7 +176,6 @@ public final class ItemIconRenderer {
                         LOGGER.warn("[ItemIconRenderer] Failed to render item {}: {}", validIds.get(start + i), t.toString());
                     }
                 }
-                long tRead0 = System.nanoTime();
                 if (!anyDrawn) {
                     continue;
                 }
@@ -189,7 +187,6 @@ public final class ItemIconRenderer {
                 RenderSystem.bindTexture(target.getColorTextureId());
                 NativeImage atlas = new NativeImage(atlasSize, atlasSize, false);
                 atlas.downloadTexture(0, false);
-                long tSlice0 = System.nanoTime();
                 for (int i = 0; i < n; i++) {
                     int cellX = (i % GRID) * size;
                     int cellY = (i / GRID) * size;
@@ -206,12 +203,6 @@ public final class ItemIconRenderer {
                     }
                 }
                 atlas.close();
-                long tEnd = System.nanoTime();
-                LOGGER.info("[ItemIconRenderer] pass {} items: draw={}ms readback+slice={}ms total={}ms",
-                    n,
-                    (tRead0 - tDraw) / 1_000_000,
-                    (tEnd - tRead0) / 1_000_000,
-                    (tEnd - tDraw) / 1_000_000);
                 target.bindWrite(false);
             }
         } catch (Throwable t) {
