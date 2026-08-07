@@ -4,14 +4,12 @@ const bakeCache = new Map<string, Promise<string | null>>()
 
 // Shape backgrounds are white filled silhouettes with a radial alpha falloff
 // (measured: ~0.99 alpha at center → ~0.32 at corners). The tile matches the
-// game: a LIGHT shape body (near-white at ~58%, like FTB's
-// quest_not_started_color) that fades into a DARK rim — the silhouette filled
-// with a center-light → edge-dark radial gradient, so the alpha falloff works
-// WITH the look (the dark edge shows through as the plate, like the game's
-// dark book behind the shape).
-const PLATE_CENTER = 'rgba(200, 208, 220, 0.95)'
-const PLATE_MID = 'rgba(105, 112, 124, 0.95)'
-const PLATE_EDGE = 'rgba(28, 32, 40, 0.95)'
+// game: a DARK GREY plate — lightest at the center, darker at the outline
+// (the game's plate is a very dark grey, not bright). The alpha falloff works
+// WITH the look: solid dark center, edges fading darker still.
+const PLATE_CENTER = 'rgba(76, 82, 92, 0.95)'
+const PLATE_MID = 'rgba(46, 51, 60, 0.95)'
+const PLATE_EDGE = 'rgba(20, 24, 30, 0.95)'
 // The game's quest outline is a VERY DARK GREY (not white) — the editor's
 // white outline was the visible divergence. Quests with an explicit color
 // tint the outline to that color instead (like the game).
@@ -134,11 +132,10 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   // the 128px source textures are downscaled to small quest tiles.
   ctx.imageSmoothingEnabled = true
 
-  // 1. Plate: the silhouette filled with a radial gradient — LIGHT at the
-  //    center (the game's bright shape body), DARK at the rim. The texture's
-  //    own alpha falloff (0.99 center → 0.32 corners) works WITH this: the
-  //    center reads solid-light, the edges fade into the dark plate, exactly
-  //    like the game's bright shape on its dark book.
+  // 1. Plate: the silhouette filled with a radial gradient — DARK GREY, lightest
+  //    at the center, darkest at the outline (the game's plate). The texture's
+  //    own alpha falloff (0.99 center → 0.32 corners) reinforces it: solid
+  //    center, edges fading darker still.
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.12, size / 2, size / 2, size * 0.75)
   grad.addColorStop(0, PLATE_CENTER)
   grad.addColorStop(0.72, PLATE_MID)
