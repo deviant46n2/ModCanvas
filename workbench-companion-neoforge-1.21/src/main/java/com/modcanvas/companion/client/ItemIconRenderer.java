@@ -63,6 +63,10 @@ import java.util.List;
  */
 public final class ItemIconRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
+    // The game's GUI item lights (Lighting.setupFor3DItems → DIFFUSE_LIGHT_0/1,
+    // verified in the vanilla bytecode + light.glsl).
+    private static final Vector3f GUI_LIGHT_0 = new Vector3f(0.2F, 1.0F, -0.7F).normalize();
+    private static final Vector3f GUI_LIGHT_1 = new Vector3f(-0.2F, 1.0F, 0.7F).normalize();
 
     /** Icon tile size ModCanvas asks for; matches the baked-icon output size. */
     public static final int DEFAULT_SIZE = 64;
@@ -336,17 +340,15 @@ public final class ItemIconRenderer {
                 ? Block.byItem(stack.getItem()).defaultBlockState()
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
-            // Per-face directional shade: vanilla bakes block quads with WHITE
-            // vertex colors — the face shade is NOT in the quads. The game
-            // applies it in the entity shaders from the quad NORMALS (Light0/
-            // Light1 uniforms), which position_tex_color has no access to.
-            // Replicate the classic block look here: multiply by the
-            // direction's shade (up 1.0, sides 0.6/0.8, down 0.5) derived from
-            // the packed normal. Flat item models (non-blocks) keep full
-            // brightness, like the game. Zero normals (missing models, some
-            // modded quads) → no shade — a null would NPE the switch and leak
-            // the model-view stack (crash: "max stack size of 16 reached").
-            boolean shaded = stack.getItem() instanceof BlockItem;
+            // Per-face shading: the game's GUI item light (Lighting.setupFor3DItems)
+            // = two directional lights normalize(0.2, 1.0, -0.7) /
+            // normalize(-0.2, 1.0, 0.7), blended by light.glsl:
+            //   min(1.0, (max(0,dot(L0,n)) + max(0,dot(L1,n))) * 0.6 + 0.4)
+            // This gives top 1.0, z-faces ~0.74, x-faces ~0.50, bottom 0.4 —
+            // the three distinct cube levels and the left≠right asymmetry the
+            // game shows (a directional light, not the axis-symmetric vanilla
+            // block shade). The normal comes from the baked quad (BLOCK int 8);
+            // zero normals → ambient 0.4 only (safe).
             for (BakedQuad quad : quads) {
                 int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
@@ -357,8 +359,7 @@ public final class ItemIconRenderer {
                     tg = (tint >> 8 & 0xFF) / 255.0F;
                     tb = (tint & 0xFF) / 255.0F;
                 }
-                Direction dir = directionOfNormal(verts);
-                float shade = shaded && dir != null ? blockShade(dir) : 1.0F;
+                float shade = guiLightShade(verts);
                 for (int i = 0; i < 4; i++) {
                     int o = stride * i;
                     float x = Float.intBitsToFloat(verts[o]);
@@ -388,29 +389,17 @@ public final class ItemIconRenderer {
         }
     }
 
-    /** Vanilla block face shade by direction (up 1.0, north/south 0.8,
-     *  west/east 0.6, down 0.5). */
-    private static float blockShade(Direction dir) {
-        return switch (dir) {
-            case DOWN -> 0.5F;
-            case UP -> 1.0F;
-            case NORTH, SOUTH -> 0.8F;
-            case WEST, EAST -> 0.6F;
-        };
-    }
-
-    /** Dominant axis of the quad's packed normal (BLOCK-format int 8: three
-     *  signed bytes) → the face direction. Zero normal → null (no shade). */
-    private static Direction directionOfNormal(int[] verts) {
+    /** The game's GUI item-light factor for a baked quad, from its packed
+     *  normal (BLOCK-format int 8: three signed bytes × 127). Mirrors
+     *  light.glsl's minecraft_mix_light with the setupFor3DItems lights. */
+    private static float guiLightShade(int[] verts) {
         int n = verts[8];
-        int nx = (byte) (n & 0xFF);
-        int ny = (byte) ((n >> 8) & 0xFF);
-        int nz = (byte) ((n >> 16) & 0xFF);
-        int ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
-        if (ax == 0 && ay == 0 && az == 0) return null;
-        if (ax >= ay && ax >= az) return nx >= 0 ? Direction.EAST : Direction.WEST;
-        if (ay >= az) return ny >= 0 ? Direction.UP : Direction.DOWN;
-        return nz >= 0 ? Direction.SOUTH : Direction.NORTH;
+        float nx = (byte) (n & 0xFF) / 127.0F;
+        float ny = (byte) ((n >> 8) & 0xFF) / 127.0F;
+        float nz = (byte) ((n >> 16) & 0xFF) / 127.0F;
+        float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
+        float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
+        return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);
     }
 
     /**
