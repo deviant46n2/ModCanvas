@@ -67,8 +67,23 @@ chrome:
   `Instance running, companion missing`) derived in
   `frontend/src/services/connection-status.ts` from socket + deployment +
   launch-tracking signals, with the "how to reach green" manual in the title
-  tooltip. A compact **Restart** icon button (`ws-action-btn`) next to it
-  restarts the bridge server.
+  tooltip. Two compact icon buttons sit next to it:
+  - **Power icon** — *restart the game instance*: sends `STOP_INSTANCE` to the
+    companion (which calls `Minecraft.getInstance().stop()`), waits for the
+    game to exit, then relaunches through the normal launch path — which
+    re-deploys the companion mod, so a freshly built jar takes effect on the
+    next boot (the `launch.rs` deploy step). Orchestration lives in
+    `useLaunchState.handleRestartInstance` (`frontend/src/hooks/useLaunchState.ts`),
+    gated on the instance actually running; the relaunch reuses the Test flow.
+    Disabled while a launch/restart is in flight. Keyboard shortcuts do not
+    work in this app (Tauri v2/WebKitGTK), so this is a visible button.
+  - **Refresh icon** — restarts the bridge server (`ws-action-btn`).
+  - The same restart flow is triggerable from the terminal for dev loops:
+    `node scripts/restart-instance.mjs` connects to the hub as a **tool**
+    peer (`client: "modcanvas-tool"`), sends `RESTART_INSTANCE`, and the hub
+    routes it to the app peer, which runs the identical orchestration. Tool
+    peers are deliberately excluded from the companion count so the pill does
+    not flash a false "Instance Connected" while the script is attached.
 - **Right** — live run feedback: `Testing… <progress>` with a spinner while a
   test is launching, the final test outcome, a truncated `Test failed: <first
   line>` with a **Copy** button when a launch errors (full trace in the title
@@ -79,6 +94,14 @@ chrome:
 
 - `frontend/src/components/common/topbar.tsx` — header + Project menu.
 - `frontend/src/components/common/statusbar.tsx` — workspace status bar.
+- `frontend/src/hooks/useLaunchState.ts` — Test / restart-instance / deploy
+  orchestration (owns `handleRestartInstance`).
+- `frontend/src/services/restart-instance.ts` — `isInstanceRunning` +
+  `waitForInstanceExit` (poll loop with injected check, unit-tested).
+- `scripts/restart-instance.mjs` — terminal trigger for the restart flow
+  (tool peer → `RESTART_INSTANCE` frame).
+- `src-tauri/src/ws_protocol.rs` — `STOP_INSTANCE` / `RESTART_INSTANCE` event
+  names and the `ClientRole::Tool` classification.
 - `frontend/src/components/common/ProjectWorkspace.tsx` — wiring; renders both.
 - `frontend/src/components/common/LeavePackModal.tsx` — Save / Discard / Cancel
   dirty-pack guard.
@@ -87,4 +110,5 @@ chrome:
 - `frontend/src/App.css` — `.workspace-header`, `.project-menu*`,
   `.workspace-statusbar`, `.statusbar-*` styles.
 - Tests: `frontend/src/components/common/topbar.test.tsx`,
-  `frontend/src/components/common/statusbar.test.tsx`.
+  `frontend/src/components/common/statusbar.test.tsx`,
+  `frontend/src/services/restart-instance.test.ts`.

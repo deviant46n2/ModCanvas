@@ -31,6 +31,16 @@ public class WorkbenchEventHandler {
             return;
         }
 
+        if (event.eventType.equals("STOP_INSTANCE")) {
+            // Graceful shutdown: the same stop() the game's quit button calls
+            // (saves worlds, flushes, then exits). Works from the main menu.
+            // External knowledge: Minecraft.stop() is Mojang-mapped in 1.21.1;
+            // verified by the compile against the game jar.
+            LOGGER.info("[WorkbenchEventHandler] STOP_INSTANCE — shutting down game");
+            Minecraft.getInstance().stop();
+            return;
+        }
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             LOGGER.warn("[WorkbenchEventHandler] Player is null, cannot execute command");

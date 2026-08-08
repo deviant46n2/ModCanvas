@@ -33,6 +33,11 @@ pub mod events {
     /// Server -> app peer: companion bridge state changed.
     /// payload: `ConnectionStatus` (camelCase).
     pub const CONNECTION_STATUS: &str = "CONNECTION_STATUS";
+    /// App -> companion: gracefully stop the game (Minecraft.getInstance().stop()).
+    pub const STOP_INSTANCE: &str = "STOP_INSTANCE";
+    /// Tool peer -> app peer: restart the running instance (stop, wait for
+    /// exit, relaunch). Handled by the frontend orchestrator, not the hub.
+    pub const RESTART_INSTANCE: &str = "RESTART_INSTANCE";
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,11 +94,16 @@ pub struct ConnectionStatus {
 /// role: app peers receive companion frames and status pushes; companion
 /// peers receive broadcast commands. Unidentified clients are treated as
 /// companions until they identify (keeps stale companion jars working).
+/// Tool peers are external dev/automation clients (e.g. a restart trigger
+/// script): their frames route to app peers like companion frames, but they
+/// are never counted as a connected companion (no pill lie) and receive no
+/// broadcast commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClientRole {
     Unidentified,
     Companion,
     App,
+    Tool,
 }
 
 /// Classify a peer from its CLIENT_INFO payload (`client` field).
@@ -101,6 +111,7 @@ pub fn classify_client_info(payload: Option<&Value>) -> ClientRole {
     let client = payload.and_then(|p| p.get("client")).and_then(Value::as_str);
     match client {
         Some("modcanvas-app") => ClientRole::App,
+        Some("modcanvas-tool") => ClientRole::Tool,
         Some(_) => ClientRole::Companion,
         None => ClientRole::Unidentified,
     }
@@ -146,6 +157,10 @@ mod tests {
         assert_eq!(
             classify_client_info(Some(&json!({"client": "workbench-companion", "version": "1.0.0"}))),
             ClientRole::Companion
+        );
+        assert_eq!(
+            classify_client_info(Some(&json!({"client": "modcanvas-tool"}))),
+            ClientRole::Tool
         );
         assert_eq!(classify_client_info(Some(&json!({"foo": 1}))), ClientRole::Unidentified);
         assert_eq!(classify_client_info(None), ClientRole::Unidentified);

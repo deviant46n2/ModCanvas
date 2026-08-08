@@ -22,6 +22,8 @@ const offlineView: ConnectionStateView = {
 const base = {
   connection: offlineView,
   onRestartWebSocket: vi.fn(),
+  onRestartInstance: vi.fn(),
+  isRestarting: false,
   isTesting: false,
   testProgress: '',
   testError: '',
@@ -61,6 +63,27 @@ describe('WorkspaceStatusBar', () => {
   it('shows a restart action for the WebSocket server', () => {
     render(<WorkspaceStatusBar {...base} />)
     expect(screen.getByRole('button', { name: /restart websocket server/i })).toBeInTheDocument()
+  })
+
+  it('shows a distinct restart action for the game instance and fires it', () => {
+    const onRestartInstance = vi.fn()
+    render(<WorkspaceStatusBar {...base} onRestartInstance={onRestartInstance} />)
+    const btn = screen.getByRole('button', { name: /restart game instance/i })
+    expect(btn).toBeInTheDocument()
+    btn.click()
+    expect(onRestartInstance).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the game restart button while testing or restarting', () => {
+    const { rerender } = render(<WorkspaceStatusBar {...base} isTesting={true} />)
+    expect(screen.getByRole('button', { name: /restart game instance/i })).toBeDisabled()
+    rerender(<WorkspaceStatusBar {...base} isRestarting={true} />)
+    expect(screen.getByRole('button', { name: /restart game instance/i })).toBeDisabled()
+  })
+
+  it('shows restart progress while restarting', () => {
+    render(<WorkspaceStatusBar {...base} isRestarting={true} testProgress="Stopping game..." />)
+    expect(screen.getByText(/restarting.*stopping game/i)).toBeInTheDocument()
   })
 
   it('shows progress while testing', () => {

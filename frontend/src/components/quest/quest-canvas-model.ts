@@ -106,9 +106,17 @@ export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
           // The shape the game will render for this node: its own shape when
           // set, else the chapter default (quests without a shape field
           // inherit it in-game). Used for the texture bake AND the CSS class.
-          displayShape: effectiveShape(node.shape, chapterDefaults?.[node.chapter_id]),
+          // `chapter_id` is null for chapter nodes, which have no default —
+          // index only when it is a real id (TS: string | null cannot index).
+          displayShape: effectiveShape(
+            node.shape,
+            node.chapter_id ? chapterDefaults?.[node.chapter_id] : null,
+          ),
           shapeTextures: getShapeTextures(
-            effectiveShape(node.shape, chapterDefaults?.[node.chapter_id]),
+            effectiveShape(
+              node.shape,
+              node.chapter_id ? chapterDefaults?.[node.chapter_id] : null,
+            ),
             textureIndex || {},
           ),
           simStatus: simMode ? simStatusById[node.id] : undefined,

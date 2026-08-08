@@ -124,6 +124,8 @@ impl WsIpcServer {
     }
 
     /// Send an event to companion peers (the frontend's command channel).
+    /// Tool peers are excluded — they are dev/automation clients, not
+    /// companions, and must not receive game commands.
     pub async fn broadcast(&self, event: ModEvent) -> Result<usize> {
         let json = event.to_json()?;
         let message = Message::Text(json.into());
@@ -131,7 +133,7 @@ impl WsIpcServer {
         let clients = self.clients.read().await;
         let mut count = 0;
         for client in clients.values() {
-            if client.role != ClientRole::App {
+            if client.role == ClientRole::Companion || client.role == ClientRole::Unidentified {
                 count += 1;
                 if client.sender.send(message.clone()).is_err() {
                     debug!("Failed to send to client (may be disconnected)");
@@ -155,13 +157,13 @@ impl WsIpcServer {
     }
 
     /// Companion bridge state. Counts companion and unidentified peers only —
-    /// the app's own socket never makes the bridge look connected.
+    /// the app's own socket and tool peers never make the bridge look connected.
     pub async fn get_status(&self) -> ConnectionStatus {
         let clients = self.clients.read().await;
         let port = *self.port.read().await;
         let companion_clients = clients
             .values()
-            .filter(|c| c.role != ClientRole::App)
+            .filter(|c| c.role == ClientRole::Companion || c.role == ClientRole::Unidentified)
             .count();
         ConnectionStatus {
             connected: companion_clients > 0,
@@ -336,6 +338,9 @@ async fn route_frame(
                 return;
             }
             ClientRole::Unidentified => return,
+            // Tool peers get no replay (status / companion identity) — they
+            // are fire-and-forget trigger clients.
+            ClientRole::Tool => return,
         }
     }
 
@@ -349,8 +354,10 @@ async fn route_frame(
     };
     let server = app_handle.state::<Arc<WsIpcServer>>();
     match sender_role {
-        // Companion frames flow to the app peer.
-        ClientRole::Companion | ClientRole::Unidentified => {
+        // Companion and tool frames flow to the app peer (the frontend
+        // orchestrator). Tool peers are external triggers (e.g. a restart
+        // script) whose commands the frontend acts on.
+        ClientRole::Companion | ClientRole::Unidentified | ClientRole::Tool => {
             let _ = server.send_to_app_clients(event).await;
         }
         // App frames are commands for the companions.

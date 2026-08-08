@@ -32,6 +32,8 @@ export interface ProjectWorkspaceProps {
   activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'
   onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') => void
   onRestartWebSocket: () => void
+  onRestartInstance: () => void
+  isRestarting: boolean
   deployCompanionMessage: string
   isTesting: boolean
   testProgress: string
@@ -186,6 +188,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
       <WorkspaceStatusBar
         connection={connectionView}
         onRestartWebSocket={props.onRestartWebSocket}
+        onRestartInstance={props.onRestartInstance}
+        isRestarting={props.isRestarting}
         isTesting={props.isTesting}
         testProgress={props.testProgress}
         testError={props.testError}

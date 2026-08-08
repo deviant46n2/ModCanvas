@@ -128,6 +128,15 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
   - For a standalone/release binary, run `pnpm build`.
 - After rebuilding, VERIFY the running binary is newer than the last edit (compare `src-tauri/target/debug/modcanvas` mtime against the newest changed source file). Never claim a fix/feature works against an unbuilt change.
 
+### The Companion Mod Has Its Own Rebuild+Restart Loop (s14 lesson)
+- The companion (`workbench-companion-neoforge-1.21/**`) is a separate artifact from the app binary: it is a mod jar loaded by the GAME at launch. **A running game cannot pick up a new companion jar** — mods load once, at startup.
+- ANY edit to companion code requires, in order:
+  1. `./gradlew build` (in `workbench-companion-neoforge-1.21/`) — produces `build/libs/workbench-companion-1.0.0.jar`.
+  2. **Deploy** the jar into the instance: `cp build/libs/workbench-companion-1.0.0.jar "<instance>/minecraft/mods/` — and VERIFY the copy happened (md5 differs from the old jar; check the new constant/symbol is present via `javap -p -verbose` if unsure — `strings` on a class file does NOT show float constants).
+  3. **Restart the game** (full relaunch, not just rejoin a world).
+- Companion changes that alter renderer semantics (e.g. per-face light constants) are coupled to the app's `engine_renders.rs` `CACHE_VERSION`: bump it in the SAME pass, and **restart the app too** (the new binary enforces the cache invalidation; an old app process keeps serving the stale cache).
+- The s14 trap: the fix was committed, the jar was re-copied, but the jar was the OLD build (identical md5) and the app never restarted — the "dirt block not fixed" observation was invalid because neither artifact ran the new code. Verification loop = rebuild → deploy → restart BOTH app and game → then observe.
+
 ### Testing & Verification
 - **Run Unit Tests:** `pnpm test` (in `frontend/` — includes frontend parser tests like smart-filter DSL)
 - **Run Rust Tests:** `cargo test` (in `src-tauri/` — includes SNBT/NBT/JSON5 parser + import/export round-trip tests)

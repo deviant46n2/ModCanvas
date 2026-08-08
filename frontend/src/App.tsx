@@ -88,6 +88,8 @@ function AppRoot() {
           activeTab={s.activeTab}
           onTabChange={s.handleTabChange}
           onRestartWebSocket={s.restartWebSocket}
+          onRestartInstance={s.handleRestartInstance}
+          isRestarting={s.isRestarting}
           deployCompanionMessage={s.deployCompanionMessage}
           isTesting={s.isTesting}
           testProgress={s.testProgress}

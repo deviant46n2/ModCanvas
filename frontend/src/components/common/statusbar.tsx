@@ -5,11 +5,13 @@ import { useEffect, useState } from 'react'
 import type { ConnectionStateView } from '../../services/connection-status'
 import { getEngineStats, subscribeEngineStats } from '../../services/engine-render'
 import { getBakedTextureKeys } from '../../services/texture-loader'
-import { RefreshIcon } from '../ui/icons'
+import { PowerIcon, RefreshIcon } from '../ui/icons'
 
 interface WorkspaceStatusBarProps {
   connection: ConnectionStateView
   onRestartWebSocket: () => void
+  onRestartInstance: () => void
+  isRestarting: boolean
   isTesting: boolean
   testProgress: string
   testError: string
@@ -21,6 +23,8 @@ const DEPLOY_GLYPHS = /^[\u2713\u2714\u2717\u2718]\s*/
 export function WorkspaceStatusBar({
   connection,
   onRestartWebSocket,
+  onRestartInstance,
+  isRestarting,
   isTesting,
   testProgress,
   testError,
@@ -53,6 +57,15 @@ export function WorkspaceStatusBar({
         </span>
         <button
           className="ws-action-btn"
+          onClick={onRestartInstance}
+          disabled={isTesting || isRestarting}
+          title="Restart game instance (stop the game, then relaunch — re-deploys the companion)"
+          aria-label="Restart game instance"
+        >
+          <PowerIcon size={12} />
+        </button>
+        <button
+          className="ws-action-btn"
           onClick={onRestartWebSocket}
           title="Restart WebSocket server"
           aria-label="Restart WebSocket server"
@@ -68,6 +81,12 @@ export function WorkspaceStatusBar({
         </span>
       </div>
       <div className="workspace-statusbar-group workspace-statusbar-right">
+        {isRestarting && !isTesting && (
+          <span className="statusbar-message info" role="status">
+            <span className="statusbar-spinner" aria-hidden="true" />
+            Restarting... {testProgress}
+          </span>
+        )}
         {isTesting && (
           <span className="statusbar-message info" role="status">
             <span className="statusbar-spinner" aria-hidden="true" />
