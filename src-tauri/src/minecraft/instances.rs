@@ -7,6 +7,7 @@ use crate::launcher::LauncherDriver;
 use crate::models::{InstanceStatus, MinecraftInstance};
 
 use super::companion::deploy_companion_mod_to_dir;
+use super::liveness::InstanceLiveness;
 use super::prism::{
     generate_instance_cfg, generate_mmc_pack, parse_prism_instance_cfg, parse_prism_mmc_pack,
     sanitize_instance_name,
@@ -27,15 +28,25 @@ pub struct InstanceManager {
     /// primary root where new instances are created.
     base_dirs: Vec<PathBuf>,
     pub(super) _driver: Arc<dyn LauncherDriver>,
+    /// Real game-process liveness, used to derive truthful Running status at
+    /// read time. The launch flow's stored status tracks the Prism wrapper,
+    /// which can exit while the game keeps running — deriving from the
+    /// process table fixes every consumer (pill, restart pre-check) at once.
+    liveness: Arc<dyn InstanceLiveness>,
 }
 
 impl InstanceManager {
-    pub fn new(base_dirs: Vec<PathBuf>, driver: Arc<dyn LauncherDriver>) -> Self {
+    pub fn new(
+        base_dirs: Vec<PathBuf>,
+        driver: Arc<dyn LauncherDriver>,
+        liveness: Arc<dyn InstanceLiveness>,
+    ) -> Self {
         eprintln!("[ModCanvas] InstanceManager::new() called with base_dirs: {:?}", base_dirs);
         let manager = Self {
             instances: std::sync::Arc::new(Mutex::new(Vec::new())),
             base_dirs,
             _driver: driver,
+            liveness,
         };
         manager.load_instances();
         eprintln!("[ModCanvas] InstanceManager::new() completed, instances loaded: {}", manager.instances.lock().unwrap().len());
@@ -225,7 +236,35 @@ impl InstanceManager {
     }
 
     pub fn list_instances(&self) -> Vec<MinecraftInstance> {
-        self.instances.lock().unwrap().clone()
+        let mut instances = self.instances.lock().unwrap().clone();
+        // Derive truthful Running status from the process table at read time.
+        // The launch flow stores wrapper-lifecycle status (Running at spawn,
+        // Stopped at exit), but the wrapper can exit while the game keeps
+        // running — the stored field then lies. The process table is the
+        // truth: a live process whose cmdline contains this game_dir IS the
+        // instance running. Every consumer (connection pill, restart
+        // pre-check) reads through here, so fixing the source fixes all of
+        // them at once — one fact, one source.
+        for inst in instances.iter_mut() {
+            if inst.status == InstanceStatus::Installing || inst.status == InstanceStatus::Crashed {
+                continue; // transient/terminal states owned by the launch flow
+            }
+            // The game process's cmdline carries the instance ROOT (via
+            // -Djava.library.path=.../natives), never the /minecraft subdir
+            // that game_dir points at. Measured on a live game 2026-08-08:
+            // the only instance-specific marker is the root path. Strip the
+            // minecraft suffix so the scan matches what the process shows.
+            let root = inst
+                .game_dir
+                .strip_suffix("/minecraft")
+                .unwrap_or(&inst.game_dir);
+            if self.liveness.is_running(root) {
+                inst.status = InstanceStatus::Running;
+            } else if inst.status == InstanceStatus::Running {
+                inst.status = InstanceStatus::Stopped;
+            }
+        }
+        instances
     }
 
     pub fn reload_instances(&self) -> Vec<MinecraftInstance> {

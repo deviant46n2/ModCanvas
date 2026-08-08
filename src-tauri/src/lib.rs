@@ -30,7 +30,7 @@ use tauri::Manager;
 
 use db::Database;
 use launcher::{LauncherDriver, PrismLauncherDriver};
-use minecraft::InstanceManager;
+use minecraft::{InstanceLiveness, InstanceManager, ProcLiveness};
 use mod_intelligence::ModIntelligence;
 
 static TEST_INSTANCE_ID: OnceLock<String> = OnceLock::new();
@@ -91,7 +91,8 @@ pub fn run() {
             }
 
             let launcher_driver: Arc<dyn LauncherDriver> = Arc::new(PrismLauncherDriver::new());
-            let instance_manager = InstanceManager::new(instances_dirs, launcher_driver);
+            let liveness: Arc<dyn InstanceLiveness> = Arc::new(ProcLiveness::default());
+            let instance_manager = InstanceManager::new(instances_dirs, launcher_driver, liveness);
             app.manage(instance_manager);
 
             // WebSocket IPC Server for Minecraft Companion Mod
