@@ -1,0 +1,223 @@
+{
+  "lineLimit": 300,
+  "lineLimitPaths": [
+    "src-tauri/src",
+    "frontend/src",
+    "workbench-companion-neoforge-1.21/src"
+  ],
+  "assetDirs": [
+    "frontend/public",
+    "frontend/src/assets"
+  ],
+  "binaryPath": "src-tauri/target/debug/modcanvas",
+  "sourcePaths": [
+    "src-tauri/src",
+    "frontend/src"
+  ],
+  "allowlists": {
+    "line-limit": [
+      {
+        "path": "src-tauri/src/commands/mod.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/commands/progression.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/commands/project.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/db.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/icons.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/curseforge.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/ftb_quests/export/mod.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/ftb_quests/export_tests.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/ftb_quests/mod.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/mod.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/packwiz.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/progression_config.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/quest_config.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/resolution.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/imports/snbt.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/ingest.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/instance_textures/models/tests/resolve.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/instance_textures.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/minecraft/instances.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/mod_intelligence/modrinth.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/path_safety.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/progression.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/quest/analysis.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/recipe_disable.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/recipes/crafttweaker.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/recipes/kubejs.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/recipes/mod.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/scriptgen/crafttweaker.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/scriptgen/kubejs.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/shared.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "src-tauri/src/ws_ipc.rs",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/App.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/ProgressionGraph.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/ProgressionGraph.tsx",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/RecipeEditor.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/components/QuestTile.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/components/common/config-editor.tsx",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/components/quest/QuestCanvas.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/components/quest/editor-theme.css",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/components/ui/icons.tsx",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/core/pack-health/checks/quests.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/core/recipe/recipe-editor.test.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/core/recipe/recipe-store.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/hooks/useModState.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/hooks/useQuestAssetPipeline.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/services/quest-types.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "frontend/src/services/texture-loader.ts",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      },
+      {
+        "path": "workbench-companion-neoforge-1.21/src/main/java/com/modcanvas/companion/client/ItemIconRenderer.java",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+      }
+    ],
+    "asset-bundle": [
+      {
+        "path": "frontend/src/assets/hero.png",
+        "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/"
+      },
+      {
+        "path": "frontend/src/assets/logo.png",
+        "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/"
+      }
+    ]
+  }
+}
