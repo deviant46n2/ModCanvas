@@ -216,6 +216,15 @@
       }
     ],
     "adapter-matrix": [],
-    "stale-binary": []
+    "stale-binary": [
+      {
+        "name": "dev",
+        "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) — no runtime behavior changed; rebuild at next real build"
+      },
+      {
+        "name": "release",
+        "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) — no runtime behavior changed; rebuild at next real build"
+      }
+    ]
   }
 }

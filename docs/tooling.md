@@ -85,6 +85,7 @@ The five failure classes observed across the arc, each with a tool:
 | Verification loops skipped under pressure (s14: jar was old build, app never restarted) | **Verification harness** — rebuild → deploy → restart → observe, each step graded on EVIDENCE; claim only after | `/verify-build` command |
 | Stale state (s13 goal contract rotted 2 sessions; B2: `.tutor` gitignored + 30-day auto-cleanup) | **State backup + audit** — tar the arc (`.tutor` + memory store + config), verify the archive, audit expiry risk | `scripts/backup-state.mjs` + `/backup` via `pnpm backup` |
 | Content-level doc drift (CACHE_VERSION, jar versions) | **Doc anchors** — doc mention ≠ code value = violation | `doc-anchors` integrity section |
+| Process-skip at session close (s22: profile mirror written, `code:session` handoff write skipped — memory told a stale story, caught s23) | **State freshness** — newest `code:session` in the memory store must postdate the last commit; stale = the closing session never wrote its snapshot | `scripts/state-freshness.mjs` via `pnpm state-freshness`, run as `/audit` step 5 |
 
 The meta-rule holds: every tool obeys the repo's own rules — documented,
 tracked, tested (the suite's test count is verified by the gate itself — a

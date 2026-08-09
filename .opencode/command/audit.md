@@ -21,6 +21,12 @@ Verify the tutor's own configuration against the repo and itself:
    (the mirror is human-readable, never the source of truth; flag drift).
 4. **Frontmatter honesty** — every command/skill `description` matches what
    the file actually instructs (a stale description misleads the next agent).
+5. **State freshness** — `node scripts/state-freshness.mjs`: the newest
+   `code:session` entry in memory must postdate the last commit. A stale
+   resume point is the s22-close failure (profile mirror written, handoff
+   write skipped — memory told a stale story). Exit 1 means the session that
+   committed the latest work never wrote its close snapshot; remedy is the
+   /handoff write, not an edit to this audit.
 
 Classify findings: **blocking** (would misdirect a session), **should**
 (hygiene), **nit** (style). Fix nothing without hands-on — the student owns

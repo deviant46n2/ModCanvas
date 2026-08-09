@@ -6,7 +6,8 @@
     "dev": "cargo tauri dev",
     "build": "cargo tauri build",
     "integrity": "node scripts/integrity-check.mjs",
-    "test:tools": "node --test scripts/integrity-check.test.mjs scripts/integrity-git.test.mjs scripts/integrity-doc.test.mjs scripts/integrity-suite.test.mjs scripts/backup-state.test.mjs",
+    "test:tools": "node --test scripts/integrity-check.test.mjs scripts/integrity-git.test.mjs scripts/integrity-doc.test.mjs scripts/integrity-suite.test.mjs scripts/backup-state.test.mjs scripts/state-freshness.test.mjs",
+    "state-freshness": "node scripts/state-freshness.mjs",
     "backup": "node scripts/backup-state.mjs"
   }
 }
