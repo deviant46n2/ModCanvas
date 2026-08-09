@@ -19,7 +19,14 @@ use crate::indexer::find_vanilla_jars;
 // s14: bump 3→4 — the s12 GUI_LIGHT_0/1 constants were wrong (mis-transcribed
 // setupGui3DDiffuseLighting); the corrected constants + game-pose normal
 // matrix change renderer semantics again.
-const CACHE_VERSION: u32 = 4;
+// s21: bump 4→5 — approach B (game's own entity_cutout shading) rendered
+// solid black until Sampler1 (overlay) + Sampler2 (lightmap) were bound via
+// the RenderType's own state methods; the cached icons were all-black.
+// s21 cont.4: bump 5→6 — baked UV2 garbage (0x8100) merged via max() landed
+// the lightmap fetch out of bounds (blocks discarded/invisible); the fix
+// zeroes baked UV2 so the passed light wins. The version-5 cache holds the
+// broken capture.
+const CACHE_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct JarMeta {

@@ -64,20 +64,13 @@ import java.util.List;
  */
 public final class ItemIconRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
-    // The game's GUI item lights (s14, bytecode-verified): Lighting.setupFor3DItems
-    // passes DIFFUSE_LIGHT_0/1 = normalize(0.2,1,-0.7) / normalize(-0.2,1,0.7)
-    // through GlStateManager.setupGui3DDiffuseLighting, which transforms them by
-    // M = scaling(1, -1, 1).rotateYXZ(1.0821041, 3.2375858, 0).rotateYXZ(
-    // -0.3926991, 2.3561945, 0), then setupLevelDiffuseLighting applies (M⁻¹)ᵀ
-    // (mapped GlStateManager bytecode; the s12 derivation mis-transcribed the
-    // scaling axes — old constants produced the collapsed left/right spread).
-    // The game's pose ALSO carries a y-reflection (GuiGraphics scale(16,-16,16)
-    // -> normal matrix det -1); light-flip x normal-flip cancel in the dot
-    // product, so the correct per-face table (identity pose) is:
-    //   up 1.000, down 0.400, north 0.892, south 0.400, west 0.686, east 0.695
-    // verified against a quest-book screenshot (left/top=0.886, right/top=0.700).
-    private static final Vector3f GUI_LIGHT_0 = new Vector3f(0.10545F, -0.81541F, -0.56920F);
-    private static final Vector3f GUI_LIGHT_1 = new Vector3f(-0.10607F, -0.80138F, 0.58868F);
+    // HISTORICAL (s21 re-scope): the manual GUI-light constants
+    // L0=(-0.9334392,-0.26269472,-0.24430016) L1=(-0.10357137,-0.9766068,0.18844642)
+    // were verified three independent ways (bytecode transform, live uniform
+    // probe, live GUI render) and REMOVED because they are now redundant: the
+    // entity_cutout shader reads those same uniforms itself and lights vertices
+    // by their baked normals — the game's own path. The trail is preserved in
+    // git history and the code:session memory.
 
     /** Icon tile size ModCanvas asks for; matches the baked-icon output size. */
     public static final int DEFAULT_SIZE = 64;
@@ -128,6 +121,14 @@ public final class ItemIconRenderer {
         // Cells set the viewport per item; the game's viewport must come back.
         int[] savedViewport = new int[4];
         GL11.glGetIntegerv(GL11.GL_VIEWPORT, savedViewport);
+        // s21 cont.4 (state-leak bug): the pass sets blend/cull/depth below and
+        // the finally MUST restore them — leaving depth ON after a capture
+        // depth-rejects the quest book's GUI draws (the "refresh bug": the book
+        // re-draws with icons discarded). The method doc claims all state is
+        // restored; it was not — this is the fix.
+        boolean blendWasEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
+        boolean cullWasEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
+        boolean depthWasEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         try {
             int atlasSize = size * GRID;
             target = new TextureTarget(atlasSize, atlasSize, true, Minecraft.ON_OSX);
@@ -146,7 +147,13 @@ public final class ItemIconRenderer {
             // mip-0 NEAREST for the capture (the game's GUI samples the atlas
             // with nearest too, so a 16px sprite reads crisp like the quest
             // book) and restore the game's filters after.
-            RenderSystem.setShaderTexture(0, blockAtlas.getId());
+            // s21 cont.4 (deferred-bind bug): RenderSystem.setShaderTexture only
+            // writes the deferred shaderTextures[] array — the flush path
+            // consumes it, the raw offscreen draw NEVER applies it (s9b
+            // cousin). Bind the atlas IMMEDIATELY so the filter calls below hit
+            // the atlas and the draw samples it, not whatever unit 0 held.
+            GL30.glActiveTexture(GL30.GL_TEXTURE0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, blockAtlas.getId());
             GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter);
             GL11.glGetTexParameteriv(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, savedMagFilter);
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
@@ -226,10 +233,16 @@ public final class ItemIconRenderer {
         } finally {
             GL30.glViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
             if (filterOverridden) {
-                RenderSystem.setShaderTexture(0, blockAtlas.getId());
+                GL30.glActiveTexture(GL30.GL_TEXTURE0);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, blockAtlas.getId());
                 GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, savedMinFilter[0]);
                 GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, savedMagFilter[0]);
             }
+            // Restore the blend/cull/depth state the pass changed — leaving
+            // depth ON breaks the game's GUI (quest book icons depth-rejected).
+            if (blendWasEnabled) RenderSystem.enableBlend(); else RenderSystem.disableBlend();
+            if (cullWasEnabled) RenderSystem.enableCull(); else RenderSystem.disableCull();
+            if (depthWasEnabled) RenderSystem.enableDepthTest(); else RenderSystem.disableDepthTest();
             if (target != null) {
                 target.unbindWrite();
                 target.destroyBuffers();
@@ -257,6 +270,11 @@ public final class ItemIconRenderer {
      *  drawWithShader is the only draw path that works in this offscreen
      *  context; the flush path's deferred setShader never applies here. */
     private static void drawItemDirect(ItemStack stack, int size, float farPlane) {
+        // GUI item light/overlay, from the game's own GuiGraphics.renderItem
+        // bytecode (verified): 0xF000F0 full-bright + NO_OVERLAY. The shade is
+        // NOT baked here anymore — entity_cutout lights via the uniforms.
+        int light = 0xF000F0;
+        int overlay = net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
         Minecraft mc = Minecraft.getInstance();
         ItemRenderer itemRenderer = mc.getItemRenderer();
         BakedModel model = itemRenderer.getModel(stack, null, null, 0);
@@ -306,6 +324,10 @@ public final class ItemIconRenderer {
 
         PoseStack poseStack = new PoseStack();
         poseStack.translate(size / 2.0F, size / 2.0F, 150.0F);
+        // NOTE (s21, REVERTED): a y-flip here (scale(s,-s,1)) was tried to fix
+        // "darkest face at top" — it broke geometry (barrel rendered upside
+        // down; student ground truth). The capture view is NOT mirrored; the
+        // shade-position mismatch lives in the SHADING side, not this pose.
         poseStack.scale(s, s, 1.0F);
         poseStack.translate(-(minX + maxX) / 2.0F, -(minY + maxY) / 2.0F, 0.0F);
         model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, poseStack);
@@ -331,16 +353,55 @@ public final class ItemIconRenderer {
             // access to, so we apply the GUI item light ourselves via the
             // shade multiplier below (the flat state, shade = 1.0, looked
             // flat precisely because the colors carry no shade).
-            RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
-            if (RenderSystem.getShader() != null) {
-                RenderSystem.getShader().apply();
+            // Approach B (s21 re-scope, experiment-verified): the game's own
+            // shading path. entity_cutout reads the Light0/Light1 uniforms
+            // (bound by setupFor3DItems at the top of render()) and lights each
+            // vertex by its NORMAL — verified binding offscreen via [ITEM-EXP]
+            // probe (5,625 confirmations). The manual shade table dies.
+            RenderSystem.setShader(GameRenderer::getRendertypeEntityCutoutShader);
+            var shader = RenderSystem.getShader();
+            if (shader != null) {
+                // The binding authority at draw time is the ShaderInstance's
+                // sampler map: setSampler() populates it, apply() binds the
+                // units from it. Raw glBindTexture AND the deferred
+                // setShaderTexture array are both OVERRIDDEN by apply() (s21
+                // cont.4, bytecode-verified) — that is why the earlier binds
+                // changed nothing. Populate the map so the draw sees the
+                // atlas (Sampler0), overlay (Sampler1), lightmap (Sampler2).
+                Object overlaySampler = null;
+                Object lightmapSampler = null;
+                try {
+                    var lt = mc.gameRenderer.lightTexture();
+                    java.lang.reflect.Field lf = net.minecraft.client.renderer.LightTexture.class.getDeclaredField("lightTexture");
+                    lf.setAccessible(true);
+                    lightmapSampler = lf.get(lt);
+                    var ot = mc.gameRenderer.overlayTexture();
+                    java.lang.reflect.Field of = net.minecraft.client.renderer.texture.OverlayTexture.class.getDeclaredField("texture");
+                    of.setAccessible(true);
+                    overlaySampler = of.get(ot);
+                } catch (Exception e10) {
+                    LOGGER.warn("[ItemIconRenderer] Sampler reflection failed: {}", e10.toString());
+                }
+                shader.setSampler("Sampler0", mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS));
+                shader.setSampler("Sampler1", overlaySampler);
+                shader.setSampler("Sampler2", lightmapSampler);
+                shader.apply();
             }
-            RenderSystem.setShaderTexture(0,
-                mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
 
             var tess = Tesselator.getInstance();
-            var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            // s21j FIX: the draw MUST use NEW_ENTITY, not BLOCK. The
+            // entity_cutout shader declares `in ivec2 UV1` (overlay) and the
+            // fragment shader mixes color with the overlay texel fetch —
+            // `color.rgb = mix(overlayColor.rgb, color.rgb, overlayColor.a)`.
+            // BLOCK has no UV1 (Position/Color/UV0/UV2/Normal per bytecode),
+            // so the VAO feeds garbage UV1 -> texelFetch OOB -> (0,0,0,0) ->
+            // mix() picks black -> EVERYTHING renders black. The game's own
+            // quest-book path (ItemRenderer.renderQuadList -> entityCutout)
+            // uses NEW_ENTITY (Position/Color/UV0/UV1/UV2/Normal), which is
+            // why in-game icons are correct. putBulkData below already
+            // receives `light, overlay`; NEW_ENTITY is what makes UV1 real.
+            var vb = tess.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
             // Block tints (grass/leaves/etc.) are applied at RENDER time, not
             // baked: the quads carry a tintIndex and vanilla multiplies the vertex
             // color by BlockColors. Without it, tinted blocks render their
@@ -350,147 +411,50 @@ public final class ItemIconRenderer {
                 ? Block.byItem(stack.getItem()).defaultBlockState()
                 : null;
             BlockColors blockColors = Minecraft.getInstance().getBlockColors();
-            // Per-face shading (s14, bytecode-verified): the game's GUI item
-            // light (setupFor3DItems lights transformed by
-            // setupGui3DDiffuseLighting, light.glsl formula) with the face
-            // normal from the quad's SEMANTIC direction — BakedQuad.getDirection(),
-            // the face the model baker baked. Null-direction quads (crosses,
-            // flat cutouts) fall back to the geometry normal, transformed the
-            // same way.
-            //
-            // CRITICAL (s14): the shade is a property of the GAME's view, not
-            // our capture view. The game computes it with the pose it renders
-            // the item with: GuiGraphics.renderItem does
-            //   translate(x+8, y+8, 150) -> scale(16,-16,16)
-            // then ItemRenderer.render applies the model's GUI display
-            // transform (block default: rotation [30,225,0], scale 0.625).
-            // The 3x3 normal matrix is (M^-1)^T of THAT pose (PoseStack$Pose.
-            // computeNormalMatrix, mapped bytecode) — which carries a
-            // y-reflection from scale(16,-16,16) (det = -1). The light dirs
-            // from setupGui3DDiffuseLighting carry a y-flip too
-            // (M.scaling(1,-1,1)..., GlStateManager bytecode); the two flips
-            // cancel in the dot product, giving the game's table:
-            //   up 1.000, down 0.400, north 0.892, south 0.400,
-            //   west 0.686, east 0.695
-            // verified against a quest-book screenshot (left/top=0.886,
-            // right/top=0.700). Our capture pose (translate, scale(s,s,1),
-            // GUI transform) is a DIFFERENT view — its normal matrix produces
-            // the wrong shades (all faces ~0.7 — the flat-ish look). So the
-            // normal matrix is NOT derived from our capture pose; it is the
-            // game's, built from the game's pose: the item's OWN GUI display
-            // transform (per-model — blocks inherit the [30,225,0]·0.625
-            // default from block/block, custom models may override) composed
-            // with GuiGraphics' scale(16,-16,16), then inverted. JOML
-            // row-vector mul n·(M⁻¹) ≡ the game's column (M⁻¹)ᵀ·n, so we
-            // store M⁻¹ (verified numerically against the quest book).
-            PoseStack gameStack = new PoseStack();
-            gameStack.scale(16.0F, -16.0F, 16.0F);
-            model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, gameStack);
-            Matrix3f poseNormalMatrix = new Matrix3f(gameStack.last().pose()).invert();
+            // The pose the geometry renders with IS the pose whose normal matrix
+            // the game uses for shading (PoseStack$Pose.transformNormal inside
+            // putBulkData). No separate flipped gameStack — the mirror bug that
+            // plagued the manual shade table cannot exist here by construction.
+            var poseEntry = poseStack.last();
             for (BakedQuad quad : quads) {
-                int[] verts = quad.getVertices();
                 int tintIndex = quad.getTintIndex();
-                float tr = 1.0F, tg = 1.0F, tb = 1.0F;
+                float tr = 1.0F, tg = 1.0F, tb = 1.0F, ta = 1.0F;
                 if (tintIndex >= 0 && tintState != null) {
                     int tint = blockColors.getColor(tintState, null, null, tintIndex);
+                    ta = (tint >>> 24) / 255.0F;
                     tr = (tint >> 16 & 0xFF) / 255.0F;
                     tg = (tint >> 8 & 0xFF) / 255.0F;
                     tb = (tint & 0xFF) / 255.0F;
                 }
-                float shade = guiLightShadeForQuad(quad, verts, poseNormalMatrix);
-                for (int i = 0; i < 4; i++) {
-                    int o = stride * i;
-                    float x = Float.intBitsToFloat(verts[o]);
-                    float y = Float.intBitsToFloat(verts[o + 1]);
-                    float z = Float.intBitsToFloat(verts[o + 2]);
-                    // Vertex color int is 0xAABBGGRR; multiply RGB by tint × shade.
-                    int color = verts[o + 3];
-                    int a = color >>> 24;
-                    int nr = (int) ((color & 0xFF) * tr * shade);
-                    int ng = (int) ((color >> 8 & 0xFF) * tg * shade);
-                    int nb = (int) ((color >> 16 & 0xFF) * tb * shade);
-                    float u = Float.intBitsToFloat(verts[o + 4]);
-                    float v = Float.intBitsToFloat(verts[o + 5]);
-                    vb.addVertex(pose, x, y, z)
-                        .setUv(u, v)
-                        .setColor(a << 24 | nb << 16 | ng << 8 | nr);
-                }
+                // The game's own vertex writer: baked direction -> normal ->
+                // transformed by the render pose's normal matrix -> written as
+                // the per-vertex normal. The entity_cutout shader then lights
+                // that normal against the bound Light0/Light1 uniforms — the
+                // exact quest-book mechanism (renderQuadList -> putBulkData).
+                vb.putBulkData(poseEntry, quad, tr, tg, tb, ta, light, overlay);
             }
             BufferUploader.drawWithShader(vb.build());
         } finally {
             // The stack MUST come back even when a draw throws: an unbalanced
             // push leaks one slot per failed item, and 16 leaks fill the
             // 16-slot Matrix4fStack — the next frame crashes ("max stack size
-            // of 16 reached").
+            // of 16 reached"). The sampler teardown lives here too, so a
+            // throwing draw can't leave units 1/2 bound to textures the next
+            // RenderType didn't ask for.
+            GL30.glActiveTexture(GL30.GL_TEXTURE1);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            GL30.glActiveTexture(GL30.GL_TEXTURE2);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            GL30.glActiveTexture(GL30.GL_TEXTURE0);
             mvStack.popMatrix();
             RenderSystem.applyModelViewMatrix();
         }
     }
 
-    /** The game's GUI item-light factor for a baked quad (s12): the semantic
-     *  face direction — BakedQuad.getDirection(), the face the model baker
-     *  baked — transformed into VIEW space by the pose's normal matrix and
-     *  run through the light.glsl formula. This reproduces the game's
-     *  per-face table exactly on identity-pose items (probe-validated) and
-     *  follows the game's renderQuadList normal transform on rotated items.
-     *  Null-direction quads (crosses, flat cutouts) fall back to the geometry
-     *  normal, transformed the same way. A degenerate OR non-finite normal
-     *  returns no shade (1.0 = the flat state): the geometry fallback reads
-     *  verts with a BLOCK-layout stride that modded quads can violate, and a
-     *  NaN shade would cast to a black vertex — the super-black failure class
-     *  via a different door. */
-    private static float guiLightShadeForQuad(BakedQuad quad, int[] verts, Matrix3f poseNormalMatrix) {
-        float nx, ny, nz;
-        Direction d = quad.getDirection();
-        if (d != null) {
-            nx = d.getStepX(); ny = d.getStepY(); nz = d.getStepZ();
-        } else {
-            float[] g = guiLightNormalFromGeometry(verts);
-            if (g == null) return 1.0F; // degenerate quad → no face → no shade
-            nx = g[0]; ny = g[1]; nz = g[2];
-        }
-        if (!Float.isFinite(nx) || !Float.isFinite(ny) || !Float.isFinite(nz)) {
-            return 1.0F; // garbage vertex layout → no shade rather than black
-        }
-        Vector3f n = new Vector3f(nx, ny, nz).mul(poseNormalMatrix);
-        n.normalize();
-        return guiLightShadeFromNormal(n.x, n.y, n.z);
-    }
-
-    /** The game's GUI item-light factor for a normalized face normal — the
-     *  light.glsl formula with the setupGui3DDiffuseLighting effective
-     *  directions. This is the LIGHT half; it does not care where the normal
-     *  came from. */
-    private static float guiLightShadeFromNormal(float nx, float ny, float nz) {
-        float l0 = Math.max(0.0F, nx * GUI_LIGHT_0.x() + ny * GUI_LIGHT_0.y() + nz * GUI_LIGHT_0.z());
-        float l1 = Math.max(0.0F, nx * GUI_LIGHT_1.x() + ny * GUI_LIGHT_1.y() + nz * GUI_LIGHT_1.z());
-        return Math.min(1.0F, (l0 + l1) * 0.6F + 0.4F);
-    }
-
-    /** The face normal from the quad's GEOMETRY: cross product of the edges
-     *  (v1−v0)×(v2−v0), normalized. Quads are wound counter-clockwise viewed
-     *  from outside, so the cross product points out of the face — the sign is
-     *  UNVERIFIED (s11 guessed it wrong → super black; see the LIGHT-PROBE).
-     *  Returns null for a degenerate (zero-area) quad. This is the NORMAL
-     *  half; it does not know about light. */
-    private static float[] guiLightNormalFromGeometry(int[] verts) {
-        float x0 = Float.intBitsToFloat(verts[0]);
-        float y0 = Float.intBitsToFloat(verts[1]);
-        float z0 = Float.intBitsToFloat(verts[2]);
-        float ax = Float.intBitsToFloat(verts[10]) - x0;
-        float ay = Float.intBitsToFloat(verts[11]) - y0;
-        float az = Float.intBitsToFloat(verts[12]) - z0;
-        float bx = Float.intBitsToFloat(verts[20]) - x0;
-        float by = Float.intBitsToFloat(verts[21]) - y0;
-        float bz = Float.intBitsToFloat(verts[22]) - z0;
-        // n = a × b
-        float nx = ay * bz - az * by;
-        float ny = az * bx - ax * bz;
-        float nz = ax * by - ay * bx;
-        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1.0E-4F) return null; // degenerate quad → no face
-        return new float[] { nx / len, ny / len, nz / len };
-    }
+    /** The game's GUI item-light factor for a baked quad (s12): REPLACED by the
+     *  game's own shading path (s21 re-scope) — entity_cutout lights vertices
+     *  by their baked normals against the Light0/Light1 uniforms; the manual
+     *  shade table was removed (dead code). */
 
     /**
      * Encode the downloaded texture as a base64 PNG data URL. The readback is

@@ -268,3 +268,42 @@ in-game appearance.
 - The mod renderer can only be verified in-game: launch the pack with the
   companion deployed, confirm `workbench status` shows "Connected", then open
   ModCanvas and watch missing icons resolve (and persist across restarts).
+
+## Fidelity arc — PARKED (2026-08-09)
+
+**Status: OPEN BUG, deliberately parked.** Engine-rendered icons currently
+capture as **opaque black or fully transparent — 0/38,828 colored** in the last
+full-pack drain. Do not treat this as fixed.
+
+**What IS fixed and kept (in the companion at this park point):**
+- `setSampler("Sampler0/1/2", ...)` + `apply()` — the deferred
+  `RenderSystem.setShaderTexture` never reaches raw offscreen draws.
+- Immediate `glBindTexture` for the block atlas (same deferred-bind family).
+- **NEW_ENTITY vertex format** (was BLOCK): `rendertype_entity_cutout.vsh`
+  declares `in ivec2 UV1`; BLOCK has no UV1 → garbage overlay `texelFetch` →
+  out-of-bounds `(0,0,0,0)` → `mix()` picks black. The game's own quest-book
+  path uses NEW_ENTITY. This is a real bug, fixed, but NOT sufficient alone.
+- UV2 zeroing (`CACHE_VERSION 6` in `engine_renders.rs`) — baked UV2 garbage
+  (0x8100) landed the lightmap fetch out of bounds (blocks discarded).
+- Blend/cull/depth restore in the `finally` (quest-book "refresh bug").
+
+**What is NOT fixed (the remaining fidelity question):**
+- Engine-rendered icons still render black/transparent even with correct
+  samplers, correct sampler content (GPU-verified: lightmap white, overlay
+  correct), and NEW_ENTITY. The draw is missing *state the game's RenderType
+  flush sets for free*:
+  1. `RenderSystem.setShaderColor(1,1,1,1)` is called AFTER `shader.apply()` —
+     the ColorModulator uniform is uploaded from the game's stale state.
+  2. `Lighting.setupFor3DItems()` runs BEFORE `setShader(...)` — Light0/Light1
+     uniforms may never land on this shader (JSON default is 0,0,0).
+  3. Fog uniforms at draw time unmeasured.
+- Shade-position question (darkest top vs bottom; barrel ground truth) —
+  previously measured, still open.
+
+**Why parked:** each hypothesis costs a full game restart + pack drain (~5
+min) to measure; the arc outran its teaching value and the maintainer is
+switching to tutor tooling (agreed s21 cont.4). The uniform-probe harness was
+stripped with this park (see git history for `ItemIconRenderer.java`); the
+resume path is: re-add the `[UNIFORM-PROBE]` block (it reads
+`intValues` XOR `floatValues` by type — FogShape is int and has a null
+floatValues), drain, and the three numbers above decide the fix.
