@@ -13,6 +13,8 @@ pub mod resolution;
 pub mod quest_config;
 pub mod progression_config;
 pub mod snbt;
+#[cfg(test)]
+mod snbt_roundtrip;
 pub mod ftb_quests;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
