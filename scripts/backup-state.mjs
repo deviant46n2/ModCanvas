@@ -27,7 +27,9 @@ const DEFAULT_SOURCES = {
 const BACKUP_DIR = join(ROOT, 'backups', 'tutor-state')
 const KEEP = 5 // archived backups retained; older ones are deleted
 
-const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+// Millisecond precision: two backups within the same second must never share
+// a filename (F5 fix — second-granularity stamps silently overwrite).
+const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').replace('Z', '')
 
 export function audit(sources) {
   const findings = []

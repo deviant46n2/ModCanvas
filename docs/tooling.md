@@ -16,8 +16,8 @@ node scripts/integrity-check.mjs            # all sections; exit 1 on violations
 node scripts/integrity-check.mjs --seed     # snapshot current tree into rules as parked debt
 node scripts/integrity-check.mjs <section>  # one section
 node --test scripts/integrity-check.test.mjs # engine tests (12)
-pnpm integrity / pnpm test:tools        # same, via the root package.json
-pnpm backup                             # state backup + expiry audit
+`pnpm integrity` / `pnpm test:tools`   # same, via the root package.json
+`pnpm backup`                          # state backup + expiry audit
 ```
 
 Sections:
@@ -26,7 +26,7 @@ Sections:
 |---|---|---|
 | `line-limit` | no file > 300 lines (AGENTS.md) | new over-limit files in `src-tauri/src`, `frontend/src`, companion `src` |
 | `asset-bundle` | no game-derived image bytes in the bundle (AGENTS.md rule 6) | new raster images in `frontend/public|src/assets`; images in `tauri.conf.json` `bundle.resources` |
-| `stale-binary` | binary embeds src + frontend; stale binary serves old behavior | `target/debug/modcanvas` older than the newest source edit |
+| `stale-binary` | binary embeds src + frontend; stale binary serves old behavior | per-binary scoping: dev binary vs `src-tauri/src` only (frontend hot-reloads in `pnpm dev` — F4 fix); release binary vs backend + frontend. Either may be parked with a written reason |
 | `diff-hygiene` | whitespace lies about structure | `git diff --check` (working tree + staged) |
 | `adapter-matrix` | new version/loader = new file, never an edit (AGENTS.md) | modified existing adapters in the diff vs HEAD (added files are fine) |
 | `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate |

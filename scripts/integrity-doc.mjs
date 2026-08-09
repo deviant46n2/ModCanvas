@@ -21,13 +21,24 @@ export function checkDocAnchors(rules, root) {
     }
     const code = readFileSync(codeFile, 'utf8')
     const doc = readFileSync(docFile, 'utf8')
-    const codeMatch = code.match(anchor.codePattern)
-    if (!codeMatch) {
+    // Normalize patterns from rules data: RegExp literals or JSON strings.
+    const codeRe = new RegExp(anchor.codePattern.source ?? anchor.codePattern, 'g')
+    const docRe = new RegExp(anchor.docPattern.source ?? anchor.docPattern, 'g')
+    const codeValues = [...code.matchAll(codeRe)].map((m) => m[1])
+    if (!codeValues.length) {
       info.push({ message: `anchor ${anchor.name}: pattern not found in code (${anchor.codeFile}) — update rules` })
       continue
     }
-    const codeValue = codeMatch[1]
-    const docValues = [...doc.matchAll(anchor.docPattern)].map((m) => m[1])
+    const unique = [...new Set(codeValues)]
+    if (unique.length > 1) {
+      // Ambiguous authority: several values in code — never guess (F8 fix).
+      violations.push({
+        path: `anchor ${anchor.name}: multiple values in code (${unique.join(', ')} at ${anchor.codeFile}) — update rules to disambiguate`,
+      })
+      continue
+    }
+    const codeValue = unique[0]
+    const docValues = [...doc.matchAll(docRe)].map((m) => m[1])
     if (!docValues.length) {
       info.push({ message: `anchor ${anchor.name}: doc (${anchor.docFile}) does not mention it — verify this is intended` })
       continue

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 
 export function checkSuiteSelf(rules, root) {
   const violations = []
+  const candidates = []
   const info = []
   const { commandsDir, skillsDir, docsFile, packageJson } = rules.suiteSelf
 
@@ -35,15 +36,30 @@ export function checkSuiteSelf(rules, root) {
     }
   }
 
-  // 3. Every pnpm script mentioned in the docs exists in package.json.
+  // 3. pnpm scripts referenced in the docs. Backticked references are
+  //    unambiguous claims — a missing script is a VIOLATION. Plain
+  //    (unbackticked) references are ambiguous prose ("no pnpm here") — they
+  //    surface as CANDIDATES telling the writer to backtick, never as gate
+  //    failures. pnpm's own verbs (install/add/...) are never scripts.
   const docsPath = join(root, docsFile)
   const pkgPath = join(root, packageJson)
+  const PNPM_VERBS = new Set([
+    'install', 'i', 'add', 'remove', 'rm', 'update', 'up', 'dlx', 'exec', 'init', 'create',
+    'link', 'unlink', 'prune', 'pack', 'publish', 'root', 'bin', 'env', 'config', 'help',
+    'ls', 'list', 'why', 'outdated', '-v', '--version',
+  ])
   if (existsSync(docsPath) && existsSync(pkgPath)) {
     const docs = readFileSync(docsPath, 'utf8')
     const pkg = safeJson(readFileSync(pkgPath, 'utf8'))
     const scripts = pkg?.scripts ?? {}
-    for (const m of docs.matchAll(/`pnpm ([\w:.-]+)`/g)) {
+    for (const m of docs.matchAll(/`pnpm (?:(?:run)\s+)?([\w:-]+)`/g)) {
+      if (PNPM_VERBS.has(m[1])) continue
       if (!(m[1] in scripts)) violations.push({ path: `docs mention pnpm ${m[1]} but package.json has no such script` })
+    }
+    for (const m of docs.matchAll(/\bpnpm (?:(?:run)\s+)?([\w:-]+)/g)) {
+      if (PNPM_VERBS.has(m[1])) continue
+      if (m[1] in scripts) continue // plain but exists — verified silently
+      candidates.push({ path: `plain pnpm reference "${m[1]}" but package.json has no such script — backtick if prose, fix if real` })
     }
   }
 
@@ -56,7 +72,7 @@ export function checkSuiteSelf(rules, root) {
     }
   }
 
-  return { violations, info }
+  return { violations, candidates, info }
 }
 
 function frontmatter(text) {

@@ -3,19 +3,19 @@
   "lineLimitPaths": [
     "src-tauri/src",
     "frontend/src",
-    "workbench-companion-neoforge-1.21/src"
+    "workbench-companion-neoforge-1.21/src",
+    "scripts"
   ],
   "assetDirs": [
     "frontend/public",
     "frontend/src/assets"
   ],
-  "binaryPath": "src-tauri/target/debug/modcanvas",
-  "sourcePaths": [
-    "src-tauri/src",
-    "frontend/src"
-  ],
   "allowlists": {
     "line-limit": [
+      {
+        "path": "scripts/integrity-check.test.mjs",
+        "reason": "fixture-heavy test file (37 cases across 6 modules); parked 2026-08-09 — split when it passes 500 lines"
+      },
       {
         "path": "src-tauri/src/commands/mod.rs",
         "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"

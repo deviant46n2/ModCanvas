@@ -70,3 +70,13 @@ test('audit: flags expiry risk and missing sources', () => {
   const bad = audit({ tutorDir: '/nope', memData: '/nope', memConfig: '/nope' })
   assert.equal(bad.filter((f) => f.severity === 'error').length, 3)
 })
+
+test('backup: two rapid stamps never collide (F5 ms precision)', () => {
+  // stamp() is not exported; prove it via two immediate backups to the same dir
+  const s = fakeSources()
+  const backupDir = join(s.root, 'backups')
+  const a = backup(s, backupDir)
+  const b = backup(s, backupDir)
+  assert.notEqual(a.archive, b.archive)
+  assert.ok(existsSync(a.archive) && existsSync(b.archive))
+})

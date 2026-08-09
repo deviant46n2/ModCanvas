@@ -35,68 +35,12 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from '
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { RULES_PATH, loadRules, mergeRules } from './integrity-rules.mjs'
 import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
 import { checkDocAnchors } from './integrity-doc.mjs'
 import { checkSuiteSelf } from './integrity-suite.mjs'
 
-const RULES_PATH = join(process.cwd(), 'scripts', 'integrity-rules.json')
-const DEFAULT_RULES = {
-  lineLimit: 300,
-  lineLimitPaths: ['src-tauri/src', 'frontend/src', 'workbench-companion-neoforge-1.21/src'],
-  assetDirs: ['frontend/public', 'frontend/src/assets'],
-  binaryPath: 'src-tauri/target/debug/modcanvas',
-  sourcePaths: ['src-tauri/src', 'frontend/src'],
-  adapterDirs: ['frontend/src/adapters'],
-  suiteSelf: {
-    commandsDir: '.opencode/command',
-    skillsDir: '.opencode/skills',
-    docsFile: 'docs/tooling.md',
-    packageJson: 'package.json',
-  },
-  docAnchors: [
-    {
-      name: 'cache-version',
-      codeFile: 'src-tauri/src/engine_renders.rs',
-      codePattern: /CACHE_VERSION: u32 = (\d+)/,
-      docFile: 'docs/engine-renders.md',
-      docPattern: /CACHE_VERSION\s*(\d+)/g,
-    },
-    {
-      name: 'companion-jar-version',
-      codeFile: 'workbench-companion-neoforge-1.21/build.gradle',
-      codePattern: /^version\s*=\s*'([^']+)'/m,
-      docFile: 'AGENTS.md',
-      docPattern: /workbench-companion-([\d.]+)\.jar/g,
-    },
-  ],
-  docSync: {
-    codePaths: ['src-tauri/src', 'frontend/src'],
-    docPaths: ['docs', 'README.md', 'AGENTS.md'],
-    lookback: 10,
-  },
-  allowlists: {
-    'line-limit': [],
-    'asset-bundle': [],
-    'adapter-matrix': [],
-  },
-}
-
 const RASTER = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
-
-// --- rules loading -------------------------------------------------------
-
-// The on-disk rules file is authoritative once it exists, but the engine may
-// grow new config keys later. Merge: loaded rules overlay the defaults, and
-// defaults fill any gaps — a stale rules file must never crash the gate.
-export function mergeRules(base, over) {
-  return {
-    ...base,
-    ...over,
-    allowlists: { ...base.allowlists, ...(over.allowlists ?? {}) },
-  }
-}
-
-const loadRules = () => (existsSync(RULES_PATH) ? mergeRules(DEFAULT_RULES, JSON.parse(readFileSync(RULES_PATH, 'utf8'))) : DEFAULT_RULES)
 
 // --- pure helpers ---------------------------------------------------------
 
@@ -116,7 +60,13 @@ export function walk(dir) {
   return out
 }
 
-const lineCount = (file) => (readFileSync(file, 'utf8').match(/\n/g) ?? []).length
+// Editor-accurate line count: wc -l counts newlines, but a 301-line file
+// without a trailing newline has only 300 \n. Count the final unterminated
+// line too (F9 fix).
+const lineCount = (file) => {
+  const text = readFileSync(file, 'utf8')
+  return (text.match(/\n/g) ?? []).length + (text.length > 0 && !text.endsWith('\n') ? 1 : 0)
+}
 
 // --- checks --------------------------------------------------------------
 
@@ -172,25 +122,35 @@ export function checkAssetBundle(rules, root) {
 export function checkStaleBinary(rules, root) {
   const info = []
   const violations = []
-  const bin = join(root, rules.binaryPath)
-  if (!existsSync(bin)) {
-    return { violations, info: [{ message: `no binary at ${rules.binaryPath} — build first (pnpm dev / pnpm build)` }] }
-  }
-  let newest = 0
-  for (const dir of rules.sourcePaths) {
-    for (const f of walk(join(root, dir))) {
-      newest = Math.max(newest, statSync(f).mtimeMs)
+  const parked = []
+  for (const bin of rules.staleBinaries) {
+    const abs = join(root, bin.path)
+    if (!existsSync(abs)) {
+      info.push({ message: `[${bin.name}] no binary at ${bin.path} — build first (pnpm dev / pnpm build)` })
+      continue
+    }
+    let newest = 0
+    for (const dir of bin.sourcePaths) {
+      for (const f of walk(join(root, dir))) {
+        newest = Math.max(newest, statSync(f).mtimeMs)
+      }
+    }
+    const binTime = statSync(abs).mtimeMs
+    if (binTime < newest) {
+      const entry = (rules.allowlists['stale-binary'] ?? []).find((a) => a.name === bin.name)
+      if (entry) parked.push({ path: `[${bin.name}] ${bin.path}`, reason: entry.reason })
+      else {
+        violations.push({
+          message: `[${bin.name}] ${bin.path} (${new Date(binTime).toISOString()}) older than newest ${bin.sourcePaths.join(
+            ' + ',
+          )} source (${new Date(newest).toISOString()}) — STALE`,
+        })
+      }
+    } else {
+      info.push({ message: `[${bin.name}] binary newer than all sources` })
     }
   }
-  const binTime = statSync(bin).mtimeMs
-  if (binTime < newest) {
-    violations.push({
-      message: `binary (${new Date(binTime).toISOString()}) older than newest source (${new Date(newest).toISOString()}) — STALE`,
-    })
-  } else {
-    info.push({ message: 'binary newer than all sources' })
-  }
-  return { violations, info }
+  return { violations, parked, info }
 }
 
 // --- reporting -----------------------------------------------------------
@@ -203,16 +163,16 @@ export function report(results) {
     violationCount += n
     console.log(`\n== ${section.name} ==`)
     for (const v of section.violations) {
-      console.log(`  VIOLATION  ${v.path ?? v.message}${v.lines ? ` (${v.lines} lines)` : ''}`)
+      console.log(`VIOLATION: ${v.path ?? v.message}${v.lines ? ` (${v.lines} lines)` : ''}`)
     }
     for (const c of section.candidates ?? []) {
-      console.log(`  candidate  commit ${c.commit} changed code without docs: ${(c.files ?? []).join(', ')}`)
+      console.log(`CANDIDATE: commit ${c.commit} changed code without docs: ${(c.files ?? []).join(', ')}`)
     }
     for (const p of section.parked ?? []) {
-      console.log(`  parked     ${p.path} — ${p.reason}`)
+      console.log(`PARKED:    ${p.path} — ${p.reason}`)
     }
     for (const i of section.info ?? []) {
-      console.log(`  info       ${i.message}`)
+      console.log(`INFO:      ${i.message}`)
     }
     if (n === 0 && !(section.candidates?.length) && !(section.parked?.length) && !(section.info?.length)) console.log('  clean')
   }

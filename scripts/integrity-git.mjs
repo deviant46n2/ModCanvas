@@ -22,7 +22,9 @@ export function checkDiffHygiene(rules, root) {
 
 // Adapter matrix discipline: a new version/loader = a NEW file, never an edit
 // to an existing adapter (editing existing adapters breaks other versions
-// silently). Modified-existing = violation; added = fine.
+// silently). Modified (M), deleted (D), or renamed (R) existing adapters are
+// all violations — a deletion removes functionality for that version, a
+// rename breaks the factory's imports; only an ADD (A) of a new file is fine.
 export function checkAdapterMatrix(rules, root) {
   const violations = []
   const parked = []
@@ -34,13 +36,16 @@ export function checkAdapterMatrix(rules, root) {
   }
   for (const line of status.split('\n')) {
     if (!line.trim()) continue
-    const [code, path] = line.split('\t')
-    if (code !== 'M' || !path) continue
+    const fields = line.split('\t')
+    const code = fields[0]
+    const path = code.startsWith('R') ? fields[2] : fields[1] // renames carry old + new
+    if (!['M', 'D', 'R'].some((c) => code.startsWith(c)) || !path) continue
     const isAdapter = rules.adapterDirs.some((d) => path.startsWith(d + '/'))
     if (!isAdapter) continue
     const entry = rules.allowlists['adapter-matrix'].find((a) => a.path === path)
+    const label = code.startsWith('D') ? 'deleted' : code.startsWith('R') ? 'renamed' : 'modified'
     if (entry) parked.push({ path, reason: entry.reason })
-    else violations.push({ path })
+    else violations.push({ path: `${label} adapter: ${path}` })
   }
   return { violations, parked }
 }

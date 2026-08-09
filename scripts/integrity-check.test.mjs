@@ -23,8 +23,8 @@ const RULES = {
   lineLimit: 300,
   lineLimitPaths: ['src'],
   assetDirs: ['public', 'assets'],
-  binaryPath: 'bin/out',
-  sourcePaths: ['src'],
+  staleBinaries: [{ name: 'dev', path: 'bin/out', sourcePaths: ['src'] }],
+  sourcePaths: ['src'], // legacy key kept for merge-compat tests
   allowlists: { 'line-limit': [], 'asset-bundle': [] },
 }
 
@@ -57,6 +57,15 @@ test('line-limit: at-limit file is clean', () => {
   writeFileSync(join(root, 'src', 'ok.rs'), nLines(300))
   const { violations } = checkLineLimit(RULES, root)
   assert.equal(violations.length, 0)
+})
+
+test('line-limit: 301 lines WITHOUT trailing newline is still a violation (F9)', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  writeFileSync(join(root, 'src', 'edge.rs'), 'x\n'.repeat(300) + 'x') // 301 lines, no trailing \n
+  const { violations } = checkLineLimit(RULES, root)
+  assert.equal(violations.length, 1)
+  assert.equal(violations[0].lines, 301)
 })
 
 test('line-limit: missing directory is skipped', () => {
@@ -111,6 +120,7 @@ test('stale-binary: binary older than newest source is a violation', () => {
   const { violations, info } = checkStaleBinary(RULES, root)
   assert.equal(violations.length, 1)
   assert.match(violations[0].message, /STALE/)
+  assert.match(violations[0].message, /\[dev\]/)
   assert.equal(info.length, 0)
 })
 
@@ -134,6 +144,22 @@ test('stale-binary: no binary is info, not a violation', () => {
   const { violations, info } = checkStaleBinary(RULES, root)
   assert.equal(violations.length, 0)
   assert.equal(info.length, 1)
+})
+
+test('stale-binary: dev binary ignores frontend edits (F4 — dev hot-reload)', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  mkdirSync(join(root, 'bin'), { recursive: true })
+  writeFileSync(join(root, 'bin', 'out'), 'bin')
+  // frontend edit AFTER the binary: must NOT stale the dev binary
+  writeFileSync(join(root, 'frontend', 'App.tsx'), '// newer frontend')
+  const rules = {
+    staleBinaries: [{ name: 'dev', path: 'bin/out', sourcePaths: ['src'] }],
+    allowlists: { 'line-limit': [], 'asset-bundle': [] },
+  }
+  const { violations } = checkStaleBinary(rules, root)
+  assert.equal(violations.length, 0)
 })
 
 test('diff-hygiene: trailing whitespace in staged diff is a violation, then clears', () => {
@@ -195,7 +221,19 @@ test('adapter-matrix: modifying an existing adapter is a violation', () => {
   writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export const x = 1')
   const { violations } = checkAdapterMatrix(RULES_V2, root)
   assert.equal(violations.length, 1)
-  assert.equal(violations[0].path, 'frontend/src/adapters/v1_20_1/neoforge.ts')
+  assert.match(violations[0].path, /modified adapter: frontend\/src\/adapters\/v1_20_1\/neoforge\.ts/)
+})
+
+test('adapter-matrix: deleting an existing adapter is a violation (F7)', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'frontend/src/adapters/v1_20_1'), { recursive: true })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export {}')
+  git(root, 'add', '.')
+  commit(root, 'init')
+  execFileSync('rm', [join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts')])
+  const { violations } = checkAdapterMatrix(RULES_V2, root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].path, /deleted adapter/)
 })
 
 test('adapter-matrix: adding a NEW adapter is clean; allowlisted edit is parked', () => {
@@ -217,6 +255,17 @@ test('adapter-matrix: adding a NEW adapter is clean; allowlisted edit is parked'
   writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export const x = 1')
   ;({ violations } = checkAdapterMatrix(rules, root))
   assert.equal(violations.length, 0)
+})
+
+test('doc-anchors: multiple code values is a violation, not a guess (F8)', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'docs'), { recursive: true })
+  writeFileSync(join(root, 'src/engine.rs'), 'const CACHE_VERSION: u32 = 6;\n#[cfg(test)] const CACHE_VERSION: u32 = 4;')
+  writeFileSync(join(root, 'docs/engine.md'), 'CACHE_VERSION 6')
+  const { violations } = checkDocAnchors(anchorRules([ANCHOR]), root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].path, /multiple values/)
 })
 
 test('doc-sync: code-only commit is a candidate; code+docs commit is not', () => {
@@ -350,6 +399,36 @@ test('suite-self: docs mention a pnpm script that does not exist', () => {
   assert.match(violations[0].path, /ghost-script/)
 })
 
+test('suite-self: PLAIN reference to a MISSING script is a candidate (F1)', () => {
+  const root = suiteFixture()
+  mkdirSync(join(root, '.opencode/skills/tutor-observation'), { recursive: true })
+  writeFileSync(join(root, '.opencode/skills/tutor-observation/SKILL.md'), '---\nname: tutor-observation\ndescription: x\n---\n')
+  writeFileSync(join(root, 'docs/tooling.md'), 'Run pnpm ghost-script for real.\n')
+  const { violations, candidates } = checkSuiteSelf(SUITE_RULES, root)
+  assert.deepEqual(violations, [])
+  assert.equal(candidates.length, 1)
+  assert.match(candidates[0].path, /ghost-script/)
+})
+
+test('suite-self: plain reference to an EXISTING script verifies silently', () => {
+  const root = suiteFixture()
+  mkdirSync(join(root, '.opencode/skills/tutor-observation'), { recursive: true })
+  writeFileSync(join(root, '.opencode/skills/tutor-observation/SKILL.md'), '---\nname: tutor-observation\ndescription: x\n---\n')
+  writeFileSync(join(root, 'docs/tooling.md'), 'Run pnpm integrity for real.\n')
+  const { violations, candidates } = checkSuiteSelf(SUITE_RULES, root)
+  assert.deepEqual(violations, [])
+  assert.deepEqual(candidates, [])
+})
+
+test('suite-self: pnpm verbs in prose are not treated as scripts', () => {
+  const root = suiteFixture()
+  mkdirSync(join(root, '.opencode/skills/tutor-observation'), { recursive: true })
+  writeFileSync(join(root, '.opencode/skills/tutor-observation/SKILL.md'), '---\nname: tutor-observation\ndescription: x\n---\n')
+  writeFileSync(join(root, 'docs/tooling.md'), 'Run pnpm install here.\n')
+  const { violations } = checkSuiteSelf(SUITE_RULES, root)
+  assert.deepEqual(violations, [])
+})
+
 test('suite-self: test:tools lists a missing test file', () => {
   const root = suiteFixture()
   mkdirSync(join(root, '.opencode/skills/tutor-observation'), { recursive: true })
@@ -358,4 +437,22 @@ test('suite-self: test:tools lists a missing test file', () => {
   writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { 'test:tools': 'node --test a.test.mjs b.test.mjs' } }))
   const { violations } = checkSuiteSelf(SUITE_RULES, root)
   assert.equal(violations.length, 2) // both missing
+})
+
+test('stale-binary: allowlisted binary is parked, not a violation', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'bin'), { recursive: true })
+  writeFileSync(join(root, 'bin', 'out'), 'bin')
+  writeFileSync(join(root, 'src', 'new.rs'), '// newer')
+  const past = new Date(Date.now() - 60_000)
+  utimesSync(join(root, 'bin', 'out'), past, past)
+  const rules = {
+    staleBinaries: [{ name: 'dev', path: 'bin/out', sourcePaths: ['src'] }],
+    allowlists: { 'stale-binary': [{ name: 'dev', reason: 'known stale — rebuild at next build' }] },
+  }
+  const { violations, parked } = checkStaleBinary(rules, root)
+  assert.equal(violations.length, 0)
+  assert.equal(parked.length, 1)
+  assert.match(parked[0].reason, /rebuild at next build/)
 })
