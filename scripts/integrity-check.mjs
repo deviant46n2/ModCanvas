@@ -183,22 +183,28 @@ export function report(results) {
 // --- seeding -------------------------------------------------------------
 
 export function seedRules(rulesPath, rules, root) {
-  // The on-disk rules file is authoritative once it exists; before that, the
-  // passed rules (defaults or caller-constructed) are the base to extend.
-  const existing = existsSync(rulesPath) ? mergeRules(rules, JSON.parse(readFileSync(rulesPath, 'utf8'))) : rules
+  // Seed ONLY the allowlists. Never persist non-allowlist config: the
+  // defaults supply it via loadRules' merge, and RegExp-bearing keys
+  // (docAnchors) would be destroyed by JSON serialization — a silent
+  // check-killer (s22 audit: --seed wrote docAnchors as {} and the
+  // doc-anchors check vacuously passed on "[object Object]" matches).
+  const fileRules = existsSync(rulesPath) ? JSON.parse(readFileSync(rulesPath, 'utf8')) : {}
+  const base = mergeRules(rules, fileRules)
   const add = (key, list, reason) => {
-    const cur = existing.allowlists[key] ?? []
-    const known = new Set(cur.map((a) => a.path))
+    const cur = base.allowlists[key] ?? []
+    const known = new Set(cur.map((a) => a.path ?? a.name))
     for (const v of list) {
-      if (!known.has(v.path)) cur.push({ path: v.path, reason })
+      const id = v.path ?? v.name
+      if (!known.has(id)) cur.push({ ...v, reason })
     }
-    existing.allowlists[key] = cur
+    base.allowlists[key] = cur
   }
   const reasonLine = `pre-existing at tool introduction (${new Date().toISOString().slice(0, 10)}); parked — revisit on next touching change`
   add('line-limit', checkLineLimit(rules, root).violations, reasonLine)
   add('asset-bundle', checkAssetBundle(rules, root).violations, reasonLine)
-  writeFileSync(rulesPath, JSON.stringify(existing, null, 2) + '\n')
-  return existing
+  const next = { ...fileRules, allowlists: base.allowlists }
+  writeFileSync(rulesPath, JSON.stringify(next, null, 2) + '\n')
+  return next
 }
 
 // --- main ----------------------------------------------------------------

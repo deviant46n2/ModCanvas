@@ -22,9 +22,30 @@ export function checkDocAnchors(rules, root) {
     const code = readFileSync(codeFile, 'utf8')
     const doc = readFileSync(docFile, 'utf8')
     // Normalize patterns from rules data: RegExp literals or JSON strings.
-    const codeRe = new RegExp(anchor.codePattern.source ?? anchor.codePattern, 'g')
-    const docRe = new RegExp(anchor.docPattern.source ?? anchor.docPattern, 'g')
+    // Reconstructing from .source must preserve the literal's flags (e.g.
+    // /m on ^version) — and dedupe 'g' (duplicate flags throw).
+    const withG = (pattern) => {
+      const src = pattern.source ?? String(pattern)
+      const flags = new Set([...(pattern.flags ?? ''), 'g'])
+      return new RegExp(src, [...flags].join(''))
+    }
+    // A pattern that throws (broken string regex in hand-edited rules) or
+    // produces no capture group must FAIL LOUDLY, never pass vacuously —
+    // the s22 audit found a corrupted {} pattern matching "[object Object]"
+    // in both files and reporting clean.
+    let codeRe, docRe
+    try {
+      codeRe = withG(anchor.codePattern)
+      docRe = withG(anchor.docPattern)
+    } catch (e) {
+      violations.push({ path: `anchor ${anchor.name}: bad pattern in rules (${e.message}) — fix the rules` })
+      continue
+    }
     const codeValues = [...code.matchAll(codeRe)].map((m) => m[1])
+    if (codeValues.some((v) => v === undefined)) {
+      violations.push({ path: `anchor ${anchor.name}: pattern matches without a capture group (${anchor.codeFile}) — fix the rules, it would pass vacuously` })
+      continue
+    }
     if (!codeValues.length) {
       info.push({ message: `anchor ${anchor.name}: pattern not found in code (${anchor.codeFile}) — update rules` })
       continue
@@ -39,6 +60,10 @@ export function checkDocAnchors(rules, root) {
     }
     const codeValue = unique[0]
     const docValues = [...doc.matchAll(docRe)].map((m) => m[1])
+    if (docValues.some((v) => v === undefined)) {
+      violations.push({ path: `anchor ${anchor.name}: doc pattern matches without a capture group (${anchor.docFile}) — fix the rules, it would pass vacuously` })
+      continue
+    }
     if (!docValues.length) {
       info.push({ message: `anchor ${anchor.name}: doc (${anchor.docFile}) does not mention it — verify this is intended` })
       continue

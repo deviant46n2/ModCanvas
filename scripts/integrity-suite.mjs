@@ -9,7 +9,7 @@ export function checkSuiteSelf(rules, root) {
   const violations = []
   const candidates = []
   const info = []
-  const { commandsDir, skillsDir, docsFile, packageJson } = rules.suiteSelf
+  const { commandsDir, skillsDir, docsFiles, packageJson } = rules.suiteSelf
 
   // 1. Every command has agent: tutor + a description in frontmatter.
   const commandsDirAbs = join(root, commandsDir)
@@ -36,39 +36,54 @@ export function checkSuiteSelf(rules, root) {
     }
   }
 
-  // 3. pnpm scripts referenced in the docs. Backticked references are
-  //    unambiguous claims — a missing script is a VIOLATION. Plain
-  //    (unbackticked) references are ambiguous prose ("no pnpm here") — they
-  //    surface as CANDIDATES telling the writer to backtick, never as gate
-  //    failures. pnpm's own verbs (install/add/...) are never scripts.
-  const docsPath = join(root, docsFile)
+  // 3-5. For each docs file: pnpm script claims, and test-count claims.
+  //   Backticked pnpm references are unambiguous — a missing script is a
+  //   VIOLATION. Plain references are ambiguous prose ("no pnpm here") —
+  //   they surface as CANDIDATES, never gate failures. pnpm verbs
+  //   (install/add/...) are never scripts.
+  //   Test-count claims ("N tests total") must match the real count of
+  //   test() calls in the suite's test files — a stale number claim is
+  //   doc drift the commit-level check can't see (s22 final pass: docs
+  //   said 28, suite had 37).
   const pkgPath = join(root, packageJson)
   const PNPM_VERBS = new Set([
     'install', 'i', 'add', 'remove', 'rm', 'update', 'up', 'dlx', 'exec', 'init', 'create',
     'link', 'unlink', 'prune', 'pack', 'publish', 'root', 'bin', 'env', 'config', 'help',
     'ls', 'list', 'why', 'outdated', '-v', '--version',
   ])
-  if (existsSync(docsPath) && existsSync(pkgPath)) {
-    const docs = readFileSync(docsPath, 'utf8')
-    const pkg = safeJson(readFileSync(pkgPath, 'utf8'))
-    const scripts = pkg?.scripts ?? {}
-    for (const m of docs.matchAll(/`pnpm (?:(?:run)\s+)?([\w:-]+)`/g)) {
-      if (PNPM_VERBS.has(m[1])) continue
-      if (!(m[1] in scripts)) violations.push({ path: `docs mention pnpm ${m[1]} but package.json has no such script` })
-    }
-    for (const m of docs.matchAll(/\bpnpm (?:(?:run)\s+)?([\w:-]+)/g)) {
-      if (PNPM_VERBS.has(m[1])) continue
-      if (m[1] in scripts) continue // plain but exists — verified silently
-      candidates.push({ path: `plain pnpm reference "${m[1]}" but package.json has no such script — backtick if prose, fix if real` })
-    }
-  }
-
-  // 4. The test:tools script's test files exist.
+  let realTestCount = -1
   if (existsSync(pkgPath)) {
     const pkg = safeJson(readFileSync(pkgPath, 'utf8'))
-    const testCmd = pkg?.scripts?.['test:tools'] ?? ''
+    const scripts = pkg?.scripts ?? {}
+    const testCmd = scripts['test:tools'] ?? ''
+    realTestCount = [...testCmd.matchAll(/[\w./-]+\.test\.mjs/g)].reduce((n, m) => {
+      const abs = join(root, m[0])
+      return n + (existsSync(abs) ? (readFileSync(abs, 'utf8').match(/\btest\(/g) ?? []).length : 0)
+    }, 0)
+    // 4. The test:tools script's test files exist.
     for (const f of testCmd.matchAll(/[\w./-]+\.test\.mjs/g)) {
       if (!existsSync(join(root, f[0]))) violations.push({ path: `test:tools lists missing file ${f[0]}` })
+    }
+    for (const docsFile of docsFiles) {
+      const docsPath = join(root, docsFile)
+      if (!existsSync(docsPath)) continue
+      const docs = readFileSync(docsPath, 'utf8')
+      // 3. pnpm claims.
+      for (const m of docs.matchAll(/`pnpm (?:(?:run)\s+)?([\w:-]+)`/g)) {
+        if (PNPM_VERBS.has(m[1])) continue
+        if (!(m[1] in scripts)) violations.push({ path: `${docsFile} mentions pnpm ${m[1]} but package.json has no such script` })
+      }
+      for (const m of docs.matchAll(/\bpnpm (?:(?:run)\s+)?([\w:-]+)/g)) {
+        if (PNPM_VERBS.has(m[1])) continue
+        if (m[1] in scripts) continue // plain but exists — verified silently
+        candidates.push({ path: `${docsFile}: plain pnpm reference "${m[1]}" but package.json has no such script — backtick if prose, fix if real` })
+      }
+      // 5. Test-count claims.
+      for (const m of docs.matchAll(/(\d+)(?:\/\d+)? tests?\b/g)) {
+        if (Number(m[1]) !== realTestCount) {
+          violations.push({ path: `${docsFile} claims ${m[0]} but the suite has ${realTestCount} tests — update the doc` })
+        }
+      }
     }
   }
 

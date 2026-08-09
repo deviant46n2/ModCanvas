@@ -42,7 +42,7 @@ export const DEFAULT_RULES = {
   suiteSelf: {
     commandsDir: '.opencode/command',
     skillsDir: '.opencode/skills',
-    docsFile: 'docs/tooling.md',
+    docsFiles: ['docs/tooling.md', 'todo-tooling.md'],
     packageJson: 'package.json',
   },
   docAnchors: [
