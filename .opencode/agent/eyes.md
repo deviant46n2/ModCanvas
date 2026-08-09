@@ -45,5 +45,17 @@ Rules:
 - Be exhaustive about visual detail that could matter for pixel-fidelity
   decisions: shading gradients, color tints per region, borders, edges,
   iconography, text.
+- MANDATORY rendering-quality section: for every image, end the report with a
+  section titled "Rendering quality" that states, for each texture/icon/region:
+  (a) SHARPNESS — are edges hard and crisp, soft, or blurred? (b) ALIASING —
+  are there stair-step/jagged edges, or smooth diagonals? (c) PIXEL UNIFORMITY
+  — are pixels even-sized, or irregular ("wrong sizes in places")? (d) FUZZ —
+  is there any loss of detail, smearing, or softness beyond the pixel grid?
+  Always answer each item explicitly with "hard", "soft", "blurred",
+  "uniform", "irregular", etc. — never omit the section, never assume "no
+  blur" without stating you checked for it. Under-reporting softness is a
+  known failure mode of this agent; when in doubt between sharp and soft,
+  state the observable evidence on both sides (e.g. "hard staircase edges on
+  diagonals, but a soft halo around the outline").
 - If you cannot read the file or it contains no image, say so plainly with
   the error — never guess.
