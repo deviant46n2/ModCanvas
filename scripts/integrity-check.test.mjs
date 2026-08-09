@@ -12,6 +12,7 @@ import { join } from 'node:path'
 
 import { checkLineLimit, checkAssetBundle, checkStaleBinary, seedRules } from './integrity-check.mjs'
 import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
+import { checkDocAnchors } from './integrity-doc.mjs'
 
 const fixture = () => mkdtempSync(join(tmpdir(), 'integrity-test-'))
 
@@ -242,5 +243,58 @@ test('doc-sync: no history is info, not an error', () => {
   writeFileSync(join(root, 'src', 'a.rs'), '// a')
   const { candidates, info } = checkDocSync(RULES_V2, root)
   assert.equal(candidates.length, 0)
+  assert.equal(info.length, 1)
+})
+
+// --- v3: doc-anchors (content-level doc drift) ----------------------------
+
+const anchorRules = (anchors) => ({ docAnchors: anchors })
+
+const ANCHOR = {
+  name: 'cache-version',
+  codeFile: 'src/engine.rs',
+  codePattern: /CACHE_VERSION: u32 = (\d+)/,
+  docFile: 'docs/engine.md',
+  docPattern: /CACHE_VERSION\s*(\d+)/g,
+}
+
+test('doc-anchors: matching code and doc is clean', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'docs'), { recursive: true })
+  writeFileSync(join(root, 'src/engine.rs'), 'const CACHE_VERSION: u32 = 6;')
+  writeFileSync(join(root, 'docs/engine.md'), 'The cache version is CACHE_VERSION 6.')
+  const { violations, info } = checkDocAnchors(anchorRules([ANCHOR]), root)
+  assert.equal(violations.length, 0)
+  assert.equal(info.length, 0)
+})
+
+test('doc-anchors: stale doc mention is a violation', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'docs'), { recursive: true })
+  writeFileSync(join(root, 'src/engine.rs'), 'const CACHE_VERSION: u32 = 6;')
+  writeFileSync(join(root, 'docs/engine.md'), 'Older docs said CACHE_VERSION 4; the new value is CACHE_VERSION 6.')
+  const { violations } = checkDocAnchors(anchorRules([ANCHOR]), root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].path, /cache-version="4"/)
+  assert.match(violations[0].path, /"6"/)
+})
+
+test('doc-anchors: doc that never mentions the anchor is info, not a violation', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'docs'), { recursive: true })
+  writeFileSync(join(root, 'src/engine.rs'), 'const CACHE_VERSION: u32 = 6;')
+  writeFileSync(join(root, 'docs/engine.md'), 'no version facts here')
+  const { violations, info } = checkDocAnchors(anchorRules([ANCHOR]), root)
+  assert.equal(violations.length, 0)
+  assert.equal(info.length, 1)
+})
+
+test('doc-anchors: missing file is info, not a crash', () => {
+  const root = fixture()
+  const { violations, info } = checkDocAnchors(anchorRules([ANCHOR]), root)
+  assert.equal(violations.length, 0)
   assert.equal(info.length, 1)
 })

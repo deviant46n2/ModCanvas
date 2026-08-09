@@ -16,7 +16,8 @@ node scripts/integrity-check.mjs            # all sections; exit 1 on violations
 node scripts/integrity-check.mjs --seed     # snapshot current tree into rules as parked debt
 node scripts/integrity-check.mjs <section>  # one section
 node --test scripts/integrity-check.test.mjs # engine tests (12)
-pnpm integrity / pnpm test:integrity        # same, via the root package.json
+pnpm integrity / pnpm test:tools        # same, via the root package.json
+pnpm backup                             # state backup + expiry audit
 ```
 
 Sections:
@@ -29,10 +30,12 @@ Sections:
 | `diff-hygiene` | whitespace lies about structure | `git diff --check` (working tree + staged) |
 | `adapter-matrix` | new version/loader = new file, never an edit (AGENTS.md) | modified existing adapters in the diff vs HEAD (added files are fine) |
 | `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate |
+| `doc-anchors` | docs and code must agree on specific facts | content-level: CACHE_VERSION, companion jar version — any doc mention ≠ code value is a violation (stale doc text) |
 
-The last two are git-aware and live in `scripts/integrity-git.mjs` (split from the
-main engine when it tripped its own 300-line rule — the tripwire working on the
-tool itself). Engine: 258 lines; git module: 84.
+The git-aware checks live in `scripts/integrity-git.mjs`; the content-level
+doc anchors in `scripts/integrity-doc.mjs` (split from the main engine when
+it tripped its own 300-line rule — the tripwire working on the tool itself).
+Engine: 258 lines; git module: 84; doc module: 40.
 
 **The allowlist is the "written reason" (P4).** A file appears as `parked` with
 its reason attached — the debt is visible, never silently forgotten. `--seed`
@@ -70,7 +73,22 @@ memory discipline (memory is a pointer, not proof; stale beats absent). No
 separate tool — it's the output format of `/verify` and the storage rule of
 `code:` memories.
 
-## 5. Planned
+## 5. The reliability gates (s22 batch 2 — improving the tutor's own quality)
 
-- (open) — the student's next tool designs; the suite is booked complete for
-  the agreed s21 cont.4 scope.
+The five failure classes observed across the arc, each with a tool:
+
+| Failure class (evidence) | Tool | Form |
+|---|---|---|
+| Unverified observations as evidence (s6 truncated grep → wrong pack story; s8 fabricated `.env`; s20 grep error) | **Observation gate** — pin raw observation + source + timestamp, classify observed/derived/remembered, truncated ≠ evidence | `tutor-observation` skill, loaded by `/debug` step 0 |
+| Instruments that silently don't fire (s20c dead probe; s21 NPE probe, midnight log rotation) | **Instrumentation gate** — prove applied / can fire / NPE-safe / right log, before any probe cycle | `tutor-instrument` skill |
+| Verification loops skipped under pressure (s14: jar was old build, app never restarted) | **Verification harness** — rebuild → deploy → restart → observe, each step graded on EVIDENCE; claim only after | `/verify-build` command |
+| Stale state (s13 goal contract rotted 2 sessions; B2: `.tutor` gitignored + 30-day auto-cleanup) | **State backup + audit** — tar the arc (`.tutor` + memory store + config), verify the archive, audit expiry risk | `scripts/backup-state.mjs` + `/backup` via `pnpm backup` |
+| Content-level doc drift (CACHE_VERSION, jar versions) | **Doc anchors** — doc mention ≠ code value = violation | `doc-anchors` integrity section |
+
+The meta-rule holds: every tool obeys the repo's own rules — documented,
+tracked, tested (24 tests total across the suite).
+
+## 6. Planned
+
+- (open) — the student's next tool designs; the agreed s21 cont.4 scope is
+  complete, and batch 2 (reliability gates) is complete.

@@ -21,3 +21,4 @@ workbench-companion-archived/*/out/
 
 # Private tutor state (learner profile + curriculum) — never commit
 .tutor/
+backups/

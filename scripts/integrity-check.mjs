@@ -32,6 +32,7 @@ import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
+import { checkDocAnchors } from './integrity-doc.mjs'
 
 const RULES_PATH = join(process.cwd(), 'scripts', 'integrity-rules.json')
 const DEFAULT_RULES = {
@@ -41,6 +42,22 @@ const DEFAULT_RULES = {
   binaryPath: 'src-tauri/target/debug/modcanvas',
   sourcePaths: ['src-tauri/src', 'frontend/src'],
   adapterDirs: ['frontend/src/adapters'],
+  docAnchors: [
+    {
+      name: 'cache-version',
+      codeFile: 'src-tauri/src/engine_renders.rs',
+      codePattern: /CACHE_VERSION: u32 = (\d+)/,
+      docFile: 'docs/engine-renders.md',
+      docPattern: /CACHE_VERSION\s*(\d+)/g,
+    },
+    {
+      name: 'companion-jar-version',
+      codeFile: 'workbench-companion-neoforge-1.21/build.gradle',
+      codePattern: /^version\s*=\s*'([^']+)'/m,
+      docFile: 'AGENTS.md',
+      docPattern: /workbench-companion-([\d.]+)\.jar/g,
+    },
+  ],
   docSync: {
     codePaths: ['src-tauri/src', 'frontend/src'],
     docPaths: ['docs', 'README.md', 'AGENTS.md'],
@@ -236,11 +253,12 @@ function main() {
     { name: 'diff-hygiene', run: () => checkDiffHygiene(rules, root) },
     { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
     { name: 'doc-sync', run: () => checkDocSync(rules, root) },
+    { name: 'doc-anchors', run: () => checkDocAnchors(rules, root) },
   ]
   const selected = arg && arg !== '--seed' ? sections.filter((s) => s.name === arg) : sections
   if (!selected.length) {
     console.error(
-      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync)`,
+      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors)`,
     )
     process.exit(2)
   }
