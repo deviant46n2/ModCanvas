@@ -21,7 +21,6 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -31,9 +30,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.ClientHooks;
-import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.slf4j.Logger;
@@ -63,7 +60,10 @@ import java.util.List;
  * full-pack drain was ~one sync per icon.
  */
 public final class ItemIconRenderer {
-    private static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
+    // Package-visible: ItemIconBatchCapture logs through this so the
+    // [ItemIconRenderer] tag (referenced by docs and probe instrumentation)
+    // stays stable across the s25 extraction.
+    static final Logger LOGGER = LoggerFactory.getLogger("ItemIconRenderer");
     // HISTORICAL (s21 re-scope): the manual GUI-light constants
     // L0=(-0.9334392,-0.26269472,-0.24430016) L1=(-0.10357137,-0.9766068,0.18844642)
     // were verified three independent ways (bytecode transform, live uniform
@@ -173,86 +173,7 @@ public final class ItemIconRenderer {
             }
 
             for (int start = 0; start < stacks.size(); start += GRID * GRID) {
-                int n = Math.min(GRID * GRID, stacks.size() - start);
-                target.clear(Minecraft.ON_OSX);
-                // clear() drops the binding again — re-bind for THIS pass.
-                GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, target.frameBufferId);
-                RenderSystem.disableCull();
-                RenderSystem.disableBlend();
-                // Depth ON: the buffer is cleared per pass and each cell is
-                // drawn by exactly one item into a disjoint viewport region,
-                // so cube faces occlude correctly per item without
-                // painter's-order artifacts.
-                RenderSystem.enableDepthTest();
-                // s25 LIGHT-FLIP, moved to PASS level: the game's GUI pipeline
-                // y-flips the pose (scale(16,-16,16)) AND the light matrix
-                // (scaling(1,-1,1)) — both flips. We keep an unflipped pose
-                // (s21 barrel lesson), so we must flip the lights' y instead:
-                // dot(n, flipY(L)) == dot(flipY(n), L), verified numerically.
-                // Set once per pass (NOT per item): the per-item flip raced the
-                // game's own setupFor3DItems between items — measured ~50/50
-                // flipped/unflipped in one drain. Constants are the deterministic
-                // game lights (normalize(0.2,1,-0.7) etc. through setupGui3D-
-                // DiffuseLighting's matrix; verified == measured uniform values)
-                // with y negated. Restored after the pass.
-                org.joml.Vector3f passL0 = new org.joml.Vector3f(-0.9334392F, 0.26269472F, -0.24430016F);
-                org.joml.Vector3f passL1 = new org.joml.Vector3f(-0.10357137F, 0.9766068F, 0.18844642F);
-                RenderSystem.setShaderLights(passL0, passL1);
-                boolean anyDrawn = false;
-                for (int i = 0; i < n; i++) {
-                    int cellX = (i % GRID) * size;
-                    int cellY = (i / GRID) * size;
-                    // The viewport maps the item-local ortho [0,size] into
-                    // this cell's pixels; the item pose (which centers at
-                    // size/2, size/2) therefore lands in its own cell.
-                    GL30.glViewport(cellX, cellY, size, size);
-                    try {
-                        drawItemDirect(stacks.get(start + i), size, farPlane);
-                        anyDrawn = true;
-                    } catch (Throwable t) {
-                        LOGGER.warn("[ItemIconRenderer] Failed to render item {}: {}", validIds.get(start + i), t.toString());
-                    }
-                }
-                if (!anyDrawn) {
-                    // No items drawn: restore the pass-scoped light flip so the
-                    // game's next GUI draw sees its own lights.
-                    RenderSystem.setShaderLights(
-                        new org.joml.Vector3f(-0.9334392F, -0.26269472F, -0.24430016F),
-                        new org.joml.Vector3f(-0.10357137F, -0.9766068F, 0.18844642F)
-                    );
-                    continue;
-                }
-
-                // ONE readback per pass, then slice the cells into individual
-                // icons. The whole pass shares the projection/filter state set
-                // above — no per-item FBO cycle, no per-item GPU sync.
-                target.unbindWrite();
-                RenderSystem.bindTexture(target.getColorTextureId());
-                NativeImage atlas = new NativeImage(atlasSize, atlasSize, false);
-                atlas.downloadTexture(0, false);
-                for (int i = 0; i < n; i++) {
-                    int cellX = (i % GRID) * size;
-                    int cellY = (i / GRID) * size;
-                    NativeImage slice = new NativeImage(size, size, false);
-                    for (int y = 0; y < size; y++) {
-                        for (int x = 0; x < size; x++) {
-                            slice.setPixelRGBA(x, y, atlas.getPixelRGBA(cellX + x, cellY + y));
-                        }
-                    }
-                    String dataUrl = encodePng(slice);
-                    slice.close();
-                    if (dataUrl != null) {
-                        out.addProperty(validIds.get(start + i), dataUrl);
-                    }
-                }
-                atlas.close();
-                target.bindWrite(false);
-                // Restore the pass-scoped light flip (set before the item loop)
-                // so the game's next GUI draw sees its own unflipped lights.
-                RenderSystem.setShaderLights(
-                    new org.joml.Vector3f(-0.9334392F, -0.26269472F, -0.24430016F),
-                    new org.joml.Vector3f(-0.10357137F, -0.9766068F, 0.18844642F)
-                );
+                ItemIconBatchCapture.run(validIds, stacks, start, size, farPlane, target, out);
             }
         } catch (Throwable t) {
             LOGGER.error("[ItemIconRenderer] Render pass failed", t);
@@ -295,7 +216,7 @@ public final class ItemIconRenderer {
      *  GuiGraphics/buffer source). Direct Tesselator + shader-apply +
      *  drawWithShader is the only draw path that works in this offscreen
      *  context; the flush path's deferred setShader never applies here. */
-    private static void drawItemDirect(ItemStack stack, int size, float farPlane) {
+    static void drawItemDirect(ItemStack stack, int size, float farPlane) {
         // GUI item light/overlay, from the game's own GuiGraphics.renderItem
         // bytecode (verified): 0xF000F0 full-bright + NO_OVERLAY. The shade is
         // NOT baked here anymore — entity_cutout lights via the uniforms.
@@ -324,48 +245,10 @@ public final class ItemIconRenderer {
             return;
         }
 
-        // Never assume a model's coordinate range (blocks span 0..16, custom
-        // models 0..1) and never assume the display transform is identity.
-        // Apply the GUI transform FIRST and measure the PROJECTED bounds, so
-        // rotated models (e.g. a flat quad turned edge-on) fit correctly.
-        int stride = DefaultVertexFormat.BLOCK.getVertexSize() / 4; // bytes -> ints
-        PoseStack guiStack = new PoseStack();
-        model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, guiStack);
-        Matrix4f gui = new Matrix4f(guiStack.last().pose());
-        Vector3f p = new Vector3f();
-        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
-        for (BakedQuad quad : quads) {
-            int[] verts = quad.getVertices();
-            for (int i = 0; i < 4; i++) {
-                int o = stride * i;
-                p.set(Float.intBitsToFloat(verts[o]), Float.intBitsToFloat(verts[o + 1]), Float.intBitsToFloat(verts[o + 2]));
-                gui.transformPosition(p);
-                minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-                minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-            }
-        }
-        float w = maxX - minX, h = maxY - minY;
-        float s = Math.min(size / w, size / h) * 0.9F;
-
-        PoseStack poseStack = new PoseStack();
-        poseStack.translate(size / 2.0F, size / 2.0F, 150.0F);
-        // NOTE (s21, REVERTED): a y-flip here (scale(s,-s,1)) was tried to fix
-        // "darkest face at top" — it broke geometry (barrel rendered upside
-        // down; student ground truth). The capture view is NOT mirrored; the
-        // shade-position mismatch lives in the SHADING side, not this pose.
-        // s25 FIX: scale(s,s,1) was NON-UNIFORM (z=1 vs x/y=s). PoseStack.scale
-        // applies the normal matrix (1/x,1/y,1/z) for non-uniform scales, so
-        // x/y normals were divided by s (~58) while z stayed 1 — every face
-        // collapsed to ~(0,0,±1), dot(normal,light)≈0, flat 0.4 shading on all
-        // faces (measured: normal matrix y-row (0,0.0148,0.5) = 0.866/s;
-        // pixel-verified flat stone). scale(s,s,s) is uniform → normal matrix
-        // stays the rotation → correct per-face lighting (the game's own pose
-        // uses uniform-magnitude scale(16,-16,16)).
-        poseStack.scale(s, s, s);
-        poseStack.translate(-(minX + maxX) / 2.0F, -(minY + maxY) / 2.0F, 0.0F);
-        model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, poseStack);
-        Matrix4f pose = new Matrix4f(poseStack.last().pose());
+        // Pure pose math (bounds measurement + uniform-scale + GUI transform):
+        // extracted to ItemIconPose for the 300-line rule and testability.
+        // See ItemIconPose.build for the s25 uniform-scale history.
+        PoseStack poseStack = ItemIconPose.build(quads, size, model);
 
         // Assert the GUI matrices before the draw: the shader transforms the
         // pose-baked vertices by ProjMat * ModelViewMat ON TOP of the baked
@@ -400,33 +283,15 @@ public final class ItemIconRenderer {
                 // BufferUploader.drawWithShader -> ShaderInstance.setDefaultUniforms
                 // reads RenderSystem.getShaderTexture(i) and OVERWRITES every
                 // sampler entry from it, then apply() binds from the clobbered
-                // map (s25, decompiled-verified). The game's own flush path uses
-                // the same deferred array (LightTexture.turnOnLightLayer ->
-                // setShaderTexture(2,...), OverlayTexture.setupOverlayColor ->
-                // setShaderTexture(1,...), TextureStateShard -> setShaderTexture(0,...)).
-                // setSampler() calls are dead here — the draw clobbers them.
-                // Mirror the game: populate the deferred array before the draw.
-                Object overlaySampler = null;
-                Object lightmapSampler = null;
-                try {
-                    var lt = mc.gameRenderer.lightTexture();
-                    java.lang.reflect.Field lf = net.minecraft.client.renderer.LightTexture.class.getDeclaredField("lightTexture");
-                    lf.setAccessible(true);
-                    lightmapSampler = lf.get(lt);
-                    var ot = mc.gameRenderer.overlayTexture();
-                    java.lang.reflect.Field of = net.minecraft.client.renderer.texture.OverlayTexture.class.getDeclaredField("texture");
-                    of.setAccessible(true);
-                    overlaySampler = of.get(ot);
-                } catch (Exception e10) {
-                    LOGGER.warn("[ItemIconRenderer] Sampler reflection failed: {}", e10.toString());
-                }
+                // map (s25, decompiled-verified). setSampler() calls are dead
+                // here — the draw clobbers them. Mirror the game's own flush
+                // path by populating the deferred array via its PUBLIC API —
+                // no reflection (a field rename in any MC update would
+                // silently break the old reflection path; the game exposes
+                // exactly the calls we need).
                 RenderSystem.setShaderTexture(0, mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
-                if (overlaySampler instanceof net.minecraft.client.renderer.texture.AbstractTexture ovt) {
-                    RenderSystem.setShaderTexture(1, ovt.getId());
-                }
-                if (lightmapSampler instanceof net.minecraft.client.renderer.texture.AbstractTexture lmt) {
-                    RenderSystem.setShaderTexture(2, lmt.getId());
-                }
+                mc.gameRenderer.lightTexture().turnOnLightLayer();       // unit 2 (lightmap)
+                mc.gameRenderer.overlayTexture().setupOverlayColor();    // unit 1 (overlay)
                 shader.apply();
             }
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
@@ -490,10 +355,10 @@ public final class ItemIconRenderer {
             GL30.glActiveTexture(GL30.GL_TEXTURE0);
             // s25: restore the DEFERRED array too. setDefaultUniforms reads it
             // at the next draw and would bind our atlas/lightmap into the
-            // game's next RenderType flush. The game's own teardown does the
-            // same (turnOffLightLayer/teardownOverlayColor set units to 0).
-            RenderSystem.setShaderTexture(1, 0);
-            RenderSystem.setShaderTexture(2, 0);
+            // game's next RenderType flush. Use the game's own public teardown
+            // (mirrors the setup via turnOnLightLayer/setupOverlayColor above).
+            mc.gameRenderer.lightTexture().turnOffLightLayer();
+            mc.gameRenderer.overlayTexture().teardownOverlayColor();
             mvStack.popMatrix();
             RenderSystem.applyModelViewMatrix();
         }
@@ -509,7 +374,7 @@ public final class ItemIconRenderer {
      * already upright (same ortho + atlas conventions as vanilla's GUI pass),
      * so no row flip is applied.
      */
-    private static String encodePng(NativeImage src) {
+    static String encodePng(NativeImage src) {
         try {
             byte[] png = src.asByteArray();
             return "data:image/png;base64," + Base64.getEncoder().encodeToString(png);
