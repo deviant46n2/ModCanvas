@@ -419,7 +419,12 @@
   height: 100%;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  /* NO CSS `filter` here. A drop-shadow once lived on this rule and blurred
+     every icon: inside ReactFlow's transformed viewport a filter forces the
+     icon into its own compositing layer at CSS-pixel resolution, and the
+     viewport resamples that layer with bilinear smoothing ON TOP of the hard
+     pixels — stairs plus fuzz (s25 regression, fixed by removing it). Depth
+     cues must be box-shadow or baked into the texture, never a filter. */
 }
 
 .ftb-quest-node-icon-fallback {
@@ -492,6 +497,15 @@
 
 .shape-diamond {
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  /* PARKED s25 (latent twin of the icon-blur bug): this recolor filter also
+     forces the shape-wrap into a CSS-pixel-resolution layer inside the
+     transformed viewport, blurring any icon it contains — but only on the
+     fallback path (instances WITHOUT real FTB shape textures, where the
+     baked-tile path sets `filter: none` above). The filter is load-bearing
+     here (paints the solid silhouette under the ~13%-alpha tint fill), so
+     removing it needs a filter-free recolor design (nested clipped elements
+     or SVG fills). Parked with this written reason; revisit when a
+     texture-less instance matters. */
   filter: drop-shadow(0 0 0 var(--shape-color, #000));
 }
 

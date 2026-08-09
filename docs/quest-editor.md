@@ -268,6 +268,19 @@ subtree at CSS-pixel resolution (DPR 1), which made the whole canvas visibly
 "go pixelated" while hovering a dependency line. The hover/selected glow is now
 a plain brighter `stroke-width` bump — same visual, no compositing penalty.
 
+**Same class, second instance (s25):** `.ftb-quest-node-icon-img` also carried a
+`filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4))` for icon depth. It forced each
+icon into its own CSS-pixel-resolution layer, so the viewport transform
+resampled it with bilinear smoothing **on top of** the hard `image-rendering:
+pixelated` texels — every icon in the editor looked fuzzy ("stairs plus fuzz"),
+noticeably different from in-game. The filter was removed; depth cues on node
+icons must use `box-shadow` or be baked into the texture, never a CSS `filter`
+inside the transformed viewport. The fallback shape-recolor
+`drop-shadow(0 0 0 var(--shape-color))` rules (`.shape-diamond` etc.) are the
+same latent class — PARKED (only reachable without real FTB shape textures;
+the baked-tile path sets `filter: none`), see the comment at
+`QuestCanvas.css`.
+
 # Quest Editor — Grid Snapping (In-Game Parity)
 
 ## Behavior
