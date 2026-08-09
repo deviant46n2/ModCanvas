@@ -269,41 +269,54 @@ in-game appearance.
   companion deployed, confirm `workbench status` shows "Connected", then open
   ModCanvas and watch missing icons resolve (and persist across restarts).
 
-## Fidelity arc — PARKED (2026-08-09)
+## Fidelity arc — RESOLVED (2026-08-09, s25)
 
-**Status: OPEN BUG, deliberately parked.** Engine-rendered icons currently
-capture as **opaque black or fully transparent — 0/38,828 colored** in the last
-full-pack drain. Do not treat this as fixed.
+**Status: FIXED, verified.** Engine-rendered icons are now opaque, textured,
+and lit like the game's own quest book (per-face shading: top brightest,
+directional sides; pixel-verified on stone 94/81/51, smooth_stone 118/102/64;
+student-confirmed in app + recipes tab + game UI match).
 
-**What IS fixed and kept (in the companion at this park point):**
-- `setSampler("Sampler0/1/2", ...)` + `apply()` — the deferred
-  `RenderSystem.setShaderTexture` never reaches raw offscreen draws.
-- Immediate `glBindTexture` for the block atlas (same deferred-bind family).
-- **NEW_ENTITY vertex format** (was BLOCK): `rendertype_entity_cutout.vsh`
-  declares `in ivec2 UV1`; BLOCK has no UV1 → garbage overlay `texelFetch` →
-  out-of-bounds `(0,0,0,0)` → `mix()` picks black. The game's own quest-book
-  path uses NEW_ENTITY. This is a real bug, fixed, but NOT sufficient alone.
-- UV2 zeroing (`CACHE_VERSION 6` in `engine_renders.rs`) — baked UV2 garbage
-  (0x8100) landed the lightmap fetch out of bounds (blocks discarded).
-- Blend/cull/depth restore in the `finally` (quest-book "refresh bug").
+**Root causes found and fixed (three bugs, each measured):**
 
-**What is NOT fixed (the remaining fidelity question):**
-- Engine-rendered icons still render black/transparent even with correct
-  samplers, correct sampler content (GPU-verified: lightmap white, overlay
-  correct), and NEW_ENTITY. The draw is missing *state the game's RenderType
-  flush sets for free*:
-  1. `RenderSystem.setShaderColor(1,1,1,1)` is called AFTER `shader.apply()` —
-     the ColorModulator uniform is uploaded from the game's stale state.
-  2. `Lighting.setupFor3DItems()` runs BEFORE `setShader(...)` — Light0/Light1
-     uniforms may never land on this shader (JSON default is 0,0,0).
-  3. Fog uniforms at draw time unmeasured.
-- Shade-position question (darkest top vs bottom; barrel ground truth) —
-  previously measured, still open.
+1. **Deferred texture array is the binding authority — the old comment had it
+   backwards.** `BufferUploader.drawWithShader` → `ShaderInstance.setDefaultUniforms`
+   reads `RenderSystem.getShaderTexture(i)` and OVERWRITES every sampler-map
+   entry from it, then `apply()` binds from the clobbered map. Our `setSampler`
+   calls were dead code — the draw never saw them. Fix: populate the deferred
+   array (`RenderSystem.setShaderTexture(0/1/2, ...)`) like the game's own
+   flush path (LightmapStateShard → `turnOnLightLayer`, OverlayStateShard →
+   `setupOverlayColor`, TextureStateShard). Restore units 1/2 to 0 in the
+   `finally` (mirroring `turnOffLightLayer`/`teardownOverlayColor`) so the
+   game's next GUI draw isn't polluted. Symptom: opaque black with correct
+   alpha (geometry drew, color was black).
+2. **`poseStack.scale(s,s,1)` was non-uniform → normals collapsed.**
+   `PoseStack.scale` applies the normal matrix `(1/x,1/y,1/z)` for non-uniform
+   scales; with z=1 vs x/y=s, every face normal became ~(0,0,±1), so
+   `dot(normal, light) ≈ 0` → flat 0.4 shading on all faces. Measured: normal
+   matrix y-row `(0, 0.0148, 0.5)` = `0.866/s`. Fix: `scale(s,s,s)` (uniform →
+   normal matrix stays the rotation; verified y-row reads 0.866). The game's
+   own pose uses uniform-magnitude `scale(16,-16,16)`. Symptom: flat, dark,
+   unshaded cubes.
+3. **Light y-flip must be pass-scoped, not per-item.** The game's GUI pipeline
+   y-flips both the pose (`scale(16,-16,16)`) and the light matrix
+   (`setupGui3DDiffuseLighting`: `scaling(1,-1,1)`). We keep an unflipped pose
+   (s21 barrel lesson), so the lights' y must be negated to compensate
+   (`dot(n, flipY(L)) == dot(flipY(n), L)`). Per-item flipping raced the game's
+   own `setupFor3DItems` between items (~50/50 flipped/unflipped in one drain).
+   Fix: set the flipped constants once per 16-item grid pass, restore after.
+   The constants are the deterministic game lights
+   (`normalize(0.2,1,-0.7)` / `normalize(-0.2,1,0.7)` through
+   `setupGui3DDiffuseLighting`'s matrix — computed values match measured
+   uniforms to 4 decimals).
 
-**Why parked:** each hypothesis costs a full game restart + pack drain (~5
-min) to measure; the arc outran its teaching value and the maintainer is
-switching to tutor tooling (agreed s21 cont.4). The uniform-probe harness was
-stripped with this park (see git history for `ItemIconRenderer.java`); the
-resume path is: re-add the `[UNIFORM-PROBE]` block (it reads
-`intValues` XOR `floatValues` by type — FogShape is int and has a null
-floatValues), drain, and the three numbers above decide the fix.
+**Kept from the park point (still real):** NEW_ENTITY vertex format (UV1 for
+the overlay fetch), UV2 zeroing (CACHE_VERSION 6), blend/cull/depth restore in
+the `finally`, immediate atlas binds.
+
+**Lesson (s25):** this park note's "deferred setShaderTexture never reaches the
+draw" claim was exactly backwards, and "the three numbers decide the fix" was
+refuted by measurement (all three uniforms were correct). Both claims were
+verified in a dead probe era and then committed to the doc. A park note is a
+pointer, not proof — same rule as memory. The probes were re-added, measured,
+and stripped after the fix; git history has the `[UNIFORM-PROBE]`,
+`[SAMPLER-PROBE]`, and `[NORMAL-PROBE]` blocks for reference.

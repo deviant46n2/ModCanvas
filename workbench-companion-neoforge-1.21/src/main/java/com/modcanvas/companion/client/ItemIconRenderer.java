@@ -184,6 +184,20 @@ public final class ItemIconRenderer {
                 // so cube faces occlude correctly per item without
                 // painter's-order artifacts.
                 RenderSystem.enableDepthTest();
+                // s25 LIGHT-FLIP, moved to PASS level: the game's GUI pipeline
+                // y-flips the pose (scale(16,-16,16)) AND the light matrix
+                // (scaling(1,-1,1)) — both flips. We keep an unflipped pose
+                // (s21 barrel lesson), so we must flip the lights' y instead:
+                // dot(n, flipY(L)) == dot(flipY(n), L), verified numerically.
+                // Set once per pass (NOT per item): the per-item flip raced the
+                // game's own setupFor3DItems between items — measured ~50/50
+                // flipped/unflipped in one drain. Constants are the deterministic
+                // game lights (normalize(0.2,1,-0.7) etc. through setupGui3D-
+                // DiffuseLighting's matrix; verified == measured uniform values)
+                // with y negated. Restored after the pass.
+                org.joml.Vector3f passL0 = new org.joml.Vector3f(-0.9334392F, 0.26269472F, -0.24430016F);
+                org.joml.Vector3f passL1 = new org.joml.Vector3f(-0.10357137F, 0.9766068F, 0.18844642F);
+                RenderSystem.setShaderLights(passL0, passL1);
                 boolean anyDrawn = false;
                 for (int i = 0; i < n; i++) {
                     int cellX = (i % GRID) * size;
@@ -200,6 +214,12 @@ public final class ItemIconRenderer {
                     }
                 }
                 if (!anyDrawn) {
+                    // No items drawn: restore the pass-scoped light flip so the
+                    // game's next GUI draw sees its own lights.
+                    RenderSystem.setShaderLights(
+                        new org.joml.Vector3f(-0.9334392F, -0.26269472F, -0.24430016F),
+                        new org.joml.Vector3f(-0.10357137F, -0.9766068F, 0.18844642F)
+                    );
                     continue;
                 }
 
@@ -227,6 +247,12 @@ public final class ItemIconRenderer {
                 }
                 atlas.close();
                 target.bindWrite(false);
+                // Restore the pass-scoped light flip (set before the item loop)
+                // so the game's next GUI draw sees its own unflipped lights.
+                RenderSystem.setShaderLights(
+                    new org.joml.Vector3f(-0.9334392F, -0.26269472F, -0.24430016F),
+                    new org.joml.Vector3f(-0.10357137F, -0.9766068F, 0.18844642F)
+                );
             }
         } catch (Throwable t) {
             LOGGER.error("[ItemIconRenderer] Render pass failed", t);
@@ -328,7 +354,15 @@ public final class ItemIconRenderer {
         // "darkest face at top" — it broke geometry (barrel rendered upside
         // down; student ground truth). The capture view is NOT mirrored; the
         // shade-position mismatch lives in the SHADING side, not this pose.
-        poseStack.scale(s, s, 1.0F);
+        // s25 FIX: scale(s,s,1) was NON-UNIFORM (z=1 vs x/y=s). PoseStack.scale
+        // applies the normal matrix (1/x,1/y,1/z) for non-uniform scales, so
+        // x/y normals were divided by s (~58) while z stayed 1 — every face
+        // collapsed to ~(0,0,±1), dot(normal,light)≈0, flat 0.4 shading on all
+        // faces (measured: normal matrix y-row (0,0.0148,0.5) = 0.866/s;
+        // pixel-verified flat stone). scale(s,s,s) is uniform → normal matrix
+        // stays the rotation → correct per-face lighting (the game's own pose
+        // uses uniform-magnitude scale(16,-16,16)).
+        poseStack.scale(s, s, s);
         poseStack.translate(-(minX + maxX) / 2.0F, -(minY + maxY) / 2.0F, 0.0F);
         model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, poseStack);
         Matrix4f pose = new Matrix4f(poseStack.last().pose());
@@ -361,13 +395,17 @@ public final class ItemIconRenderer {
             RenderSystem.setShader(GameRenderer::getRendertypeEntityCutoutShader);
             var shader = RenderSystem.getShader();
             if (shader != null) {
-                // The binding authority at draw time is the ShaderInstance's
-                // sampler map: setSampler() populates it, apply() binds the
-                // units from it. Raw glBindTexture AND the deferred
-                // setShaderTexture array are both OVERRIDDEN by apply() (s21
-                // cont.4, bytecode-verified) — that is why the earlier binds
-                // changed nothing. Populate the map so the draw sees the
-                // atlas (Sampler0), overlay (Sampler1), lightmap (Sampler2).
+                // The binding authority at DRAW time is the deferred
+                // shaderTextures[] array, NOT the ShaderInstance sampler map:
+                // BufferUploader.drawWithShader -> ShaderInstance.setDefaultUniforms
+                // reads RenderSystem.getShaderTexture(i) and OVERWRITES every
+                // sampler entry from it, then apply() binds from the clobbered
+                // map (s25, decompiled-verified). The game's own flush path uses
+                // the same deferred array (LightTexture.turnOnLightLayer ->
+                // setShaderTexture(2,...), OverlayTexture.setupOverlayColor ->
+                // setShaderTexture(1,...), TextureStateShard -> setShaderTexture(0,...)).
+                // setSampler() calls are dead here — the draw clobbers them.
+                // Mirror the game: populate the deferred array before the draw.
                 Object overlaySampler = null;
                 Object lightmapSampler = null;
                 try {
@@ -382,9 +420,13 @@ public final class ItemIconRenderer {
                 } catch (Exception e10) {
                     LOGGER.warn("[ItemIconRenderer] Sampler reflection failed: {}", e10.toString());
                 }
-                shader.setSampler("Sampler0", mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS));
-                shader.setSampler("Sampler1", overlaySampler);
-                shader.setSampler("Sampler2", lightmapSampler);
+                RenderSystem.setShaderTexture(0, mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
+                if (overlaySampler instanceof net.minecraft.client.renderer.texture.AbstractTexture ovt) {
+                    RenderSystem.setShaderTexture(1, ovt.getId());
+                }
+                if (lightmapSampler instanceof net.minecraft.client.renderer.texture.AbstractTexture lmt) {
+                    RenderSystem.setShaderTexture(2, lmt.getId());
+                }
                 shader.apply();
             }
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // clear any stale color modulator
@@ -446,6 +488,12 @@ public final class ItemIconRenderer {
             GL30.glActiveTexture(GL30.GL_TEXTURE2);
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
             GL30.glActiveTexture(GL30.GL_TEXTURE0);
+            // s25: restore the DEFERRED array too. setDefaultUniforms reads it
+            // at the next draw and would bind our atlas/lightmap into the
+            // game's next RenderType flush. The game's own teardown does the
+            // same (turnOffLightLayer/teardownOverlayColor set units to 0).
+            RenderSystem.setShaderTexture(1, 0);
+            RenderSystem.setShaderTexture(2, 0);
             mvStack.popMatrix();
             RenderSystem.applyModelViewMatrix();
         }
