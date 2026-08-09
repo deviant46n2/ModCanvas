@@ -48,12 +48,29 @@ Known debt parked at introduction (2026-08-09): 48 files over 300 lines
 self-authored branding. The parked list is visible on every run — pay it down
 by splitting files and removing their allowlist entries.
 
-## 2. Planned (suite roadmap)
+## 2. Verifier — `/verify`
 
-- **Verifier** (P3): grade claims against repo state — read the code a claim
-  points at before believing it.
-- **Workaround-register** (s21 cont.4 lesson): tracked register of lived-
-  experience workarounds ("restart app to refresh textures") so they are
-  surfaced at diagnostic start, not withheld.
-- **Provenance** (memory discipline): every recorded fact carries where it
-  came from; stale beats absent.
+P3 claims-vs-repo as a discipline command. Given any claim (AI's, tutor's,
+student's): restate it, read the code it points at, grade PASS / FAIL /
+PARTIAL / UNVERIFIABLE, and emit the provenance header — claim → evidence
+`file:line` → verdict → confidence. The code wins over any confident story.
+
+## 3. Workaround register — `docs/workarounds.md` + `/workaround`
+
+The s21 cont.4 lesson made executable: real workarounds ("restart the app to
+refresh textures" — withheld for weeks) get written down, consulted at every
+diagnostic start, and the student is always asked for their own. Seeded with
+5 entries from the record (midnight log rotation, md5/javap jar verification,
+lingering-game-process, CACHE_VERSION pairing).
+
+## 4. Provenance
+
+Folded into the verifier (the header: claim → evidence → verdict) and the
+memory discipline (memory is a pointer, not proof; stale beats absent). No
+separate tool — it's the output format of `/verify` and the storage rule of
+`code:` memories.
+
+## 5. Planned
+
+- (open) — the student's next tool designs; the suite is booked complete for
+  the agreed s21 cont.4 scope.
