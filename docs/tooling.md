@@ -31,6 +31,7 @@ Sections:
 | `adapter-matrix` | new version/loader = new file, never an edit (AGENTS.md) | modified existing adapters in the diff vs HEAD (added files are fine) |
 | `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate |
 | `doc-anchors` | docs and code must agree on specific facts | content-level: CACHE_VERSION, companion jar version — any doc mention ≠ code value is a violation (stale doc text) |
+| `suite-self` | the tooling is a maintainership artifact (s13 meta-rule) | the suite checks itself: command frontmatter (agent/description), skill references resolve, `pnpm` scripts in docs exist in package.json, test files exist |
 
 The git-aware checks live in `scripts/integrity-git.mjs`; the content-level
 doc anchors in `scripts/integrity-doc.mjs` (split from the main engine when
@@ -86,7 +87,24 @@ The five failure classes observed across the arc, each with a tool:
 | Content-level doc drift (CACHE_VERSION, jar versions) | **Doc anchors** — doc mention ≠ code value = violation | `doc-anchors` integrity section |
 
 The meta-rule holds: every tool obeys the repo's own rules — documented,
-tracked, tested (24 tests total across the suite).
+tracked, tested (28 tests total across the suite).
+
+## 7. Batch 3 — the tutor's own reliability (todo-tooling.md)
+
+| Item | Tool | Status |
+|---|---|---|
+| T1 | `/handoff` — session snapshot: DONE / IN-FLIGHT / PENDING (owed) / WHAT WE BUILT (the tutor's one line) / UNVERIFIED CLAIMS / DECISIONS | shipped |
+| T2 | `/owed` — the ledger, NOT a gate (2026-08-09 veto: no forced explain-backs, ever; schedule or carry, frictionless) | shipped |
+| T3 | `/audit` — self-audit: command/skill references resolve, profile mirror ≈ memory, no stale contracts | shipped |
+| T4 | falsification skill — "this is wrong if [observable]", then go look; untestable conclusions flagged | shipped |
+| T5 | `suite-self` integrity section — the suite checks itself | shipped |
+| T6 | model decision — RECORDED (keep deepseek-v4-flash until a better model matches its price); S1 (default agent) still open | decided |
+
+Policy change recorded 2026-08-09: the understanding floor is about unowned
+*accumulation*, not ceremony — explain-backs happen only at the student's
+invitation or scheduled time; the one-line "what we built and why" is the
+tutor's job in every /handoff, and unconfirmed lines stay visible in the
+ledger as data (the s21 lesson).
 
 ## 6. Planned
 

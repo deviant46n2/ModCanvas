@@ -5,10 +5,11 @@ batch 2 (docs/tooling.md §5) killed the *observation* failure classes; this
 batch kills the *tutor-side structural* ones — context loss, self-drift,
 pattern-matching, completion-over-understanding, model ceiling.
 
-**Status:** DRAFT — agreed scope in brainstorm (2026-08-09). Work top-down;
-each item ends with its own tests. Read fully before coding; follow AGENTS.md
-(docs are code, ≤300 lines/file, rebuild + mtime verify — and the suite obeys
-its own rules).
+**Status:** T1–T5 SHIPPED (2026-08-09); T6 model decision RECORDED (keep
+deepseek-v4-flash until a better model matches its price — not to be
+relitigated); S1 (default agent → tutor) still open. Backlog worked top-down;
+each item landed with tests + doc sync; the suite obeys its own rules
+(gate exit 0, 28/28 tests, diff-check clean).
 
 ---
 

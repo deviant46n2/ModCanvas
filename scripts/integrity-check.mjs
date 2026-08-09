@@ -18,6 +18,10 @@
 //                    adapter breaks other versions silently (git diff vs HEAD).
 //   doc-sync       — code commit without a doc commit = drift CANDIDATE
 //                    (maintainer judges; surfaced, never a gate).
+//   doc-anchors    — content-level: doc mention ≠ code value (CACHE_VERSION,
+//                    jar versions) is a violation (stale doc text).
+//   suite-self     — the suite checks itself: command frontmatter, skill
+//                    references, docs↔package.json scripts, test files.
 //
 // Usage (run from the repo root):
 //   node scripts/integrity-check.mjs            # all sections; exit 1 on violations
@@ -33,6 +37,7 @@ import { pathToFileURL } from 'node:url'
 
 import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
 import { checkDocAnchors } from './integrity-doc.mjs'
+import { checkSuiteSelf } from './integrity-suite.mjs'
 
 const RULES_PATH = join(process.cwd(), 'scripts', 'integrity-rules.json')
 const DEFAULT_RULES = {
@@ -42,6 +47,12 @@ const DEFAULT_RULES = {
   binaryPath: 'src-tauri/target/debug/modcanvas',
   sourcePaths: ['src-tauri/src', 'frontend/src'],
   adapterDirs: ['frontend/src/adapters'],
+  suiteSelf: {
+    commandsDir: '.opencode/command',
+    skillsDir: '.opencode/skills',
+    docsFile: 'docs/tooling.md',
+    packageJson: 'package.json',
+  },
   docAnchors: [
     {
       name: 'cache-version',
@@ -254,11 +265,12 @@ function main() {
     { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
     { name: 'doc-sync', run: () => checkDocSync(rules, root) },
     { name: 'doc-anchors', run: () => checkDocAnchors(rules, root) },
+    { name: 'suite-self', run: () => checkSuiteSelf(rules, root) },
   ]
   const selected = arg && arg !== '--seed' ? sections.filter((s) => s.name === arg) : sections
   if (!selected.length) {
     console.error(
-      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors)`,
+      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|suite-self)`,
     )
     process.exit(2)
   }
