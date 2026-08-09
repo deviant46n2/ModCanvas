@@ -27,6 +27,12 @@ Sections:
 | `asset-bundle` | no game-derived image bytes in the bundle (AGENTS.md rule 6) | new raster images in `frontend/public|src/assets`; images in `tauri.conf.json` `bundle.resources` |
 | `stale-binary` | binary embeds src + frontend; stale binary serves old behavior | `target/debug/modcanvas` older than the newest source edit |
 | `diff-hygiene` | whitespace lies about structure | `git diff --check` (working tree + staged) |
+| `adapter-matrix` | new version/loader = new file, never an edit (AGENTS.md) | modified existing adapters in the diff vs HEAD (added files are fine) |
+| `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate |
+
+The last two are git-aware and live in `scripts/integrity-git.mjs` (split from the
+main engine when it tripped its own 300-line rule — the tripwire working on the
+tool itself). Engine: 258 lines; git module: 84.
 
 **The allowlist is the "written reason" (P4).** A file appears as `parked` with
 its reason attached — the debt is visible, never silently forgotten. `--seed`

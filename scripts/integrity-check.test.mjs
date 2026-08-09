@@ -10,7 +10,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, existsSync } from 'n
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { checkLineLimit, checkAssetBundle, checkStaleBinary, checkDiffHygiene, seedRules } from './integrity-check.mjs'
+import { checkLineLimit, checkAssetBundle, checkStaleBinary, seedRules } from './integrity-check.mjs'
+import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
 
 const fixture = () => mkdtempSync(join(tmpdir(), 'integrity-test-'))
 
@@ -161,4 +162,85 @@ test('seedRules: parks violations and preserves existing entries', () => {
   assert.ok(seeded.allowlists['line-limit'].some((a) => a.path === 'src/big.rs'))
   assert.ok(seeded.allowlists['asset-bundle'].some((a) => a.path === 'public/x.png'))
   assert.ok(existsSync(rulesPath))
+})
+
+// --- v2: git-aware checks (real git repos in temp dirs) -------------------
+
+const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+const commit = (root, msg) => git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', msg)
+
+const gitFixture = () => {
+  const root = fixture()
+  git(root, 'init', '-q')
+  git(root, 'config', 'user.name', 't')
+  git(root, 'config', 'user.email', 't@t')
+  return root
+}
+
+const RULES_V2 = {
+  ...RULES,
+  adapterDirs: ['frontend/src/adapters'],
+  docSync: { codePaths: ['src'], docPaths: ['docs'], lookback: 10 },
+  allowlists: { 'line-limit': [], 'asset-bundle': [], 'adapter-matrix': [] },
+}
+
+test('adapter-matrix: modifying an existing adapter is a violation', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'frontend/src/adapters/v1_20_1'), { recursive: true })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export {}')
+  git(root, 'add', '.')
+  commit(root, 'init')
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export const x = 1')
+  const { violations } = checkAdapterMatrix(RULES_V2, root)
+  assert.equal(violations.length, 1)
+  assert.equal(violations[0].path, 'frontend/src/adapters/v1_20_1/neoforge.ts')
+})
+
+test('adapter-matrix: adding a NEW adapter is clean; allowlisted edit is parked', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'frontend/src/adapters/v1_20_1'), { recursive: true })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export {}')
+  git(root, 'add', '.')
+  commit(root, 'init')
+
+  // new version = new file (allowed)
+  mkdirSync(join(root, 'frontend/src/adapters/v1_21_1'), { recursive: true })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_21_1/neoforge.ts'), 'export {}')
+  let { violations } = checkAdapterMatrix(RULES_V2, root)
+  assert.equal(violations.length, 0)
+
+  // allowlisted modification = parked
+  const rules = structuredClone(RULES_V2)
+  rules.allowlists['adapter-matrix'].push({ path: 'frontend/src/adapters/v1_20_1/neoforge.ts', reason: 'version-boundary bug fix' })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export const x = 1')
+  ;({ violations } = checkAdapterMatrix(rules, root))
+  assert.equal(violations.length, 0)
+})
+
+test('doc-sync: code-only commit is a candidate; code+docs commit is not', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  mkdirSync(join(root, 'docs'), { recursive: true })
+
+  writeFileSync(join(root, 'src', 'a.rs'), '// a')
+  git(root, 'add', '.')
+  commit(root, 'code only')
+
+  writeFileSync(join(root, 'src', 'b.rs'), '// b')
+  writeFileSync(join(root, 'docs', 'x.md'), '# x')
+  git(root, 'add', '.')
+  commit(root, 'code + docs')
+
+  const { candidates } = checkDocSync(RULES_V2, root)
+  assert.equal(candidates.length, 1)
+  assert.equal(candidates[0].commit.length, 7)
+})
+
+test('doc-sync: no history is info, not an error', () => {
+  const root = fixture() // not a git repo
+  mkdirSync(join(root, 'src'), { recursive: true })
+  writeFileSync(join(root, 'src', 'a.rs'), '// a')
+  const { candidates, info } = checkDocSync(RULES_V2, root)
+  assert.equal(candidates.length, 0)
+  assert.equal(info.length, 1)
 })

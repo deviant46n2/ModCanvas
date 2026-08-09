@@ -14,6 +14,10 @@
 //   stale-binary   — the binary embeds src-tauri/** and frontend/**; a binary
 //                    older than the newest source silently serves old code.
 //   diff-hygiene   — git diff --check (whitespace lies about structure).
+//   adapter-matrix — new version/loader = new file; editing an existing
+//                    adapter breaks other versions silently (git diff vs HEAD).
+//   doc-sync       — code commit without a doc commit = drift CANDIDATE
+//                    (maintainer judges; surfaced, never a gate).
 //
 // Usage (run from the repo root):
 //   node scripts/integrity-check.mjs            # all sections; exit 1 on violations
@@ -23,10 +27,11 @@
 //
 // Exit codes: 0 clean, 1 violations, 2 error (bad cwd, git failure).
 
-import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
 
 const RULES_PATH = join(process.cwd(), 'scripts', 'integrity-rules.json')
 const DEFAULT_RULES = {
@@ -35,13 +40,35 @@ const DEFAULT_RULES = {
   assetDirs: ['frontend/public', 'frontend/src/assets'],
   binaryPath: 'src-tauri/target/debug/modcanvas',
   sourcePaths: ['src-tauri/src', 'frontend/src'],
+  adapterDirs: ['frontend/src/adapters'],
+  docSync: {
+    codePaths: ['src-tauri/src', 'frontend/src'],
+    docPaths: ['docs', 'README.md', 'AGENTS.md'],
+    lookback: 10,
+  },
   allowlists: {
     'line-limit': [],
     'asset-bundle': [],
+    'adapter-matrix': [],
   },
 }
 
 const RASTER = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
+
+// --- rules loading -------------------------------------------------------
+
+// The on-disk rules file is authoritative once it exists, but the engine may
+// grow new config keys later. Merge: loaded rules overlay the defaults, and
+// defaults fill any gaps — a stale rules file must never crash the gate.
+export function mergeRules(base, over) {
+  return {
+    ...base,
+    ...over,
+    allowlists: { ...base.allowlists, ...(over.allowlists ?? {}) },
+  }
+}
+
+const loadRules = () => (existsSync(RULES_PATH) ? mergeRules(DEFAULT_RULES, JSON.parse(readFileSync(RULES_PATH, 'utf8'))) : DEFAULT_RULES)
 
 // --- pure helpers ---------------------------------------------------------
 
@@ -138,30 +165,20 @@ export function checkStaleBinary(rules, root) {
   return { violations, info }
 }
 
-export function checkDiffHygiene(rules, root) {
-  const violations = []
-  for (const args of [['diff', '--check'], ['diff', '--cached', '--check']]) {
-    try {
-      execFileSync('git', args, { cwd: root, encoding: 'utf8' })
-    } catch (e) {
-      const out = String(e.stdout ?? '')
-      if (out.trim()) violations.push({ message: `git ${args.join(' ')}:\n${out.trim()}` })
-      else throw new Error(`git ${args.join(' ')} failed: ${e.message}`)
-    }
-  }
-  return { violations }
-}
-
 // --- reporting -----------------------------------------------------------
 
 export function report(results) {
   let violationCount = 0
   for (const section of results) {
-    const n = section.violations.length
+    const violations = section.violations ?? []
+    const n = violations.length
     violationCount += n
     console.log(`\n== ${section.name} ==`)
     for (const v of section.violations) {
       console.log(`  VIOLATION  ${v.path ?? v.message}${v.lines ? ` (${v.lines} lines)` : ''}`)
+    }
+    for (const c of section.candidates ?? []) {
+      console.log(`  candidate  commit ${c.commit} changed code without docs: ${(c.files ?? []).join(', ')}`)
     }
     for (const p of section.parked ?? []) {
       console.log(`  parked     ${p.path} — ${p.reason}`)
@@ -169,7 +186,7 @@ export function report(results) {
     for (const i of section.info ?? []) {
       console.log(`  info       ${i.message}`)
     }
-    if (n === 0 && !(section.parked?.length) && !(section.info?.length)) console.log('  clean')
+    if (n === 0 && !(section.candidates?.length) && !(section.parked?.length) && !(section.info?.length)) console.log('  clean')
   }
   console.log(`\n${violationCount} violation(s).`)
   return violationCount
@@ -180,7 +197,7 @@ export function report(results) {
 export function seedRules(rulesPath, rules, root) {
   // The on-disk rules file is authoritative once it exists; before that, the
   // passed rules (defaults or caller-constructed) are the base to extend.
-  const existing = existsSync(rulesPath) ? JSON.parse(readFileSync(rulesPath, 'utf8')) : rules
+  const existing = existsSync(rulesPath) ? mergeRules(rules, JSON.parse(readFileSync(rulesPath, 'utf8'))) : rules
   const add = (key, list, reason) => {
     const cur = existing.allowlists[key] ?? []
     const known = new Set(cur.map((a) => a.path))
@@ -205,7 +222,7 @@ function main() {
     console.error('integrity-check: run from the repo root (no src-tauri/src here)')
     process.exit(2)
   }
-  const rules = existsSync(RULES_PATH) ? JSON.parse(readFileSync(RULES_PATH, 'utf8')) : DEFAULT_RULES
+  const rules = loadRules()
 
   if (arg === '--seed') {
     seedRules(RULES_PATH, rules, root)
@@ -217,10 +234,14 @@ function main() {
     { name: 'asset-bundle', run: () => checkAssetBundle(rules, root) },
     { name: 'stale-binary', run: () => checkStaleBinary(rules, root) },
     { name: 'diff-hygiene', run: () => checkDiffHygiene(rules, root) },
+    { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
+    { name: 'doc-sync', run: () => checkDocSync(rules, root) },
   ]
   const selected = arg && arg !== '--seed' ? sections.filter((s) => s.name === arg) : sections
   if (!selected.length) {
-    console.error(`integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene)`)
+    console.error(
+      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync)`,
+    )
     process.exit(2)
   }
   try {
