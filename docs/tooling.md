@@ -87,7 +87,8 @@ The five failure classes observed across the arc, each with a tool:
 | Content-level doc drift (CACHE_VERSION, jar versions) | **Doc anchors** — doc mention ≠ code value = violation | `doc-anchors` integrity section |
 
 The meta-rule holds: every tool obeys the repo's own rules — documented,
-tracked, tested (28 tests total across the suite).
+tracked, tested (the suite's test count is verified by the gate itself — a
+stale "N tests" claim in this doc is a violation).
 
 ## 7. Batch 3 — the tutor's own reliability (todo-tooling.md)
 

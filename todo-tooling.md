@@ -9,7 +9,7 @@ pattern-matching, completion-over-understanding, model ceiling.
 deepseek-v4-flash until a better model matches its price — not to be
 relitigated); S1 (default agent → tutor) still open. Backlog worked top-down;
 each item landed with tests + doc sync; the suite obeys its own rules
-(gate exit 0, 28/28 tests, diff-check clean).
+(gate exit 0, all tests green, diff-check clean).
 
 ---
 
@@ -25,9 +25,9 @@ each item landed with tests + doc sync; the suite obeys its own rules
 
 ## Current state (already built — do NOT redo)
 
-- Integrity gate (`scripts/integrity-check.mjs` + `integrity-git.mjs` +
-  `integrity-doc.mjs`): 7 sections, rules-as-data, `--seed`, allowlist-as-
-  written-reason, 24 tests.
+- Integrity gate (`scripts/integrity-check.mjs` + the `integrity-*.mjs`
+  modules): 8 sections, rules-as-data, `--seed`, allowlist-as-
+  written-reason, all tests green.
 - Verifier (`/verify`), workaround register (`docs/workarounds.md` +
   `/workaround`), observation gate (`tutor-observation` skill, `/debug` step 0),
   instrumentation gate (`tutor-instrument` skill), verification harness
