@@ -100,3 +100,23 @@ test('suite-self: stale test-count claim in docs is a violation (s22 final pass)
   assert.match(violations[0].path, /claims 28 tests/)
   assert.match(violations[0].path, /has 0 tests/)
 })
+
+test('suite-self: subdir-scoped pnpm refs resolve against that dir (in `frontend/`)', () => {
+  const root = withSkill(suiteFixture())
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  writeFileSync(join(root, 'frontend/package.json'), JSON.stringify({ scripts: { test: 'vitest run', lint: 'oxlint' } }))
+  writeFileSync(join(root, 'docs/tooling.md'), 'Run `pnpm test` (in `frontend/`) and `pnpm integrity`.\n')
+  const { violations, candidates } = checkSuiteSelf(SUITE_RULES, root)
+  assert.deepEqual(violations, [])
+  assert.deepEqual(candidates, [])
+})
+
+test('suite-self: subdir-scoped ref to a MISSING script is still a violation', () => {
+  const root = withSkill(suiteFixture())
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  writeFileSync(join(root, 'frontend/package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }))
+  writeFileSync(join(root, 'docs/tooling.md'), 'Run `pnpm lint` (in `frontend/`).\n')
+  const { violations } = checkSuiteSelf(SUITE_RULES, root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].path, /pnpm lint/)
+})

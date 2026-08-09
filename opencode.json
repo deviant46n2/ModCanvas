@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "default_agent": "tutor",
   "permission": {
     "external_directory": {
       "/home/deviant/.local/share/PrismLauncher/**": "allow"

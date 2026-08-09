@@ -144,6 +144,42 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
 
 ---
 
+## Maintainer Tooling (state-truth suite — use it, don't improvise)
+
+This repo ships a tool suite (built s21–s22) that exists so the maintainer can
+verify AI claims against the repo instead of trusting them. **Use these tools
+at the moments they exist for** — that is the point of having built them:
+
+- **Session start:** read `docs/workarounds.md` (the lived-experience
+  register) and list owed items via `/owed`. Run `pnpm backup` at session
+  boundaries — the tutor arc's data expires on the memory store's cleanup
+  clocks.
+- **Repo health, before trusting a diff:** `pnpm integrity`
+  (`node scripts/integrity-check.mjs` — 8 sections: line-limit,
+  asset-bundle, stale-binary, diff-hygiene, adapter-matrix, doc-sync,
+  doc-anchors, suite-self). Violations are new debt; PARKED entries are
+  known debt with written reasons; CANDIDATES need maintainer judgment.
+- **Before claiming any fix or feature works:** `/verify-build` — rebuild →
+  deploy → restart → observe, each step graded on EVIDENCE (mtime, md5,
+  process start, fresh log). A claim without evidence for all four steps is
+  not done.
+- **Diagnosing:** load the `tutor-observation` skill (pin the raw
+  observation before any theory) and, for companion probes, the
+  `tutor-instrument` skill (prove the instrument applied, can fire, won't
+  NPE, and that the log being read is the one being written).
+- **Any claim, including your own:** `/verify` — restate, read the code it
+  points at, grade PASS/FAIL/PARTIAL/UNVERIFIABLE with a provenance header.
+  The code wins over any confident story.
+- **Checking the tutor's own config:** `/audit` (command/skill references,
+  profile mirror, stale contracts).
+
+Detail lives in `docs/tooling.md` (the reference) — this section is the
+contract-level hook, not a duplicate. The suite obeys the repo's own rules:
+documented, tracked, tested (`pnpm test:tools`), and every tool stays under
+the 300-line limit it enforces.
+
+---
+
 ## Pre-Commit Checklist for Agents
 
 Before finalizing any PR, commit, or file edit, ensure:

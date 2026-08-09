@@ -54,8 +54,8 @@ export function checkSuiteSelf(rules, root) {
   let realTestCount = -1
   if (existsSync(pkgPath)) {
     const pkg = safeJson(readFileSync(pkgPath, 'utf8'))
-    const scripts = pkg?.scripts ?? {}
-    const testCmd = scripts['test:tools'] ?? ''
+    const scriptsRoot = pkg?.scripts ?? {}
+    const testCmd = scriptsRoot['test:tools'] ?? ''
     realTestCount = [...testCmd.matchAll(/[\w./-]+\.test\.mjs/g)].reduce((n, m) => {
       const abs = join(root, m[0])
       return n + (existsSync(abs) ? (readFileSync(abs, 'utf8').match(/\btest\(/g) ?? []).length : 0)
@@ -68,15 +68,27 @@ export function checkSuiteSelf(rules, root) {
       const docsPath = join(root, docsFile)
       if (!existsSync(docsPath)) continue
       const docs = readFileSync(docsPath, 'utf8')
-      // 3. pnpm claims.
+      // 3. pnpm claims. A reference scoped to a subdir ("(in `frontend/`")
+      // resolves against THAT dir's package.json, not the root — false
+      // positives on the always-loaded contract are noise (F4 lesson).
+      const scopedPkg = (i) => {
+        const m = docs.slice(i).match(/\(in [`']?([\w./-]+)[`']?\//)
+        if (!m) return null
+        const p = join(root, m[1], 'package.json')
+        return existsSync(p) ? safeJson(readFileSync(p, 'utf8'))?.scripts ?? null : null
+      }
       for (const m of docs.matchAll(/`pnpm (?:(?:run)\s+)?([\w:-]+)`/g)) {
         if (PNPM_VERBS.has(m[1])) continue
-        if (!(m[1] in scripts)) violations.push({ path: `${docsFile} mentions pnpm ${m[1]} but package.json has no such script` })
+        const scoped = scopedPkg(m.index + m[0].length)
+        const scripts = scoped ?? scriptsRoot
+        if (!(m[1] in scripts)) violations.push({ path: `${docsFile} mentions pnpm ${m[1]} but the relevant package.json has no such script` })
       }
       for (const m of docs.matchAll(/\bpnpm (?:(?:run)\s+)?([\w:-]+)/g)) {
         if (PNPM_VERBS.has(m[1])) continue
+        const scoped = scopedPkg(m.index + m[0].length)
+        const scripts = scoped ?? scriptsRoot
         if (m[1] in scripts) continue // plain but exists — verified silently
-        candidates.push({ path: `${docsFile}: plain pnpm reference "${m[1]}" but package.json has no such script — backtick if prose, fix if real` })
+        candidates.push({ path: `${docsFile}: plain pnpm reference "${m[1]}" but the relevant package.json has no such script — backtick if prose, fix if real` })
       }
       // 5. Test-count claims.
       for (const m of docs.matchAll(/(\d+)(?:\/\d+)? tests?\b/g)) {
