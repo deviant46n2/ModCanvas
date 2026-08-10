@@ -33,11 +33,6 @@
         "since": "2026-08-09T03:33:00"
       },
       {
-        "path": "src-tauri/src/icons.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
-        "since": "2026-08-09T03:33:00"
-      },
-      {
         "path": "src-tauri/src/imports/curseforge.rs",
         "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
         "since": "2026-08-09T03:33:00"
@@ -199,11 +194,6 @@
       },
       {
         "path": "frontend/src/components/quest/editor-theme.css",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
-        "since": "2026-08-09T03:33:00"
-      },
-      {
-        "path": "frontend/src/components/ui/icons.tsx",
         "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },

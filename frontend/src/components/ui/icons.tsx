@@ -1,29 +1,22 @@
-import type { ReactNode } from 'react'
+// icons.tsx — the app's self-authored SVG icon set (the ONLY sanctioned icon
+// source, docs/design.md §4.7). No lucide, no Font Awesome, no emoji-as-icon.
+// Under the 300-line cap by split: Icon/IconProps live in icon-base.tsx, the
+// align/distribute toolbar icons in icons-align.tsx (re-exported below so
+// consumers keep a single import site).
 
-export interface IconProps {
-  size?: number
-  className?: string
-}
+export { Icon, type IconProps } from './icon-base'
+import { Icon, type IconProps } from './icon-base'
 
-function Icon({ size = 16, className, children }: IconProps & { children: ReactNode }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      {children}
-    </svg>
-  )
-}
+export {
+  AlignLeftIcon,
+  AlignCenterXIcon,
+  AlignRightIcon,
+  AlignTopIcon,
+  AlignCenterYIcon,
+  AlignBottomIcon,
+  DistributeHIcon,
+  DistributeVIcon,
+} from './icons-align'
 
 export const XIcon = (p: IconProps) => (
   <Icon {...p}>
@@ -156,70 +149,6 @@ export const CheckSquareIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="m9 11 3 3L22 4" />
     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-  </Icon>
-)
-
-export const AlignLeftIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="4" y1="6" x2="20" y2="6" />
-    <line x1="4" y1="12" x2="12" y2="12" />
-    <line x1="4" y1="18" x2="16" y2="18" />
-  </Icon>
-)
-
-export const AlignCenterXIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="4" y1="6" x2="20" y2="6" />
-    <line x1="8" y1="12" x2="16" y2="12" />
-    <line x1="6" y1="18" x2="18" y2="18" />
-  </Icon>
-)
-
-export const AlignRightIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="4" y1="6" x2="20" y2="6" />
-    <line x1="12" y1="12" x2="20" y2="12" />
-    <line x1="8" y1="18" x2="20" y2="18" />
-  </Icon>
-)
-
-export const AlignTopIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="6" y1="4" x2="6" y2="20" />
-    <line x1="12" y1="4" x2="12" y2="12" />
-    <line x1="18" y1="4" x2="18" y2="16" />
-  </Icon>
-)
-
-export const AlignCenterYIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="6" y1="4" x2="6" y2="20" />
-    <line x1="12" y1="8" x2="12" y2="16" />
-    <line x1="18" y1="6" x2="18" y2="18" />
-  </Icon>
-)
-
-export const AlignBottomIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="6" y1="4" x2="6" y2="20" />
-    <line x1="12" y1="12" x2="12" y2="20" />
-    <line x1="18" y1="8" x2="18" y2="20" />
-  </Icon>
-)
-
-export const DistributeHIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="5" y1="4" x2="5" y2="20" />
-    <line x1="12" y1="4" x2="12" y2="20" />
-    <line x1="19" y1="4" x2="19" y2="20" />
-  </Icon>
-)
-
-export const DistributeVIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <line x1="4" y1="5" x2="20" y2="5" />
-    <line x1="4" y1="12" x2="20" y2="12" />
-    <line x1="4" y1="19" x2="20" y2="19" />
   </Icon>
 )
 
