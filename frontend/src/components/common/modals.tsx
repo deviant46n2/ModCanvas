@@ -1,5 +1,3 @@
-export { NewProjectModal } from './NewProjectModal'
-
 interface Project {
   id: string
   name: string

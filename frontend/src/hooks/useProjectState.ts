@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { listProjects, createProject, saveProject, deleteProject } from '../services/api'
+import type { CreateProjectInput } from '../services/types'
 
 export interface Project {
   id: string
@@ -26,10 +27,7 @@ export function useProjectState() {
   // The project highlighted in the launcher for the metadata preview. This is
   // purely a selection concept — it never triggers a load.
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [showNewProject, setShowNewProject] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [mcVersion, setMcVersion] = useState('1.21.1')
-  const [modLoader, setModLoader] = useState('Forge')
+  const [showWizard, setShowWizard] = useState(false)
   const [confirmCloseProject, setConfirmCloseProject] = useState(false)
 
   function persistSelection(id: string | null) {
@@ -80,25 +78,27 @@ export function useProjectState() {
     }
   }
 
-  async function handleCreateProject(): Promise<Project | null> {
-    try {
-      const project = await createProject(
-        newProjectName,
-        mcVersion,
-        modLoader,
-        `~/modpacks/${newProjectName.toLowerCase().replace(/\s+/g, '-')}`,
-      )
-      setProjects([project, ...projects])
-      // Select it in the launcher; useAppState.handleCreateProject decides
-      // whether to open it (which runs the full load pipeline).
-      setSelectedProject(project)
-      setShowNewProject(false)
-      setNewProjectName('')
-      return project
-    } catch (e) {
-      console.error('Failed to create project:', e)
-      return null
-    }
+  /**
+   * Create a project and surface it in the launcher. `input` is derived by
+   * the First-Pack wizard (or the classic flow); errors propagate to the
+   * caller so the wizard can show them — the wizard must stay open on a
+   * failed create (e.g. scaffold refused an instance that already has a
+   * quest book).
+   */
+  async function handleCreateProject(input: CreateProjectInput): Promise<Project> {
+    const project = await createProject(
+      input.name,
+      input.mcVersion,
+      input.modLoader,
+      input.path,
+      input.templateId,
+    )
+    setProjects([project, ...projects])
+    // Select it in the launcher; useAppState.handleCreateProject decides
+    // whether to open it (which runs the full load pipeline).
+    setSelectedProject(project)
+    setShowWizard(false)
+    return project
   }
 
   async function handleSaveProject() {
@@ -143,10 +143,7 @@ export function useProjectState() {
     selectProject,
     openPack,
     closePack,
-    showNewProject, setShowNewProject,
-    newProjectName, setNewProjectName,
-    mcVersion, setMcVersion,
-    modLoader, setModLoader,
+    showWizard, setShowWizard,
     confirmCloseProject, setConfirmCloseProject,
     loadProjects,
     getLastProjectId,

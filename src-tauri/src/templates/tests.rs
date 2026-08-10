@@ -100,6 +100,25 @@ fn unknown_template_errors_without_partial_writes() {
 }
 
 #[test]
+fn scaffold_refuses_to_clobber_an_existing_quest_book() {
+    let (_tmp, root) = scaffolded_root();
+    // The wizard can point at an existing instance: a quests dir the game (or
+    // a previous project) wrote must never be overwritten by a scaffold.
+    let quests = root.join("config").join("ftbquests").join("quests");
+    let marker = quests.join("book.snbt");
+    std::fs::create_dir_all(&marker.parent().unwrap()).unwrap();
+    std::fs::write(&marker, "{version: 13}").unwrap();
+
+    let err = scaffold_template(&root, "exploration").expect_err("existing content must error");
+    assert!(err.contains("already contains a quest book"), "error explains: {err}");
+    assert_eq!(
+        std::fs::read_to_string(&marker).unwrap(),
+        "{version: 13}",
+        "existing quest content untouched"
+    );
+}
+
+#[test]
 fn list_templates_exposes_metadata() {
     let templates = list_templates();
     assert!(templates.iter().any(|t| t.id == "exploration"), "exploration listed");

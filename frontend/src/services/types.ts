@@ -20,6 +20,15 @@ export interface ProjectTemplate {
   description: string
 }
 
+/** Everything `create_project` needs — the wizard derives it from user picks. */
+export interface CreateProjectInput {
+  name: string
+  mcVersion: string
+  modLoader: string
+  path: string
+  templateId: string | null
+}
+
 export interface ImportResult {
   project: Project
   mods: Array<{ mod_id: string; slug: string; name: string; version: string; source: string }>

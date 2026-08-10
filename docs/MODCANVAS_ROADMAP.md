@@ -136,7 +136,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Does not exist.** `NewProjectModal` (`components/common/modals.tsx:33-82`) is a 3-field form (name + MC version + loader). |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Partially implemented (P0-WIZARD chunks 1–2).** The wizard UI (`components/common/WizardStepper.tsx`) replaced the new-project modal: instance pick (or start-from-scratch with the classic form), template pick, review-and-create. `create_project` scaffolds template packages (chunk 1). Steps 4–6 (curated mod picks, guided first quest, green check + Launch handoff) pending. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunk 1).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: exploration starter chapter). No UI exposes it yet — the new-project modal still creates empty packs. Config profiles + recipe content pending. |
@@ -526,7 +526,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | Bare 3-field form (`NewProjectModal.tsx`); no instance pick; no "about" question. **Scaffold infra now exists** (`create_project` + `template_id`, P0-WIZARD chunk 1) but no UI calls it | User has an empty dir and no idea what to do next |
+| Create Pack | **Wizard shipped (P0-WIZARD chunks 1–2):** instance pick or start-from-scratch, template pick, review+create — replaces the 3-field modal. Steps 4–6 (curated mods, guided first quest, green check + Launch) still pending. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -538,12 +538,19 @@ Export (mrpack/CF zip) → Playable Modpack
 
 Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
 
-1. **Instance** — reuse `list_prism_instances` (`commands/modpack/mod.rs:263`) + instance
+1. **Instance** — reuse `list_prism_instances` (`commands/mod.rs:243-284`) + instance
    root discovery (`minecraft/instances.rs`). Offer existing instances or browse-for-folder.
    Never create instances (out of scope, Bible §10.2). Fix the **1.19.2/Quilt adapter lie**
-   in the same pass (P0-HYGIENE-1).
+   in the same pass (P0-HYGIENE-1). **Status (P0-WIZARD chunk 2):** the wizard lists
+   `list_mc_instances` (full metadata — version, loader, game_dir, status) and derives the
+   project's version/loader/path from the pick, so no technical question is asked; running
+   and unparseable instances are excluded; the classic 3-field form lives inside as "start
+   from scratch". The adapter lie is already fixed (`servedMatrix`). Browse-for-folder
+   deferred (written reason: `import_instance_folder` covers it; every extra step is
+   surface a first-timer can trip on — revisit when a user asks).
 2. **"What's your pack about?"** — one plain-language question (vibe, not mod list). The
-   answer selects a **template pack**.
+   answer selects a **template pack**. **Status (chunk 2):** rendered as template cards
+   plus an explicit "Start empty" card, on both paths.
 3. **Template** — a content skeleton: starter quest chapter(s), a handful of coherent
    starter recipes, a config profile. Templates are **real content files shipped in the
    bundle** (self-authored JSON/SNBT — not game assets, so the no-bundling rule is

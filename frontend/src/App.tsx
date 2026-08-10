@@ -26,7 +26,8 @@ import { ToastProvider } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Launcher } from './components/launcher/Launcher'
 import { ProjectWorkspace } from './components/common/ProjectWorkspace'
-import { NewProjectModal, ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
+import { ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
+import { WizardStepper } from './components/common/WizardStepper'
 import { LeavePackModal } from './components/common/LeavePackModal'
 import { LoadPackModal } from './components/common/LoadPackModal'
 import { useAppState } from './hooks/useAppState'
@@ -193,20 +194,14 @@ function AppRoot() {
           onRefresh={s.loadProjects}
           onOpenPrism={s.openPrismLauncher}
           onImport={() => s.setShowImport(true)}
-          onNewProject={() => s.setShowNewProject(true)}
+          onNewProject={() => s.setShowWizard(true)}
           onDeleteProject={() => s.setConfirmCloseProject(true)}
         />
       )}
 
-      <NewProjectModal
-        show={s.showNewProject}
-        onClose={() => s.setShowNewProject(false)}
-        projectName={s.newProjectName}
-        onProjectNameChange={s.setNewProjectName}
-        mcVersion={s.mcVersion}
-        onMcVersionChange={s.setMcVersion}
-        modLoader={s.modLoader}
-        onModLoaderChange={s.setModLoader}
+      <WizardStepper
+        show={s.showWizard}
+        onClose={() => s.setShowWizard(false)}
         onCreate={s.handleCreateProject}
       />
 

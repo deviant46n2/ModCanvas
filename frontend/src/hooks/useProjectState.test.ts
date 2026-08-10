@@ -64,18 +64,28 @@ describe('useProjectState', () => {
     expect(result.current.getLastProjectId()).toBe('p1')
   })
 
-  it('handleCreateProject selects the new project but leaves opening to the caller', async () => {
+  it('handleCreateProject creates with the given input and selects the new project', async () => {
     const created = project({ id: 'p9', name: 'New Pack' })
     vi.mocked(createProject).mockResolvedValue(created)
     const { result } = renderHook(() => useProjectState())
-    act(() => result.current.setNewProjectName('New Pack'))
+    const input = {
+      name: 'New Pack',
+      mcVersion: '1.21.1',
+      modLoader: 'NeoForge',
+      path: '~/modpacks/new-pack',
+      templateId: 'exploration',
+    }
 
     await act(async () => {
-      const returned = await result.current.handleCreateProject()
-      expect(returned?.id).toBe('p9')
+      const returned = await result.current.handleCreateProject(input)
+      expect(returned.id).toBe('p9')
     })
+    expect(createProject).toHaveBeenCalledWith(
+      'New Pack', '1.21.1', 'NeoForge', '~/modpacks/new-pack', 'exploration',
+    )
     expect(result.current.selectedProject?.id).toBe('p9')
     expect(result.current.openProject).toBeNull()
+    expect(result.current.showWizard).toBe(false)
   })
 
   it('handleConfirmDelete removes the selected project and clears selection', async () => {

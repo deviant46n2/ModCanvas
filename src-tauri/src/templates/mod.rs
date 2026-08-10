@@ -53,6 +53,11 @@ pub fn list_templates() -> Vec<TemplateMeta> {
 /// quests/<...>`. Every write goes through `validate_project_write` (scoped
 /// to `<root>/config`, traversal-checked) and `atomic_write_str` (tmp +
 /// rename), so an interrupted scaffold can never corrupt an instance.
+///
+/// The wizard may point at an EXISTING instance, so the scaffold refuses to
+/// touch a quests dir that already holds content — a second scaffold or a
+/// wizard run against an instance the game has already written would
+/// otherwise clobber a real quest book.
 pub fn scaffold_template(project_root: &Path, template_id: &str) -> Result<(), String> {
     let tpl = TEMPLATES
         .iter()
@@ -62,6 +67,14 @@ pub fn scaffold_template(project_root: &Path, template_id: &str) -> Result<(), S
     let root = project_root
         .to_str()
         .ok_or_else(|| format!("Project path is not valid UTF-8: {}", project_root.display()))?;
+
+    let quests_dir = project_root.join("config").join("ftbquests").join("quests");
+    if quests_dir.exists() && quests_dir.read_dir().map_err(|e| e.to_string())?.next().is_some() {
+        return Err(format!(
+            "Project already contains a quest book at {} — templates only start fresh packs",
+            quests_dir.display()
+        ));
+    }
 
     for (rel, contents) in tpl.files {
         // Same layout the app's own exporter produces, so the load pipeline

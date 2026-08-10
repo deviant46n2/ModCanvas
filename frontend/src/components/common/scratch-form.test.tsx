@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { NewProjectModal } from './modals'
+import { ScratchForm } from './scratch-form'
 import { servedMatrix } from '../../adapters/served-matrix'
 
 const LOADER_LABELS: Record<string, string> = {
@@ -12,15 +12,12 @@ const LOADER_LABELS: Record<string, string> = {
 
 function makeBase() {
   return {
-    show: true,
-    onClose: vi.fn(),
     projectName: '',
     onProjectNameChange: vi.fn(),
     mcVersion: '1.21.1',
     onMcVersionChange: vi.fn(),
     modLoader: 'Forge',
     onModLoaderChange: vi.fn(),
-    onCreate: vi.fn(),
   }
 }
 
@@ -33,10 +30,12 @@ function optionValues(select: HTMLSelectElement): string[] {
   return Array.from(select.querySelectorAll('option')).map((o) => (o as HTMLOptionElement).value)
 }
 
-describe('NewProjectModal', () => {
+// The wizard's "start from scratch" path carries the same served-matrix
+// guarantees the old NewProjectModal had — these are the s34 adapter-lie
+// regression locks, ported onto the new home.
+describe('ScratchForm', () => {
   it('offers exactly the versions the adapter matrix can serve', () => {
-    const base = makeBase()
-    render(<NewProjectModal {...base} />)
+    render(<ScratchForm {...makeBase()} />)
     const { version } = getSelects()
     const served = servedMatrix().map((v) => v.mcVersion)
     expect(optionValues(version)).toEqual(served)
@@ -45,8 +44,7 @@ describe('NewProjectModal', () => {
   })
 
   it('offers exactly the loaders served for the selected version', () => {
-    const base = makeBase()
-    render(<NewProjectModal {...base} />)
+    render(<ScratchForm {...makeBase()} />)
     const { loader } = getSelects()
     const servedLoaders =
       servedMatrix().find((v) => v.mcVersion === '1.21.1')?.loaders ?? []
@@ -59,7 +57,7 @@ describe('NewProjectModal', () => {
     const base = makeBase()
     // Quilt exists only for 1.21.1; switching to 1.20.1 must reset to a
     // loader 1.20.1 actually serves (its first: Forge).
-    render(<NewProjectModal {...base} modLoader="Quilt" />)
+    render(<ScratchForm {...base} modLoader="Quilt" />)
     const { version } = getSelects()
     fireEvent.change(version, { target: { value: '1.20.1' } })
     expect(base.onMcVersionChange).toHaveBeenCalledWith('1.20.1')
@@ -68,7 +66,7 @@ describe('NewProjectModal', () => {
 
   it('keeps the loader when the new version still serves it', () => {
     const base = makeBase()
-    render(<NewProjectModal {...base} modLoader="Forge" />)
+    render(<ScratchForm {...base} modLoader="Forge" />)
     const { version } = getSelects()
     fireEvent.change(version, { target: { value: '1.20.1' } })
     expect(base.onModLoaderChange).not.toHaveBeenCalled()

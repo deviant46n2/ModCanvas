@@ -4,7 +4,7 @@ import { useProjectState, type Project } from './useProjectState'
 import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
-import type { LoadPackProgress } from '../services/types'
+import type { LoadPackProgress, CreateProjectInput } from '../services/types'
 import { usePackIo } from './use-pack-io'
 import {
   type AppTab,
@@ -88,13 +88,12 @@ export function useAppState() {
     await runLoadPipeline(project, force, true)
   }
 
-  /** Create a project, then open it (full cache-aware load). */
-  async function handleCreateProject() {
-    const project = await projectState.handleCreateProject()
-    if (project) {
-      setActiveTab('mods')
-      await openPack(project)
-    }
+  /** Create a project, then open it (full cache-aware load). Errors propagate
+   *  to the wizard so it can stay open and show why the create failed. */
+  async function handleCreateProject(input: CreateProjectInput) {
+    const project = await projectState.handleCreateProject(input)
+    setActiveTab('mods')
+    await openPack(project)
   }
 
   /** Dismiss the load modal. If a fresh open failed, also leave the workspace. */
