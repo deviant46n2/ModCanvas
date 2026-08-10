@@ -13,6 +13,8 @@ pub mod quest_config;
 pub mod snbt;
 #[cfg(test)]
 mod snbt_roundtrip;
+#[cfg(test)]
+mod curseforge_tests;
 pub mod ftb_quests;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

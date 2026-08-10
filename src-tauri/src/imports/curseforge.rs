@@ -313,7 +313,7 @@ impl CurseForgeExporter {
         let loader_version = "latest"; // CurseForge handles resolution
 
         let mut cf_files = Vec::new();
-        let mut _modrinth_mods = Vec::new();
+        let mut overrides_mods = Vec::new();
 
         for m in mods {
             if let Some(cf_id) = m.mod_id.strip_prefix("curseforge:") {
@@ -328,8 +328,10 @@ impl CurseForgeExporter {
                     });
                 }
             } else {
-                // Non-CurseForge mod - store as jar in overrides
-                _modrinth_mods.push(m);
+                // Non-CurseForge mod - ship its jar in overrides/mods (see the
+                // copy loop below). CurseForge's manifest cannot reference it,
+                // so the jar is the ONLY way it travels with the pack.
+                overrides_mods.push(m);
             }
         }
 
@@ -364,6 +366,45 @@ impl CurseForgeExporter {
             }
             crate::path_safety::atomic_write_str(&config_path, &config.content)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
+        }
+
+        // Ship non-CurseForge mods as real jars in overrides/mods. The manifest
+        // omits them (CurseForge resolves manifest entries by projectID/fileID),
+        // so without this copy the exported pack silently lacks every Modrinth
+        // or local mod. Failing loudly beats a silent drop: a zip whose
+        // manifest omits a mod AND whose overrides lack the jar is a broken
+        // pack the user cannot notice.
+        for m in &overrides_mods {
+            let Some(file_name) = &m.file_name else {
+                return Err(anyhow::anyhow!(
+                    "Cannot export '{}' to CurseForge: it is not on CurseForge \
+                     and its jar file is not recorded. Remove it or re-add it \
+                     through the mods tab, then retry.",
+                    m.name
+                ));
+            };
+            let source = crate::path_safety::validate_under_root(
+                Path::new(&project.path),
+                &format!("mods/{file_name}"),
+            )
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Cannot export '{}' to CurseForge: invalid jar path (not \
+                     under the instance mods folder): {e}",
+                    m.name
+                )
+            })?;
+            if !source.is_file() {
+                return Err(anyhow::anyhow!(
+                    "Cannot export '{}' to CurseForge: expected jar '{}' is \
+                     missing from the instance. Remove it or re-add it through \
+                     the mods tab, then retry.",
+                    m.name,
+                    source.display()
+                ));
+            }
+            std::fs::copy(&source, mods_dir.join(file_name))
+                .with_context(|| format!("Failed to copy '{}' into the export", m.name))?;
         }
 
         // Create zip

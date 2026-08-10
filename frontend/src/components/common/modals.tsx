@@ -1,3 +1,5 @@
+export { NewProjectModal } from './NewProjectModal'
+
 interface Project {
   id: string
   name: string
@@ -16,69 +18,6 @@ interface ImportResult {
   mods: Array<{ mod_id: string; slug: string; name: string; version: string; source: string }>
   unresolved_mods: Array<{ file_name: string; mod_id: string | null; version: string | null; loader: string | null }>
   config_files: Array<{ path: string; content: string; format: string }>
-}
-
-interface NewProjectModalProps {
-  show: boolean
-  onClose: () => void
-  projectName: string
-  onProjectNameChange: (name: string) => void
-  mcVersion: string
-  onMcVersionChange: (v: string) => void
-  modLoader: string
-  onModLoaderChange: (v: string) => void
-  onCreate: () => void
-}
-
-export function NewProjectModal({
-  show,
-  onClose,
-  projectName,
-  onProjectNameChange,
-  mcVersion,
-  onMcVersionChange,
-  modLoader,
-  onModLoaderChange,
-  onCreate,
-}: NewProjectModalProps) {
-  if (!show) return null
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>New Project</h2>
-        <div className="form-group">
-          <label>Project Name</label>
-          <input
-            type="text"
-            value={projectName}
-            onChange={(e) => onProjectNameChange(e.target.value)}
-            placeholder="My Modpack"
-          />
-        </div>
-        <div className="form-group">
-          <label>Minecraft Version</label>
-          <select value={mcVersion} onChange={(e) => onMcVersionChange(e.target.value)}>
-            <option value="1.21.1">1.21.1</option>
-            <option value="1.20.1">1.20.1</option>
-            <option value="1.19.2">1.19.2</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Mod Loader</label>
-          <select value={modLoader} onChange={(e) => onModLoaderChange(e.target.value)}>
-            <option value="Forge">Forge</option>
-            <option value="NeoForge">NeoForge</option>
-            <option value="Fabric">Fabric</option>
-            <option value="Quilt">Quilt</option>
-          </select>
-        </div>
-        <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={onCreate}>Create</button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 interface ImportModalProps {
