@@ -7,14 +7,6 @@
 //! Generator scope (written exclusions = PARKED debt, `snbt.rs` is line-limit
 //! allowlisted with reason "revisit on next touching change"):
 //! - NaN / ±Infinity: upstream data bug class, not a serializer concern.
-//! - `f32` negative zero: `Display` emits `-0f`, the parser's integer path
-//!   (`parse_number`, no `.`/`e` → `i64`) yields `+0.0`, so `-0f` → `0f` — a
-//!   real round-trip hole, trivial impact, parked with snbt.rs.
-//! - Integral `f32` magnitude ≥ 2^63: `Display` emits full digits with no `.`,
-//!   so `parse_number` takes the `i64` path and bails on overflow — the
-//!   serializer can emit output its own parser cannot read. Parked with snbt.rs.
-//!   (`f64` is saved from this by the `.0d` integral special-case, which forces
-//!   the float path.)
 //! - Comments inside NESTED compounds: the parser attaches an inter-field
 //!   comment as trailing on the preceding entry, and the serializer emits
 //!   trailing comments at a hard-coded 2-space indent (`snbt.rs:228`), not the
@@ -23,6 +15,21 @@
 //!   `proptest-regressions/`). Parked with snbt.rs; the generator scopes
 //!   comments to top-level compounds, which matches real FTB file shape
 //!   (chapter/quest maps) and is byte-stable.
+//!
+//! FIXED s30 (previously parked, now un-parked — the filters that excluded
+//! them are gone, so the property proves the fix):
+//! - `f32` negative zero: was `Display` emitting `-0f` → integer path → `+0.0`;
+//!   the serializer now emits `-0.0f` (the `.0f` integral special-case, same
+//!   idiom as the f64 `.0d`), which forces the float path and preserves the
+//!   sign.
+//! - Integral `f32` magnitude ≥ 2^63: was emitting full digits with no `.` →
+//!   integer path → i64 overflow → "Invalid number"; now `.0f` forces the
+//!   float path, so the serializer's output always re-parses.
+//! - `needs_quoting` key classes: digit-first keys and `-`/`.`/`+`/`/`-in-body
+//!   were let through unquoted but the tokenizer reads them as Number tokens
+//!   or splits at `+`/`/` and drops the tail; `needs_quoting` now quotes any
+//!   key the tokenizer's unquoted-identifier path cannot read back
+//!   (first char must be letter/`_`/`-`/`.`/`+`; body alphanumeric/`_`/`-`/`.`).
 
 use proptest::prelude::*;
 use std::collections::HashMap;
@@ -48,14 +55,7 @@ fn string_value() -> impl Strategy<Value = String> {
 
 fn float32_value() -> impl Strategy<Value = SnbtValue> {
     any::<f32>()
-        .prop_filter(
-            "f32 serializer holes (PARKED): -0.0 and integral |v| >= 2^63 do not round-trip",
-            |v| {
-                v.is_finite()
-                    && !(*v == 0.0 && v.is_sign_negative())
-                    && (v.fract() != 0.0 || v.abs() < 9_223_372_036_854_775_808.0)
-            },
-        )
+        .prop_filter("NaN/Inf are an upstream data bug, not a serializer concern", |v| v.is_finite())
         .prop_map(SnbtValue::Float)
 }
 
@@ -66,25 +66,26 @@ fn float64_value() -> impl Strategy<Value = SnbtValue> {
 }
 
 /// Keys: either tokenizer-safe unquoted (letter/`_` start, `[alphanumeric _ - .]`
-/// body), or containing a char that forces `needs_quoting` to quote them.
-/// Excluded by design (PARKED snbt.rs holes): digit-first keys and `-`/`.`/`+`/
-/// `+`/`/`-in-body — `needs_quoting` lets them through unquoted but the
-/// tokenizer reads them as Number tokens or skips them entirely
-/// (proptest-found: key `"+"` → "Expected key, got Colon").
+/// body), or containing a char that forces `needs_quoting` to quote them
+/// (any other char in body — including `+`/`/`, and digit-first keys, both
+/// previously parked holes, now quoted by `needs_quoting`).
 fn key_strategy() -> impl Strategy<Value = String> {
     prop_oneof![
         prop::string::string_regex("[a-zA-Z_][a-zA-Z0-9_.-]{0,16}").unwrap(),
+        // digit-first — the tokenizer routes these to the number path, so
+        // needs_quoting must quote them (s30 fix; previously a parked hole)
+        prop::string::string_regex("[0-9][a-zA-Z0-9_.-]{0,16}").unwrap(),
         // namespaced — the ':' forces quoting (the smart-filter class)
         prop::string::string_regex("[a-z0-9_]{1,12}:[a-z0-9_.\\-/]{1,24}").unwrap(),
-        // general: letter/_ start + a char outside needs_quoting's safe set,
-        // so the serializer quotes it and the tokenizer reads a String token
+        // general: letter/_ start + any char outside the tokenizer's
+        // unquoted-read set (alnum/_/-/.), so the serializer quotes it
         string_value().prop_filter(
-            "must start like an identifier and force quoting (snbt.rs needs_quoting hole, PARKED)",
+            "must start like an identifier and force quoting",
             |s| {
                 !s.is_empty()
                     && s.len() <= 20
                     && (s.chars().next().unwrap().is_alphabetic() || s.starts_with('_'))
-                    && s.chars().any(|c| !c.is_alphanumeric() && c != '_' && c != '-' && c != '.' && c != '+' && c != '/')
+                    && s.chars().any(|c| !c.is_alphanumeric() && c != '_' && c != '-' && c != '.')
             },
         ),
     ]

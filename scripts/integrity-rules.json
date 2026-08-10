@@ -263,11 +263,6 @@
     "adapter-matrix": [],
     "stale-binary": [
       {
-        "name": "dev",
-        "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) — no runtime behavior changed; rebuild at next real build",
-        "since": "2026-08-09T03:33:00"
-      },
-      {
         "name": "release",
         "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) — no runtime behavior changed; rebuild at next real build",
         "since": "2026-08-09T03:33:00"

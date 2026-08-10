@@ -137,11 +137,21 @@ impl SnbtValue {
         if s.is_empty() { return true; }
         let mut chars = s.chars();
         let first = chars.next().unwrap();
-        if !first.is_alphanumeric() && first != '_' && first != '-' && first != '.' && first != '+' {
+        // First char must be one the tokenizer's identifier path handles
+        // unambiguously: letter or '_'. A digit-first key routes to
+        // read_number_or_id, which can mis-split it ("123abc" -> Number("123")
+        // + Identifier("abc")) — quote it instead. ('-'/'.'/'+' first chars are
+        // kept unquoted: '-' reads via read_number_or_id and '.'/'+' are valid
+        // unquoted identifier starts for the tokenizer.)
+        if !first.is_alphabetic() && first != '_' && first != '-' && first != '.' && first != '+' {
             return true;
         }
         for ch in chars {
-            if !ch.is_alphanumeric() && ch != '_' && ch != '-' && ch != '.' && ch != '+' && ch != '/' {
+            // Must match what the tokenizer's unquoted-identifier read accepts
+            // (alphanumeric / _ / - / .): a body containing '+' or '/' passes
+            // here unquoted but the tokenizer splits at it and silently drops
+            // the tail (proptest-found, s23). Quote them instead.
+            if !ch.is_alphanumeric() && ch != '_' && ch != '-' && ch != '.' {
                 return true;
             }
         }
@@ -164,7 +174,19 @@ impl SnbtValue {
             SnbtValue::Short(v) => format!("{}s", v),
             SnbtValue::Int(v) => v.to_string(),
             SnbtValue::Long(v) => format!("{}L", v),
-            SnbtValue::Float(v) => format!("{}f", v),
+            SnbtValue::Float(v) => {
+                // f32 Display emits integral values with no '.' (e.g. 9.3e18 ->
+                // "9300000000000000000"), so the parser's integer path takes
+                // over and overflows on |v| >= 2^63 — the serializer emitting
+                // output its own parser cannot read (proptest, s23). The ".0f"
+                // forces the float path, exactly like the f64 ".0d" case below.
+                // It also preserves -0.0 (Display "-0" would parse as +0.0).
+                if v.fract() == 0.0 && v.is_finite() {
+                    format!("{}.0f", v)
+                } else {
+                    format!("{}f", v)
+                }
+            }
             SnbtValue::Double(v) => {
                 if v.fract() == 0.0 && v.is_finite() {
                     format!("{}.0d", v)
