@@ -2,7 +2,7 @@ use tauri::State;
 use uuid::Uuid;
 
 use crate::db::Database;
-use crate::mod_intelligence::{ModIntelligence, search_modpacks as search_modpacks_mint};
+use crate::mod_intelligence::ModIntelligence;
 use crate::models::*;
 
 use super::resolve_curseforge_api_key;
@@ -225,67 +225,4 @@ mod tests {
         assert!(!version_compatible("1.21", "1.20.1"));
         assert!(!version_compatible("1.19", "1.21.1"));
     }
-}
-
-#[tauri::command]
-pub async fn search_modpacks(
-    query: String,
-    mc_version: String,
-    loader: String,
-    sort: String,
-) -> Result<Vec<ModpackMetadata>, String> {
-    search_modpacks_mint(&query, &mc_version, &loader, &sort).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn search_modpacks_curseforge(
-    query: String,
-    mc_version: String,
-    loader: String,
-    db: State<'_, Database>,
-    intelligence: State<'_, ModIntelligence>,
-) -> Result<Vec<ModpackMetadata>, String> {
-    let api_key = resolve_curseforge_api_key(&db)?;
-    if let Some(key) = api_key {
-        let version = if mc_version.is_empty() { None } else { Some(mc_version.as_str()) };
-        let loader_filter = if loader == "all" { None } else { Some(loader.as_str()) };
-        intelligence.search_curseforge_modpacks(&query, &key, version, loader_filter).await.map_err(|e| e.to_string())
-    } else {
-        Err("CurseForge API key not configured. Open Settings (gear icon) to add your API key.".to_string())
-    }
-}
-
-#[tauri::command]
-pub async fn search_modpacks_all(
-    query: String,
-    mc_version: String,
-    loader: String,
-    sort: String,
-    db: State<'_, Database>,
-    intelligence: State<'_, ModIntelligence>,
-) -> Result<Vec<ModpackMetadata>, String> {
-    let mut results = Vec::new();
-    
-    // Search Modrinth
-    match search_modpacks_mint(&query, &mc_version, &loader, &sort).await {
-        Ok(mut mods) => results.append(&mut mods),
-        Err(e) => eprintln!("[ModCanvas] Modrinth modpack search failed: {}", e),
-    }
-    
-    // Search CurseForge if API key configured
-    let api_key = resolve_curseforge_api_key(&db)?;
-    if let Some(key) = api_key {
-        let version = if mc_version.is_empty() { None } else { Some(mc_version.as_str()) };
-        let loader_filter = if loader == "all" { None } else { Some(loader.as_str()) };
-        match intelligence.search_curseforge_modpacks(&query, &key, version, loader_filter).await {
-            Ok(mut mods) => results.append(&mut mods),
-            Err(e) => eprintln!("[ModCanvas] CurseForge modpack search failed: {}", e),
-        }
-    }
-    
-    // Deduplicate by project_id
-    results.sort_by_key(|m| m.project_id.clone());
-    results.dedup_by(|a, b| a.project_id == b.project_id);
-    
-    Ok(results)
 }

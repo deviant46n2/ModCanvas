@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::cache::load_ingest_cache;
 use super::models::{IngestProgress, IngestResult};
-use super::resolve::{fallback_kubejs_texture, texture_data_url_for_key};
+use super::resolve::fallback_kubejs_texture;
 use super::ingest_active_instance_with_progress;
 
 /// Emit an `IngestProgress` event to the frontend window.
@@ -33,24 +32,9 @@ pub async fn ingest_active_instance_cmd(
 }
 
 /// Serve a texture file on-demand by key.
-/// Extracts the texture from the JAR file or reads from filesystem.
-#[tauri::command]
-pub async fn get_texture_file(texture_key: String, instance_path: String) -> Result<String, String> {
-    let instance_path = Path::new(&instance_path);
-    if let Some(url) = load_ingest_cache(&instance_path.join("mods"))
-        .and_then(|c| texture_data_url_for_key(&c, &texture_key))
-    {
-        return Ok(url);
-    }
-    if let Some(url) = fallback_kubejs_texture(&texture_key, instance_path) {
-        return Ok(url);
-    }
-    Err("Texture not found".to_string())
-}
-
-/// Batch variant of `get_texture_file`: resolve many texture keys in a single
-/// IPC round-trip. Returns a map of key → data URL (or `None` when a texture
-/// could not be resolved).
+/// Batch variant of the single-texture resolver: resolve many texture keys in a
+/// single IPC round-trip. Returns a map of key → data URL (or `None` when a
+/// texture could not be resolved).
 #[tauri::command]
 pub async fn get_texture_files(
     texture_keys: Vec<String>,

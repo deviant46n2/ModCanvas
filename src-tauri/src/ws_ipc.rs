@@ -398,7 +398,3 @@ pub async fn ws_ipc_restart(
     state.stop().await;
     state.start().await.map_err(|e| e.to_string())
 }
-
-pub fn register_ws_ipc_commands(app: &mut tauri::App) {
-    app.manage(Arc::new(WsIpcServer::new(app.handle().clone())));
-}

@@ -96,16 +96,6 @@ pub fn set_curseforge_api_key(db: State<'_, Database>, key: String) -> Result<()
 }
 
 #[tauri::command]
-pub fn open_project(db: State<'_, Database>, project_id: String) -> Result<Project, String> {
-    let projects = db.list_projects().map_err(|e| e.to_string())?;
-    let id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    projects
-        .into_iter()
-        .find(|p| p.id == id)
-        .ok_or_else(|| "Project not found".to_string())
-}
-
-#[tauri::command]
 pub fn add_mod(
     db: State<'_, Database>,
     project_id: String,
@@ -354,21 +344,4 @@ pub fn get_project_companion_status(
         std::path::Path::new(&instance.game_dir),
         source_jar.as_deref(),
     ))
-}
-
-#[tauri::command]
-pub async fn sync_instance_mods(
-    db: State<'_, Database>,
-    project_id: String,
-) -> Result<usize, String> {
-    let pid = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    
-    // Get the project to find its mods directory
-    let project = db.get_project(&pid).map_err(|e| e.to_string())?
-        .ok_or_else(|| "Project not found".to_string())?;
-    
-    let game_dir = std::path::PathBuf::from(&project.path);
-    let mods_dir = game_dir.join("mods");
-    
-    db.sync_instance_mods(&pid, &mods_dir).map_err(|e| e.to_string())
 }

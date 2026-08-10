@@ -15,11 +15,8 @@ pub use project::*;
 pub use runtime::*;
 
 use crate::db::Database;
-use crate::imports::packwiz::{PackwizWorkspace, parse_packwiz_workspace};
-use crate::minecraft::{detect_kubejs_scripts, get_all_kubejs_scripts as get_all_kubejs_scripts_impl, KubeJSScriptDir, KubeJSScript};
 use crate::models::{Recipe, ModLoader, ModSource, ModEntry};
 use crate::quest::QuestGraph;
-use crate::scriptgen::generate_script_strings;
 use anyhow::Result;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -170,23 +167,6 @@ pub async fn scan_instance_mods(
     
     eprintln!("[ModCanvas] Scanned {} mods from instance at {:?}", mods.len(), mods_dir);
     Ok(mods)
-}
-
-#[tauri::command]
-pub fn get_packwiz_workspace(path: String) -> Result<PackwizWorkspace, String> {
-    parse_packwiz_workspace(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn get_kubejs_scripts(game_dir: String) -> Result<Vec<KubeJSScriptDir>, String> {
-    let path = PathBuf::from(game_dir);
-    Ok(detect_kubejs_scripts(&path))
-}
-
-#[tauri::command]
-pub fn get_all_kubejs_scripts(game_dir: String) -> Result<Vec<KubeJSScript>, String> {
-    let path = PathBuf::from(game_dir);
-    Ok(get_all_kubejs_scripts_impl(&path))
 }
 
 #[tauri::command]

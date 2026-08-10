@@ -3,30 +3,6 @@ use tauri::{AppHandle, State};
 use crate::minecraft::{InstanceManager, MinecraftInstance};
 
 /// Diagnostic: return raw scan info about all instance roots.
-#[tauri::command]
-pub fn debug_instance_scan(manager: State<'_, InstanceManager>) -> String {
-    let instances = manager.reload_instances();
-    let mut out = String::new();
-    for base in manager.base_dirs() {
-        out.push_str(&format!("base_dir: {:?}\n", base));
-        if let Ok(entries) = std::fs::read_dir(base) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                let is_dir = p.is_dir();
-                out.push_str(&format!("  raw dir entry: [{} dir={}]", p.display(), is_dir));
-                out.push('\n');
-            }
-        }
-    }
-    out.push_str(&format!("instances found: {}\n", instances.len()));
-    for inst in &instances {
-        out.push_str(&format!(
-            "  - name={}, mc_version={}, loader={}, loader_version={:?}, game_dir={}\n",
-            inst.name, inst.mc_version, inst.loader, inst.loader_version, inst.game_dir
-        ));
-    }
-    out
-}
 
 #[tauri::command]
 pub fn create_mc_instance(

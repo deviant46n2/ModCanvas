@@ -1,6 +1,6 @@
 use reqwest::Client;
 
-use crate::models::{ModLoader, ModMetadata, ModpackMetadata};
+use crate::models::{ModLoader, ModMetadata};
 
 use super::types::*;
 
@@ -46,117 +46,6 @@ pub async fn search_modrinth(query: &str, loader: &ModLoader, mc_version: &str) 
         .collect())
 }
 
-pub async fn search_modpacks(query: &str, mc_version: &str, loader: &str, sort: &str) -> Result<Vec<ModpackMetadata>, String> {
-    let client = Client::new();
-
-    // Build facets - only add version filter if provided
-    let mut facet_parts = vec![r#"["project_type:modpack"]"#.to_string()];
-    
-    if !mc_version.is_empty() {
-        facet_parts.push(format!(r#"["versions:{mc_version}"]"#));
-    }
-    
-    // Note: Modrinth search API doesn't support loader filter in facets
-    // Results include all loaders - backend handles loader compatibility during download
-    // We can filter by categories if they contain explicit loader hints
-    
-    let facets = format!("[{}]", facet_parts.join(","));
-
-    // Build sort parameter
-    let sort_param = match sort {
-        "downloads" => "downloads",
-        "updated" => "updated",
-        "newest" => "new",
-        _ => "relevance",
-    };
-
-    let url = format!(
-        "{}/search?query={}&facets={}&limit=50&index={}",
-        MODRINTH_API,
-        urlencoding::encode(query),
-        urlencoding::encode(&facets),
-        sort_param
-    );
-
-    let resp = client
-        .get(&url)
-        .header("User-Agent", "MMM/0.1.0")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
-    let data: ModrinthSearchResult = resp
-        .json()
-        .await
-        .map_err(|e| format!("Parse failed: {}", e))?;
-
-    let mut results: Vec<ModpackMetadata> = data
-        .hits
-        .into_iter()
-        .map(|hit| ModpackMetadata {
-            project_id: hit.slug.clone(),
-            slug: hit.slug,
-            name: hit.title,
-            description: hit.description,
-            author: hit.author,
-            categories: hit.categories.unwrap_or_default(),
-            downloads: hit.downloads,
-            versions: hit.versions,
-            project_type: "modpack".to_string(),
-        })
-        .collect();
-
-    // Filter by loader if specified
-    // Modrinth search doesn't return loader info, so we check if categories contain loader hints
-    // or skip filter since most modpacks support multiple loaders anyway
-    if loader != "all" {
-        let loader_lower = loader.to_lowercase();
-        // Filter out packs that explicitly DON'T support this loader
-        // by checking if they have loader-specific categories that exclude ours
-        results.retain(|pack| {
-            // If pack has explicit loader categories, check them
-            let has_loader_categories = pack.categories.iter().any(|c| {
-                let c_lower = c.to_lowercase();
-                c_lower == "fabric" || c_lower == "forge" || c_lower == "neoforge" || c_lower == "quilt"
-            });
-            
-            if has_loader_categories {
-                // Pack has explicit loader info - check if it matches
-                pack.categories.iter().any(|c| {
-                    let c_lower = c.to_lowercase();
-                    match loader_lower.as_str() {
-                        "fabric" => c_lower.contains("fabric"),
-                        "forge" => c_lower.contains("forge"),
-                        "neoforge" => c_lower.contains("neoforge") || c_lower.contains("neo"),
-                        "quilt" => c_lower.contains("quilt"),
-                        _ => true
-                    }
-                })
-            } else {
-                // No explicit loader info - keep it (most modpacks support multiple loaders)
-                true
-            }
-        });
-    }
-
-    // Sort client-side for downloads/updated if needed (API handles relevance/newest)
-    match sort {
-        "downloads" => results.sort_by(|a, b| b.downloads.cmp(&a.downloads)),
-        "updated" | "newest" => {
-            // Modrinth doesn't expose updated date in search results easily
-            // Could sort by versions (assuming newer versions = newer)
-            let empty = String::new();
-            results.sort_by(|a, b| {
-                let a_latest = a.versions.last().unwrap_or(&empty);
-                let b_latest = b.versions.last().unwrap_or(&empty);
-                b_latest.cmp(a_latest)
-            });
-        }
-        _ => {} // relevance - keep API order
-    }
-
-    Ok(results)
-}
 
 use std::path::Path;
 

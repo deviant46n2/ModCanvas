@@ -3,7 +3,6 @@ pub mod exports;
 pub mod ftb;
 pub mod mrpack;
 pub mod packwiz;
-pub mod prism;
 pub mod search;
 pub mod search_merge;
 
@@ -12,7 +11,6 @@ pub use exports::*;
 pub use ftb::*;
 pub use mrpack::*;
 pub use packwiz::*;
-pub use prism::*;
 pub use search::*;
 
 use tauri::State;

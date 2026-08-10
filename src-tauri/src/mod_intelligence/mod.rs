@@ -7,7 +7,7 @@ mod modrinth;
 mod curseforge;
 mod curseforge_search;
 
-pub use modrinth::{search_modrinth, search_modpacks};
+pub use modrinth::search_modrinth;
 pub(crate) use curseforge_search::normalize_slug;
 pub use types::{CurseForgeResponse, CurseForgeModInfo, CurseForgeCategory, CurseForgeAuthor, CurseForgeLinks, CurseForgeFileResponse, CurseForgeFileInfo};
 

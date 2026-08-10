@@ -60,27 +60,6 @@ fn list_files_under(root: &PathBuf) -> Vec<ConfigFileInfo> {
 }
 
 #[tauri::command]
-pub fn get_config(path: String) -> Result<serde_json::Value, String> {
-    let safe_path = path_safety::validate_config_read(&path)?;
-    let content = std::fs::read_to_string(&safe_path).map_err(|e| e.to_string())?;
-
-    if safe_path.extension().and_then(|e| e.to_str()) == Some("toml")
-        || safe_path.extension().and_then(|e| e.to_str()) == Some("cfg")
-    {
-        let val: serde_json::Value = toml_edit::de::from_str(&content).map_err(|e| e.to_string())?;
-        Ok(val)
-    } else {
-        serde_json::from_str(&content).map_err(|e| e.to_string())
-    }
-}
-
-#[tauri::command]
-pub fn save_config(path: String, content: String) -> Result<(), String> {
-    let safe_path = path_safety::validate_config_write(&path)?;
-    path_safety::atomic_write_str(&safe_path, &content).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub fn list_config_files(project_id: String, db: tauri::State<'_, Database>) -> Result<Vec<ConfigFileInfo>, String> {
     let project = resolve_project(&db, &project_id)?;
     let root = config_root(&project.path);

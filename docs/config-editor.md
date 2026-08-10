@@ -43,7 +43,10 @@ artifacts produced by the import pipeline.
 | `write_config_file` | `project_id`, `path`, `content` | Atomic write raw text. |
 | `parse_config_file` | `project_id`, `path` | Parse a file into a typed config tree. |
 | `save_structured_config` | `project_id`, `path`, `config` | Serialize + atomic write. |
-| `get_config` / `save_config` | `path` / `path, content` | Legacy temp-mirror helpers, kept for compatibility. |
+
+The legacy `get_config` / `save_config` temp-mirror helpers were pruned in the
+s34 dead-command sweep — they predated the scoped `read_config_file` /
+`save_structured_config` path and had no frontend callers.
 
 All `project_id` values are `Uuid`s resolved via the `Database`. Path traversal,
 absolute escapes, and symlink escapes outside the config root are rejected.

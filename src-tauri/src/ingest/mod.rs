@@ -10,7 +10,7 @@ pub mod models;
 mod resolve;
 mod scan;
 
-pub use commands::{get_texture_file, get_texture_files, ingest_active_instance_cmd};
+pub use commands::{get_texture_files, ingest_active_instance_cmd};
 pub use models::{IngestProgress, IngestResult, TextureEntry, VirtualAssetRegistry};
 pub use scan::scan_kubejs_assets;
 

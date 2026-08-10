@@ -56,22 +56,6 @@ impl Database {
                     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
                 );
 
-                CREATE TABLE IF NOT EXISTS mod_metadata (
-                    mod_id TEXT PRIMARY KEY,
-                    slug TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    description TEXT DEFAULT '',
-                    author TEXT DEFAULT '',
-                    categories TEXT DEFAULT '[]',
-                    dependencies TEXT DEFAULT '[]',
-                    supported_loaders TEXT DEFAULT '[]',
-                    supported_versions TEXT DEFAULT '[]',
-                    downloads INTEGER DEFAULT 0,
-                    source_url TEXT,
-                    issues_url TEXT,
-                    documentation_url TEXT
-                );
-
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
