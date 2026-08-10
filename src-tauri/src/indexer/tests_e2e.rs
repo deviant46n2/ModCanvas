@@ -26,7 +26,9 @@ fn test_scan_instance_items_end_to_end() {
 
     let copper = items.iter().find(|i| i.id == "mod1:ingot_copper").unwrap();
     assert_eq!(copper.name, "Copper Ingot");
-    assert!(copper.texture_data_url.is_some());
+    let url = copper.texture_data_url.as_deref().expect("copper resolves a texture");
+    assert!(url.starts_with("jar:"), "registry holds a descriptor, not a data URL: {url}");
+    assert!(!url.starts_with("data:image"), "banned base64 format leaked into the registry: {url}");
 
     let machine = items.iter().find(|i| i.id == "mod2:machine_frame").unwrap();
     assert_eq!(machine.name, "Machine Frame");

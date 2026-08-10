@@ -26,6 +26,11 @@ pub struct ItemRegistryEntry {
     pub id: String,
     pub name: String,
     pub mod_id: String,
+    /// Compact texture descriptor (`jar:<abs>!<zip>`) when the scan could map
+    /// the item to a texture. NEVER image bytes — displayable data URLs are
+    /// materialized lazily on demand (AGENTS.md: scans are enumeration-only).
+    /// Consumers must only treat this as a URL when it passes
+    /// `isUsableTextureValue`; otherwise resolve through the texture index.
     pub texture_data_url: Option<String>,
 }
 

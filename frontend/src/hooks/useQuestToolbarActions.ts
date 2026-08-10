@@ -1,10 +1,7 @@
 // Quest-book persistence & FTB Quests import actions for the editor toolbar.
 // Presentation-free hook: owns state and side effects, exposes callbacks.
 import { useState, useCallback, useRef, useEffect } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import {
-  scanModJarTextures,
-  reindexTextures,
   importFtbQuestsFromDir,
   exportFtbQuestsToDir,
   saveQuestGraph,
@@ -25,11 +22,9 @@ export interface QuestToolbarActions {
   saveAndHotReload: () => Promise<void>
   scheduleAutoSave: () => void
   wsStatus: { connected: boolean; clientCount: number }
-  browseModsDir: () => Promise<void>
   handleImportFtb: () => Promise<void>
   handleImportFromPrism: (instance: PrismInstance) => Promise<void>
   handleBrowseOther: () => Promise<void>
-  handleReIndex: () => Promise<void>
   loadPrismList: () => Promise<void>
   prismInstances: PrismInstance[] | null
   prismLoading: boolean
@@ -41,14 +36,12 @@ interface UseQuestToolbarActionsOpts {
   projectId: string
   projectPath?: string
   textureIndex: Record<string, string>
-  setTextureIndex: Dispatch<SetStateAction<Record<string, string>>>
   modsDir: string
-  setModsDir: (dir: string) => void
 }
 
 export function useQuestToolbarActions({
   graph, setGraph, projectId, projectPath,
-  textureIndex, setTextureIndex, modsDir, setModsDir,
+  textureIndex, modsDir,
 }: UseQuestToolbarActionsOpts): QuestToolbarActions {
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [prismInstances, setPrismInstances] = useState<PrismInstance[] | null>(null)
@@ -169,20 +162,6 @@ export function useQuestToolbarActions({
   }, [graph, projectPath, projectId, setGraph])
 
 
-  const browseModsDir = useCallback(async () => {
-    try {
-      const selected = await pickDir()
-      if (!selected) return
-      setModsDir(selected)
-      const idx = await scanModJarTextures(selected)
-      setTextureIndex(prev => ({ ...prev, ...idx }))
-      alert(`Loaded ${Object.keys(idx).length} textures from ${selected}`)
-    } catch (e) {
-      console.error('Mods Dir error:', e)
-      alert(`Failed to scan mods directory: ${e}`)
-    }
-  }, [setModsDir, setTextureIndex])
-
   const handleImportFtb = useCallback(async () => {
     const dir = projectPath || modsDir?.replace(/\/mods$/, '') || ''
     if (!dir) { alert('No project or mods directory available'); return }
@@ -227,44 +206,6 @@ export function useQuestToolbarActions({
     finally { setPrismLoading(false) }
   }, [prismInstances])
 
-  const handleReIndex = useCallback(async () => {
-    const dir = modsDir || (projectPath ? `${projectPath}/mods` : '')
-    if (!dir) { alert('No mods directory set'); return }
-    try {
-      const keysToRemove = ['modcanvas_mods_dir']
-      for (const key of keysToRemove) { localStorage.removeItem(key) }
-      console.log('[ModCanvas] Cleared localStorage cache keys')
-
-      const idx = await reindexTextures(dir)
-      setTextureIndex(idx)
-      const texCount = Object.keys(idx).length
-      console.log(`[ModCanvas] Re-indexed ${texCount} textures`)
-
-      if (projectPath) {
-        const result = await importFtbQuestsFromDir(projectPath)
-        if (result.graph && result.chapter_count > 0) {
-          setGraph(result.graph)
-          await saveQuestGraph(projectId, result.graph)
-          const s = result.stats
-          const diag = [
-            `Quests: ${result.quest_count}`,
-            `Chapters: ${result.chapter_count}`,
-            `Chapter images: ${s.chapter_images_total}`,
-            `Titles from task item: ${s.title_from_task}`,
-            `Icons from task item: ${s.icon_from_task}`,
-            `Textures indexed: ${texCount}`,
-          ].join(' | ')
-          console.log(`[ModCanvas ReIndex] ${diag}`)
-          alert(`Re-index complete.\n\n${diag}`)
-        } else {
-          alert(`Re-indexed ${texCount} textures but no FTB Quests data found at ${projectPath}`)
-        }
-      } else {
-        alert(`Re-indexed ${texCount} textures (no project path for quest re-import)`)
-      }
-    } catch (e) { console.error('Re-index failed:', e); alert(`Re-index failed: ${e}`) }
-  }, [modsDir, projectPath, setTextureIndex, projectId, setGraph])
-
   const handleBrowseOther = useCallback(async () => {
     try {
       const selected = await pickDir()
@@ -285,8 +226,8 @@ export function useQuestToolbarActions({
 
   return {
     saveMessage, saveNow, saveAndHotReload, scheduleAutoSave,
-    wsStatus, browseModsDir,
-    handleImportFtb, handleImportFromPrism, handleBrowseOther, handleReIndex,
+    wsStatus,
+    handleImportFtb, handleImportFromPrism, handleBrowseOther,
     loadPrismList, prismInstances, prismLoading,
   }
 }

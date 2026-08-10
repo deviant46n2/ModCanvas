@@ -48,10 +48,6 @@ export async function writeScriptFiles(
   })
 }
 
-export async function scanModJarTextures(modsDir: string): Promise<Record<string, string>> {
-  return invoke<Record<string, string>>('scan_mod_jar_textures', { modsDir })
-}
-
 export async function scanInstanceTextures(instancePath: string): Promise<Record<string, string>> {
   return invoke<Record<string, string>>('scan_instance_textures_cmd', { instancePath })
 }
@@ -67,10 +63,6 @@ export async function pruneCaches(
   modsDirs: string[],
 ): Promise<number> {
   return invoke<number>('prune_caches_cmd', { instancePaths, modsDirs })
-}
-
-export async function reindexTextures(modsDir: string): Promise<Record<string, string>> {
-  return invoke<Record<string, string>>('reindex_textures', { modsDir })
 }
 
 export async function getQuestThemeBackground(

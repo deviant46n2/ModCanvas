@@ -97,8 +97,8 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
 
   const selectedNode = selectedNodeId ? graph?.nodes.find(n => n.id === selectedNodeId) : null
 
-  const { textureIndex, setTextureIndex, animations, texturesLoading, texturesRemaining, bakedCount, questBackgroundUrl, items } =
-    useQuestAssetPipeline({ instancePath, ingestResult, modsDir, kubejsNamespace, wsConnected, graph, activeChapter, selectedNode, packLoaded, projectId })
+  const { textureIndex, animations, texturesLoading, texturesRemaining, bakedCount, questBackgroundUrl, items } =
+    useQuestAssetPipeline({ instancePath, ingestResult, kubejsNamespace, wsConnected, graph, activeChapter, selectedNode, packLoaded, projectId })
 
   // Item picker icons resolve lazily through the live texture index first
   // (shared lazy materializer), falling back to the registry's own data URL —
@@ -186,7 +186,6 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       onReady={onReady}
       toolbarApiRef={toolbarApiRef}
       textureIndex={textureIndex}
-      setTextureIndex={setTextureIndex}
       animations={animations}
       modsDir={modsDir}
       setModsDir={setModsDir}

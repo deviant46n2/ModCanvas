@@ -36,7 +36,7 @@ import {
   questRuntimeNamespaces,
   requestRuntimeTextures,
 } from '../services/runtime-textures'
-import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, scanModJarTextures, getQuestThemeBackground } from '../services/recipes'
+import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, getQuestThemeBackground } from '../services/recipes'
 import { registerModItems } from '../services/smart-filter-mods'
 import { resolveAssetUrl } from '../services/asset-resolver'
 import { resolveIconKey } from '../components/quest/questIcons'
@@ -51,7 +51,6 @@ import {
 interface UseQuestAssetPipelineOptions {
   instancePath: string
   ingestResult: IngestResult | null | undefined
-  modsDir: string
   kubejsNamespace: string
   wsConnected?: boolean
   graph: QuestGraphData | null
@@ -64,7 +63,6 @@ interface UseQuestAssetPipelineOptions {
 export function useQuestAssetPipeline({
   instancePath,
   ingestResult,
-  modsDir,
   kubejsNamespace,
   wsConnected,
   graph,
@@ -220,17 +218,18 @@ export function useQuestAssetPipeline({
     // which the flat materializer never populates — that made every item
     // look textureless and dumped the whole registry into the engine queue.)
     //
-    // s26 fix: an item with a registry `texture_data_url` (the bright
-    // straight-from-jar data URL) must NEVER be engine-queued, even when its
+    // s26 fix: an item with a registry `texture_data_url` (a compact `jar:`
+    // descriptor — the scan's enumeration-only proof that the item has an
+    // offline texture source) must NEVER be engine-queued, even when its
     // `textureIndex` entry hasn't landed yet. The index fills asynchronously
     // (ingest/scan race the items cache read), and during that window items
     // look "missing" here — queuing them sent flat textures to the engine,
     // whose in-game renders came back ~50% darker than the jar bytes and
-    // clobbered the good URLs via mergeIndex. The registry URL proves the
-    // item is resolvable offline; the engine is only for items with no URL
-    // AND no index entry (or bake: keys, handled by the baked-keys effect).
-    // Runs whenever items/textureIndex change, but queueEngineRenders is
-    // idempotent (queueSet/inflight/failed dedupe), so re-runs are cheap.
+    // clobbered the good URLs via mergeIndex. The registry descriptor proves
+    // the item is resolvable offline; the engine is only for items with no
+    // descriptor AND no index entry (or bake: keys, handled by the baked-keys
+    // effect). Runs whenever items/textureIndex change, but queueEngineRenders
+    // is idempotent (queueSet/inflight/failed dedupe), so re-runs are cheap.
     const missingRegistry = items
       .filter((i) => !i.texture_data_url && !textureIndex[i.id])
       .map((i) => i.id)
@@ -273,24 +272,18 @@ export function useQuestAssetPipeline({
   }, [wsConnected, instancePath])
   useEffect(() => {
     let cancelled = false
-    if (instancePath) {
-      scanInstanceTextures(instancePath).then((idx) => {
-        if (cancelled || !idx || Object.keys(idx).length === 0) return
-        registerBakedKeysFromIndex(idx)
-        setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
-      }).catch(() => {})
-      scanInstanceAnimations(instancePath).then((map) => {
-        if (cancelled || !map || Object.keys(map).length === 0) return
-        setAnimations(prev => ({ ...prev, ...map }))
-      }).catch(() => {})
-    } else if (modsDir) {
-      scanModJarTextures(modsDir).then((idx) => {
-        if (cancelled || !idx || Object.keys(idx).length === 0) return
-        setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
-      }).catch(() => {})
-    }
+    if (!instancePath) return
+    scanInstanceTextures(instancePath).then((idx) => {
+      if (cancelled || !idx || Object.keys(idx).length === 0) return
+      registerBakedKeysFromIndex(idx)
+      setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
+    }).catch(() => {})
+    scanInstanceAnimations(instancePath).then((map) => {
+      if (cancelled || !map || Object.keys(map).length === 0) return
+      setAnimations(prev => ({ ...prev, ...map }))
+    }).catch(() => {})
     return () => { cancelled = true }
-  }, [instancePath, modsDir])
+  }, [instancePath])
   useEffect(() => {
     let timer: number | undefined
     let pending = false
@@ -357,7 +350,6 @@ export function useQuestAssetPipeline({
   }, [graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, ingestPathIndex, scanPathIndex, instancePath, wsConnected])
   return {
     textureIndex,
-    setTextureIndex,
     animations,
     texturesLoading,
     texturesRemaining,

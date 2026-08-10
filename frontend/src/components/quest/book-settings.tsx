@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
-import { useTextureScan } from '../../hooks/useTextureScan'
 import { SHAPES, PROGRESSION_MODES } from './quest-helpers'
 
 interface BookSettingsProps {
@@ -10,8 +9,6 @@ interface BookSettingsProps {
   onGraphChange: (g: QuestGraphData) => void
   modsDir: string
   onModsDirChange: (dir: string) => void
-  textureIndex: Record<string, string>
-  onTextureIndexChange: (idx: Record<string, string>) => void
   onClose: () => void
   onSave: () => void
   pickDir: () => Promise<string | null>
@@ -23,14 +20,11 @@ export function BookSettings({
   onGraphChange,
   modsDir,
   onModsDirChange,
-  textureIndex,
-  onTextureIndexChange,
   onClose,
   onSave,
   pickDir,
 }: BookSettingsProps) {
   const [modsDirInput, setModsDirInput] = useState('')
-  const { scanModJarTextures: scanTextures } = useTextureScan()
 
   useEffect(() => {
     if (open) setModsDirInput(modsDir)
@@ -193,20 +187,14 @@ export function BookSettings({
                   if (!selected) return
                   setModsDirInput(selected)
                   onModsDirChange(selected)
-                  const idx = await scanTextures(selected)
-                  onTextureIndexChange(idx)
-                  alert(`Loaded ${Object.keys(idx).length} textures from ${selected}`)
                 }}>Browse</button>
                 <button className="ftb-popup-btn primary" onClick={async () => {
                   if (!modsDirInput) return
                   onModsDirChange(modsDirInput)
-                  const idx = await scanTextures(modsDirInput)
-                  onTextureIndexChange(idx)
-                  alert(`Loaded ${Object.keys(idx).length} textures from ${modsDirInput}`)
-                }}>Load Textures</button>
+                }}>Set</button>
               </div>
               <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                {Object.keys(textureIndex).length} textures loaded
+                Used as the fallback quest-import source when no project path is set. Textures load from the instance via the lazy materializer.
               </div>
             </div>
           </div>

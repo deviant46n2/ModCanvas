@@ -2,7 +2,6 @@
 // settings, reward tables, and save / hot-reload. Persistence and import side
 // effects live in useQuestToolbarActions; this file only wires presentation.
 import { useState, useCallback, useEffect } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import type { QuestGraphData } from '../../services/api'
 import { IconPicker } from './icon-picker'
 import { BookSettings } from './book-settings'
@@ -10,7 +9,7 @@ import { RewardTablesModal } from './RewardTablesModal'
 import { ImportMenu } from './import-menu'
 import { useQuestToolbarActions } from '../../hooks/useQuestToolbarActions'
 import { pickDir } from './pick-dir'
-import { SearchIcon, RefreshIcon, SettingsIcon, TrophyIcon, TagIcon } from '../ui/icons'
+import { TagIcon, SettingsIcon, TrophyIcon } from '../ui/icons'
 
 export interface ToolbarAPI {
   scheduleAutoSave: () => void
@@ -25,7 +24,6 @@ interface ImportExportToolbarProps {
   projectId: string
   projectPath?: string
   textureIndex: Record<string, string>
-  setTextureIndex: Dispatch<SetStateAction<Record<string, string>>>
   modsDir: string
   setModsDir: (dir: string) => void
   onReady: (api: ToolbarAPI) => void
@@ -33,7 +31,7 @@ interface ImportExportToolbarProps {
 
 export function ImportExportToolbar({
   graph, setGraph, projectId, projectPath,
-  textureIndex, setTextureIndex, modsDir, setModsDir, onReady,
+  textureIndex, modsDir, setModsDir, onReady,
 }: ImportExportToolbarProps) {
   const [iconPickerState, setIconPickerState] = useState<{ open: boolean; target: IconPickerTarget | null }>({ open: false, target: null })
   const [showBookSettings, setShowBookSettings] = useState(false)
@@ -41,11 +39,11 @@ export function ImportExportToolbar({
 
   const {
     saveMessage, saveNow, saveAndHotReload, scheduleAutoSave, wsStatus,
-    browseModsDir, handleImportFtb, handleImportFromPrism, handleBrowseOther,
-    handleReIndex, loadPrismList, prismInstances, prismLoading,
+    handleImportFtb, handleImportFromPrism, handleBrowseOther,
+    loadPrismList, prismInstances, prismLoading,
   } = useQuestToolbarActions({
     graph, setGraph, projectId, projectPath,
-    textureIndex, setTextureIndex, modsDir, setModsDir,
+    textureIndex, modsDir,
   })
 
   const openIconPicker = useCallback((target: IconPickerTarget) => {
@@ -63,12 +61,6 @@ export function ImportExportToolbar({
       <header className="quest-editor-toolbar">
         <div className="quest-editor-toolbar-left">
           <span className="quest-editor-title">{graph.name || 'Quest Book'}</span>
-          <button className="book-btn" onClick={browseModsDir} title="Scan mod jar / KubeJS textures into the index">
-            <SearchIcon size={14} /> Textures
-          </button>
-          <button className="book-btn" onClick={handleReIndex} title="Force a full texture re-index and quest re-import">
-            <RefreshIcon size={14} /> Re-Index
-          </button>
           <ImportMenu
             instances={prismInstances}
             loading={prismLoading}
@@ -123,8 +115,6 @@ export function ImportExportToolbar({
         onGraphChange={setGraph}
         modsDir={modsDir}
         onModsDirChange={setModsDir}
-        textureIndex={textureIndex}
-        onTextureIndexChange={setTextureIndex}
         onClose={() => setShowBookSettings(false)}
         onSave={saveNow}
         pickDir={pickDir}

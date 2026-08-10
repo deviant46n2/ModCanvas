@@ -1,6 +1,5 @@
 use tauri::State;
 use uuid::Uuid;
-use std::collections::HashMap;
 
 use crate::db::Database;
 use crate::mod_intelligence::ModIntelligence;
@@ -203,32 +202,6 @@ pub async fn get_dep_names(
 }
 
 #[tauri::command]
-pub fn scan_mod_jar_textures(mods_dir: String) -> Result<std::collections::HashMap<String, String>, String> {
-    let path = std::path::Path::new(&mods_dir);
-    Ok(crate::icons::scan_directory_for_jar_textures(path).by_item_id)
-}
-
-#[tauri::command]
-pub fn get_texture_by_id(mods_dir: String, item_id: String) -> Result<Option<String>, String> {
-    let path = std::path::Path::new(&mods_dir);
-    if !path.exists() {
-        return Ok(None);
-    }
-    for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let jar_path = entry.path();
-        if jar_path.extension().map_or(false, |ext| ext == "jar") {
-            if let Some(data_url) = crate::icons::get_texture_from_jar(&jar_path, &item_id)
-                .map_err(|e| e.to_string())?
-            {
-                return Ok(Some(data_url));
-            }
-        }
-    }
-    Ok(None)
-}
-
-#[tauri::command]
 pub fn get_pack_icon(path: String) -> Result<Option<String>, String> {
     let p = std::path::Path::new(&path);
     Ok(crate::icons::get_pack_icon(p))
@@ -238,18 +211,4 @@ pub fn get_pack_icon(path: String) -> Result<Option<String>, String> {
 pub fn log_debug(message: String) -> Result<(), String> {
     println!("[DEBUG] {}", message);
     Ok(())
-}
-
-#[tauri::command]
-pub fn reindex_textures(mods_dir: String) -> Result<std::collections::HashMap<String, String>, String> {
-    let path = std::path::Path::new(&mods_dir);
-    // Clear texture cache to force full re-scan
-    let cache = crate::icons::cache_path(path);
-    if cache.exists() {
-        eprintln!("[ModCanvas] Clearing texture cache at {:?}", cache);
-        std::fs::remove_file(&cache).map_err(|e| format!("Failed to clear texture cache: {}", e))?;
-    }
-    let result = crate::icons::scan_directory_for_jar_textures(path);
-    eprintln!("[ModCanvas] Re-indexed {} textures from {}", result.by_item_id.len(), mods_dir);
-    Ok(result.by_item_id)
 }

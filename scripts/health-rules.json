@@ -6,11 +6,6 @@
   },
   "ledger": [
     {
-      "id": "legacy-data-url-scan",
-      "priority": "P1",
-      "reason": "audit item 2 (DEFERRED 2026-08-05): icons.rs/indexer.rs base64 PNG scan violates AGENTS.md enumeration-only invariant; intersects the s26 flat-icon guard (registry texture_data_url is its proof) - design decision, not mechanical"
-    },
-    {
       "id": "audit-item-7-stale-docs",
       "priority": "P2",
       "reason": "audit item 7 (Pending): README.md + featureparity.md content not re-checked since the audit flagged them; recipe-editor.md already rewritten"

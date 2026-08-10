@@ -1,5 +1,3 @@
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
@@ -75,12 +73,11 @@ pub(super) fn scan_jar_for_items_and_textures(jar_path: &Path) -> anyhow::Result
                 let item_key = rest.strip_suffix(".png").unwrap_or(&rest).to_string();
                 let full_key = format!("{}:{}", namespace, item_key);
 
-                let mut buf = Vec::new();
-                if entry.read_to_end(&mut buf).is_ok() && !buf.is_empty() {
-                    let b64 = STANDARD.encode(&buf);
-                    let data_url = format!("data:image/png;base64,{}", b64);
-                    texture_map.insert(full_key, data_url);
-                }
+                // Enumeration-only: store the compact `jar:<abs>!<zip>` descriptor,
+                // never the PNG bytes. Displayable URLs are materialized lazily on
+                // demand (AGENTS.md: scans must not read PNG bytes).
+                let descriptor = format!("jar:{}!{}", jar_path.display(), name);
+                texture_map.insert(full_key, descriptor);
             }
         } else if name.ends_with("en_us.json") && name.starts_with("assets/") {
             let parts: Vec<&str> = name.split('/').collect();

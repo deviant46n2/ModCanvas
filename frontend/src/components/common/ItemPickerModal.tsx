@@ -3,6 +3,7 @@ import { XIcon } from '../ui/icons'
 import { Grid, type CellComponentProps } from 'react-window'
 import type { ItemRegistryEntry } from '../../services/api'
 import { parseItemQuery } from '../../services/item-registry'
+import { isUsableTextureValue } from '../../services/texture-loader'
 import './ItemPickerModal.css'
 
 interface ItemPickerModalProps {
@@ -10,7 +11,9 @@ interface ItemPickerModalProps {
   onSelect: (itemId: string) => void
   onClose: () => void
   /** Lazy icon resolver (e.g. `textureDisplayUrl` over the live texture
-   *  index). Tried first; falls back to the entry's `texture_data_url`. */
+   *  index). Tried first; falls back to the entry's `texture_data_url` when
+   *  it is a displayable URL (the registry field may hold a compact
+   *  `jar:` descriptor, which must go through the materializer instead). */
   getTextureUrl?: (itemId: string) => string | null
 }
 
@@ -30,7 +33,9 @@ function ItemCell({ columnIndex, rowIndex, items, getUrl, onSelectRef, onHoverRe
   const item = items[index]
   if (!item) return <div style={style} />
 
-  const url = getUrl(item.id) ?? item.texture_data_url
+  const url =
+    getUrl(item.id) ??
+    (isUsableTextureValue(item.texture_data_url) ? item.texture_data_url : null)
   return (
     <div style={style}>
       <div

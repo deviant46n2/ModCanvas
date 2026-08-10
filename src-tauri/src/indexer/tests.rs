@@ -115,8 +115,8 @@ fn test_scan_jar_for_items_and_textures() {
 #[test]
 fn test_find_texture_item_subdir() {
     let mut textures = HashMap::new();
-    textures.insert("testmod:item/test_item".into(), "data:image/png;base64,abc".into());
-    textures.insert("testmod:block/test_block".into(), "data:image/png;base64,def".into());
+    textures.insert("testmod:item/test_item".into(), "jar:/abs/test.jar!assets/testmod/textures/item/test_item.png".into());
+    textures.insert("testmod:block/test_block".into(), "jar:/abs/test.jar!assets/testmod/textures/block/test_block.png".into());
 
     assert_eq!(
         find_texture_for_item("testmod:test_item", &textures),
@@ -133,15 +133,41 @@ fn test_find_texture_item_subdir() {
 }
 
 #[test]
+fn test_scan_emits_descriptors_not_data_urls() {
+    let dir = tempdir().unwrap();
+    let jar_path = dir.path().join("test.jar");
+    create_test_jar(
+        &jar_path,
+        "testmod",
+        &["item/test_item.png", "block/test_block.png"],
+        Some(r#"{"item.testmod.test_item": "Test Item"}"#),
+    );
+
+    let (_, textures, _) = scan_jar_for_items_and_textures(&jar_path).unwrap();
+    // AGENTS.md: scans are enumeration-only — values must be compact
+    // `jar:<abs>!<zip>` descriptors, never base64 data URLs.
+    for value in textures.values() {
+        assert!(
+            value.starts_with("jar:") && value.contains('!'),
+            "scan emitted a non-descriptor value: {value}"
+        );
+        assert!(
+            !value.starts_with("data:image/png;base64,"),
+            "scan emitted a banned base64 data URL: {value}"
+        );
+    }
+}
+
+#[test]
 fn test_model_texture_resolution_fallback() {
     let mut textures = HashMap::new();
-    textures.insert("minecraft:block/crafting_table_front".into(), "data:image/png;base64,front".into());
+    textures.insert("minecraft:block/crafting_table_front".into(), "jar:/abs/test.jar!assets/minecraft/textures/block/crafting_table_front.png".into());
 
     let mut model_map = HashMap::new();
     model_map.insert("minecraft:crafting_table".into(), vec!["minecraft:block/crafting_table_front".into()]);
 
     let url = resolve_texture_from_model("minecraft:crafting_table", &model_map, &textures);
-    assert_eq!(url, Some("data:image/png;base64,front".into()));
+    assert_eq!(url, Some("jar:/abs/test.jar!assets/minecraft/textures/block/crafting_table_front.png".into()));
 }
 
 #[test]

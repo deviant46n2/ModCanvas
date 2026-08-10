@@ -9,8 +9,10 @@ pub(super) fn namespace_kubejs_id(id: &str, default_ns: &str) -> String {
     }
 }
 
-/// Resolve a `.texture('ns:path')` ref to a data URL. Bare refs inherit the
-/// item's namespace (the scan's texture keys are `ns:path`).
+/// Resolve a `.texture('ns:path')` ref to its index value. Bare refs inherit
+/// the item's namespace (the scan's texture keys are `ns:path`). The value is
+/// a compact descriptor (`jar:<abs>!<zip>`) — never image bytes; displayable
+/// URLs are materialized lazily on demand.
 pub(super) fn resolve_kubejs_texture(
     texture: &str,
     item_id: &str,

@@ -3,7 +3,7 @@ import type { ImportedRecipe } from '../../core/recipe/json-import'
 import { patternToGrid, ingredientsToGrid, gridToPattern, gridToIngredients, type Grid } from '../../core/recipe/grid'
 import { replaceIngredient, type IngredientRef } from '../../core/recipe/bulk-replace'
 import type { ItemRegistryEntry, ItemTagInfo } from '../../services/api'
-import { textureDisplayUrl, isTexturePending, requestMaterialize } from '../../services/texture-loader'
+import { textureDisplayUrl, isTexturePending, requestMaterialize, isUsableTextureValue } from '../../services/texture-loader'
 import { scanPackRecipes, scanInstanceItems, listItemTags } from '../../services/api'
 import { withDiscoveredMeta } from '../../hooks/app-state-utils'
 
@@ -18,7 +18,11 @@ export function writeScriptPreviewPref(next: boolean): void {
 export function buildRegistryUrlMap(itemRegistry: ItemRegistryEntry[]): Map<string, string> {
   const map = new Map<string, string>()
   for (const item of itemRegistry) {
-    if (item.texture_data_url) map.set(item.id, item.texture_data_url)
+    // The registry field may hold a compact `jar:` descriptor (enumeration-only
+    // scans) — only displayable URLs belong in this map; descriptors resolve
+    // through the texture index/materializer instead.
+    const url = item.texture_data_url
+    if (url && isUsableTextureValue(url)) map.set(item.id, url)
   }
   return map
 }

@@ -11,7 +11,10 @@ use super::ItemRegistryEntry;
 
 /// Bump whenever the cache shape, key forms, or layer semantics change so
 /// existing on-disk caches rescan once.
-const ITEM_CACHE_VERSION: u32 = 2;
+/// v3: `texture_data_url` now holds `jar:<abs>!<zip>` descriptors, not base64
+/// data URLs (AGENTS.md enumeration-only scans) — old caches would serve the
+/// banned format, so a bump forces one rescan.
+const ITEM_CACHE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct JarMeta {

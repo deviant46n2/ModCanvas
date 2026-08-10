@@ -37,7 +37,6 @@ interface QuestEditorLayoutProps {
   onReady: (api: ToolbarAPI) => void
   toolbarApiRef: React.MutableRefObject<ToolbarAPI | null>
   textureIndex: Record<string, string>
-  setTextureIndex: React.Dispatch<React.SetStateAction<Record<string, string>>>
   animations: Record<string, string>
   modsDir: string
   setModsDir: (dir: string) => void
@@ -145,7 +144,6 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
         projectId={props.projectId}
         projectPath={props.projectPath}
         textureIndex={props.textureIndex}
-        setTextureIndex={props.setTextureIndex}
         modsDir={props.modsDir}
         setModsDir={props.setModsDir}
         onReady={props.onReady}
