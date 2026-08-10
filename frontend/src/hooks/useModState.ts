@@ -254,6 +254,15 @@ export function useModState(selectedProject: Project | null) {
     }
   }
 
+  // Source toggles must visibly take effect: clear the stale results list so
+  // a toggle never leaves the previous search's results on screen pretending
+  // to be current (that made the toggles look dead/bouncing depending on
+  // whether the user happened to re-search before looking).
+  const handleSearchSourcesChange = useCallback((sources: Array<'modrinth' | 'curseforge'>) => {
+    setSearchSources(sources)
+    setSearchResults([])
+  }, [])
+
   function getMissingDependencies(modId: string) {
     const meta = modMetadata.get(modId)
     if (!meta) return []
@@ -287,7 +296,7 @@ export function useModState(selectedProject: Project | null) {
     projectMods,
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
-    searchSources, setSearchSources,
+    searchSources, setSearchSources: handleSearchSourcesChange,
     modFilterInput, setModFilterInput,
     modMetadata,
     isLoadingMetadata,
