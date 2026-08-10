@@ -5,10 +5,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { audit, backup } from './backup-state.mjs'
+import { audit, backup, checkpointWal } from './backup-state.mjs'
 
 const fixture = () => mkdtempSync(join(tmpdir(), 'backup-test-'))
 
@@ -79,4 +80,42 @@ test('backup: two rapid stamps never collide (F5 ms precision)', () => {
   const b = backup(s, backupDir)
   assert.notEqual(a.archive, b.archive)
   assert.ok(existsSync(a.archive) && existsSync(b.archive))
+})
+
+test('checkpointWal: folds a live WAL into the main db', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wal-test-'))
+  const dbPath = join(dir, 'shard.db')
+  // The producer (the opencode-mem plugin) holds the db open with rows in
+  // the WAL; close() would auto-checkpoint, so keep this connection live.
+  const producer = new DatabaseSync(dbPath)
+  producer.exec('PRAGMA journal_mode = WAL')
+  producer.exec('CREATE TABLE t (v TEXT)')
+  producer.exec('INSERT INTO t VALUES (\'hello\')')
+  const walPath = dbPath + '-wal'
+  assert.ok(existsSync(walPath) && statSync(walPath).size > 0, 'WAL file should hold the uncheckpointed write')
+
+  // The backup script is a separate process — checkpoint from a new connection
+  const res = checkpointWal(dir)
+  assert.equal(res.checked, 1)
+  assert.equal(res.skipped, 0)
+
+  // TRUNCATE empties the -wal: the archive captures one consistent state
+  assert.ok(!existsSync(walPath) || statSync(walPath).size === 0, 'WAL should be truncated after checkpoint')
+  producer.close()
+})
+
+test('checkpointWal: skips non-db files and unopenable dbs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wal-skip-'))
+  writeFileSync(join(dir, 'not-a-db.txt'), 'text')
+  writeFileSync(join(dir, 'corrupt.db'), 'not sqlite')
+  mkdirSync(join(dir, 'nested'))
+  writeFileSync(join(dir, 'nested', 'other.txt'), 'x')
+  const res = checkpointWal(dir)
+  assert.equal(res.checked, 0)
+  assert.equal(res.skipped, 1) // corrupt.db fails to open; txt files ignored
+})
+
+test('checkpointWal: missing dir is a no-op, never throws', () => {
+  const res = checkpointWal('/nonexistent/nowhere')
+  assert.deepEqual(res, { checked: 0, skipped: 0 })
 })

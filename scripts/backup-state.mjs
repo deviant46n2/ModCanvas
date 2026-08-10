@@ -16,6 +16,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, rmSync, writeFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 
 const ROOT = process.cwd()
@@ -79,6 +80,15 @@ export function backup(sources, backupDir = BACKUP_DIR) {
   const ts = stamp()
   const archive = join(backupDir, `tutor-state-${ts}.tar.gz`)
 
+  // WAL checkpoint before tar: the memory store runs SQLite in WAL mode, so a
+  // live -wal file holds writes newer than the main .db. Tarring a live store
+  // can catch .db and .db-wal at different moments (a torn snapshot that
+  // passes the presence-only verification). Checkpoint each shard first so
+  // the .db holds the latest committed state and the -wal is empty. Best
+  // effort: a shard that can't open (locked, mid-write) is tarred as-is — the
+  // -wal travels with it and SQLite replays/truncates it on restore.
+  checkpointWal(sources.memData)
+
   // Entry names are relative to each -C base (the archive mixes three roots:
   // the repo for .tutor, $HOME for the memory store and the plugin config).
   const parts = []
@@ -118,6 +128,35 @@ export function backup(sources, backupDir = BACKUP_DIR) {
   }
 
   return { archive, listing }
+}
+
+// Checkpoint every SQLite shard under dir: fold the -wal into the main .db
+// (wal_checkpoint TRUNCATE also empties the -wal file, so the archive captures
+// a single consistent state). Skips non-db files and dbs that fail to open —
+// never throws, never blocks the backup (a live WAL replays fine on restore).
+export function checkpointWal(dir) {
+  if (!existsSync(dir)) return { checked: 0, skipped: 0 }
+  let checked = 0
+  let skipped = 0
+  const walk = (d) => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, entry.name)
+      if (entry.isDirectory()) {
+        walk(p)
+      } else if (entry.name.endsWith('.db')) {
+        try {
+          const db = new DatabaseSync(p)
+          db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+          db.close()
+          checked++
+        } catch {
+          skipped++
+        }
+      }
+    }
+  }
+  walk(dir)
+  return { checked, skipped }
 }
 
 function manifestText(sources, ts) {

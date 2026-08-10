@@ -151,9 +151,11 @@ verify AI claims against the repo instead of trusting them. **Use these tools
 at the moments they exist for** — that is the point of having built them:
 
 - **Session start:** read `docs/workarounds.md` (the lived-experience
-  register) and list owed items via `/owed`. Run `pnpm backup` at session
-  boundaries — the tutor arc's data expires on the memory store's cleanup
-  clocks.
+  register) and list owed items via `/owed`. `pnpm backup` archives the tutor
+  arc (`.tutor` + memory store + config) — automated daily via the
+  `modcanvas-backup.timer` systemd user unit, so a forgotten boundary run no
+  longer leaves the arc unprotected (s30); manual runs still fine at
+  boundaries.
 - **Repo health, before trusting a diff:** `pnpm integrity`
   (`node scripts/integrity-check.mjs` — 8 sections: line-limit,
   asset-bundle, stale-binary, diff-hygiene, adapter-matrix, doc-sync,

@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily ModCanvas tutor-state backup
+
+[Timer]
+# Fire daily; Persistent=true catches missed runs at next login — this is the
+# "I will not think to do it" net (the s30 agreement): the archive must never
+# silently go stale because nobody remembered the boundary ritual.
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

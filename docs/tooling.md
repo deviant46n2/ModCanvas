@@ -19,6 +19,14 @@ node --test scripts/integrity-check.test.mjs # engine tests (12)
 `pnpm integrity` / `pnpm test:tools`   # same, via the root package.json
 `pnpm backup`                          # state backup + expiry audit
 ```
+The backup is also automated: a systemd user timer. Source of truth is
+`scripts/systemd/modcanvas-backup.{service,timer}`; the installed units in
+`~/.config/systemd/user/` are symlinks to the repo copies (install/reinstall:
+`ln -sf …/scripts/systemd/modcanvas-backup.{service,timer} …/user/` +
+`systemctl --user daemon-reload`). Daily, `Persistent=true` — missed runs catch
+up at next login. The script checkpoints WAL-mode SQLite shards before tarring,
+so an archive taken mid-write is still one consistent state (s30). `pnpm
+backup` remains for boundary runs.
 
 Sections:
 
@@ -83,7 +91,7 @@ The five failure classes observed across the arc, each with a tool:
 | Unverified observations as evidence (s6 truncated grep → wrong pack story; s8 fabricated `.env`; s20 grep error) | **Observation gate** — pin raw observation + source + timestamp, classify observed/derived/remembered, truncated ≠ evidence | `tutor-observation` skill, loaded by `/debug` step 0 |
 | Instruments that silently don't fire (s20c dead probe; s21 NPE probe, midnight log rotation) | **Instrumentation gate** — prove applied / can fire / NPE-safe / right log, before any probe cycle | `tutor-instrument` skill |
 | Verification loops skipped under pressure (s14: jar was old build, app never restarted) | **Verification harness** — rebuild → deploy → restart → observe, each step graded on EVIDENCE; claim only after | `/verify-build` command |
-| Stale state (s13 goal contract rotted 2 sessions; B2: `.tutor` gitignored + 30-day auto-cleanup) | **State backup + audit** — tar the arc (`.tutor` + memory store + config), verify the archive, audit expiry risk | `scripts/backup-state.mjs` + `/backup` via `pnpm backup` |
+| Stale state (s13 goal contract rotted 2 sessions; B2: `.tutor` gitignored + 30-day auto-cleanup) | **State backup + audit** — tar the arc (`.tutor` + memory store + config), verify the archive, audit expiry risk; WAL checkpoint before tar; automated daily via a systemd user timer (s30, units tracked in `scripts/systemd/`), manual boundary runs still fine | `scripts/backup-state.mjs` via `pnpm backup` + `scripts/systemd/modcanvas-backup.timer` |
 | Content-level doc drift (CACHE_VERSION, jar versions) | **Doc anchors** — doc mention ≠ code value = violation | `doc-anchors` integrity section |
 | Process-skip at session close (s22: profile mirror written, `code:session` handoff write skipped — memory told a stale story, caught s23) | **State freshness** — newest `code:session` in the memory store must postdate the last commit; stale = the closing session never wrote its snapshot | `scripts/state-freshness.mjs` via `pnpm state-freshness`, run as `/audit` step 5 |
 
