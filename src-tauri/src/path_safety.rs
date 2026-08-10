@@ -597,6 +597,21 @@ fn imports_base_dir() -> Result<PathBuf, String> {
     Err("Cannot resolve a data directory for imported packs".to_string())
 }
 
+/// Expand a leading `~/` to the user's home directory. POSIX filesystem
+/// calls do NOT expand `~` (that is a shell feature, not a filesystem one),
+/// so any path handed to `std::fs` must be expanded first — a literal
+/// `~/modpacks/foo` otherwise fails with ENOENT. Non-tilde paths are
+/// returned unchanged. Used by `create_project`, where the frontend may
+/// send `~/modpacks/<name>`.
+pub fn expand_home(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = dirs_next::home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(path)
+}
+
 /// Create a fresh per-import directory inside `base` named `<name>-<short-id>`.
 fn make_import_dir(base: &Path, hint: &str) -> Result<PathBuf, String> {
     let name = sanitize_project_name(hint).unwrap_or_else(|_| "pack".to_string());

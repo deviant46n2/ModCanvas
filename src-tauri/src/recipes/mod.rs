@@ -434,7 +434,10 @@ pub async fn scan_pack_recipes_cmd(project_path: String) -> Result<Vec<Discovere
     tauri::async_runtime::spawn_blocking(move || {
         let path = std::path::Path::new(&project_path);
         if !path.is_dir() {
-            return Err("project path is not a directory".to_string());
+            return Err(format!(
+                "The project folder '{}' does not exist on disk — the pack may have been moved or deleted. Delete this project and re-create/re-import it.",
+                project_path
+            ));
         }
         Ok(scan_pack_recipes(path))
     })

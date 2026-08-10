@@ -191,7 +191,7 @@ impl ModIntelligence {
         );
         
         let url = format!(
-            "{}/search?q={}&facets={}&limit=20",
+            "{}/search?query={}&facets={}&limit=20",
             MODRINTH_API,
             urlencoding::encode(query),
             urlencoding::encode(&facets)

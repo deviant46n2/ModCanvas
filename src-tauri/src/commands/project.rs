@@ -23,6 +23,13 @@ pub fn create_project(
         _ => ModLoader::Forge,
     };
 
+    // The frontend sends `~/modpacks/<name>`; POSIX fs calls never expand
+    // `~`, so resolve it here (the path-ownership boundary) and make the
+    // pack root exist — the load pipeline reads files from it immediately.
+    let path = crate::path_safety::expand_home(&path);
+    std::fs::create_dir_all(&path)
+        .map_err(|e| format!("Failed to create project directory {:?}: {e}", path))?;
+
     let now = Utc::now();
     let project = Project {
         id: Uuid::new_v4(),
@@ -35,7 +42,7 @@ pub fn create_project(
         author: String::new(),
         created_at: now,
         updated_at: now,
-        path,
+        path: path.display().to_string(),
         source: "modcanvas".to_string(),
     };
 
