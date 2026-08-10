@@ -180,11 +180,11 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
    send-sites dormant (`useQuestToolbarActions.ts:77`, `useRecipeSave.ts:27`,
    `sync-pipeline.ts:32`). Documented freeze (todo.md Phase 3), not a bug — but any roadmap
    item that assumes in-game hot reload is unavailable.
-5. **`mod_metadata` DB table is a dead schema** — created (`db.rs:59`), never written.
+5. **`mod_metadata` DB table is a dead schema** — created in the schema (`db.rs` init_schema), never written.
    **Removed from the schema in the s34 debt arc.** Existing databases keep the (empty,
    never-populated) orphan table — no migration warranted; fresh DBs never create it.
 6. **CurseForge export silently drops Modrinth-sourced mods** — collected into
-   `_modrinth_mods` but never written into the zip (`imports/curseforge.rs:316-333`).
+   `_modrinth_mods` but never written into the zip (`imports/curseforge/export.rs`).
    **This is a real functional bug in a shipped export path.**
 7. **`NewProjectModal` advertises 1.19.2 and Quilt** — no 1.19.x adapter exists; Quilt
    exists for 1.21.1 only. Selecting 1.19.2 falls back to the 1.21.1 NeoForge adapter with a
@@ -531,7 +531,7 @@ Export (mrpack/CF zip) → Playable Modpack
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
 | Launch | Test works (`test_project`, `minecraft/launch.rs`); companion deploy works (NeoForge only) | "Launch your pack" is buried in a veteran-shaped toolbar |
-| Export | mrpack + CF zip exist; **CF export drops Modrinth mods** (`imports/curseforge.rs:316-333`) | A first-timer's export can be silently incomplete |
+| Export | mrpack + CF zip exist; **CF export drops Modrinth mods** (`imports/curseforge/export.rs`) | A first-timer's export can be silently incomplete |
 | Error recovery | No crash-help path; no log-deciphering (by design, no AI) | "It crashed after GO" has no in-app response |
 
 ### 9.3 First-Pack wizard (P0-WIZARD) — implementable spec
@@ -865,7 +865,7 @@ Conventions:
 
 #### P0-HYGIENE-2 — CurseForge export bug
 
-- **Class:** Harden (real bug: `imports/curseforge.rs:316-333` collects Modrinth-sourced
+- **Class:** Harden (real bug: `imports/curseforge/export.rs` collects Modrinth-sourced
   mods and never writes them into the zip).
 - **Fix:** include non-CF mods in the overrides (download or reference-by-slug), or
   explicitly fail the export with a clear message — never silently drop.

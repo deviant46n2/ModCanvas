@@ -142,7 +142,19 @@ that's the suite's job; this is the ledger's thermometer):
 | violation | 10 | a broken invariant (the suite's exit-1 class) |
 | candidate | 3 | surfaced, needs maintainer judgment (doc-sync) |
 | parked | 0.5 | known debt WITH a written reason — near-zero so good parks aren't punished (s22) |
+| accepted | 0 | an intentional decision, NOT debt (s36) — zero deduction, never a work item |
 | ledger item | by priority P0 15 / P1 10 / P2 5 / P3 2 | explicit priority field, data not magic |
+
+**Accepted decisions (s36) — the intentional-vs-debt distinction.** An
+allowlist entry with `"kind": "accepted"` is a decision, not debt: it costs
+zero, never appears in "What to work on next", and reports as `ACCEPTED`
+instead of `PARKED`. The anti-gaming guard (suite-self): an accepted entry's
+reason MUST cite an existing doc (`AGENTS.md`, `README.md`, `docs/*.md`)
+where the decision is recorded — "AGENTS.md permits self-authored branding"
+is a decision; "we decided" is an excuse and a violation. This is what lets
+the score reach 100 with intentional exceptions present: `pnpm health` prints
+`Known debt: 0 — N accepted intentional decision(s), not debt.` whenever the
+ledger is genuinely empty, so a sub-100 score always has an explanation.
 
 **Severity bands (s30 — the flat parked weight was undercounting real debt).**
 A section may define `parkedWeights` in `health-rules.json`: the parked

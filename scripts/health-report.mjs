@@ -57,6 +57,19 @@ export function loadHealthRules() {
     return DEFAULT_HEALTH
   }
 }
+
+/** The "Known debt: N" line (s36): distinguishes debt from accepted
+ *  intentional decisions — a score below 100 with zero debt must say so
+ *  plainly instead of leaving the number unexplained. */
+export function knownDebtLine(totalDebt, totalAccepted, deduction) {
+  if (totalDebt > 0) return `Known debt: ${totalDebt} item(s).`
+  if (totalAccepted > 0) {
+    return deduction > 0
+      ? `Known debt: 0 — the remaining ${deduction} point(s) are ${totalAccepted} accepted intentional decision(s), not debt.`
+      : `Known debt: 0 — ${totalAccepted} accepted intentional decision(s), not debt.`
+  }
+  return 'Known debt: 0.'
+}
 const MAX_TREND = 120
 
 const WEIGHT_DEFAULTS = { violation: 10, candidate: 3, parked: 0.5 }
@@ -96,12 +109,13 @@ export function computeScore(results, health) {
     const nV = countOf(results, section.name, 'violations')
     const nC = countOf(results, section.name, 'candidates') ?? 0
     const nP = countOf(results, section.name, 'parked') ?? 0
+    const nA = countOf(results, section.name, 'accepted') ?? 0
     let parkedDeduction = 0
     for (const p of section.parked ?? []) {
       parkedDeduction += parkedWeightFor(health, section.name, p, weights.parked)
     }
     const d = nV * weights.violation + nC * weights.candidate + parkedDeduction
-    breakdown[section.name] = { violations: nV, candidates: nC, parked: nP, deduction: +d.toFixed(1) }
+    breakdown[section.name] = { violations: nV, candidates: nC, parked: nP, accepted: nA, deduction: +d.toFixed(1) }
     deduction += d
   }
   for (const item of health.ledger ?? []) {
@@ -223,14 +237,27 @@ function printReport() {
   }
   work.sort((a, b) => ({ P0: 0, P1: 1, P2: 2, P3: 3 })[a.priority] - ({ P0: 0, P1: 1, P2: 2, P3: 3 })[b.priority])
 
+  // Known debt = violations + candidates + parked (accepted decisions are
+  // NOT debt — they carry zero deduction by design, s36).
+  const totalDebt = results.reduce(
+    (n, s) => n + (s.violations?.length ?? 0) + (s.candidates?.length ?? 0) + (s.parked?.length ?? 0),
+    0,
+  )
+  const totalAccepted = results.reduce((n, s) => n + (s.accepted?.length ?? 0), 0)
+
   console.log(`\nModCanvas repo health: ${score}/100 (manageable debt load)`)
   console.log(`  deductions: ${deduction} points`)
   for (const [section, b] of Object.entries(breakdown)) {
-    if (b.deduction === 0 && b.violations === 0 && b.candidates === 0 && b.parked === 0) continue
+    if (b.deduction === 0 && b.violations === 0 && b.candidates === 0 && b.parked === 0 && b.accepted === 0) continue
     console.log(
-      `  ${section.padEnd(28)} V:${b.violations} C:${b.candidates} P:${b.parked}  −${b.deduction}`,
+      `  ${section.padEnd(28)} V:${b.violations} C:${b.candidates} P:${b.parked} A:${b.accepted}  −${b.deduction}`,
     )
   }
+
+  // The explicit zero-debt statement (s36): a score below 100 can coexist
+  // with ZERO known debt when the remainder is accepted intentional
+  // decisions. Say so plainly instead of leaving the number unexplained.
+  console.log(knownDebtLine(totalDebt, totalAccepted, deduction))
 
   if (work.length > 0) {
     console.log(`\nWhat to work on next (${work.length}):`)

@@ -163,7 +163,12 @@ at the moments they exist for** — that is the point of having built them:
   (`node scripts/integrity-check.mjs` — 9 sections: line-limit,
   asset-bundle, stale-binary, diff-hygiene, adapter-matrix, doc-sync,
   doc-anchors, build-smoke, suite-self). Violations are new debt; PARKED entries are
-  known debt with written reasons; CANDIDATES need maintainer judgment.
+  known debt with written reasons (revisit on touching change — the tripwire);
+  ACCEPTED entries are intentional decisions, not debt — zero deduction, and the
+  reason MUST cite an existing doc (AGENTS.md / README.md / docs/*.md) so the
+  decision is reviewable, never a free pass; CANDIDATES need maintainer judgment.
+  `pnpm health` states known-debt explicitly, so a sub-100 score can only mean
+  accepted decisions or actual debt — never an unexplained number.
 - **Before claiming any fix or feature works:** `/verify-build` — rebuild →
   deploy → restart → observe, each step graded on EVIDENCE (mtime, md5,
   process start, fresh log). A claim without evidence for all four steps is

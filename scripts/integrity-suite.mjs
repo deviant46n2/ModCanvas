@@ -99,6 +99,28 @@ export function checkSuiteSelf(rules, root) {
     }
   }
 
+  // 6. Accepted entries must cite a reviewable decision (an existing doc
+  //    file) in their reason. 'accepted' means intentional — and intent must
+  //    be verifiable, or 'accepted' becomes a free pass for any debt (the
+  //    s36 anti-gaming guard: a reason like 'AGENTS.md permits X' is a
+  //    decision; 'we decided' without a location is an excuse).
+  for (const [key, entries] of Object.entries(rules.allowlists ?? {})) {
+    for (const e of entries ?? []) {
+      if (e.kind !== 'accepted') continue
+      const cite = (e.reason ?? '').match(/(?:docs\/[\w./-]+\.md|AGENTS\.md|README\.md)/)
+      const id = e.path ?? e.name
+      if (!cite) {
+        violations.push({
+          path: `accepted entry ${key}/${id}: reason must cite an existing doc (AGENTS.md, README.md, docs/*.md) — a decision must be reviewable`,
+        })
+      } else if (!existsSync(join(root, cite[0]))) {
+        violations.push({
+          path: `accepted entry ${key}/${id}: cited ${cite[0]} does not exist`,
+        })
+      }
+    }
+  }
+
   return { violations, candidates, info }
 }
 

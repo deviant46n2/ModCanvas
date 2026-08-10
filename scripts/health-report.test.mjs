@@ -208,3 +208,47 @@ test('trend: one entry per day (same-day runs dedupe)', () => {
     rmSync(tmp, { force: true })
   }
 })
+
+// --- accepted decisions (s36): zero deduction + explicit zero-debt line ---
+
+import { knownDebtLine } from './health-report.mjs'
+
+test('accepted entries deduct nothing and are counted in the breakdown', () => {
+  const results = [
+    { name: 'asset-bundle', violations: [], candidates: [], parked: [], accepted: [{ path: 'a.png', reason: 'x' }] },
+    { name: 'line-limit', violations: [], candidates: [], parked: [], accepted: [] },
+  ]
+  const { score, breakdown, deduction } = computeScore(results, { weights: {}, parkedWeights: {}, ledger: [] })
+  assert.equal(deduction, 0)
+  assert.equal(score, 100)
+  assert.equal(breakdown['asset-bundle'].accepted, 1)
+  assert.equal(breakdown['line-limit'].accepted, 0)
+})
+
+test('accepted entries never appear as work items', () => {
+  const results = [
+    { name: 'asset-bundle', violations: [], candidates: [], parked: [], accepted: [{ path: 'a.png', reason: 'x' }] },
+  ]
+  const work = rankWork(results, { weights: {}, parkedWeights: {}, ledger: [] }, ROOT)
+  assert.equal(work.length, 0)
+})
+
+test('knownDebtLine: zero debt with accepted decisions states it explicitly', () => {
+  assert.equal(
+    knownDebtLine(0, 2, 0),
+    'Known debt: 0 — 2 accepted intentional decision(s), not debt.',
+  )
+  assert.equal(
+    knownDebtLine(0, 2, 1),
+    'Known debt: 0 — the remaining 1 point(s) are 2 accepted intentional decision(s), not debt.',
+  )
+})
+
+test('knownDebtLine: zero debt and zero accepted says just that', () => {
+  assert.equal(knownDebtLine(0, 0, 0), 'Known debt: 0.')
+})
+
+test('knownDebtLine: debt present never claims zero', () => {
+  assert.equal(knownDebtLine(3, 0, 1.5), 'Known debt: 3 item(s).')
+  assert.equal(knownDebtLine(1, 5, 10), 'Known debt: 1 item(s).')
+})

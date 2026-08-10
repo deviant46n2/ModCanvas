@@ -120,3 +120,30 @@ test('suite-self: subdir-scoped ref to a MISSING script is still a violation', (
   assert.equal(violations.length, 1)
   assert.match(violations[0].path, /pnpm lint/)
 })
+
+// --- accepted-entry anti-gaming guard (s36) -------------------------------
+
+test('accepted entry without a doc citation is a violation (decision must be reviewable)', () => {
+  const root = suiteFixture()
+  const rules = structuredClone(SUITE_RULES)
+  rules.allowlists = { 'line-limit': [{ path: 'src/big.rs', reason: 'we decided', kind: 'accepted' }] }
+  const { violations } = checkSuiteSelf(rules, root)
+  assert.ok(violations.some((v) => v.path.includes('accepted entry') && v.path.includes('must cite')))
+})
+
+test('accepted entry citing a nonexistent doc is a violation', () => {
+  const root = suiteFixture()
+  const rules = structuredClone(SUITE_RULES)
+  rules.allowlists = { 'line-limit': [{ path: 'src/big.rs', reason: 'decided — see docs/ghost.md', kind: 'accepted' }] }
+  const { violations } = checkSuiteSelf(rules, root)
+  assert.ok(violations.some((v) => v.path.includes('does not exist')))
+})
+
+test('accepted entry citing an existing doc is clean', () => {
+  const root = withSkill(suiteFixture())
+  const rules = structuredClone(SUITE_RULES)
+  rules.allowlists = { 'line-limit': [{ path: 'src/big.rs', reason: 'branding — AGENTS.md permits', kind: 'accepted' }] }
+  writeFileSync(join(root, 'AGENTS.md'), 'branding rule lives here')
+  const { violations } = checkSuiteSelf(rules, root)
+  assert.equal(violations.length, 0)
+})

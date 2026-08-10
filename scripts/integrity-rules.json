@@ -16,12 +16,14 @@
       {
         "path": "frontend/src/assets/hero.png",
         "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/",
-        "since": "2026-08-09T03:33:00"
+        "since": "2026-08-09T03:33:00",
+        "kind": "accepted"
       },
       {
         "path": "frontend/src/assets/logo.png",
         "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/",
-        "since": "2026-08-09T03:33:00"
+        "since": "2026-08-09T03:33:00",
+        "kind": "accepted"
       }
     ],
     "adapter-matrix": [],

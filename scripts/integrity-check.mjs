@@ -77,30 +77,38 @@ const lineCount = (file) => {
 export function checkLineLimit(rules, root) {
   const violations = []
   const parked = []
+  const accepted = []
   for (const dir of rules.lineLimitPaths) {
     for (const file of walk(join(root, dir))) {
       const lines = lineCount(file)
       if (lines <= rules.lineLimit) continue
       const rel = relative(root, file)
       const entry = rules.allowlists['line-limit'].find((a) => a.path === rel)
-      if (entry) parked.push({ path: rel, lines, reason: entry.reason, since: entry.since })
-      else violations.push({ path: rel, lines })
+      if (entry) {
+        // kind: "accepted" = an intentional decision, not debt — zero
+        // deduction, never a work item (s36). Everything else parked.
+        if (entry.kind === 'accepted') accepted.push({ path: rel, lines, reason: entry.reason })
+        else parked.push({ path: rel, lines, reason: entry.reason, since: entry.since })
+      } else violations.push({ path: rel, lines })
     }
   }
-  return { violations, parked }
+  return { violations, parked, accepted }
 }
 
 export function checkAssetBundle(rules, root) {
   const violations = []
   const parked = []
+  const accepted = []
   const allow = rules.allowlists['asset-bundle']
   for (const dir of rules.assetDirs) {
     for (const file of walk(join(root, dir))) {
       if (!RASTER.test(file)) continue
       const rel = relative(root, file)
       const entry = allow.find((a) => a.path === rel)
-      if (entry) parked.push({ path: rel, reason: entry.reason })
-      else violations.push({ path: rel })
+      if (entry) {
+        if (entry.kind === 'accepted') accepted.push({ path: rel, reason: entry.reason })
+        else parked.push({ path: rel, reason: entry.reason })
+      } else violations.push({ path: rel })
     }
   }
   // bundle.resources must not reference images either (AGENTS.md rule 6).
@@ -120,13 +128,14 @@ export function checkAssetBundle(rules, root) {
       }
     }
   }
-  return { violations, parked }
+  return { violations, parked, accepted }
 }
 
 export function checkStaleBinary(rules, root) {
   const info = []
   const violations = []
   const parked = []
+  const accepted = []
   for (const bin of rules.staleBinaries) {
     const abs = join(root, bin.path)
     if (!existsSync(abs)) {
@@ -142,8 +151,10 @@ export function checkStaleBinary(rules, root) {
     const binTime = statSync(abs).mtimeMs
     if (binTime < newest) {
       const entry = (rules.allowlists['stale-binary'] ?? []).find((a) => a.name === bin.name)
-      if (entry) parked.push({ path: `[${bin.name}] ${bin.path}`, reason: entry.reason })
-      else {
+      if (entry) {
+        if (entry.kind === 'accepted') accepted.push({ path: `[${bin.name}] ${bin.path}`, reason: entry.reason })
+        else parked.push({ path: `[${bin.name}] ${bin.path}`, reason: entry.reason })
+      } else {
         violations.push({
           message: `[${bin.name}] ${bin.path} (${new Date(binTime).toISOString()}) older than newest ${bin.sourcePaths.join(
             ' + ',
@@ -154,7 +165,7 @@ export function checkStaleBinary(rules, root) {
       info.push({ message: `[${bin.name}] binary newer than all sources` })
     }
   }
-  return { violations, parked, info }
+  return { violations, parked, accepted, info }
 }
 
 // --- reporting -----------------------------------------------------------
@@ -186,10 +197,13 @@ export function report(results) {
     for (const p of section.parked ?? []) {
       console.log(`PARKED:    ${p.path} — ${p.reason}`)
     }
+    for (const a of section.accepted ?? []) {
+      console.log(`ACCEPTED:  ${a.path} — ${a.reason}`)
+    }
     for (const i of section.info ?? []) {
       console.log(`INFO:      ${i.message}`)
     }
-    if (n === 0 && !(section.candidates?.length) && !(section.parked?.length) && !(section.info?.length)) console.log('  clean')
+    if (n === 0 && !(section.candidates?.length) && !(section.parked?.length) && !(section.accepted?.length) && !(section.info?.length)) console.log('  clean')
   }
   console.log(`\n${violationCount} violation(s).`)
   return violationCount
