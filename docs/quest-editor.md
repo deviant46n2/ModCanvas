@@ -616,10 +616,16 @@ Right-clicking a quest node or the empty pane opens a context menu
 editing UX:
 
 - **Node context menu** — Edit Quest, Rename (starts an inline rename on the
-  canvas), Duplicate (copy+paste in place), Copy Quest ID, and Delete; in
-  Simulate mode also Complete Selected / Reset Selected. A multi-selection
-  supports bulk duplicate/delete/complete/reset. Right-clicking a node not
-  currently in the selection makes it the sole operand.
+  canvas), Duplicate (copy+paste in place), Copy Quest ID, **Move to chapter**
+  (a toggle expanding the other chapters; moves the selection there, keeping
+  positions, edges, objectives and rewards — FTB allows cross-chapter
+  dependency edges), and Delete; in Simulate mode also Complete Selected /
+  Reset Selected. A multi-selection supports bulk
+  duplicate/delete/move/complete/reset. Right-clicking a node not currently
+  in the selection makes it the sole operand. The move op rewrites
+  `node.chapter_id` via `onMoveNodesToChapter` and is undoable — the export
+  groups quests by `chapter_id`, so a moved quest lands in its new chapter's
+  `chapter.snbt`.
 - **Empty-pane context menu** — Add Quest, Add Quest Link, a "New Quest with
   Task" toggle that expands a two-column grid of every objective type (clicking
   the toggle keeps the menu compact instead of a tall 19-item list), and Paste

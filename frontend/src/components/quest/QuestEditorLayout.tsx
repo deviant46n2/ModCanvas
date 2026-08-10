@@ -75,6 +75,7 @@ interface QuestEditorLayoutProps {
   onApplyThemePreset: (presetId: string) => void
   onDeleteNode: (nodeId: string) => void
   onDeleteNodes: (nodeIds: string[]) => void
+  onMoveNodesToChapter?: (nodeIds: string[], chapterId: string) => void
   onPasteNodes: (nodes: QuestNodeData[], edges: QuestEdgeData[]) => void
   onDeleteEdge: (edgeId: string) => void
   onAddQuest: (chapterId?: string, position?: { x: number; y: number }) => void
@@ -191,6 +192,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onApplyThemePreset={props.onApplyThemePreset}
             onDeleteNode={props.onDeleteNode}
             onDeleteNodes={props.onDeleteNodes}
+            onMoveNodesToChapter={props.onMoveNodesToChapter}
             onPasteNodes={props.onPasteNodes}
             onDeleteEdge={props.onDeleteEdge}
             onAddNode={props.onAddQuest}

@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -9,6 +9,7 @@ import type {
 } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
 import { useQuestCanvasModel } from './useQuestCanvasModel';
+import { useChapterDisplayState } from './useChapterDisplayState';
 import { useQuestCanvasKeyboard } from './useQuestCanvasKeyboard';
 import { useQuestCanvasInteractions } from './useQuestCanvasInteractions';
 import { useQuestCanvasContextMenu } from './useQuestCanvasContextMenu';
@@ -31,6 +32,7 @@ interface QuestCanvasProps {
   onApplyThemePreset?: (presetId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteNodes?: (nodeIds: string[]) => void;
+  onMoveNodesToChapter?: (nodeIds: string[], chapterId: string) => void;
   onPasteNodes?: (nodes: QuestNodeData[], edges: QuestEdgeData[]) => void;
   onDeleteEdge: (edgeId: string) => void;
   onAddNode: (chapterId: string, position?: { x: number; y: number }) => void;
@@ -73,6 +75,7 @@ function QuestCanvasInner({
   onApplyThemePreset,
   onDeleteNode: _onDeleteNode,
   onDeleteNodes,
+  onMoveNodesToChapter,
   onPasteNodes,
   onDeleteEdge,
   onAddNode,
@@ -156,12 +159,12 @@ function QuestCanvasInner({
     handleNodeContextMenu, handlePaneContextMenu, closeCtxMenu,
     handleCtxEdit, handleCtxDuplicate, handleCtxCopyId, handleCtxDelete,
     applySimToSelection, handleCtxAddQuest, handleCtxAddLink,
-    handleCtxAddQuestWithTask, viewportMenuPos,
+    handleCtxAddQuestWithTask, handleCtxMoveToChapter, viewportMenuPos,
   } = useQuestCanvasContextMenu({
     selectedIds, setSelectedIds, setSelectedNodeId, screenToFlowPosition,
     editLocked, questNodes: questGraph.nodes, onDeleteNodes,
     onSetQuestProgress, activeChapter, onAddNode, onAddLink, onAddQuestWithTask,
-    copySelected, pasteClipboard,
+    copySelected, pasteClipboard, onMoveToChapter: onMoveNodesToChapter,
   });
 
   // Search: select + fly to the first matching quest (Enter in the search bar).
@@ -190,19 +193,8 @@ function QuestCanvasInner({
     setBezierEditEdgeId(null);
   }, []);
 
-  const activeChapterName = useMemo(() => {
-    if (!activeChapter || !chapters) return '';
-    const ch = chapters.find((c: QuestChapter) => c.id === activeChapter);
-    return ch?.title || 'Untitled';
-  }, [activeChapter, chapters]);
-
-  const activeChapterNodes = questGraph.nodes.filter((n: QuestNodeData) => n.chapter_id === activeChapter);
-
-  const activeChapterImages = useMemo(() => {
-    if (!activeChapter) return [];
-    const ch = chapters.find((c: QuestChapter) => c.id === activeChapter);
-    return ch?.images || [];
-  }, [activeChapter, chapters]);
+  const { activeChapterName, moveToChapters, activeChapterNodes, activeChapterImages } =
+    useChapterDisplayState(chapters, activeChapter, questGraph.nodes);
 
   const selectedEdge = selectedEdgeId
     ? filteredEdges.find((e: QuestEdgeData) => e.id === selectedEdgeId) || null
@@ -278,6 +270,7 @@ function QuestCanvasInner({
         onCtxReset={() => applySimToSelection(null)}
         onCtxAddQuest={handleCtxAddQuest} onCtxAddLink={handleCtxAddLink}
         onCtxPaste={pasteClipboard} onCtxAddQuestWithTask={handleCtxAddQuestWithTask}
+        onCtxMoveToChapter={handleCtxMoveToChapter} moveToChapters={moveToChapters}
         selectedCount={selectedIds.size} hasClipboard={!!clipboardRef.current}
         showShortcuts={showShortcuts} onCloseShortcuts={() => setShowShortcuts(false)}
         activeChapter={activeChapter} onAddNode={handleAddNode} onAddLink={onAddLink}

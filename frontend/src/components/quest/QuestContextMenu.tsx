@@ -9,11 +9,17 @@ export interface QuestCtxMenuState {
   nodeId?: string | null
 }
 
+export interface MoveChapterOption {
+  id: string
+  title: string
+}
+
 interface QuestContextMenuProps {
   menu: QuestCtxMenuState
   simMode: boolean
   selectedCount: number
   hasClipboard: boolean
+  moveToChapters: MoveChapterOption[]
   onClose: () => void
   onEdit: (nodeId: string) => void
   onRename: (nodeId: string) => void
@@ -26,6 +32,7 @@ interface QuestContextMenuProps {
   onAddLink: () => void
   onPaste: () => void
   onAddQuestWithTask: (objectiveType: string) => void
+  onMoveToChapter: (chapterId: string) => void
   objectiveTypes: Array<{ value: string; label: string }>
 }
 
@@ -58,6 +65,7 @@ export function QuestContextMenu({
   simMode,
   selectedCount,
   hasClipboard,
+  moveToChapters,
   onClose,
   onEdit,
   onRename,
@@ -70,10 +78,12 @@ export function QuestContextMenu({
   onAddLink,
   onPaste,
   onAddQuestWithTask,
+  onMoveToChapter,
   objectiveTypes,
 }: QuestContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [showTaskGrid, setShowTaskGrid] = useState(false)
+  const [showMoveToChapter, setShowMoveToChapter] = useState(false)
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -101,6 +111,34 @@ export function QuestContextMenu({
           {menu.nodeId && <Item label="Rename" onClick={doAndClose(() => onRename(menu.nodeId!))} />}
           <Item label="Duplicate" onClick={doAndClose(onDuplicate)} />
           <Item label="Copy Quest ID" onClick={doAndClose(onCopyId)} />
+          {moveToChapters.length > 0 && (
+            <>
+              <Divider />
+              <Group>Move to chapter</Group>
+              <button
+                className="ctx-menu-grid-toggle"
+                onClick={() => setShowMoveToChapter(g => !g)}
+                aria-expanded={showMoveToChapter}
+              >
+                {showMoveToChapter ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
+                <span>{showMoveToChapter ? 'Hide chapters' : 'Choose chapter'}</span>
+              </button>
+              {showMoveToChapter && (
+                <div className="ctx-menu-move-list">
+                  {moveToChapters.map(ch => (
+                    <button
+                      key={ch.id}
+                      className="ctx-menu-item"
+                      onClick={doAndClose(() => onMoveToChapter(ch.id))}
+                      title={ch.title}
+                    >
+                      {ch.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           <Divider />
           {simMode && (
             <>

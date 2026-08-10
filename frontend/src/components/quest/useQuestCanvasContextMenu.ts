@@ -19,6 +19,7 @@ interface UseQuestCanvasContextMenuArgs {
   onAddQuestWithTask?: (chapterId: string, objectiveType: string, position?: { x: number; y: number }) => void
   copySelected: () => void
   pasteClipboard: () => void
+  onMoveToChapter?: (nodeIds: string[], chapterId: string) => void
 }
 
 export function useQuestCanvasContextMenu(args: UseQuestCanvasContextMenuArgs) {
@@ -26,6 +27,7 @@ export function useQuestCanvasContextMenu(args: UseQuestCanvasContextMenuArgs) {
     selectedIds, setSelectedIds, setSelectedNodeId, screenToFlowPosition,
     editLocked, questNodes, onDeleteNodes, onSetQuestProgress, activeChapter,
     onAddNode, onAddLink, onAddQuestWithTask, copySelected, pasteClipboard,
+    onMoveToChapter,
   } = args
 
   const [ctxMenu, setCtxMenu] = useState<QuestCtxMenuState | null>(null)
@@ -98,6 +100,16 @@ export function useQuestCanvasContextMenu(args: UseQuestCanvasContextMenuArgs) {
     setSelectedIds(new Set())
   }, [selectedIds, ctxMenu?.nodeId, onDeleteNodes, editLocked, setSelectedIds])
 
+  const handleCtxMoveToChapter = useCallback(
+    (chapterId: string) => {
+      if (editLocked) return
+      const ids = selectedIds.size > 0 ? Array.from(selectedIds) : (ctxMenu?.nodeId ? [ctxMenu.nodeId] : [])
+      if (ids.length === 0) return
+      onMoveToChapter?.(ids, chapterId)
+    },
+    [selectedIds, ctxMenu?.nodeId, onMoveToChapter, editLocked]
+  )
+
   const applySimToSelection = useCallback(
     (status: 'started' | 'complete' | null) => {
       const ids = selectedIds.size > 0 ? Array.from(selectedIds) : (ctxMenu?.nodeId ? [ctxMenu.nodeId] : [])
@@ -138,6 +150,6 @@ export function useQuestCanvasContextMenu(args: UseQuestCanvasContextMenuArgs) {
     ctxMenu, handleNodeContextMenu, handlePaneContextMenu, closeCtxMenu,
     gridPosFromCursor, handleCtxEdit, handleCtxDuplicate, handleCtxCopyId,
     handleCtxDelete, applySimToSelection, handleCtxAddQuest, handleCtxAddLink,
-    handleCtxAddQuestWithTask, viewportMenuPos,
+    handleCtxAddQuestWithTask, handleCtxMoveToChapter, viewportMenuPos,
   }
 }

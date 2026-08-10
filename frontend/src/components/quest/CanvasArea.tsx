@@ -14,12 +14,13 @@ import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/rea
 import type { QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel } from '../../services/quest-types'
 import { nodeTypes } from './quest-nodes'
 import { OBJECTIVE_TYPES } from './quest-form-constants'
-import type { QuestCtxMenuState } from './QuestContextMenu'
+import type { QuestCtxMenuState, MoveChapterOption } from './QuestContextMenu'
 import { QuestContextMenu } from './QuestContextMenu'
 import { KeyboardShortcutsOverlay } from './keyboard-shortcuts'
 import { ChapterImagesLayer } from './ChapterImagesLayer'
 import { ChapterDecorationsCanvas } from './ChapterDecorationsCanvas'
 import { DecorationPanel } from './DecorationPanel'
+import { EdgeActionChip } from './EdgeActionChip'
 import { EdgeBezierEditor } from './EdgeBezierEditor'
 import { defaultDecorationImage } from './decoration-picker'
 import { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
@@ -72,6 +73,8 @@ interface CanvasAreaProps {
   onCtxAddLink: () => void
   onCtxPaste: () => void
   onCtxAddQuestWithTask: (objectiveType: string) => void
+  onCtxMoveToChapter: (chapterId: string) => void
+  moveToChapters: MoveChapterOption[]
   selectedCount: number
   hasClipboard: boolean
   showShortcuts: boolean
@@ -102,7 +105,8 @@ export function CanvasArea({
   edgeColor, editLocked, showMiniMap, showBackground, simMode,
   viewportMenuPos, onCloseCtxMenu, onCtxEdit, onCtxRename, onCtxDuplicate,
   onCtxCopyId, onCtxDelete, onCtxComplete, onCtxReset, onCtxAddQuest,
-  onCtxAddLink, onCtxPaste, onCtxAddQuestWithTask, selectedCount, hasClipboard,
+  onCtxAddLink, onCtxPaste, onCtxAddQuestWithTask, onCtxMoveToChapter,
+  moveToChapters, selectedCount, hasClipboard,
   showShortcuts, onCloseShortcuts, activeChapter, onAddNode, onAddLink,
   selectedEdge, bezierEditEdgeId, setBezierEditEdgeId, onUpdateEdgeBezier,
   onDeleteEdge, setSelectedEdgeId, nodeLabelById, selectedDecoIndex,
@@ -197,6 +201,7 @@ export function CanvasArea({
           simMode={simMode}
           selectedCount={selectedCount}
           hasClipboard={hasClipboard}
+          moveToChapters={moveToChapters}
           onClose={onCloseCtxMenu}
           onEdit={onCtxEdit}
           onRename={onCtxRename}
@@ -209,6 +214,7 @@ export function CanvasArea({
           onAddLink={onCtxAddLink}
           onPaste={onCtxPaste}
           onAddQuestWithTask={onCtxAddQuestWithTask}
+          onMoveToChapter={onCtxMoveToChapter}
           objectiveTypes={OBJECTIVE_TYPES}
         />
       )}
@@ -225,46 +231,19 @@ export function CanvasArea({
       )}
 
       {selectedEdge && (
-        <div className="edge-action-chip">
-          <span className="edge-action-label">
-            {nodeLabelById(selectedEdge.source)} → {nodeLabelById(selectedEdge.target)}
-          </span>
-          {!editLocked && (
-            <>
-              <button
-                className={`edge-action-ghost${bezierEditEdgeId === selectedEdge.id ? ' edge-action-active' : ''}`}
-                onClick={() => {
-                  setBezierEditEdgeId((cur) => (cur === selectedEdge.id ? null : selectedEdge.id))
-                }}
-                title={bezierEditEdgeId === selectedEdge.id ? 'Hide curve control points' : 'Edit bezier control points of this arrow'}
-              >
-                {bezierEditEdgeId === selectedEdge.id ? 'Done' : 'Curve'}
-              </button>
-              {bezierEditEdgeId === selectedEdge.id && selectedEdge.bezier && (
-                <button
-                  className="edge-action-ghost"
-                  onClick={() => {
-                    onUpdateEdgeBezier?.(selectedEdge.id, null)
-                  }}
-                  title="Reset this arrow to the default curve"
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                className="edge-action-delete"
-                onClick={() => {
-                  onDeleteEdge(selectedEdge.id)
-                  setSelectedEdgeId(null)
-                  setBezierEditEdgeId(null)
-                }}
-                title="Remove this dependency arrow (Del)"
-              >
-                Remove
-              </button>
-            </>
-          )}
-        </div>
+        <EdgeActionChip
+          selectedEdge={selectedEdge}
+          edgeLabel={`${nodeLabelById(selectedEdge.source)} → ${nodeLabelById(selectedEdge.target)}`}
+          bezierEditEdgeId={bezierEditEdgeId}
+          editLocked={editLocked}
+          onToggleBezier={() => setBezierEditEdgeId((cur) => (cur === selectedEdge.id ? null : selectedEdge.id))}
+          onResetBezier={() => onUpdateEdgeBezier?.(selectedEdge.id, null)}
+          onDelete={() => {
+            onDeleteEdge(selectedEdge.id)
+            setSelectedEdgeId(null)
+            setBezierEditEdgeId(null)
+          }}
+        />
       )}
 
       {decorEditMode && activeChapter && (

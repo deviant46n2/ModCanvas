@@ -60,5 +60,10 @@
   opacity: 0.7;
   padding: 4px 9px;
 }
+.ctx-menu-move-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
 
 /* Glyph-free icon fallbacks & compact controls */

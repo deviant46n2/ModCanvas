@@ -90,6 +90,18 @@ export function useQuestNodeMutations({
     scheduleAutoSave()
   }, [graph, selectedNodeId, scheduleAutoSave, setSelectedNodeId])
 
+  const onMoveNodesToChapter = useCallback((nodeIds: string[], chapterId: string) => {
+    if (!graph || nodeIds.length === 0 || !chapterId) return
+    const moving = new Set(nodeIds)
+    commitGraph({
+      ...graph,
+      // Only the chapter_id changes — positions, edges, objectives and rewards
+      // stay attached. FTB allows cross-chapter dependencies, so edges survive.
+      nodes: graph.nodes.map(n => (moving.has(n.id) ? { ...n, chapter_id: chapterId } : n)),
+    })
+    scheduleAutoSave()
+  }, [graph, commitGraph, scheduleAutoSave])
+
   const onPasteNodes = useCallback((newNodes: QuestNodeData[], newEdges: QuestEdgeData[]) => {
     if (!graph || newNodes.length === 0) return
     commitGraph({
@@ -234,6 +246,7 @@ export function useQuestNodeMutations({
     onAddQuestLink,
     onDeleteNode,
     onDeleteNodes,
+    onMoveNodesToChapter,
     onPasteNodes,
     onAddEdge,
     onUpdateEdge,
