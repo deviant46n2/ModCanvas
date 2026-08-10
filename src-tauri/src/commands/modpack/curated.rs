@@ -139,37 +139,81 @@ pub async fn list_curated_mods(
     };
 
     let cf_key = resolve_curseforge_api_key(&db)?;
-    let keys: Vec<String> = CURATED.iter().map(|c| c.key.to_string()).collect();
-    // Batch fetch resolves both Modrinth slugs and `curseforge:{id}` keys;
-    // unresolvable picks are dropped by the filter, so a registry hiccup
-    // degrades to a shorter list, never an error.
+
+    // Modrinth picks: batch fetch (keyless).
+    let modrinth_keys: Vec<String> = CURATED
+        .iter()
+        .filter(|c| !c.key.starts_with("curseforge:"))
+        .map(|c| c.key.to_string())
+        .collect();
     let metadata = intelligence
-        .batch_get_metadata(&keys, &loader.to_string(), &project.minecraft_version, cf_key.as_deref())
+        .batch_get_metadata(&modrinth_keys, &loader.to_string(), &project.minecraft_version, None)
         .await;
 
     let mut out = filter_curated(&metadata, &loader, &project.minecraft_version);
 
-    // CurseForge picks with no key configured: show them BLOCKED, never
-    // silently absent — FTB Quests is core and its absence would be a
-    // confusing gap in the list.
-    if cf_key.is_none() {
-        for pick in CURATED.iter().filter(|c| c.key.starts_with("curseforge:")) {
-            out.push(CuratedMod {
-                source: "curseforge".to_string(),
-                mod_id: String::new(),
-                slug: String::new(),
-                name: pick.name.to_string(),
-                description: pick.description.to_string(),
-                ticked: false,
-                core: pick.core,
-                blocked_reason: Some(
-                    "needs a CurseForge API key — add one in Settings (gear icon)".to_string(),
-                ),
-            });
-        }
+    // The CurseForge pick is resolved DIRECTLY so its outcome is precise:
+    // installable, or blocked with the exact reason. The old batch path
+    // swallowed the fetch error into a silent absence — a core pick must
+    // never vanish without telling the user why (s37: "FTB Quests missing").
+    if let Some(pick) = CURATED.iter().find(|c| c.key.starts_with("curseforge:")) {
+        out.push(resolve_cf_pick(&intelligence, pick, cf_key.as_deref(), &loader, &project.minecraft_version).await);
     }
 
     Ok(out)
+}
+
+fn blocked(pick: &CuratedPick, reason: &str) -> CuratedMod {
+    CuratedMod {
+        source: "curseforge".to_string(),
+        mod_id: String::new(),
+        slug: String::new(),
+        name: pick.name.to_string(),
+        description: pick.description.to_string(),
+        ticked: false,
+        core: pick.core,
+        blocked_reason: Some(reason.to_string()),
+    }
+}
+
+/// Resolve the single CurseForge pick with a visible outcome. Never silently
+/// absent: a missing key, a failed fetch, or a version mismatch all surface
+/// as a blocked row with the reason.
+async fn resolve_cf_pick(
+    intelligence: &ModIntelligence,
+    pick: &CuratedPick,
+    cf_key: Option<&str>,
+    loader: &ModLoader,
+    mc_version: &str,
+) -> CuratedMod {
+    let Some(key) = cf_key else {
+        return blocked(pick, "needs a CurseForge API key — add one in Settings (gear icon)");
+    };
+    let cf_id: u64 = pick
+        .key
+        .strip_prefix("curseforge:")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    match intelligence.get_curseforge_mod_metadata(cf_id, key).await {
+        Ok(meta) => {
+            if !pick_supported(&meta, loader, mc_version) {
+                return blocked(pick, &format!("no version for MC {mc_version} / {loader} in this mod's files"));
+            }
+            CuratedMod {
+                source: "curseforge".to_string(),
+                // The installer's CF branch parses a bare u64 — the metadata
+                // already carries the bare numeric id (curseforge.rs).
+                mod_id: meta.mod_id.clone(),
+                slug: meta.slug.clone(),
+                name: meta.name.clone(),
+                description: pick.description.to_string(),
+                ticked: pick.ticked,
+                core: pick.core,
+                blocked_reason: None,
+            }
+        }
+        Err(e) => blocked(pick, &format!("CurseForge metadata fetch failed: {e}")),
+    }
 }
 
 #[cfg(test)]
