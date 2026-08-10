@@ -159,7 +159,10 @@ impl ModIntelligence {
         }
         eligible.first()
             .map(|f| f.id)
-            .ok_or_else(|| anyhow::anyhow!("No downloadable files for CurseForge project {}", project_id))
+            .ok_or_else(|| anyhow::anyhow!(
+                "No files for CurseForge project {} matching {} {} — the mod likely does not support your pack's version (see the version note on the search result)",
+                project_id, loader, mc_version
+            ))
     }
 
     /// Download the best-matching CurseForge file for a project into `dest`.

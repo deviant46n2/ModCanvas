@@ -230,12 +230,13 @@ export function SearchResultRow({
         </div>
         <div className="mod-row-actions">
           <button
-            className={`btn-add ${isAdded || isInstalling ? 'added' : ''}`}
-            onClick={() => !isAdded && !isInstalling && addModToProject(mod)}
-            disabled={isAdded || isInstalling}
-            aria-label={isAdded ? `${mod.name} already added` : isInstalling ? `Installing ${mod.name}` : `Add ${mod.name}`}
+            className={`btn-add ${isAdded || isInstalling || !!mod.mismatch ? 'added' : ''}`}
+            onClick={() => !isAdded && !isInstalling && !mod.mismatch && addModToProject(mod)}
+            disabled={isAdded || isInstalling || !!mod.mismatch}
+            title={mod.mismatch || undefined}
+            aria-label={isAdded ? `${mod.name} already added` : isInstalling ? `Installing ${mod.name}` : mod.mismatch ? `${mod.name} unavailable: ${mod.mismatch}` : `Add ${mod.name}`}
           >
-            {isInstalling ? 'Installing...' : isAdded ? 'Added' : '+ Add'}
+            {isInstalling ? 'Installing...' : isAdded ? 'Added' : mod.mismatch ? 'Unavailable' : '+ Add'}
           </button>
         </div>
       </div>
