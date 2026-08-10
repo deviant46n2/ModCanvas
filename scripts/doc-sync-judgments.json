@@ -1,0 +1,60 @@
+{
+  "judgments": [
+    {
+      "commit": "22e797d",
+      "reason": "progression theme pass \u2014 docs written same session (s30): docs/progression.md Visual design section rewritten to the shipped design (5658187)"
+    },
+    {
+      "commit": "6560e43",
+      "reason": "pure structural extraction (876-line split, zero call-site edits) \u2014 doc-less by judgment, recorded in docs/audit-2026-08-05.md (5658187)"
+    },
+    {
+      "commit": "c39024f",
+      "reason": "pure structural split (icons.tsx 301->230, icon-base + icons-align, zero behavior change, 586 tests green) \u2014 doc-less by judgment, s30"
+    },
+    {
+      "commit": "6443557",
+      "reason": "pure structural split (export/mod.rs 303->177 + book.rs, zero behavior change, 279 tests green) \u2014 doc-less by judgment, s30"
+    },
+    {
+      "commit": "9eea70c",
+      "reason": "pure structural split (App.css 3225->224 into 19 feature files, byte-identical bundle verified) \u2014 doc-less by judgment, s30"
+    },
+    {
+      "commit": "10efe0b",
+      "reason": "pure structural split (QuestCanvas.css 2099->12 files, byte-identical bundle verified) \u2014 doc-less by judgment, s30"
+    },
+    {
+      "commit": "bd4016b",
+      "reason": "pure structural split (RecipeEditor.css 2033->10 files, byte-identical bundle verified) \u2014 doc-less by judgment, s30"
+    },
+    {
+      "commit": "cecace0",
+      "reason": "snbt.rs split \u2014 docs synced in-pass (snbt_roundtrip.rs pointers updated to snbt/ submodule layout; trailing-comment indent reference moved to serialize.rs), judged complete"
+    },
+    {
+      "commit": "69c6e06",
+      "reason": "ingest.rs split \u2014 internal module restructure + command registration path (lib.rs); no user-facing behavior/doc surface changed, dead code removed \u2014 doc-less by judgment"
+    },
+    {
+      "commit": "accfab5",
+      "reason": "recipe barrel import fix \u2014 repaired a build break (dangling CSS imports); internal import path, no doc surface \u2014 doc-less by judgment, s32"
+    },
+    {
+      "commit": "29b92c6",
+      "reason": "create-project path fix (expand ~ + mkdir) \u2014 bug fix so behavior matches the documented load-pack flow; no new surface \u2014 doc-less by judgment, s32"
+    },
+    {
+      "commit": "afb8749",
+      "reason": "ModrinthVersionFile serde rename \u2014 internal deserialization bug fix, no user-facing surface; fixture test added \u2014 doc-less by judgment, s32"
+    },
+    {
+      "commit": "29a326c",
+      "reason": "source toggles clear stale search results \u2014 UI bug fix, behavior now matches intent; no doc record for the toggles existed \u2014 doc-less by judgment, s32"
+    },
+    {
+      "commit": "1707af8",
+      "reason": "version-mismatch gating + CF error text \u2014 user-visible behavior; documented in docs/mods-tab.md with the category-feature commit, s32"
+    }
+  ]
+}

@@ -85,4 +85,23 @@ export function mergeRules(base, over) {
   }
 }
 
-export const loadRules = () => (existsSync(RULES_PATH) ? mergeRules(DEFAULT_RULES, JSON.parse(readFileSync(RULES_PATH, 'utf8'))) : DEFAULT_RULES)
+// Doc-sync judgments are DATA and live in their own file (scripts/
+// doc-sync-judgments.json) so integrity-rules.json stays under the 300-line
+// limit the gate enforces — s32: six journey-fix judgments pushed the rules
+// file to 302 and the suite-self check caught its own config.
+export const JUDGMENTS_PATH = join(process.cwd(), 'scripts', 'doc-sync-judgments.json')
+
+export const loadRules = () => {
+  const base = existsSync(RULES_PATH)
+    ? mergeRules(DEFAULT_RULES, JSON.parse(readFileSync(RULES_PATH, 'utf8')))
+    : DEFAULT_RULES
+  if (!existsSync(JUDGMENTS_PATH)) return base
+  const extra = JSON.parse(readFileSync(JUDGMENTS_PATH, 'utf8'))
+  return {
+    ...base,
+    docSync: {
+      ...(base.docSync ?? {}),
+      judgments: [...(base.docSync?.judgments ?? []), ...(extra.judgments ?? [])],
+    },
+  }
+}

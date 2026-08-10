@@ -14,177 +14,177 @@
     "line-limit": [
       {
         "path": "src-tauri/src/commands/mod.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/commands/progression.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/commands/project.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/db.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/curseforge.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/ftb_quests/export_tests.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/ftb_quests/mod.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/mod.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/packwiz.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/progression_config.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/quest_config.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/imports/resolution.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/instance_textures/models/tests/resolve.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/instance_textures.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/minecraft/instances.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/mod_intelligence/modrinth.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/path_safety.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/quest/analysis.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/recipe_disable.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/recipes/crafttweaker.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/recipes/kubejs.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/recipes/mod.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/scriptgen/crafttweaker.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/scriptgen/kubejs.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/shared.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "src-tauri/src/ws_ipc.rs",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/ProgressionGraph.css",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/ProgressionGraph.tsx",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/components/QuestTile.css",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/components/common/config-editor.tsx",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/components/quest/editor-theme.css",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/core/pack-health/checks/quests.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/core/recipe/recipe-editor.test.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/core/recipe/recipe-store.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/hooks/useModState.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
@@ -194,29 +194,29 @@
       },
       {
         "path": "frontend/src/services/quest-types.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/services/texture-loader.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "workbench-companion-neoforge-1.21/src/main/java/com/modcanvas/companion/client/ItemIconRenderer.java",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
+        "reason": "pre-existing at tool introduction (2026-08-09); parked \u2014 revisit on next touching change",
         "since": "2026-08-09T03:33:00"
       }
     ],
     "asset-bundle": [
       {
         "path": "frontend/src/assets/hero.png",
-        "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/",
+        "reason": "self-authored branding asset \u2014 AGENTS.md permits original UI/branding in assets/",
         "since": "2026-08-09T03:33:00"
       },
       {
         "path": "frontend/src/assets/logo.png",
-        "reason": "self-authored branding asset — AGENTS.md permits original UI/branding in assets/",
+        "reason": "self-authored branding asset \u2014 AGENTS.md permits original UI/branding in assets/",
         "since": "2026-08-09T03:33:00"
       }
     ],
@@ -224,7 +224,7 @@
     "stale-binary": [
       {
         "name": "release",
-        "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) — no runtime behavior changed; rebuild at next real build",
+        "reason": "s23: test-only change (proptest dev-dep + cfg(test) module + tooling scripts) \u2014 no runtime behavior changed; rebuild at next real build",
         "since": "2026-08-09T03:33:00"
       }
     ]
@@ -239,64 +239,6 @@
       "README.md",
       "AGENTS.md"
     ],
-    "lookback": 10,
-    "judgments": [
-      {
-        "commit": "22e797d",
-        "reason": "progression theme pass — docs written same session (s30): docs/progression.md Visual design section rewritten to the shipped design (5658187)"
-      },
-      {
-        "commit": "6560e43",
-        "reason": "pure structural extraction (876-line split, zero call-site edits) — doc-less by judgment, recorded in docs/audit-2026-08-05.md (5658187)"
-      },
-      {
-        "commit": "c39024f",
-        "reason": "pure structural split (icons.tsx 301->230, icon-base + icons-align, zero behavior change, 586 tests green) — doc-less by judgment, s30"
-      },
-      {
-        "commit": "6443557",
-        "reason": "pure structural split (export/mod.rs 303->177 + book.rs, zero behavior change, 279 tests green) — doc-less by judgment, s30"
-      },
-      {
-        "commit": "9eea70c",
-        "reason": "pure structural split (App.css 3225->224 into 19 feature files, byte-identical bundle verified) — doc-less by judgment, s30"
-      },
-      {
-        "commit": "10efe0b",
-        "reason": "pure structural split (QuestCanvas.css 2099->12 files, byte-identical bundle verified) — doc-less by judgment, s30"
-      },
-      {
-        "commit": "bd4016b",
-        "reason": "pure structural split (RecipeEditor.css 2033->10 files, byte-identical bundle verified) — doc-less by judgment, s30"
-      },
-      {
-        "commit": "cecace0",
-        "reason": "snbt.rs split — docs synced in-pass (snbt_roundtrip.rs pointers updated to snbt/ submodule layout; trailing-comment indent reference moved to serialize.rs), judged complete"
-      },
-      {
-        "commit": "69c6e06",
-        "reason": "ingest.rs split — internal module restructure + command registration path (lib.rs); no user-facing behavior/doc surface changed, dead code removed — doc-less by judgment"
-      },
-      {
-        "commit": "accfab5",
-        "reason": "recipe barrel import fix — repaired a build break (dangling CSS imports); internal import path, no doc surface — doc-less by judgment, s32"
-      },
-      {
-        "commit": "29b92c6",
-        "reason": "create-project path fix (expand ~ + mkdir) — bug fix so behavior matches the documented load-pack flow; no new surface — doc-less by judgment, s32"
-      },
-      {
-        "commit": "afb8749",
-        "reason": "ModrinthVersionFile serde rename — internal deserialization bug fix, no user-facing surface; fixture test added — doc-less by judgment, s32"
-      },
-      {
-        "commit": "29a326c",
-        "reason": "source toggles clear stale search results — UI bug fix, behavior now matches intent; no doc record for the toggles existed — doc-less by judgment, s32"
-      },
-      {
-        "commit": "1707af8",
-        "reason": "version-mismatch gating + CF error text — user-visible behavior; documented in docs/mods-tab.md with the category-feature commit, s32"
-      }
-    ]
+    "lookback": 10
   }
 }
