@@ -227,6 +227,49 @@ pub(crate) struct ModrinthVersion {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ModrinthVersionFile {
     pub(crate) url: String,
+    // The JSON key is `filename` — the underscore-prefixed Rust name marks
+    // the field unused, but WITHOUT the rename it also renamed the serde
+    // key, so decoding the live API shape failed with a missing-field error
+    // ("error decoding response body") on every Modrinth version fetch.
+    #[serde(rename = "filename")]
     pub(crate) _filename: String,
     pub(crate) primary: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Locks the deserialization of Modrinth's live version-object shape. The
+    // `_filename`-without-rename bug shipped because nothing ever decoded a
+    // realistic payload — a fixture mirroring the API keys (filename, not
+    // _filename) catches that class of silent break.
+    #[test]
+    fn modrinth_version_decodes_live_api_shape() {
+        let body = r#"[
+            {
+                "id": "lHHiI26k",
+                "name": "Refined Storage 2.0.9",
+                "version_number": "2.0.9",
+                "loaders": ["neoforge"],
+                "game_versions": ["1.21.1"],
+                "dependencies": [],
+                "files": [
+                    {
+                        "filename": "refinedstorage-neoforge-2.0.9.jar",
+                        "primary": true,
+                        "url": "https://cdn.modrinth.com/data/x/versions/y/jar.jar",
+                        "size": 1234,
+                        "hashes": { "sha1": "abc" }
+                    }
+                ]
+            }
+        ]"#;
+        let versions: Vec<ModrinthVersion> = serde_json::from_str(body).expect("decodes the live API shape");
+        assert_eq!(versions.len(), 1);
+        assert_eq!(versions[0].id, "lHHiI26k");
+        assert_eq!(versions[0].files[0]._filename, "refinedstorage-neoforge-2.0.9.jar");
+        assert!(versions[0].files[0].primary);
+        assert_eq!(versions[0].files[0].url, "https://cdn.modrinth.com/data/x/versions/y/jar.jar");
+    }
 }

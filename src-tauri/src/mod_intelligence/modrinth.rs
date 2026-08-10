@@ -245,10 +245,12 @@ impl ModIntelligence {
             "{}/project/{}/version?loaders=[\"{}\"]&game_versions=[\"{}\"]",
             MODRINTH_API, mod_id, loader_str, mc_version
         );
+        eprintln!("[ModCanvas] download_mod version-list URL: {url}");
         let resp = self.client.get(&url)
             .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
             .send()
             .await?;
+        eprintln!("[ModCanvas] download_mod version-list status: {}", resp.status());
 
         if !resp.status().is_success() {
             anyhow::bail!("Modrinth API returned {} for project {}", resp.status(), mod_id);
