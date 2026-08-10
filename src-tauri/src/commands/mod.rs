@@ -2,15 +2,15 @@ pub mod config;
 pub mod history;
 pub mod mod_intel;
 pub mod modpack;
-pub mod progression;
 pub mod project;
+pub mod quest_graph;
 pub mod runtime;
 
 pub use config::*;
 pub use history::*;
 pub use mod_intel::*;
 pub use modpack::*;
-pub use progression::*;
+pub use quest_graph::*;
 pub use project::*;
 pub use runtime::*;
 
@@ -18,7 +18,6 @@ use crate::db::Database;
 use crate::imports::packwiz::{PackwizWorkspace, parse_packwiz_workspace};
 use crate::minecraft::{detect_kubejs_scripts, get_all_kubejs_scripts as get_all_kubejs_scripts_impl, KubeJSScriptDir, KubeJSScript};
 use crate::models::{Recipe, ModLoader, ModSource, ModEntry};
-use crate::progression::ProgressionGraph;
 use crate::quest::QuestGraph;
 use crate::scriptgen::generate_script_strings;
 use anyhow::Result;
@@ -56,23 +55,6 @@ pub(super) fn resolve_curseforge_api_key(db: &Database) -> Result<Option<String>
     }
     // 3. DB setting (legacy fallback)
     db.get_curseforge_api_key().map_err(|e| e.to_string())
-}
-
-/// Load progression graph from a pack directory and save to project config
-pub(super) fn load_progression_from_pack(project_id: &str, pack_dir: &PathBuf) -> Result<(), String> {
-    let progression_path = pack_dir.join("progression.json");
-    if progression_path.exists() {
-        let content = std::fs::read_to_string(&progression_path).map_err(|e| e.to_string())?;
-        let graph: ProgressionGraph = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-        let config_dir = std::env::temp_dir()
-            .join("modcanvas_configs")
-            .join(project_id);
-        std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-        let graph_path = config_dir.join("progression.json");
-        crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())?)?;
-        eprintln!("[ModCanvas] Loaded progression graph from pack: {} nodes, {} edges", graph.nodes.len(), graph.edges.len());
-    }
-    Ok(())
 }
 
 /// Load quest graph from a pack directory and save to project config.

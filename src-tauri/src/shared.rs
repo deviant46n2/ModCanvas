@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::Path;
 use zip::ZipArchive;
 
-// ── Shared Position type (used by both progression.rs and quest.rs) ──────────
+// ── Shared Position type (used by the quest types) ──────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Position {
@@ -14,7 +14,7 @@ pub struct Position {
     pub y: f64,
 }
 
-// ── Shared EdgeType (superset of both progression.rs and quest.rs variants) ──
+// ── Shared EdgeType (used by the quest types) ───────────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

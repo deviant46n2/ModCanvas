@@ -212,15 +212,6 @@ impl CurseForgeImporter {
             mods: Vec::new(),
             unresolved_mods,
             config_files,
-            progression_graph: {
-                let progression_path = std::env::temp_dir().join("progression.json");
-                if progression_path.exists() {
-                    let content = std::fs::read_to_string(&progression_path).ok();
-                    content.and_then(|c| serde_json::from_str(&c).ok())
-                } else {
-                    None
-                }
-            },
             quest_graph: {
                 let quests_dir = dest.join("config/ftbquests/quests");
                 if quests_dir.is_dir() {

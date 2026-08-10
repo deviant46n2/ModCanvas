@@ -5,7 +5,6 @@ import { TopBar } from './topbar'
 import { WorkspaceStatusBar } from './statusbar'
 import { ModsTab, type ModsTabProps } from './ModsTab'
 import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
-import ProgressionGraph from '../../ProgressionGraph'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
 import { PackHealthProvider } from './PackHealthProvider'
@@ -29,8 +28,8 @@ export interface ProjectWorkspaceProps {
     updated_at: string
     path: string
   }
-  activeTab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'
-  onTabChange: (tab: 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health') => void
+  activeTab: 'mods' | 'configs' | 'quests' | 'recipes' | 'health'
+  onTabChange: (tab: 'mods' | 'configs' | 'quests' | 'recipes' | 'health') => void
   onRestartWebSocket: () => void
   onRestartInstance: () => void
   isRestarting: boolean
@@ -117,7 +116,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onClosePack={props.onBackToProjects}
       />
 
-            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'progression', 'quests', 'recipes'] as const).map((tab) => (
+            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes'] as const).map((tab) => (
           <button
             key={tab}
             id={`tab-${tab}`}
@@ -149,11 +148,6 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </div>
           <div id="tabpanel-configs" role="tabpanel" aria-labelledby="tab-configs" className={activeTab === 'configs' ? '' : 'tab-hidden'}>
             <ConfigsTab {...props.configsTab} />
-          </div>
-          <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression" className={activeTab === 'progression' ? '' : 'tab-hidden'}>
-            <ErrorBoundary>
-              <ProgressionGraph projectId={project.id} instancePath={ingestResult?.active_instance || project.path} />
-            </ErrorBoundary>
           </div>
           <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests" className={activeTab === 'quests' ? '' : 'tab-hidden'}>
             <ErrorBoundary>

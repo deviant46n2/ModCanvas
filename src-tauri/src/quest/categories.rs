@@ -1,4 +1,4 @@
-/// Mod categories for progression classification
+/// Mod categories for quest analysis
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModCategory {
     /// Core libraries and APIs
@@ -31,7 +31,7 @@ pub enum ModCategory {
     Unknown,
 }
 
-/// Mod progression phases
+/// Mod phases (early/mid/late) for quest analysis
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModPhase {    Foundation,
     Early,

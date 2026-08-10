@@ -169,7 +169,6 @@ The workbench core is **largely built** — the veteran-facing power is already 
 - **Quests** — near-full FTB Quests 1.21.1 parity (canvas, tasks, rewards, reward tables, smart filters, quest links, bezier edges, grid snap, undo/redo, progress simulation, book/chapter/group settings, animated + baked 3D icons, theme presets). See `featureparity.md`.
 - **Recipes** — KubeJS + CraftTweaker + vanilla, bidirectional scan (incl. mod jars), JSON paste-import, validation, non-clobber saves.
 - **Configs** — structured + raw editors, in-place on the real instance `config/`, comment-preserving atomic writes.
-- **Progression** — React Flow node graph with a research-grounded vanilla template.
 - **Pack lifecycle** — attach instance, scan textures, import/export FTB quests (flat + subdirs), import `.mrpack`/packwiz/CurseForge, export, launch via companion mod.
 - **Global history** — durable journal, cross-tool Ctrl+Z, timeline drawer.
 - **Runtime hot-swap** — WebSocket IPC + companion mod (multiple variants exist; see §8.4).

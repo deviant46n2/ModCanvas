@@ -12,7 +12,7 @@ import type { Recipe } from '../core/recipe/recipe-store'
 import type { Project, ImportResult, LoadPackProgress, DiscoveredRecipe } from '../services/types'
 import type { IngestResult } from '../services/quest-types'
 
-export type AppTab = 'mods' | 'configs' | 'progression' | 'quests' | 'recipes' | 'health'
+export type AppTab = 'mods' | 'configs' | 'quests' | 'recipes' | 'health'
 
 export function errorMessage(e: any): string {
   return typeof e === 'string' ? e : e?.message || String(e)
@@ -143,7 +143,7 @@ export async function runLoadPipelineCore(ctx: LoadPipelineCtx): Promise<boolean
     // pack-health skips them.
     useRecipeStore.getState().loadRecipesFromPack(withDiscoveredMeta(discovered))
 
-    // Stage 6: Prepare quest/progression/recipe data
+    // Stage 6: Prepare quest/recipe data
     setLoadPackProgress({ stage: 'recipes', message: 'Preparing editor data...', progress: 94 })
 
     // Complete

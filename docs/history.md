@@ -114,7 +114,7 @@ state directory under the project/instance root — `<instance>/.modcanvas/quest
   workspace state file (cached in-memory), and migrates the legacy
   `{temp}/modcanvas_configs/{pid}/quests.json` working graph into the workspace
   the first time a project opens after the layout change.
-- `src-tauri/src/commands/progression.rs` — `get_quest_graph` / `save_quest_graph`
+- `src-tauri/src/commands/quest_graph.rs` — `get_quest_graph` / `save_quest_graph`
   resolve the project from the DB and read/write the workspace state file via
   atomic writes; all quest mutation commands now take `db: State<Database>`.
 - `load_quest_from_pack` (import/ingest) and `export_ftb_quests_to_dir` also
@@ -129,8 +129,6 @@ history journal restores snapshots against it.
 - Raw-mode config edits are recorded per-keystroke into a single coalesced
   step; a "split on save" gesture (so each explicit save is its own undo step)
   is not implemented yet.
-- The progression working graph (`progression.json`) still uses the legacy
-  temp-mirror layout; it is not yet part of the shared history system.
 
 ## Tests
 

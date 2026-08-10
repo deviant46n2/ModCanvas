@@ -22,7 +22,6 @@ ModCanvas removes both: **no code required, and no boot-to-discover-errors.** It
 | **Quests** | A WYSIWYG FTB Quests canvas: tasks, rewards, reward tables, smart filters, quest links, dependency curves, grid snapping, progress simulation, animated + baked 3D item icons. Faithful SNBT import/export. |
 | **Recipes** | Visual editing for KubeJS, CraftTweaker, and vanilla datapacks — including scanning existing pack recipes and non-clobber saves. |
 | **Configs** | Structured, typed forms over raw TOML/JSON/Properties/YAML — comment-preserving, atomic, in place. |
-| **Progression** | A node-graph editor for mapping your pack's content flow, with a research-grounded vanilla template. |
 | **Health** | A project-wide go/no-go panel — "recipes: 3 errors", "cover image missing", dead references — so you know the pack is sound before you boot. Tier 1 (reference integrity + coverage) is shipped. |
 
 Everything reads and writes the **real formats the modding ecosystem already uses** — real `.snbt`, real `.js`, real `.json`. No black-box save format, no lock-in: leave ModCanvas tomorrow and keep everything you made.
@@ -66,7 +65,7 @@ cargo test   # in src-tauri/
 - **[AGENTS.md](AGENTS.md)** — architectural principles & strict boundaries for AI coding agents.
 - **[Design system](docs/design.md)** — the Unity/Blender-class visual language.
 - **[Feature parity](featureparity.md)** — ModCanvas ↔ FTB in-game editor gap checklist.
-- **Feature records** — [`docs/`](docs/): quest editor, recipe editor, config editor, progression, history, load-pack flow, workspace actions.
+- **Feature records** — [`docs/`](docs/): quest editor, recipe editor, config editor, history, load-pack flow, workspace actions.
 
 ## Contributing
 

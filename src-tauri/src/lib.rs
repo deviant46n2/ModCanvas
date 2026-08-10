@@ -15,7 +15,6 @@ pub mod models;
 pub mod mod_intelligence;
 pub mod minecraft;
 pub mod path_safety;
-pub mod progression;
 pub mod quest;
 pub mod quest_cache;
 pub mod recipe_disable;
@@ -184,15 +183,6 @@ pub fn run() {
             commands::import_modpack_via_prism,
             commands::import_curseforge_via_prism,
             commands::open_prism_launcher,
-            commands::get_progression_graph,
-            commands::save_progression_graph,
-            commands::add_progression_node,
-            commands::update_progression_node,
-            commands::delete_progression_node,
-            commands::add_progression_edge,
-            commands::delete_progression_edge,
-            commands::analyze_progression,
-            commands::auto_generate_progression,
             commands::get_quest_graph,
             commands::save_quest_graph,
             commands::add_quest_node,

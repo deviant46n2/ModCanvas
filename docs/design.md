@@ -99,11 +99,6 @@ minimum elevation that communicates hierarchy.
 - Semantic colors: `--color-success` `#34D399`, `--color-warning` `#FBBF24`,
   `--color-error` `#F87171`, `--color-info` `#60A5FA`. Each has a `-subtle`
   variant (10% alpha) for tinted backgrounds.
-- **Progression node type colors** live in
-  `frontend/src/core/progression/phase-bands.ts` (`NODE_TYPE_COLORS`,
-  `PHASE_COLORS`) — they are the *only* place multi-hue color is sanctioned,
-  and they exist to distinguish progression phases. The progression lane
-  palette is blue/green/violet/amber/rose.
 
 ### 2.5 Typography
 
@@ -172,10 +167,11 @@ directly — never the legacy literals. One token source, one palette.
 - `--color-bg-overlay` (50% black) scrim; panel at `--color-bg-surface-1`,
   `--shadow-modal`. Header with title + close; footer with actions.
 
-### 4.4 Canvas (quest editor + progression)
+### 4.4 Canvas (quest editor)
 
 - Canvases sit on `--color-bg-sunken` with a subtle dot grid
-  (React Flow `<Background>` / `.react-flow` rule in `ProgressionGraph.css`).
+  (React Flow `<Background>` / `.react-flow` rules in
+  `frontend/src/components/quest/styles/canvas-rf.css`).
 - Nodes are compact cards: surface gradient, 1px border, thin accent left
   border per type, `--radius-md`. Selected = accent border + glow; hover =
   lift + accent-tinted glow.
@@ -189,8 +185,6 @@ directly — never the legacy literals. One token source, one palette.
   ring, not a `filter: brightness()`.
 - Edges: 1.5px stroke tinted by source node type; hover/selected thicken.
   Optional edges animate (dash flow).
-- Phase lanes (progression): gradient-tinted columns behind nodes, derived
-  data only — never persisted, never selectable.
 
 ### 4.5 Empty states
 
@@ -274,6 +268,5 @@ token block was stale — App.css `:root` + this file's §2 are the truth).
 ---
 
 *Related: `frontend/src/App.css` (token definitions), `frontend/src/components/
-quest/editor-theme.css` (FTB aliasing), `frontend/src/core/progression/
-phase-bands.ts` (progression palette), `docs/tutor-agent.md` (agent design
+quest/editor-theme.css` (FTB aliasing), `docs/tutor-agent.md` (agent design
 review flow).*

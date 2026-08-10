@@ -1,4 +1,4 @@
-use super::ModCategory;
+use crate::quest::categories::ModCategory;
 
 /// Known mod categorizations (mod_id -> category)
 pub fn get_known_mod_category(mod_id: &str) -> Option<ModCategory> {

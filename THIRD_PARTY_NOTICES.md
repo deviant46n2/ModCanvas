@@ -12,10 +12,8 @@ ModCanvas application and its dependency licenses.
 | `@tauri-apps/plugin-dialog` | ^2 | MIT OR Apache-2.0 |
 | `react` | ^19 | MIT |
 | `react-dom` | ^19 | MIT |
-| `dagre` | ^0.8 | MIT |
 | `react-window` | ^2 | MIT |
 | `reactflow` | ^11 | MIT |
-| `@types/dagre` | ^0.7 | MIT |
 
 Packages licensed `Apache-2.0 OR MIT` / `MIT OR Apache-2.0` are used under the
 MIT option; the MIT License text below applies.

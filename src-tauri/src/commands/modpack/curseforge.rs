@@ -7,7 +7,7 @@ use crate::imports::{ImportResult, curseforge};
 use crate::mod_intelligence::ModIntelligence;
 use crate::models::*;
 
-use super::{load_progression_from_pack, load_quest_from_pack, resolve_curseforge_api_key, try_deploy_companion};
+use super::{load_quest_from_pack, resolve_curseforge_api_key, try_deploy_companion};
 #[tauri::command]
 pub async fn import_curseforge_zip(
     path: String,
@@ -100,12 +100,6 @@ pub async fn import_curseforge_zip(
 
     try_deploy_companion(&result.project.mod_loader, &result.project.minecraft_version, &result.project.path);
 
-    // Load progression graph from pack if exists
-    if let Some(ref graph) = result.progression_graph {
-        load_progression_from_pack(&result.project.id.to_string(), &path)?;
-        eprintln!("[ModCanvas] Loaded progression graph from pack: {} nodes", graph.nodes.len());
-    }
-
     // Load quest graph from pack if exists
     if let Some(ref graph) = result.quest_graph {
         load_quest_from_pack(&result.project.id.to_string(), &path)?;
@@ -117,7 +111,6 @@ pub async fn import_curseforge_zip(
         mods: resolved_mods,
         unresolved_mods: Vec::new(),
         config_files: result.config_files,
-        progression_graph: result.progression_graph,
         quest_graph: result.quest_graph,
     })
 }

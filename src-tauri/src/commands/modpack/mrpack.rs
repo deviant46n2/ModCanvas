@@ -3,12 +3,12 @@ use uuid::Uuid;
 use std::path::PathBuf;
 
 use crate::db::Database;
-use crate::imports::{ImportResult, mrpack, progression_config, quest_config, resolution};
+use crate::imports::{ImportResult, mrpack, quest_config, resolution};
 use crate::mod_intelligence::ModIntelligence;
 use crate::models::*;
 use crate::path_safety::atomic_write_str;
 
-use super::{load_progression_from_pack, load_quest_from_pack, resolve_curseforge_api_key, try_deploy_companion};
+use super::{load_quest_from_pack, resolve_curseforge_api_key, try_deploy_companion};
 #[tauri::command]
 pub async fn download_modpack_modrinth(
     slug: String,
@@ -196,12 +196,6 @@ pub async fn import_modrinth_mrpack(
         db.add_mod(&entry).map_err(|e| e.to_string())?;
     }
     
-    // Load progression graph from pack if exists
-    if let Some(ref graph) = final_result.progression_graph {
-        load_progression_from_pack(&final_result.project.id.to_string(), &PathBuf::from(&final_result.project.path))?;
-        eprintln!("[ModCanvas] Loaded progression graph from pack: {} nodes", graph.nodes.len());
-    }
-    
     // Load quest graph from pack if exists
     if let Some(ref graph) = final_result.quest_graph {
         load_quest_from_pack(&final_result.project.id.to_string(), &PathBuf::from(&final_result.project.path))?;
@@ -218,22 +212,6 @@ pub async fn import_modrinth_mrpack(
             crate::quest_cache::put(&final_result.project.id.to_string(), &quest_graph);
             eprintln!("[ModCanvas] Parsed and saved quest graph from configs: {} nodes, {} edges", 
                 quest_graph.nodes.len(), quest_graph.edges.len());
-        }
-    }
-    
-    // Try to parse progression configs from config files (Game Stages, FTB Quests chapters, Advancements, etc.)
-    if final_result.progression_graph.is_none() && !final_result.config_files.is_empty() {
-        eprintln!("[ModCanvas] Attempting to parse progression configs from {} config files", final_result.config_files.len());
-        if let Ok(Some(progression_graph)) = progression_config::parse_all_progression_configs(&final_result.config_files) {
-            // Save the parsed progression graph to project config
-            let config_dir = std::env::temp_dir()
-                .join("modcanvas_configs")
-                .join(&final_result.project.id.to_string());
-            std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-            let graph_path = config_dir.join("progression.json");
-            crate::path_safety::atomic_write_str(&graph_path, &serde_json::to_string_pretty(&progression_graph).map_err(|e| e.to_string())?)?;
-            eprintln!("[ModCanvas] Parsed and saved progression graph from configs: {} nodes, {} edges", 
-                progression_graph.nodes.len(), progression_graph.edges.len());
         }
     }
     

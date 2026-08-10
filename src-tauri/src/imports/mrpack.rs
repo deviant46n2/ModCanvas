@@ -221,15 +221,6 @@ impl MrPackImporter {
             mods,
             unresolved_mods,
             config_files,
-            progression_graph: {
-                let progression_path = temp_dir.join("progression.json");
-                if progression_path.exists() {
-                    let content = std::fs::read_to_string(&progression_path).ok();
-                    content.and_then(|c| serde_json::from_str(&c).ok())
-                } else {
-                    None
-                }
-            },
             quest_graph: {
                 let quest_path = temp_dir.join("quests.json");
                 if quest_path.exists() {

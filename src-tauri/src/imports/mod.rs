@@ -1,5 +1,4 @@
 use crate::models::{ModLoader, Project};
-use crate::progression::ProgressionGraph;
 use crate::quest::QuestGraph;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -11,7 +10,6 @@ pub mod packwiz;
 pub mod curseforge;
 pub mod resolution;
 pub mod quest_config;
-pub mod progression_config;
 pub mod snbt;
 #[cfg(test)]
 mod snbt_roundtrip;
@@ -23,8 +21,6 @@ pub struct ImportResult {
     pub mods: Vec<ResolvedMod>,
     pub unresolved_mods: Vec<UnresolvedMod>,
     pub config_files: Vec<ConfigFile>,
-    #[serde(default)]
-    pub progression_graph: Option<ProgressionGraph>,
     #[serde(default)]
     pub quest_graph: Option<QuestGraph>,
 }

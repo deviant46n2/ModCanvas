@@ -132,7 +132,7 @@ export function LoadPackModal({ show, onClose, progress }: LoadPackModalProps) {
           {isComplete && (
             <div className="success-message">
               <p>Modpack loaded successfully!</p>
-              <p className="hint">You can now navigate to Quests, Progression, Recipes, and Configs tabs.</p>
+              <p className="hint">You can now navigate to Quests, Recipes, and Configs tabs.</p>
             </div>
           )}
         </div>

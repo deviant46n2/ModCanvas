@@ -1,6 +1,5 @@
 use crate::imports::{ConfigFile, snbt::{SnbtValue, CommentedSnbt, parse_snbt}};
 use crate::quest::{QuestGraph, QuestNode, QuestEdge, QuestObjective, QuestReward, QuestNodeType, ObjectiveType, RewardType, EdgeType, Position};
-use crate::progression::ProgressionGraph;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -651,17 +650,6 @@ fn convert_to_quest_graph(name: &str, data: ParsedQuestData) -> QuestGraph {
     }
     
     graph
-}
-
-/// Parse progression configs (similar approach for progression mods)
-pub fn parse_progression_configs(_config_files: &[ConfigFile]) -> Result<Option<ProgressionGraph>> {
-    // Could parse mods like:
-    // - Game Stages (config/gamestages/)
-    // - Achievement mods
-    // - Custom progression data
-    
-    // For now, return None - implement if needed
-    Ok(None)
 }
 
 #[cfg(test)]

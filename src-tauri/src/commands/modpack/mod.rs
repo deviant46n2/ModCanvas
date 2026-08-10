@@ -18,7 +18,7 @@ use tauri::State;
 use uuid::Uuid;
 use std::path::PathBuf;
 
-use crate::commands::{load_progression_from_pack, load_quest_from_pack, resolve_curseforge_api_key};
+use crate::commands::{load_quest_from_pack, resolve_curseforge_api_key};
 use crate::db::Database;
 use crate::imports::{ImportResult, resolution};
 use crate::minecraft::deploy_companion_mod_to_dir;
@@ -99,12 +99,6 @@ pub async fn import_instance_folder(
         file_name: Some(crate::models::normalize_mod_file_name(&mod_entry.file_name)),
         };
         db.add_mod(&entry).map_err(|e| e.to_string())?;
-    }
-    
-    // Load progression graph from pack if exists
-    if let Some(ref graph) = final_result.progression_graph {
-        load_progression_from_pack(&final_result.project.id.to_string(), &PathBuf::from(&final_result.project.path))?;
-        eprintln!("[ModCanvas] Loaded progression graph from pack: {} nodes", graph.nodes.len());
     }
     
     // Load quest graph from pack if exists

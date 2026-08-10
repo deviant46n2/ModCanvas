@@ -322,7 +322,6 @@ impl PackwizImporter {
             mods,
             unresolved_mods,
             config_files,
-            progression_graph: None,
             quest_graph: None,
         })
     }

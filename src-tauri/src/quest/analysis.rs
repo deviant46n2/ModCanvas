@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::progression::{categorize_by_name, get_known_mod_category, get_mod_phase, ModPhase};
+use crate::quest::{categorize_by_name, get_known_mod_category, get_mod_phase, ModPhase};
 
 use super::types::*;
 
@@ -143,7 +143,7 @@ pub fn auto_generate_quest(
     let slugs: std::collections::HashSet<String> =
         mods.iter().map(|(_, slug, _)| slug.to_lowercase()).collect();
 
-    let mut categorized: Vec<(String, String, String, crate::progression::ModCategory, ModPhase)> =
+    let mut categorized: Vec<(String, String, String, crate::quest::ModCategory, ModPhase)> =
         mods.iter()
             .map(|(mod_id, slug, mod_name)| {
                 let category = get_known_mod_category(slug)
