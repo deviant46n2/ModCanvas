@@ -13,6 +13,7 @@ consulting it.
 | 3 | Verify a deployed jar actually RAN, not that it exists | After any companion rebuild/deploy | File existence ≠ new code: check md5 differs AND the new symbol is present (`javap -p -verbose`); `strings` won't show float constants | s14 |
 | 4 | Kill a lingering game process before relaunch | Launch "fails" or the game doesn't come up | A stale game process holds the old jar in memory — mods load once at startup; the wrapper may be dead while the game lives | s21 cont.3 |
 | 5 | Bump `engine_renders.rs` CACHE_VERSION in the SAME pass as a renderer-semantics change, then restart the app | Any companion change to shading/sampler/format semantics | The disk cache validates on version mismatch; an old binary keeps serving the stale cache | s14 / s21 |
+| 6 | Purge the engine-render cache after a frontend-side render-guard fix — it will NOT self-heal | After changing which items the frontend queues to the engine (e.g. the s26 flat-icon guard: flats now never re-render) | The cache only regenerates items the frontend queues; unqueued items keep their stale renders forever, and bright materialized URLs never get persisted to the engine cache — the stale value re-flashes at every boot until the purge | 2026-08-09 (s27 → debt arc) |
 
 ## Rules of the register
 
