@@ -4,17 +4,17 @@
 //! number suffixes preserved, quoted namespaced keys (the
 //! `"ftbfiltersystem:filter"` class) round-trip, comments preserved.
 //!
-//! Generator scope (written exclusions = PARKED debt, `snbt.rs` is line-limit
-//! allowlisted with reason "revisit on next touching change"):
+//! Generator scope (written exclusions = PARKED debt, the snbt serializer is
+//! split across `snbt/` submodules and no longer line-limit parked):
 //! - NaN / ±Infinity: upstream data bug class, not a serializer concern.
 //! - Comments inside NESTED compounds: the parser attaches an inter-field
 //!   comment as trailing on the preceding entry, and the serializer emits
-//!   trailing comments at a hard-coded 2-space indent (`snbt.rs:228`), not the
-//!   nesting pad — so a comment in a compound nested deeper than the top level
-//!   does not round-trip byte-identically (proptest-found, shrunk case in
-//!   `proptest-regressions/`). Parked with snbt.rs; the generator scopes
-//!   comments to top-level compounds, which matches real FTB file shape
-//!   (chapter/quest maps) and is byte-stable.
+//!   trailing comments at a hard-coded 2-space indent (`snbt/serialize.rs`),
+//!   not the nesting pad — so a comment in a compound nested deeper than the
+//!   top level does not round-trip byte-identically (proptest-found, shrunk
+//!   case in `proptest-regressions/`). Parked with the serializer; the
+//!   generator scopes comments to top-level compounds, which matches real FTB
+//!   file shape (chapter/quest maps) and is byte-stable.
 //!
 //! FIXED s30 (previously parked, now un-parked — the filters that excluded
 //! them are gone, so the property proves the fix):
