@@ -20,6 +20,30 @@ export async function listMcInstances(): Promise<MinecraftInstance[]> {
   return invoke<MinecraftInstance[]>('list_mc_instances')
 }
 
+/** Create a fresh Prism instance (wizard's "create a new instance" path). */
+export async function createMcInstance(
+  name: string,
+  mcVersion: string,
+  loader: string,
+  loaderVersion: string,
+): Promise<MinecraftInstance> {
+  return invoke<MinecraftInstance>('create_mc_instance', {
+    name,
+    mcVersion,
+    loader,
+    loaderVersion,
+  })
+}
+
+/** Latest stable loader version for the wizard's supported combo. None =
+ *  unresolvable — callers fail loudly, never write a guessed version. */
+export async function resolveLoaderVersion(
+  mcVersion: string,
+  loader: string,
+): Promise<string | null> {
+  return invoke<string | null>('resolve_loader_version', { mcVersion, loader })
+}
+
 /** Instances the wizard can scaffold into: known loader, not running. */
 export function wizardCandidates(instances: MinecraftInstance[]): MinecraftInstance[] {
   return instances.filter(

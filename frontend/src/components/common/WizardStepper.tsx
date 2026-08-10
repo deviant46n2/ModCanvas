@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import {
   listMcInstances,
   wizardCandidates,
+  createMcInstance,
+  resolveLoaderVersion,
   type MinecraftInstance,
 } from '../../services/instances'
 import { listProjectTemplates } from '../../services/project'
 import type { CreateProjectInput, Project, ProjectTemplate } from '../../services/types'
-import { ScratchForm } from './scratch-form'
 import { CuratedModsStep } from './CuratedModsStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
+import { WizardWhereStep, type WizardMode } from './WizardWhereStep'
 
 export type { CreateProjectInput } from '../../services/types'
 
@@ -27,7 +29,7 @@ interface WizardStepperProps {
   onDone: () => void
 }
 
-type Mode = 'instance' | 'scratch'
+type Mode = WizardMode
 
 const STEP_LABELS: Record<number, string> = {
   1: 'where your pack lives',
@@ -92,6 +94,17 @@ export function WizardStepper({
         templateId: templateId === '' ? null : templateId,
       }
     }
+    // 'new' mode has no path yet — the instance is created at the commit
+    // point (step 3) and buildInput is only used for the review display.
+    if (mode === 'new') {
+      return {
+        name: scratch.name,
+        mcVersion: '1.21.1',
+        modLoader: 'NeoForge',
+        path: 'New Prism instance',
+        templateId: templateId === '' ? null : templateId,
+      }
+    }
     return {
       name: scratch.name,
       mcVersion: scratch.mcVersion,
@@ -102,13 +115,36 @@ export function WizardStepper({
   }
 
   const step1Complete =
-    mode === 'instance' ? instanceId !== null : scratch.name.trim().length > 0
+    mode === 'instance'
+      ? instanceId !== null
+      : scratch.name.trim().length > 0
 
   async function handleCreate() {
     setCreating(true)
     setError(null)
     try {
-      const created = await onCreate(buildInput())
+      let created: Project
+      if (mode === 'new') {
+        // The wizard's one supported combo (NeoForge 1.21.1). Resolve the
+        // latest loader version, create the Prism instance, then create the
+        // project ON it — one commit, no created-but-empty states.
+        const loaderVersion = await resolveLoaderVersion('1.21.1', 'NeoForge')
+        if (!loaderVersion) {
+          throw new Error(
+            "Couldn't determine the latest NeoForge version — check your connection and retry.",
+          )
+        }
+        const mcInstance = await createMcInstance(scratch.name, '1.21.1', 'NeoForge', loaderVersion)
+        created = await onCreate({
+          name: scratch.name,
+          mcVersion: '1.21.1',
+          modLoader: 'NeoForge',
+          path: mcInstance.game_dir,
+          templateId: templateId === '' ? null : templateId,
+        })
+      } else {
+        created = await onCreate(buildInput())
+      }
       setProject(created)
       setStep(4)
     } catch (e) {
@@ -144,55 +180,16 @@ export function WizardStepper({
         )}
 
         {step === 1 && (
-          <>
-            <div style={card(mode === 'instance')} onClick={() => setMode('instance')}>
-              <strong>Use a Prism instance</strong>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                Start from an existing launcher instance — it can be launched straight from ModCanvas.
-              </div>
-            </div>
-            <div style={card(mode === 'scratch')} onClick={() => setMode('scratch')}>
-              <strong>Start from scratch</strong>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                Create an empty pack folder with just a version and loader.
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>
-                No launcher instance — this pack can't be launched from ModCanvas. Use it
-                with external tools (e.g. export it and run it through Prism).
-              </div>
-            </div>
-
-            {mode === 'instance' && (
-              <div style={{ maxHeight: 260, overflowY: 'auto', marginTop: 8 }}>
-                {instances === null && <div style={{ color: 'var(--color-text-tertiary)' }}>Loading instances…</div>}
-                {candidates.map((inst) => (
-                  <div key={inst.id} style={card(instanceId === inst.id)} onClick={() => setInstanceId(inst.id)}>
-                    <strong>{inst.name}</strong>
-                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                      MC {inst.mc_version} · {inst.loader}
-                      {inst.loader_version ? ` ${inst.loader_version}` : ''}
-                    </div>
-                  </div>
-                ))}
-                {candidates.length === 0 && instances !== null && (
-                  <div style={{ color: 'var(--color-warning)' }}>
-                    No usable instances found. Create one in Prism Launcher, or start from scratch.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {mode === 'scratch' && (
-              <ScratchForm
-                projectName={scratch.name}
-                onProjectNameChange={(name) => setScratch((s) => ({ ...s, name }))}
-                mcVersion={scratch.mcVersion}
-                onMcVersionChange={(mcVersion) => setScratch((s) => ({ ...s, mcVersion }))}
-                modLoader={scratch.modLoader}
-                onModLoaderChange={(modLoader) => setScratch((s) => ({ ...s, modLoader }))}
-              />
-            )}
-          </>
+          <WizardWhereStep
+            mode={mode}
+            onModeChange={setMode}
+            candidates={candidates}
+            instancesLoading={instances === null}
+            instanceId={instanceId}
+            onInstanceSelect={setInstanceId}
+            scratch={scratch}
+            onScratchChange={setScratch}
+          />
         )}
 
         {step === 2 && (
@@ -252,7 +249,7 @@ export function WizardStepper({
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}
-            launchable={mode === 'instance'}
+            launchable={mode !== 'scratch'}
             onDone={onDone}
           />
         )}

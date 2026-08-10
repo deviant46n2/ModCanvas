@@ -2,6 +2,7 @@ pub mod curseforge;
 pub mod curated;
 pub mod exports;
 pub mod ftb;
+pub mod loader_version;
 pub mod mrpack;
 pub mod packwiz;
 pub mod search;

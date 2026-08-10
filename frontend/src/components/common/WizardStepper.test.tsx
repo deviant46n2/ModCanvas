@@ -7,13 +7,15 @@ vi.mock('../../services/instances', async (importOriginal) => {
   return {
     ...actual,
     listMcInstances: vi.fn(),
+    createMcInstance: vi.fn(),
+    resolveLoaderVersion: vi.fn(),
   }
 })
 vi.mock('../../services/project', () => ({
   listProjectTemplates: vi.fn(),
 }))
 
-import { listMcInstances } from '../../services/instances'
+import { listMcInstances, createMcInstance, resolveLoaderVersion } from '../../services/instances'
 import { listProjectTemplates } from '../../services/project'
 import type { MinecraftInstance } from '../../services/instances'
 
@@ -42,7 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listMcInstances).mockResolvedValue(instances)
   vi.mocked(listProjectTemplates).mockResolvedValue([
-    { id: 'exploration', name: 'Exploration Starter', description: 'A starter chapter.' },
+    { id: 'exploration', name: 'First Steps — Play & Shape Your Pack', description: 'A starter chapter.' },
   ])
 })
 
@@ -81,7 +83,7 @@ describe('WizardStepper', () => {
 
     fireEvent.click(screen.getByText('Starter World'))
     fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Exploration Starter'))
+    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Create & continue'))
 
@@ -126,5 +128,39 @@ describe('WizardStepper', () => {
     await renderWizard()
     const next = screen.getByText('Next') as HTMLButtonElement
     expect(next.disabled).toBe(true)
+  })
+
+  it('create-a-new-instance path resolves the loader version, creates the instance, and creates the pack on it', async () => {
+    const onCreate = await renderWizard()
+    vi.mocked(resolveLoaderVersion).mockResolvedValue('21.1.248')
+    vi.mocked(createMcInstance).mockResolvedValue({
+      id: 'i-new',
+      name: 'My First Pack',
+      mc_version: '1.21.1',
+      loader: 'NeoForge',
+      loader_version: '21.1.248',
+      game_dir: '/prism/instances/My_First_Pack/minecraft',
+      status: 'Offline',
+    })
+
+    fireEvent.click(screen.getByText('Create a new instance'))
+    fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
+    fireEvent.click(screen.getByText('Next'))
+    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
+    fireEvent.click(screen.getByText('Next'))
+    fireEvent.click(screen.getByText('Create & continue'))
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    // The loader version comes from the resolver, the pack lands ON the new
+    // instance's game dir — launchable by construction.
+    expect(resolveLoaderVersion).toHaveBeenCalledWith('1.21.1', 'NeoForge')
+    expect(createMcInstance).toHaveBeenCalledWith('My First Pack', '1.21.1', 'NeoForge', '21.1.248')
+    expect(onCreate).toHaveBeenCalledWith({
+      name: 'My First Pack',
+      mcVersion: '1.21.1',
+      modLoader: 'NeoForge',
+      path: '/prism/instances/My_First_Pack/minecraft',
+      templateId: 'exploration',
+    })
   })
 })

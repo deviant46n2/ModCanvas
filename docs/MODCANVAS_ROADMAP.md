@@ -540,12 +540,19 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
 
 1. **Instance** — reuse `list_prism_instances` (`commands/mod.rs:243-284`) + instance
    root discovery (`minecraft/instances.rs`). Offer existing instances or browse-for-folder.
-   Never create instances (out of scope, Bible §10.2). Fix the **1.19.2/Quilt adapter lie**
-   in the same pass (P0-HYGIENE-1). **Status (P0-WIZARD chunk 2):** the wizard lists
+   ~~Never create instances (out of scope, Bible §10.2)~~ **OVERRIDDEN 2026-08-10** (maintainer
+   decision): the wizard now creates instances. Fix the **1.19.2/Quilt adapter lie**
+   in the same pass (P0-HYGIENE-1). **Status (P0-WIZARD chunks 2–4):** the wizard lists
    `list_mc_instances` (full metadata — version, loader, game_dir, status) and derives the
    project's version/loader/path from the pick, so no technical question is asked; running
    and unparseable instances are excluded; the classic 3-field form lives inside as "start
-   from scratch". The adapter lie is already fixed (`servedMatrix`). Browse-for-folder
+   from scratch"; a **"Create a new instance"** card builds a fresh Prism instance for the
+   pack — one combo (MC 1.21.1 · NeoForge), loader version auto-resolved from NeoForge's
+   Maven metadata (`commands/modpack/loader_version.rs`; the mmc-pack generator's "0.0.0"
+   fallback is never reached — unresolved = loud failure), instance created at the commit
+   point, game downloads on Prism's first launch (auto-install; verify in the journey
+   test). More combos unlock by extending the resolver + the card — never before. The
+   adapter lie is already fixed (`servedMatrix`). Browse-for-folder
    deferred (written reason: `import_instance_folder` covers it; every extra step is
    surface a first-timer can trip on — revisit when a user asks).
 2. **"What's your pack about?"** — one plain-language question (vibe, not mod list). The

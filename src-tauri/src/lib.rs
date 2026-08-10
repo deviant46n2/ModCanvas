@@ -159,6 +159,7 @@ pub fn run() {
             // API for the launch work (roadmap P0-LAUNCH); the UI currently
             // routes through test_project.
             commands::create_mc_instance,
+            commands::resolve_loader_version,
             commands::list_mc_instances,
             commands::launch_mc_instance,
             commands::stop_mc_instance,

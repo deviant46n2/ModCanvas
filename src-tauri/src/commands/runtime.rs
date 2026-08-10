@@ -17,6 +17,17 @@ pub fn create_mc_instance(
         .map_err(|e| e.to_string())
 }
 
+/// Latest stable loader version for an MC version + loader, from the loaders'
+/// own official endpoints. None = unresolvable (offline / unknown series) —
+/// callers must fail loudly, never write a guessed version.
+#[tauri::command]
+pub async fn resolve_loader_version(
+    mc_version: String,
+    loader: String,
+) -> Result<Option<String>, String> {
+    crate::commands::modpack::loader_version::resolve_loader_version(&mc_version, &loader).await
+}
+
 #[tauri::command]
 pub fn list_mc_instances(manager: State<'_, InstanceManager>) -> Vec<MinecraftInstance> {
     manager.list_instances()
