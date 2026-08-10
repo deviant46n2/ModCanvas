@@ -268,5 +268,27 @@
         "since": "2026-08-09T03:33:00"
       }
     ]
+  },
+  "docSync": {
+    "codePaths": [
+      "src-tauri/src",
+      "frontend/src"
+    ],
+    "docPaths": [
+      "docs",
+      "README.md",
+      "AGENTS.md"
+    ],
+    "lookback": 10,
+    "judgments": [
+      {
+        "commit": "22e797d",
+        "reason": "progression theme pass — docs written same session (s30): docs/progression.md Visual design section rewritten to the shipped design (5658187)"
+      },
+      {
+        "commit": "6560e43",
+        "reason": "pure structural extraction (876-line split, zero call-site edits) — doc-less by judgment, recorded in docs/audit-2026-08-05.md (5658187)"
+      }
+    ]
   }
 }

@@ -38,6 +38,11 @@ export const DEFAULT_RULES = {
     codePaths: ['src-tauri/src', 'frontend/src'],
     docPaths: ['docs', 'README.md', 'AGENTS.md'],
     lookback: 10,
+    // A doc-sync candidate the maintainer has JUDGED — either legitimately
+    // doc-less (pure refactor/revert/test-only) or its docs written elsewhere.
+    // The written reason is the permanent proof (s30: aged-out unjudged
+    // candidates were vanishing silently — 65c1fe8 went 5 sessions unpaid).
+    judgments: [],
   },
   suiteSelf: {
     commandsDir: '.opencode/command',

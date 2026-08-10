@@ -117,6 +117,24 @@ test('doc-sync: code-only commit is a candidate; code+docs commit is not', () =>
   assert.equal(candidates[0].commit.length, 7)
 })
 
+test('doc-sync: a judged commit is info with its reason, not a candidate', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  writeFileSync(join(root, 'src', 'a.rs'), '// a')
+  git(root, 'add', '.')
+  commit(root, 'code only')
+  const hash = git(root, 'rev-parse', '--short', 'HEAD').trim()
+
+  const withJudgment = {
+    ...RULES_V2,
+    docSync: { ...RULES_V2.docSync, judgments: [{ commit: hash, reason: 'pure refactor, doc-less by decision' }] },
+  }
+  const { candidates, info } = checkDocSync(withJudgment, root)
+  assert.equal(candidates.length, 0)
+  assert.equal(info.length, 1)
+  assert.match(info[0].message, /pure refactor, doc-less by decision/)
+})
+
 test('doc-sync: no history is info, not an error', () => {
   const root = fixture() // not a git repo
   mkdirSync(join(root, 'src'), { recursive: true })

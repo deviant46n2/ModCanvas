@@ -25,3 +25,4 @@ backups/
 
 # Repo health trend history — the thermometer's own memory, ours not git's
 .health-trend.json
+.doc-sync-state.json

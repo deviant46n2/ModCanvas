@@ -26,6 +26,7 @@ import { execFileSync } from 'node:child_process'
 
 import { loadRules } from './integrity-rules.mjs'
 import { runAllSections } from './integrity-check.mjs'
+import { loadDocSyncState, saveDocSyncState, transitionDocSync } from './doc-sync-state.mjs'
 
 const DEFAULT_TREND_PATH = join(process.cwd(), '.health-trend.json')
 // Lazy: tests override TREND_PATH via env after import; the constant would
@@ -177,7 +178,30 @@ function printReport() {
   const health = loadHealthRules()
   const results = runAllSections(rules, root)
   const { score, breakdown, deduction } = computeScore(results, health)
+
+  // Aged-out doc-sync candidates: a candidate that left the lookback window
+  // unjudged must not vanish (65c1fe8 class). Transition them into visible
+  // P2 work; a judged candidate (written reason) is retired permanently.
+  const statePath = process.env.DOC_SYNC_STATE_PATH ?? join(root, '.doc-sync-state.json')
+  const docSyncState = loadDocSyncState(statePath)
+  const docSyncResults = results.find((r) => r.name === 'doc-sync')
+  const seen = docSyncResults?.candidates ?? []
+  const judged = (rules.docSync.judgments ?? []).map((j) => j.commit)
+  const agedOut = transitionDocSync(docSyncState, seen, judged)
+  saveDocSyncState(docSyncState, statePath)
+
   const work = rankWork(results, health, root)
+  for (const a of agedOut) {
+    const files = (a.files ?? []).join(', ')
+    work.push({
+      class: 'aged-out-unjudged',
+      section: 'doc-sync',
+      name: `commit ${a.commit} changed code without docs and aged out UNJUDGED (first seen ${a.firstSeen}): ${files}`,
+      priority: 'P2',
+      reason: 'judge it now: doc-less (write the reason in docSync.judgments) or write the docs it needed',
+    })
+  }
+  work.sort((a, b) => ({ P0: 0, P1: 1, P2: 2, P3: 3 })[a.priority] - ({ P0: 0, P1: 1, P2: 2, P3: 3 })[b.priority])
 
   console.log(`\nModCanvas repo health: ${score}/100 (manageable debt load)`)
   console.log(`  deductions: ${deduction} points`)

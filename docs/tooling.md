@@ -37,7 +37,7 @@ Sections:
 | `stale-binary` | binary embeds src + frontend; stale binary serves old behavior | per-binary scoping: dev binary vs `src-tauri/src` only (frontend hot-reloads in `pnpm dev` — F4 fix); release binary vs backend + frontend. Either may be parked with a written reason |
 | `diff-hygiene` | whitespace lies about structure | `git diff --check` (working tree + staged) |
 | `adapter-matrix` | new version/loader = new file, never an edit (AGENTS.md) | modified existing adapters in the diff vs HEAD (added files are fine) |
-| `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate |
+| `doc-sync` | docs are code (AGENTS.md) | commits in the last 10 that touched code but no doc — **candidates**, maintainer judges (refactors/reverts are legitimately doc-less); never a gate. Judged commits (`docSync.judgments` in the rules, written reason) are info, not candidates. A candidate that **ages out unjudged** does not vanish — the health report transitions it to visible P2 work via `.doc-sync-state.json` (s30: the 65c1fe8 failure — an unjudged candidate sat invisible for 5 sessions) |
 | `doc-anchors` | docs and code must agree on specific facts | content-level: CACHE_VERSION, companion jar version — any doc mention ≠ code value is a violation (stale doc text) |
 | `suite-self` | the tooling is a maintainership artifact (s13 meta-rule) | the suite checks itself: command frontmatter (agent/description), skill references resolve, `pnpm` scripts in docs exist in package.json, test files exist |
 

@@ -53,8 +53,16 @@ export function checkAdapterMatrix(rules, root) {
 // Doc-sync: a commit that changes code but no doc is a drift CANDIDATE (the
 // maintainer judges — pure refactors and reverts are legitimately doc-less).
 // Surfaced, never a gate: false positives would break the gate's signal.
+//
+// Judged commits (rules.docSync.judgments, { commit, reason }) are reported as
+// info, not candidates — the written reason retires them permanently. An
+// unjudged candidate that ages out of the lookback window does NOT vanish: the
+// health report's state file transitions it to visible debt (s30 — 65c1fe8
+// aged out unjudged and sat invisible for 5 sessions).
 export function checkDocSync(rules, root) {
   const candidates = []
+  const info = []
+  const judged = new Map((rules.docSync.judgments ?? []).map((j) => [j.commit, j.reason]))
   let log
   try {
     log = execFileSync('git', ['log', `-${rules.docSync.lookback}`, '--format=%h', '--name-only'], {
@@ -72,7 +80,13 @@ export function checkDocSync(rules, root) {
     const touchedCode = files.some((f) => codePaths.some((p) => f.startsWith(p)))
     const touchedDoc = files.some((f) => docPaths.some((p) => f.startsWith(p) || f === p))
     if (touchedCode && !touchedDoc) {
-      candidates.push({ commit, files: files.filter((f) => codePaths.some((p) => f.startsWith(p))).slice(0, 5) })
+      const reason = judged.get(commit)
+      const entry = {
+        commit,
+        files: files.filter((f) => codePaths.some((p) => f.startsWith(p))).slice(0, 5),
+      }
+      if (reason) info.push({ message: `commit ${commit} judged doc-less: ${reason}` })
+      else candidates.push(entry)
     }
   }
   for (const line of log.split('\n')) {
@@ -85,5 +99,5 @@ export function checkDocSync(rules, root) {
     }
   }
   flush()
-  return { violations: [], candidates }
+  return { violations: [], candidates, info }
 }
