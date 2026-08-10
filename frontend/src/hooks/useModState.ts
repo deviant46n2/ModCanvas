@@ -243,7 +243,10 @@ export function useModState(selectedProject: Project | null) {
   }
 
   async function handleSearchMods() {
-    if (!searchQuery || !selectedProject || searchSources.length === 0) return
+    if (!selectedProject || searchSources.length === 0) return
+    // A query OR a category is a valid search — browsing by category with an
+    // empty query is the "show me tech mods" flow, not a no-op.
+    if (!searchQuery && !searchCategory) return
     try {
       const results = await searchMods(
         searchQuery,

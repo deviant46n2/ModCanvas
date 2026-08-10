@@ -127,6 +127,8 @@ pub async fn search_mods(
         _ => ModLoader::Forge,
     };
 
+    eprintln!("[ModCanvas] search_mods: query={query:?} loader={loader} mc={mc_version} sources={sources:?} categories={categories:?}");
+
     let mut results = Vec::new();
 
     // Search every selected source. Per-source failures are tolerated (logged,
