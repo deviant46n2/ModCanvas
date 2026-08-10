@@ -20,6 +20,9 @@
 //                    (maintainer judges; surfaced, never a gate).
 //   doc-anchors    — content-level: doc mention ≠ code value (CACHE_VERSION,
 //                    jar versions) is a violation (stale doc text).
+//   build-smoke    — the frontend must actually build (tsc + vite). Catches
+//                    the bd4016b class: import-resolution breaks tsc cannot
+//                    see (CSS/asset paths), which ship silently.
 //   suite-self     — the suite checks itself: command frontmatter, skill
 //                    references, docs↔package.json scripts, test files.
 //
@@ -39,6 +42,7 @@ import { RULES_PATH, loadRules, mergeRules } from './integrity-rules.mjs'
 import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-git.mjs'
 import { checkDocAnchors } from './integrity-doc.mjs'
 import { checkSuiteSelf } from './integrity-suite.mjs'
+import { checkBuildSmoke } from './integrity-build.mjs'
 
 const RASTER = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
 
@@ -218,12 +222,13 @@ export function runAllSections(rules, root, names) {
     { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
     { name: 'doc-sync', run: () => checkDocSync(rules, root) },
     { name: 'doc-anchors', run: () => checkDocAnchors(rules, root) },
+    { name: 'build-smoke', run: () => checkBuildSmoke(rules, root) },
     { name: 'suite-self', run: () => checkSuiteSelf(rules, root) },
   ]
   const selected = names ? sections.filter((s) => names.includes(s.name)) : sections
   if (selected.length === 0) {
     throw new Error(
-      `integrity-check: unknown section "${names}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|suite-self)`,
+      `integrity-check: unknown section "${names}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|build-smoke|suite-self)`,
     )
   }
   return selected.map((s) => ({ name: s.name, ...s.run() }))

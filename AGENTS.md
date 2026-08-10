@@ -160,9 +160,9 @@ at the moments they exist for** — that is the point of having built them:
   same timer unit, so a skipped boundary ritual surfaces as a failed unit
   (s33 compressed-handoff contract).
 - **Repo health, before trusting a diff:** `pnpm integrity`
-  (`node scripts/integrity-check.mjs` — 8 sections: line-limit,
+  (`node scripts/integrity-check.mjs` — 9 sections: line-limit,
   asset-bundle, stale-binary, diff-hygiene, adapter-matrix, doc-sync,
-  doc-anchors, suite-self). Violations are new debt; PARKED entries are
+  doc-anchors, build-smoke, suite-self). Violations are new debt; PARKED entries are
   known debt with written reasons; CANDIDATES need maintainer judgment.
 - **Before claiming any fix or feature works:** `/verify-build` — rebuild →
   deploy → restart → observe, each step graded on EVIDENCE (mtime, md5,

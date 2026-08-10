@@ -202,3 +202,58 @@ test('seedRules: never persists non-allowlist keys (JSON-safe seed)', () => {
   assert.deepEqual(Object.keys(onDisk), ['allowlists'])
   assert.ok(seeded.allowlists['line-limit'].some((a) => a.path === 'src/big.rs'))
 })
+
+// --- build-smoke (integrity-build.mjs) ------------------------------------
+
+import { checkBuildSmoke } from './integrity-build.mjs'
+
+function buildFixture(script) {
+  const root = fixture()
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  writeFileSync(
+    join(root, 'frontend', 'package.json'),
+    JSON.stringify({ scripts: { build: script } }),
+  )
+  mkdirSync(join(root, 'frontend', 'node_modules'), { recursive: true })
+  return root
+}
+
+test('build-smoke: passing build is clean', () => {
+  const root = buildFixture('node -e "process.exit(0)"')
+  const { violations } = checkBuildSmoke(RULES, root)
+  assert.equal(violations.length, 0)
+})
+
+test('build-smoke: failing build is a violation with output', () => {
+  const root = buildFixture('node -e "process.stderr.write(\\"broken import\\"); process.exit(1)"')
+  const { violations } = checkBuildSmoke(RULES, root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].message, /broken import/)
+})
+
+test('build-smoke: missing build script is a violation', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  writeFileSync(join(root, 'frontend', 'package.json'), JSON.stringify({ scripts: {} }))
+  const { violations } = checkBuildSmoke(RULES, root)
+  assert.equal(violations.length, 1)
+  assert.match(violations[0].message, /build.*script/i)
+})
+
+test('build-smoke: missing node_modules is a violation, not a blind build', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'frontend'), { recursive: true })
+  writeFileSync(join(root, 'frontend', 'package.json'), JSON.stringify({ scripts: { build: 'node -e "process.exit(0)"' } }))
+  const { violations } = checkBuildSmoke(RULES, root)
+  assert.equal(violations.length, 1)
+  assert.equal(violations[0].path, 'frontend/node_modules')
+})
+
+test('build-smoke: rules.buildSmoke.skip turns the section into info', () => {
+  const root = buildFixture('node -e "process.exit(1)"')
+  const rules = structuredClone(RULES)
+  rules.buildSmoke = { skip: true }
+  const { violations, info } = checkBuildSmoke(rules, root)
+  assert.equal(violations.length, 0)
+  assert.equal(info.length, 1)
+})
