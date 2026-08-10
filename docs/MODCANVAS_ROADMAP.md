@@ -139,7 +139,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Does not exist.** `NewProjectModal` (`components/common/modals.tsx:33-82`) is a 3-field form (name + MC version + loader). |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
-| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Does not exist.** `createProject` (`hooks/useProjectState.ts:85-90`) creates an empty project dir; no starter chapter/quest/config profile. |
+| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunk 1).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: exploration starter chapter). No UI exposes it yet — the new-project modal still creates empty packs. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
 | Progression editor / campaign surface | `workspace-actions.md:15` (stale tab), §3.1 of this doc | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
@@ -526,7 +526,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | Bare 3-field form (`modals.tsx:33-82`); no instance pick; no "about" question; no template; `createProject` scaffolds nothing (`useProjectState.ts:85-90`) | User has an empty dir and no idea what to do next |
+| Create Pack | Bare 3-field form (`NewProjectModal.tsx`); no instance pick; no "about" question. **Scaffold infra now exists** (`create_project` + `template_id`, P0-WIZARD chunk 1) but no UI calls it | User has an empty dir and no idea what to do next |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -549,7 +549,12 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    bundle** (self-authored JSON/SNBT — not game assets, so the no-bundling rule is
    unaffected) scaffolded into the instance on create. First template: "Skyblock-ish",
    "Exploration", "Tech intro" — keep the set small (2–3) and coherent-by-default
-   (Bible §10.3: "probably a bad pack" is a win).
+   (Bible §10.3: "probably a bad pack" is a win). **Status (P0-WIZARD chunk 1):** the
+   scaffold path is implemented — `create_project` takes an optional `template_id`,
+   template packages are embedded in the Rust binary (`src-tauri/templates/`, format in
+   `docs/templates.md`), and the first package ("Exploration Starter", a 7-quest
+   collect-craft-build chapter) ships with fidelity tests. The `WizardStepper` UI that
+   lets a user actually pick one is chunk 2.
 4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
    pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
    **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
@@ -772,11 +777,8 @@ Conventions:
   without seeing code (Bible MVP exit criterion).
 - **Features:** §9.3 steps 1–6: instance pick, "about" question, template scaffold,
   curated mod picks, guided first quest, green check + Launch.
-- **Technical work:** `createProject` gains a scaffold path (template JSON/SNBT written
-  into the instance); a `WizardStepper` component over `useProjectState.ts`; template
-  content files; curated-mod file; wizard → `analyzePackHealth` handoff; reuse
-  `test_project` for Launch. Fix the adapter lie: restrict the version/loader selects to
-  what the matrix serves (`adapters/factory.ts:46-83`) or add the 1.19.x adapters.
+- **Technical work:** ~~`createProject` gains a scaffold path~~ **DONE (chunk 1)**: `create_project` takes `template_id: Option<String>`, scaffolded via `crate::templates::scaffold_template` (atomic, path-safe, tested; see `docs/templates.md`). Remaining: a `WizardStepper` component over `useProjectState.ts`; curated-mod file; wizard → `analyzePackHealth` handoff; reuse
+  `test_project` for Launch. The adapter lie is fixed (options derive from `servedMatrix`).
 - **Dependencies:** none (P0 foundation). Templates must respect the no-bundling rule
   (self-authored content only).
 - **User value:** the wedge. Nothing else matters until a beginner can get to Launch.

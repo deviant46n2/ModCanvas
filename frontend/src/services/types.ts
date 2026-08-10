@@ -13,6 +13,13 @@ export interface Project {
   source: string
 }
 
+/** A starter content package the First-Pack wizard can scaffold (ids owned by Rust). */
+export interface ProjectTemplate {
+  id: string
+  name: string
+  description: string
+}
+
 export interface ImportResult {
   project: Project
   mods: Array<{ mod_id: string; slug: string; name: string; version: string; source: string }>

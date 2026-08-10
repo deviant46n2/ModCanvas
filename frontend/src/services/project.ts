@@ -1,13 +1,19 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, ImportResult } from './types'
+import type { Project, ImportResult, ProjectTemplate } from './types'
 
 export async function createProject(
   name: string,
   minecraftVersion: string,
   modLoader: string,
   path: string,
+  templateId: string | null = null,
 ): Promise<Project> {
-  return invoke<Project>('create_project', { name, minecraftVersion, modLoader, path })
+  return invoke<Project>('create_project', { name, minecraftVersion, modLoader, path, templateId })
+}
+
+/** Template packages the First-Pack wizard can offer (ids owned by Rust). */
+export async function listProjectTemplates(): Promise<ProjectTemplate[]> {
+  return invoke<ProjectTemplate[]>('list_project_templates')
 }
 
 export async function listProjects(): Promise<Project[]> {

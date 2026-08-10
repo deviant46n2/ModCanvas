@@ -18,6 +18,7 @@ pub fn create_project(
     minecraft_version: String,
     mod_loader: String,
     path: String,
+    template_id: Option<String>,
 ) -> Result<Project, String> {
     let name = crate::path_safety::sanitize_project_name(&name)?;
     let loader = match mod_loader.as_str() {
@@ -33,6 +34,14 @@ pub fn create_project(
     let path = crate::path_safety::expand_home(&path);
     std::fs::create_dir_all(&path)
         .map_err(|e| format!("Failed to create project directory {:?}: {e}", path))?;
+
+    // The First-Pack wizard (roadmap P0-WIZARD) passes a template id; the
+    // classic new-project modal passes None. Scaffolding happens in the same
+    // command as creation so there is never a "created but empty" state the
+    // wizard could strand a beginner in. Unknown ids fail the whole create.
+    if let Some(template_id) = template_id {
+        crate::templates::scaffold_template(&path, &template_id)?;
+    }
 
     let now = Utc::now();
     let project = Project {
@@ -63,6 +72,13 @@ pub fn list_projects(
     db.sync_prism_instances(&instances)
         .map_err(|e| format!("Failed to sync instances: {e}"))?;
     db.list_projects().map_err(|e| e.to_string())
+}
+
+/// Template packages the First-Pack wizard can offer. Ids come from the Rust
+/// registry (`crate::templates`), never from a hardcoded frontend list.
+#[tauri::command]
+pub fn list_project_templates() -> Result<Vec<crate::templates::TemplateMeta>, String> {
+    Ok(crate::templates::list_templates())
 }
 
 #[tauri::command]

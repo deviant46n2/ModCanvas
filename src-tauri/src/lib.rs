@@ -21,6 +21,7 @@ pub mod recipe_disable;
 pub mod recipes;
 pub mod scriptgen;
 pub mod shared;
+pub mod templates;
 pub mod ws_ipc;
 pub mod ws_protocol;
 
@@ -134,6 +135,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
+            commands::list_project_templates,
             commands::list_projects,
             commands::delete_project,
             commands::add_mod,
