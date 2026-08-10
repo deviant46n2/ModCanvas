@@ -1,0 +1,29 @@
+{
+  "weights": {
+    "violation": 10,
+    "candidate": 3,
+    "parked": 0.5
+  },
+  "ledger": [
+    {
+      "id": "legacy-data-url-scan",
+      "priority": "P1",
+      "reason": "audit item 2 (DEFERRED 2026-08-05): icons.rs/indexer.rs base64 PNG scan violates AGENTS.md enumeration-only invariant; intersects the s26 flat-icon guard (registry texture_data_url is its proof) - design decision, not mechanical"
+    },
+    {
+      "id": "audit-item-7-stale-docs",
+      "priority": "P2",
+      "reason": "audit item 7 (Pending): README.md + featureparity.md content not re-checked since the audit flagged them; recipe-editor.md already rewritten"
+    },
+    {
+      "id": "snbt-parked-holes",
+      "priority": "P2",
+      "reason": "s23 proptest found 3 parked snbt.rs holes (trailing-comment indent, needs_quoting key classes, f32 -0.0 / integral >= 2^63) - documented in snbt_roundtrip.rs header, fix when the serializer is next touched"
+    },
+    {
+      "id": "audit-remaining-300-line-debt",
+      "priority": "P3",
+      "reason": "audit 2026-08-05: next-tier Rust files still >300 (snbt.rs 916, progression.rs 876, ingest.rs 820, recipes/mod.rs 725, etc.) - parked with written reason, pay by splitting on next touch"
+    }
+  ]
+}

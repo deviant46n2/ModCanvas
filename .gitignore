@@ -22,3 +22,6 @@ workbench-companion-archived/*/out/
 # Private tutor state (learner profile + curriculum) — never commit
 .tutor/
 backups/
+
+# Repo health trend history — the thermometer's own memory, ours not git's
+.health-trend.json

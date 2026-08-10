@@ -79,7 +79,7 @@ export function checkLineLimit(rules, root) {
       if (lines <= rules.lineLimit) continue
       const rel = relative(root, file)
       const entry = rules.allowlists['line-limit'].find((a) => a.path === rel)
-      if (entry) parked.push({ path: rel, lines, reason: entry.reason })
+      if (entry) parked.push({ path: rel, lines, reason: entry.reason, since: entry.since })
       else violations.push({ path: rel, lines })
     }
   }
@@ -209,6 +209,26 @@ export function seedRules(rulesPath, rules, root) {
 
 // --- main ----------------------------------------------------------------
 
+export function runAllSections(rules, root, names) {
+  const sections = [
+    { name: 'line-limit', run: () => checkLineLimit(rules, root) },
+    { name: 'asset-bundle', run: () => checkAssetBundle(rules, root) },
+    { name: 'stale-binary', run: () => checkStaleBinary(rules, root) },
+    { name: 'diff-hygiene', run: () => checkDiffHygiene(rules, root) },
+    { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
+    { name: 'doc-sync', run: () => checkDocSync(rules, root) },
+    { name: 'doc-anchors', run: () => checkDocAnchors(rules, root) },
+    { name: 'suite-self', run: () => checkSuiteSelf(rules, root) },
+  ]
+  const selected = names ? sections.filter((s) => names.includes(s.name)) : sections
+  if (selected.length === 0) {
+    throw new Error(
+      `integrity-check: unknown section "${names}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|suite-self)`,
+    )
+  }
+  return selected.map((s) => ({ name: s.name, ...s.run() }))
+}
+
 function main() {
   const [arg] = process.argv.slice(2)
   const root = process.cwd()
@@ -223,25 +243,8 @@ function main() {
     console.log(`seeded ${RULES_PATH}`)
   }
 
-  const sections = [
-    { name: 'line-limit', run: () => checkLineLimit(rules, root) },
-    { name: 'asset-bundle', run: () => checkAssetBundle(rules, root) },
-    { name: 'stale-binary', run: () => checkStaleBinary(rules, root) },
-    { name: 'diff-hygiene', run: () => checkDiffHygiene(rules, root) },
-    { name: 'adapter-matrix', run: () => checkAdapterMatrix(rules, root) },
-    { name: 'doc-sync', run: () => checkDocSync(rules, root) },
-    { name: 'doc-anchors', run: () => checkDocAnchors(rules, root) },
-    { name: 'suite-self', run: () => checkSuiteSelf(rules, root) },
-  ]
-  const selected = arg && arg !== '--seed' ? sections.filter((s) => s.name === arg) : sections
-  if (!selected.length) {
-    console.error(
-      `integrity-check: unknown section "${arg}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|suite-self)`,
-    )
-    process.exit(2)
-  }
   try {
-    const results = selected.map((s) => ({ name: s.name, ...s.run() }))
+    const results = arg && arg !== '--seed' ? runAllSections(rules, root, [arg]) : runAllSections(rules, root)
     process.exit(report(results) > 0 ? 1 : 0)
   } catch (e) {
     console.error(`integrity-check: ${e.message}`)

@@ -112,3 +112,43 @@ ledger as data (the s21 lesson).
 
 - (open) — the student's next tool designs; the agreed s21 cont.4 scope is
   complete, and batch 2 (reliability gates) is complete.
+
+## 8. Repo health report — `scripts/health-report.mjs` / `pnpm health`
+
+The debt ledger's thermometer (built 2026-08-09, debt-clearing arc). Consumes
+the integrity engine's `runAllSections` output — it never re-derives checks —
+and applies a weighting table to produce a **manageable debt load** score:
+
+```bash
+pnpm health            # report + trend append (exit 0 always: report, never a gate)
+node scripts/health-report.test.mjs
+```
+
+**Score = 100 − deductions** (the student's definition: NOT code quality —
+that's the suite's job; this is the ledger's thermometer):
+
+| Class | Weight (rules) | Meaning |
+|---|---|---|
+| violation | 10 | a broken invariant (the suite's exit-1 class) |
+| candidate | 3 | surfaced, needs maintainer judgment (doc-sync) |
+| parked | 0.5 | known debt WITH a written reason — near-zero so good parks aren't punished (s22) |
+| ledger item | by priority P0 15 / P1 10 / P2 5 / P3 2 | explicit priority field, data not magic |
+
+**Failure classes are data, not code.** The open-item ledger lives in
+`scripts/health-rules.json` (split from `integrity-rules.json` when the seeded
+ledger + `since` fields pushed it past its own 300-line limit — the s22
+meta-rule applied to the tool itself). New failure class = new ledger row, no
+script edit.
+
+**Parked-tripwire semantics (git truth).** Parked entries carry a `since`
+timestamp (when the park was written); a park whose reason says "revisit on
+next touching change" fires as `parked-tripwire` ONLY when the file's last
+commit postdates `since` (`git log -1 --format=%cI`). A park whose contract
+hasn't fired is not work — the old reason-text matching flooded the list with
+all 46 parks; the git check narrows it to the 3 actually touched.
+
+**Trend:** appended to `.health-trend.json` (gitignored — the history is ours,
+not git churn), one entry per local day, deduped, capped at 120. The score's
+composition is printed with every run, so the number is always defensible:
+"47/100" means "the ledger currently holds 53.5 points of managed/unmanaged
+debt," nothing more.
