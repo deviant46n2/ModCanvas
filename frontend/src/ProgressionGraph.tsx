@@ -93,6 +93,10 @@ export default function ProgressionGraph({ projectId, instancePath }: Progressio
           ...(n.data as Record<string, unknown>),
           textureKey: key,
           textureUrl: key ? textureDisplayUrl(textureIndex, key) : undefined,
+          // Pending only when the lazy materializer can actually resolve it —
+          // isTexturePending excludes bake: keys (engine-needed, never
+          // materialize offline), so 3D items never show a fake loading state.
+          texturePending: key ? isTexturePending(textureIndex, key) : false,
         },
       }
     })

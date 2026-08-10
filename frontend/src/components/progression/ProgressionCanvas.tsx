@@ -6,7 +6,7 @@ import type { Node, Edge, NodeChange, EdgeChange, ReactFlowInstance } from '@xyf
 import '@xyflow/react/dist/style.css'
 import type { CSSProperties, ReactNode } from 'react'
 import { FlagIcon, LockOpenIcon, ZapIcon, TrophyIcon, PackageIcon } from '../ui/icons'
-import { nodeTypeColor, hexToRgba } from '../../core/progression/phase-bands'
+import { nodeTypeColor, hexToRgba, NODE_TYPE_COLORS } from '../../core/progression/phase-bands'
 
 function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const nodeType = (data.nodeType as string) || 'milestone'
@@ -22,6 +22,7 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const accent = (data.color as string) || nodeTypeColor(nodeType)
   const textureUrl = (data.textureUrl as string) || ''
   const textureKey = (data.textureKey as string) || ''
+  const texturePending = (data.texturePending as boolean) || false
 
   return (
     <div
@@ -53,8 +54,11 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
           {modCount > 0 && <span className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</span>}
         </div>
       )}
-      {textureKey && !textureUrl && (
-        <span className="node-texture-pending" title="Texture resolving…">…</span>
+      {textureKey && texturePending && (
+        <span
+          className="node-texture-pending"
+          title={textureKey.startsWith('bake:') ? '3D item — run the instance to capture' : 'Texture resolving…'}
+        >…</span>
       )}
       <Handle type="target" position={RFPosition.Top} />
       <Handle type="source" position={RFPosition.Bottom} />
@@ -66,7 +70,9 @@ function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
  *  `computePhaseBands`, never persisted, never selectable/draggable. */
 function PhaseBandNode({ data }: NodeProps<Node>) {
   const phase = (data.phase as string) || ''
-  const color = (data.color as string) || '#3b82f6'
+  // Single source of truth for the default hue — never duplicate a hex
+  // (design.md §2.4: phase-bands.ts owns the multi-hue palette).
+  const color = (data.color as string) || NODE_TYPE_COLORS.milestone
   const count = (data.count as number) || 0
   return (
     <div
@@ -176,7 +182,7 @@ function ProgressionFlow({
         }}
         maskColor="rgba(0,0,0,0.7)"
       />
-      <Background color="#2b2b30" gap={18} size={1} />
+      <Background color="var(--color-border-subtle)" gap={16} size={1} />
     </ReactFlow>
   )
 }

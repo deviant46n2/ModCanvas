@@ -155,8 +155,13 @@ directly — never the legacy literals. One token source, one palette.
   border per type, `--radius-md`. Selected = accent border + glow; hover =
   lift + accent-tinted glow.
 - **Textures render pixelated** (`image-rendering: pixelated`) — Minecraft
-  assets must not be smoothed. Hero textures get a soft drop-shadow, never a
-  hard box.
+  assets must not be smoothed. Depth cues on textures use box-shadow or
+  baked-in shading, **never a CSS `filter`**: inside ReactFlow's transformed
+  viewport a filter forces the icon into its own compositing layer at
+  CSS-pixel resolution, which the viewport resamples with bilinear smoothing
+  on top of the hard pixels (stairs + fuzz — the s25 regression, documented
+  in `QuestCanvas.css`). Hover feedback on pixelated nodes is a box-shadow
+  ring, not a `filter: brightness()`.
 - Edges: 1.5px stroke tinted by source node type; hover/selected thicken.
   Optional edges animate (dash flow).
 - Phase lanes (progression): gradient-tinted columns behind nodes, derived
