@@ -55,6 +55,14 @@
     {
       "commit": "1707af8",
       "reason": "version-mismatch gating + CF error text \u2014 user-visible behavior; documented in docs/mods-tab.md with the category-feature commit, s32"
+    },
+    {
+      "commit": "ef53cd8",
+      "reason": "category filter pauses CurseForge \u2014 behavior documented in the follow-up docs commit 0e80e57 (mods-tab.md)"
+    },
+    {
+      "commit": "c619895",
+      "reason": "empty-query category search allowed \u2014 behavior covered by the mods-tab.md Install Flow category-filter section; bug fix to a just-shipped feature \u2014 doc-less by judgment, s32"
     }
   ]
 }
