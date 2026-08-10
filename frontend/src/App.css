@@ -1,10 +1,10 @@
 /* ================================================================
-   Modpack Engine — Design System CSS
-   Based on design.md v1.0
+   ModCanvas — Design System CSS
+   Based on design.md (docs/design.md — the canonical design system)
    Professional game development tool aesthetic (Unity/Godot/Blender)
    ================================================================ */
 
-/* ===== DESIGN TOKENS (Section 11 — Single Source of Truth) ===== */
+/* ===== DESIGN TOKENS (docs/design.md §2 — Single Source of Truth) ===== */
 :root {
   /* BACKGROUND & SURFACE */
   --color-bg-base:             #1B1B1F;

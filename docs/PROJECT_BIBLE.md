@@ -5,7 +5,7 @@
 
 **Status:** Living document. Amend it as decisions change; that is the only way it dies.
 **Owner:** Project maintainer.
-**Related docs:** `README.md` (public front page), `AGENTS.md` (execution constraints for AI agents), `design.md` (visual design system), `docs/*.md` (per-feature records), `featureparity.md` (FTB Quests parity checklist).
+**Related docs:** `README.md` (public front page), `AGENTS.md` (execution constraints for AI agents), `docs/design.md` (visual design system), `docs/*.md` (per-feature records), `featureparity.md` (FTB Quests parity checklist).
 
 ---
 

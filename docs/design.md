@@ -27,6 +27,31 @@ Unity, Godot, and Blender editors, not a web SaaS or a marketing site.
 brutalist/editorial experiment, or a "premium SaaS" bento-grid aesthetic. Do
 not apply those conventions here.
 
+### Core principles (why the system is shaped this way)
+
+1. **Density with clarity.** Show information efficiently without clutter.
+   Every pixel earns its place.
+2. **Hierarchy through contrast.** The most important element on screen is
+   visually dominant — use color, size, and weight, not decoration.
+3. **Consistent surface language.** Elevation = importance. Higher surfaces
+   are brighter; the eye goes where the light is.
+4. **Feedback always.** Every hover, click, selection, and state change has a
+   visible response. No silent failures.
+5. **Restraint over decoration.** No gratuitous gradients or shadows, no
+   visual noise. Clean, flat, professional.
+6. **Dark-only is load-bearing.** A white or near-white surface anywhere in
+   the app is a **bug, not a mode** — it means a component shipped unstyled
+   (default browser surface). An unstyled control is a review-blocking
+   defect, not a style nit.
+
+**What we ARE / NOT** (the guardrail list): NOT cyberpunk neon, terminal
+green-on-black, generic Bootstrap dark, Material-with-dark-paint, macOS
+vibrancy, or dashboard overload. ARE: professional dark creative tool
+(Unity/Blender/Figma class), clean typographic hierarchy, subtle borders for
+panel separation (not shadows), muted palette with one purposeful accent,
+dense-but-roomy layouts, smooth subtle transitions (100–200ms), keyboard-
+navigable and accessible.
+
 ## 2. Token System (Single Source of Truth)
 
 All design values are CSS custom properties defined in **`frontend/src/App.css`
@@ -180,8 +205,23 @@ action(s) to populate it. Never a bare "No data".
 - Progress/loading: skeletal or themed spinners, never generic circular
   bootstraps.
 
-## 5. What "Good" Looks Like (the anti-slop checklist)
+### 4.7 Iconography
 
+- **The app ships its own SVG icon set** (`frontend/src/components/ui/icons.tsx`,
+  36+ exports) — this is the only sanctioned icon source. No lucide/shadcn,
+  no Font Awesome, no emoji-as-icon (see §6).
+- **Sizes:** xs 14px (inline text, badges), sm 16px (compact buttons, list
+  rows), md 20px (standard UI, default), lg 24px (sidebar, feature icons),
+  xl 32px (empty states, hero).
+- **Alignment:** icons align to the text's cap height, not the vertical
+  center — for 13px body type that's `translateY(-0.5px)` on the icon.
+- **Colors:** default `--color-text-secondary` (icons are secondary
+  elements); active/selected `--color-accent` (only when the icon represents
+  an active state); on-accent `#FFFFFF`; disabled at `--color-text-tertiary`.
+  Use `inline-flex` + `gap` for icon+text pairs; the SVG itself is
+  `flex-shrink: 0`.
+
+## 5. What "Good" Looks Like (the anti-slop checklist)
 Before shipping any frontend change, verify against the system:
 
 - [ ] Every color is a token; no raw hexes inline in component CSS.
@@ -223,6 +263,13 @@ Before shipping any frontend change, verify against the system:
    glossary in the same pass (AGENTS.md doc-sync rule).
 3. **When changing the aesthetic:** this file changes first, then the code.
    A visual change without a design.md change is a doc-sync violation.
+
+**This file is the authoritative design reference for all UI work in
+ModCanvas.** When this file and code disagree, this file is the intent and the
+code is the drift to fix — unless the code shows the file is outdated, in
+which case update the file first (rule 3). It supersedes the original
+first-commit `design.md` ("Modpack Engine — Design System", removed s30; its
+token block was stale — App.css `:root` + this file's §2 are the truth).
 
 ---
 
