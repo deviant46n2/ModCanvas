@@ -6,65 +6,52 @@
 //! When a second combo is supported, extend here (and unlock the card) —
 //! never before.
 //!
-//! NeoForge's post-1.21 version scheme encodes the MC series in the first
-//! two numbers: 1.21.1 ships as "21.1.x" (e.g. 21.1.248). The maven-metadata
-//! XML lists every version; the resolver picks the latest matching prefix.
-//! None = unresolvable (offline, metadata unreadable) — the wizard fails the
+//! SOURCE OF TRUTH: Prism's own NeoForge index
+//! (`meta.prismlauncher.org/v1/net.neoforged/`), not the raw Maven metadata.
+//! The Maven list contains retracted/broken builds Prism never indexes (e.g.
+//! 21.1.245: index-absent AND component-404, observed 2026-08-10), and a
+//! freshly published version may not be indexed yet. Picking "latest from
+//! Maven" races Prism's index and yields "could not download metadata"
+//! failures at launch. The index is the set Prism can actually serve.
+//! None = unresolvable (offline, index unreadable) — the wizard fails the
 //! create loudly instead of letting the mmc-pack generator write its bogus
 //! "0.0.0" fallback.
 
 use reqwest::Client;
 
-/// The new-scheme series prefix for the wizard's one supported MC version.
-const NEOFORGE_1211_SERIES: &str = "21.1.";
-
-/// Numeric version comparison by dot-segments ("52.1.16" > "52.1.9" — a
-/// lexical sort would get this wrong). Callers pre-filter to stable versions.
-fn segment_numbers(suffix: &str) -> Option<Vec<u32>> {
-    suffix
-        .split('.')
-        .map(|seg| seg.parse::<u32>().ok())
-        .collect()
-}
-
-/// Latest version whose string starts with `prefix`, numeric-aware. A suffix
-/// containing anything but digits and dots is a pre-release or malformed —
-/// never a candidate for a beginner wizard's pack (a beta build number must
-/// not beat the stable one).
-fn latest_with_prefix(versions: &[String], prefix: &str) -> Option<String> {
-    versions
+/// Latest NeoForge version for `mc` from Prism's own index. Pure — the
+/// fetch happens in `resolve_loader_version`; this picks from the JSON.
+fn latest_from_prism_index(index: &serde_json::Value, mc: &str) -> Option<String> {
+    let versions = index.get("versions")?.as_array()?;
+    let mut candidates: Vec<(String, String)> = versions
         .iter()
         .filter_map(|v| {
-            let suffix = v.strip_prefix(prefix)?;
-            if !suffix.chars().all(|c| c.is_ascii_digit() || c == '.') {
+            let matches_mc = v
+                .get("requires")
+                .and_then(|r| r.as_array())
+                .is_some_and(|arr| {
+                    arr.iter().any(|r| {
+                        r.get("uid").and_then(|u| u.as_str()) == Some("net.minecraft")
+                            && r.get("equals").and_then(|e| e.as_str()) == Some(mc)
+                    })
+                });
+            if !matches_mc {
                 return None;
             }
-            let nums = segment_numbers(suffix)?;
-            Some((nums, v.clone()))
+            Some((
+                v.get("version")?.as_str()?.to_string(),
+                v.get("releaseTime")?.as_str()?.to_string(),
+            ))
         })
-        .max_by(|a, b| a.0.cmp(&b.0))
-        .map(|(_, v)| v)
+        .collect();
+    // Newest first by releaseTime (ISO-8601 sorts lexically). The index is
+    // already newest-first, but sort explicitly to be order-agnostic.
+    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    candidates.first().map(|(v, _)| v.clone())
 }
 
-/// Pull `<version>` entries out of a Maven metadata XML (no XML parser in
-/// the dependency set; the tag is simple and stable).
-fn extract_versions(xml: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<version>") {
-        let after = &rest[start + "<version>".len()..];
-        if let Some(end) = after.find("</version>") {
-            out.push(after[..end].to_string());
-            rest = &after[end + "</version>".len()..];
-        } else {
-            break;
-        }
-    }
-    out
-}
-
-/// Latest NeoForge version for MC 1.21.1 (series "21.1.x"), or None when the
-/// metadata cannot be fetched or no series match exists.
+/// Latest NeoForge version for the wizard's supported combo, from Prism's
+/// own index. None = unresolvable — callers fail loudly, never guess.
 pub async fn resolve_loader_version(mc_version: &str, loader: &str) -> Result<Option<String>, String> {
     // Defensive: the wizard only ever asks for 1.21.1 + neoforge, but the
     // resolver refuses everything else rather than guessing.
@@ -73,47 +60,52 @@ pub async fn resolve_loader_version(mc_version: &str, loader: &str) -> Result<Op
     }
     let client = Client::new();
     let resp = client
-        .get("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml")
+        .get("https://meta.prismlauncher.org/v1/net.neoforged/")
         .send()
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Ok(None);
     }
-    let body = resp.text().await.map_err(|e| e.to_string())?;
-    Ok(latest_with_prefix(&extract_versions(&body), NEOFORGE_1211_SERIES))
+    let index: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(latest_from_prism_index(&index, mc_version))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
-    #[test]
-    fn numeric_compare_beats_lexical() {
-        let versions: Vec<String> = ["21.1.9", "21.1.16"].iter().map(|s| s.to_string()).collect();
-        assert_eq!(latest_with_prefix(&versions, "21.1.").unwrap(), "21.1.16");
+    fn fixture() -> serde_json::Value {
+        json!({
+            "formatVersion": 1,
+            "uid": "net.neoforged",
+            "versions": [
+                { "version": "21.1.248", "releaseTime": "2026-08-10T13:26:57+00:00", "requires": [{ "uid": "net.minecraft", "equals": "1.21.1" }] },
+                { "version": "21.1.245", "releaseTime": "2026-08-09T00:00:00+00:00", "requires": [{ "uid": "net.minecraft", "equals": "1.21.1" }] },
+                { "version": "21.0.12", "releaseTime": "2026-08-08T00:00:00+00:00", "requires": [{ "uid": "net.minecraft", "equals": "1.21" }] },
+                { "version": "26.2.0.59", "releaseTime": "2026-08-10T14:00:00+00:00", "requires": [{ "uid": "net.minecraft", "equals": "26.2" }] }
+            ]
+        })
     }
 
     #[test]
-    fn series_prefix_selects_only_the_1211_series() {
-        let versions: Vec<String> = ["21.1.248", "21.0.12", "20.2.12-beta"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        assert_eq!(latest_with_prefix(&versions, "21.1.").unwrap(), "21.1.248");
+    fn picks_latest_servable_version_for_the_mc_series() {
+        // 21.1.245 is the Maven-latest-but-PRISM-SKIPS case (index-absent
+        // in reality); the resolver picks the newest the INDEX lists.
+        assert_eq!(latest_from_prism_index(&fixture(), "1.21.1").unwrap(), "21.1.248");
     }
 
     #[test]
-    fn pre_release_is_not_a_candidate() {
-        // A higher build number on a pre-release must not beat the stable.
-        let versions: Vec<String> = ["21.1.247", "21.1.248", "21.1.249-beta"].iter().map(|s| s.to_string()).collect();
-        assert_eq!(latest_with_prefix(&versions, "21.1.").unwrap(), "21.1.248");
+    fn other_mc_series_do_not_leak_in() {
+        // A 26.2-series version released AFTER 21.1.248 must not win for a
+        // 1.21.1 pack — the requires filter is the gate.
+        assert_eq!(latest_from_prism_index(&fixture(), "1.21.1").unwrap(), "21.1.248");
     }
 
     #[test]
-    fn extract_versions_parses_maven_xml() {
-        let xml = "<metadata><versions><version>1.0</version><version>1.1</version></versions></metadata>";
-        assert_eq!(extract_versions(xml), vec!["1.0", "1.1"]);
+    fn unknown_mc_series_resolves_to_none() {
+        assert_eq!(latest_from_prism_index(&fixture(), "1.7.10"), None);
     }
 
     #[test]

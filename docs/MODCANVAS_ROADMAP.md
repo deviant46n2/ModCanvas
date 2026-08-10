@@ -547,8 +547,11 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    project's version/loader/path from the pick, so no technical question is asked; running
    and unparseable instances are excluded; the classic 3-field form lives inside as "start
    from scratch"; a **"Create a new instance"** card builds a fresh Prism instance for the
-   pack — one combo (MC 1.21.1 · NeoForge), loader version auto-resolved from NeoForge's
-   Maven metadata (`commands/modpack/loader_version.rs`; the mmc-pack generator's "0.0.0"
+   pack —    one combo (MC 1.21.1 · NeoForge), loader version auto-resolved from **Prism's own
+   index** (`meta.prismlauncher.org/v1/net.neoforged/` — the set Prism can actually
+   serve; the raw Maven list contains retracted builds Prism never indexes, and
+   Maven-latest races Prism's index into "could not download metadata" launch
+   failures; `commands/modpack/loader_version.rs`; the mmc-pack generator's "0.0.0"
    fallback is never reached — unresolved = loud failure), instance created at the commit
    point, game downloads on Prism's first launch (auto-install; verify in the journey
    test). More combos unlock by extending the resolver + the card — never before. The
@@ -578,7 +581,10 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     not dropped). Two **core** picks back ModCanvas's own features — FTB Quests (the quest
     book, CurseForge-only, id 289412) and KubeJS (recipe scripts, Modrinth, all loaders) —
     and render in their own "Needed by ModCanvas" section. A CurseForge pick with no API
-    key configured shows **blocked with a reason**, never a silent absence. The wizard's
+    key configured shows **blocked with a reason**, never a silent absence. Since 2026-08-10
+    the CF pick resolves DIRECTLY (not through the batch) so every failure mode — missing key,
+    fetch failure (e.g. a CF API 403), version mismatch — surfaces as a blocked row with the
+    precise reason; a core pick never vanishes silently. The wizard's
     step 4 installs the pre-ticked picks sequentially, then auto-runs the compat check so
     transitive libraries (FTB Library, Rhino, Architectury) appear as one-click installs,
     then refreshes the pack so the green check sees the new mods.
