@@ -1,0 +1,262 @@
+/* ================================================================
+   BUTTONS
+   ================================================================ */
+
+/* Primary Button */
+.btn-primary {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-primary:active {
+  background: var(--color-accent-strong);
+}
+
+.btn-primary:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+}
+
+/* Secondary Button */
+.btn-secondary {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+
+.btn-secondary:active {
+  background: var(--color-bg-surface-2);
+}
+
+/* Success Button */
+.btn-success {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-success);
+  color: #FFFFFF;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-success:hover {
+  background: #2CC08A;
+}
+
+.btn-success:active {
+  background: #25B37D;
+}
+
+.btn-success:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+}
+
+/* Danger Button */
+.btn-danger {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-error);
+  color: #FFFFFF;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-danger:hover {
+  background: #EF4444;
+}
+
+.btn-danger:active {
+  background: #DC2626;
+}
+
+/* Icon Button */
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  font-family: var(--font-ui);
+}
+
+.btn-icon:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary);
+}
+
+/* Ghost Button (generic) */
+.btn-ghost {
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-ghost:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary);
+}
+
+/* ================================================================
+   LAUNCH SETTINGS
+   ================================================================ */
+
+.launch-settings {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-0);
+}
+
+.launch-settings h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+}
+
+.settings-row {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.settings-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* ================================================================
+   LAUNCH ERROR
+   ================================================================ */
+
+.launch-error {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-error-subtle);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.3);
+  font-size: var(--text-sm);
+}
+
+.launch-error strong {
+  color: var(--color-error);
+}
+
+.launch-error pre {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  user-select: all;
+  cursor: text;
+}
+
+.error-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-copy {
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-copy:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+
+/* ================================================================
+   LAUNCH PROGRESS
+   ================================================================ */
+
+.launch-progress {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent-subtle);
+  border-bottom: 1px solid var(--color-accent-muted);
+}
+
+.progress-phase {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.progress-bar {
+  height: 4px;
+  background: var(--color-bg-surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+

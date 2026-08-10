@@ -1,0 +1,37 @@
+/* ================================================================
+   TABS — Unity-style bottom border indicator
+   ================================================================ */
+
+.workspace-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-0);
+  padding: 0 var(--space-4);
+}
+
+.tab {
+  height: var(--panel-header-height);
+  padding: 0 var(--space-4);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: -1px;
+  text-transform: capitalize;
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-1);
+}
+
+.tab.active {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent);
+}
+

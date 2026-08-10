@@ -1,0 +1,106 @@
+/* ================================================================
+   LOAD PACK PROGRESS
+   ================================================================ */
+
+.load-pack-modal {
+  width: 520px;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-body {
+  margin-top: var(--space-4);
+}
+
+.load-pack-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stage-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stage-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.stage-message {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.stage-detail {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.stage-file {
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-bar-container {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-sunken);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width 0.15s ease;
+}
+
+.progress-percent {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: right;
+}
+
+.error-details {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-subtle);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.error-details pre {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.success-message {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.success-message .hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+

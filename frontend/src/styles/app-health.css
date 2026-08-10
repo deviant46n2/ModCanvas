@@ -1,0 +1,204 @@
+/* ================================================================
+   PACK HEALTH — persistent go/no-go panel (Project Bible §9)
+   ================================================================ */
+
+.pack-health {
+  max-width: 880px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: var(--space-8);
+}
+
+.health-verdict {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-0);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-5);
+}
+
+.health-verdict h2 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.health-verdict-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.health-verdict--go {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.health-verdict--blocked {
+  background: var(--color-error-subtle);
+  color: var(--color-error);
+}
+
+.health-verdict-copy {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+.health-verdict-counts,
+.health-section-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.health-count {
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+.health-count--blocking {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.health-count--recommended {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.health-count--optional {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.health-count--ok {
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.health-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.health-section {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-0);
+  overflow: hidden;
+}
+
+.health-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.health-section-header h3 {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.health-items {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+}
+
+.health-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+}
+
+.health-item:hover {
+  background: var(--color-bg-surface-1);
+}
+
+.health-item-badge {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+}
+
+.health-item--blocking .health-item-badge {
+  background: var(--color-error);
+}
+
+.health-item--recommended .health-item-badge {
+  background: var(--color-warning);
+}
+
+.health-item--optional .health-item-badge {
+  background: var(--color-accent);
+}
+
+.health-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.health-item-message {
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  line-height: 1.45;
+}
+
+.health-item-detail {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  margin-top: 2px;
+}
+
+.health-copy {
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.health-copy:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.health-verdict-stats {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.health-items-more {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  border-top: 1px dashed var(--color-border-subtle);
+}
+

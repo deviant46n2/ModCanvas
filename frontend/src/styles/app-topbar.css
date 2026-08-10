@@ -1,0 +1,38 @@
+/* ================================================================
+   TOPBAR — WebSocket restart button (replaces glyph action buttons)
+   ================================================================ */
+
+.ws-restart-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ws-restart-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+/* ================================================================
+   SVG ICONS — baseline alignment for glyph-free buttons
+   ================================================================ */
+
+.btn-icon svg,
+.config-icon-btn svg,
+.btn-close svg,
+.btn-remove svg {
+  display: block;
+}
+

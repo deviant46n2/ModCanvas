@@ -1,0 +1,183 @@
+/* ================================================================
+   COMPATIBILITY PANEL
+   ================================================================ */
+
+.compat-panel {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.compat-panel.compatible {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.compat-panel.has-issues {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.compat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.compat-status {
+  font-weight: 600;
+}
+
+.compat-panel.compatible .compat-status {
+  color: #22c55e;
+}
+
+.compat-panel.has-issues .compat-status {
+  color: #ef4444;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
+
+.btn-close:hover {
+  color: var(--color-text-primary);
+}
+
+.compat-issues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.compat-issue {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.compat-issue.warning {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.compat-issue.info {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.issue-severity {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  min-width: 60px;
+}
+
+.compat-issue.error .issue-severity {
+  color: #ef4444;
+}
+
+.compat-issue.warning .issue-severity {
+  color: #eab308;
+}
+
+.compat-issue.info .issue-severity {
+  color: #3b82f6;
+}
+
+.issue-message {
+  flex: 1;
+}
+
+.issue-mods {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.compat-warnings {
+  margin-top: var(--space-2);
+}
+
+.compat-warning {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(234, 179, 8, 0.1);
+  color: #eab308;
+  font-size: var(--text-sm);
+}
+
+/* ================================================================
+   MOD DEPENDENCY BADGES
+   ================================================================ */
+
+.mod-dependencies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.dep-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.dep-badge.required {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.dep-badge.optional {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+.dep-badge.recommended {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.dep-badge.incompatible {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.dep-badge.present {
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.dep-badge.missing {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.mod-missing-deps {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: #ef4444;
+}
+
+.mod-card.has-missing-deps {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.mod-categories {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+

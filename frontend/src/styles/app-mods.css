@@ -1,0 +1,152 @@
+/* ================================================================
+   WORKSPACE CONTENT
+   ================================================================ */
+
+.workspace-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.workspace-content > [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Inactive tabs stay mounted (so state + loaded data persist) but are hidden.
+   This keeps tab switches instant instead of remounting heavy editors. */
+.workspace-content > [role="tabpanel"].tab-hidden {
+  display: none;
+}
+
+/* ================================================================
+   MODS PANEL
+   ================================================================ */
+
+.mods-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  overflow-y: auto;
+}
+
+.mods-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mods-section .section-header {
+  padding: 0 0 var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  margin-bottom: var(--space-3);
+}
+
+.mods-section .section-header h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-primary);
+}
+
+.mod-filter {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  width: 200px;
+  transition: border-color var(--transition-fast);
+}
+
+.mod-filter:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.mod-filter::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.mod-list {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ================================================================
+   MOD CARDS
+   ================================================================ */
+
+.mod-card {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-0);
+  transition: border-color var(--transition-fast);
+}
+
+.mod-card:hover {
+  border-color: var(--color-border-default);
+}
+
+.mod-card.disabled {
+  opacity: 0.5;
+}
+
+.mod-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.mod-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mod-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  margin-bottom: var(--space-half);
+  color: var(--color-text-primary);
+}
+
+.mod-author {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-1);
+}
+
+.mod-desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  margin-bottom: var(--space-1);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mod-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.mod-actions {
+  display: flex;
+  gap: var(--space-1-5);
+  align-items: center;
+  flex-shrink: 0;
+}
