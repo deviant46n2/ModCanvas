@@ -4,8 +4,9 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { computeScore, rankWork, loadTrend, appendTrend } from './health-report.mjs'
 
 const ROOT = process.cwd()
@@ -134,28 +135,29 @@ test('rankWork: tripwire fires only when the file was touched after parking', ()
 })
 
 test('trend: empty array when no trend file exists', () => {
-  const tmp = join(process.cwd(), '.health-trend.test.json')
-  if (existsSync(tmp)) writeFileSync(tmp, '[]')
-  process.env.TREND_PATH = tmp
+  const tmp = join(tmpdir(), 'health-trend-test.json')
   try {
+    if (existsSync(tmp)) writeFileSync(tmp, '[]')
+    process.env.TREND_PATH = tmp
     assert.ok(Array.isArray(loadTrend()))
   } finally {
     delete process.env.TREND_PATH
+    rmSync(tmp, { force: true })
   }
 })
 
 test('trend: one entry per day (same-day runs dedupe)', () => {
-  const tmp = join(process.cwd(), '.health-trend.test.json')
-  writeFileSync(tmp, '[]')
-  process.env.TREND_PATH = tmp
+  const tmp = join(tmpdir(), 'health-trend-test.json')
   try {
+    writeFileSync(tmp, '[]')
+    process.env.TREND_PATH = tmp
     const entry = { date: '2026-08-09', score: 88, deduction: 12, workCount: 3 }
     appendTrend(entry)
     appendTrend(entry)
     const trend = JSON.parse(readFileSync(tmp, 'utf8'))
     assert.equal(trend.length, 1)
-    delete process.env.TREND_PATH
   } finally {
     delete process.env.TREND_PATH
+    rmSync(tmp, { force: true })
   }
 })
