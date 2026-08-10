@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useModState } from './useModState'
-import { searchMods } from '../services/api'
+import { searchMods, checkCompatibility, installModFromSearch } from '../services/api'
 
 vi.mock('../services/api', () => ({
   getProjectMods: vi.fn().mockResolvedValue([]),
@@ -47,6 +47,58 @@ describe('useModState', () => {
     // old rows stay on screen pretending to be current (dead/bouncing look).
     act(() => result.current.setSearchSources(['curseforge']))
     expect(result.current.searchResults).toEqual([])
+  })
+
+  const installPayload = {
+    source: 'modrinth' as const,
+    mod_id: 'missinglib',
+    slug: 'missinglib',
+    name: 'MissingLib',
+  }
+
+  it('installMissingDependency installs the payload and re-runs the check on success', async () => {
+    const { result } = renderHook(() => useModState(project))
+    await act(async () => {
+      await result.current.installMissingDependency(installPayload)
+    })
+    expect(installModFromSearch).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'p1',
+      source: 'modrinth',
+      modId: 'missinglib',
+    }))
+    expect(checkCompatibility).toHaveBeenCalledTimes(1)
+  })
+
+  it('installMissingDependency does not re-run the check when the install fails', async () => {
+    vi.mocked(installModFromSearch).mockRejectedValueOnce('registry down')
+    const { result } = renderHook(() => useModState(project))
+    await act(async () => {
+      await result.current.installMissingDependency(installPayload)
+    })
+    expect(checkCompatibility).not.toHaveBeenCalled()
+  })
+
+  it('installAllMissingDependencies installs every resolved dep once, skips unresolvable, re-checks once', async () => {
+    const { result } = renderHook(() => useModState(project))
+    act(() => {
+      result.current.setCompatResult({
+        compatible: false,
+        issues: [
+          { severity: 'Warning', message: 'm1', affected_mods: [], affected_mod_names: [], install: installPayload },
+          { severity: 'Warning', message: 'm2', affected_mods: [], affected_mod_names: [], install: null },
+          { severity: 'Warning', message: 'm3', affected_mods: [], affected_mod_names: [], install: { source: 'curseforge', mod_id: '123', slug: 'dep2', name: 'Dep Two' } },
+        ],
+        warnings: [],
+      })
+    })
+    await act(async () => {
+      await result.current.installAllMissingDependencies()
+    })
+    expect(installModFromSearch).toHaveBeenCalledTimes(2)
+    expect(installModFromSearch).toHaveBeenNthCalledWith(1, expect.objectContaining({ modId: 'missinglib' }))
+    expect(installModFromSearch).toHaveBeenNthCalledWith(2, expect.objectContaining({ modId: '123', source: 'curseforge' }))
+    // One re-check after the whole batch, not one per install.
+    expect(checkCompatibility).toHaveBeenCalledTimes(1)
   })
 
   it('empty query without a category does not search (c619895 guard)', async () => {

@@ -115,6 +115,7 @@ pub fn check_compatibility(mods: &[crate::models::ModEntry]) -> crate::models::C
                     ),
                     affected_mods: vec![a.mod_id.clone(), b.mod_id.clone()],
                     affected_mod_names: vec![a.name.clone(), b.name.clone()],
+                    install: None,
                 });
             }
         }

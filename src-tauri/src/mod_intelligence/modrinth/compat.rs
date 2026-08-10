@@ -2,9 +2,44 @@
 //! missing/incompatible dependencies, and warn about unsupported loaders and
 //! oversized packs.
 
-use crate::models::ModLoader;
+use crate::models::{CompatibilityInstall, ModLoader, ModMetadata};
 
 use crate::mod_intelligence::ModIntelligence;
+
+/// Derive the one-click install payload for a resolved dependency. The dep
+/// metadata must carry a registry source; unknown sources get no payload —
+/// an install button we cannot back with a downloader would be a lie. The
+/// `curseforge:` id prefix (metadata.rs re-keying) is stripped back to the
+/// numeric project id `install_mod_from_search` expects.
+pub fn install_payload_for(meta: &ModMetadata) -> Option<CompatibilityInstall> {
+    match meta.source.as_str() {
+        "modrinth" => Some(CompatibilityInstall {
+            source: "modrinth".to_string(),
+            // Modrinth metadata's mod_id IS its slug — the downloader accepts it.
+            mod_id: meta.mod_id.clone(),
+            slug: meta.slug.clone(),
+            name: meta.name.clone(),
+        }),
+        "curseforge" => {
+            let numeric = meta
+                .mod_id
+                .strip_prefix("curseforge:")
+                .map(str::to_string)
+                .unwrap_or_else(|| meta.mod_id.clone());
+            if numeric.parse::<u64>().is_ok() {
+                Some(CompatibilityInstall {
+                    source: "curseforge".to_string(),
+                    mod_id: numeric,
+                    slug: meta.slug.clone(),
+                    name: meta.name.clone(),
+                })
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
 
 impl ModIntelligence {
     pub async fn check_compatibility_async(
@@ -72,6 +107,7 @@ impl ModIntelligence {
                         ),
                         affected_mods: vec![a.mod_id.clone(), b.mod_id.clone()],
                         affected_mod_names: vec![a.name.clone(), b.name.clone()],
+                        install: None,
                     });
                 }
             }
@@ -91,6 +127,7 @@ impl ModIntelligence {
                             let dep_name_resolved = metadata_map.get(&dep.mod_id)
                                 .map(|m| m.name.clone())
                                 .unwrap_or(dep.mod_id.clone());
+                            let install = metadata_map.get(&dep.mod_id).and_then(install_payload_for);
                             issues.push(crate::models::CompatibilityIssue {
                                 severity: crate::models::IssueSeverity::Warning,
                                 message: format!(
@@ -99,6 +136,7 @@ impl ModIntelligence {
                                 ),
                                 affected_mods: vec![meta.mod_id.clone(), dep.mod_id.clone()],
                                 affected_mod_names: vec![meta.name.clone(), dep_name_resolved],
+                                install,
                             });
                         }
                     }
@@ -115,6 +153,7 @@ impl ModIntelligence {
                                 ),
                                 affected_mods: vec![meta.mod_id.clone(), dep.mod_id.clone()],
                                 affected_mod_names: vec![meta.name.clone(), dep_name_resolved],
+                                install: None,
                             });
                         }
                     }
@@ -153,3 +192,7 @@ impl ModIntelligence {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "compat_tests.rs"]
+mod compat_tests;

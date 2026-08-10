@@ -49,6 +49,9 @@ function baseProps(overrides: Partial<ModsTabProps> = {}): ModsTabProps {
     searchCategory: '',
     onSearchCategoryChange: vi.fn(),
     installingIds: new Set(),
+    onInstallMissing: vi.fn(),
+    installingMissing: new Set(),
+    onInstallAllMissing: vi.fn(),
     ...overrides,
   }
 }
@@ -125,5 +128,55 @@ describe('ModsTab', () => {
     render(<ModsTab {...baseProps({ searchSources: ['modrinth'] })} />)
     expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
     expect(screen.queryByText('Select at least one source to search.')).toBeNull()
+  })
+
+  const installableIssue = {
+    severity: 'Warning',
+    message: "'Alpha Mod' requires 'MissingLib' which is not in the project",
+    affected_mods: ['a', 'missinglib'],
+    affected_mod_names: ['Alpha Mod', 'MissingLib'],
+    install: { source: 'modrinth' as const, mod_id: 'missinglib', slug: 'missinglib', name: 'MissingLib' },
+  }
+
+  it('compat panel renders an Install button on a resolvable missing dep and fires it', () => {
+    const onInstallMissing = vi.fn().mockResolvedValue(undefined)
+    render(<ModsTab {...baseProps({
+      compatResult: { compatible: false, issues: [installableIssue], warnings: [] },
+      onInstallMissing,
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+    expect(onInstallMissing).toHaveBeenCalledWith(installableIssue.install)
+  })
+
+  it('compat panel offers no Install button for an unresolvable dep', () => {
+    render(<ModsTab {...baseProps({
+      compatResult: { compatible: false, issues: [{ ...installableIssue, install: null }], warnings: [] },
+    })} />)
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+  })
+
+  it('batch button appears only when at least one missing dep resolved, and fires once', () => {
+    const onInstallAllMissing = vi.fn().mockResolvedValue(undefined)
+    render(<ModsTab {...baseProps({
+      compatResult: { compatible: false, issues: [installableIssue], warnings: [] },
+      onInstallAllMissing,
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: /install all missing/i }))
+    expect(onInstallAllMissing).toHaveBeenCalledTimes(1)
+  })
+
+  it('batch button is absent when no missing dep resolved', () => {
+    render(<ModsTab {...baseProps({
+      compatResult: { compatible: false, issues: [{ ...installableIssue, install: null }], warnings: [] },
+    })} />)
+    expect(screen.queryByRole('button', { name: /install all missing/i })).toBeNull()
+  })
+
+  it('per-dep Install disables while that dep is installing', () => {
+    render(<ModsTab {...baseProps({
+      compatResult: { compatible: false, issues: [installableIssue], warnings: [] },
+      installingMissing: new Set(['missinglib']),
+    })} />)
+    expect(screen.getByRole('button', { name: /^Installing…$/ })).toBeDisabled()
   })
 })

@@ -7,7 +7,9 @@ import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility,
 import { useToast } from '../components/ui/Toast'
 import { debounce } from '../core/utils/debounce'
 import type { Project } from './useProjectState'
+import type { CompatibilityResult } from '../services/types'
 import { filterMods, findMissingDependencies, resolveModName } from './useModState/helpers'
+import { useCompatInstall } from './useModState/compat-install'
 
 export type { ModDependency, ModMetadata, CompatibilityIssue, CompatibilityResult } from './useModState/types'
 
@@ -24,7 +26,7 @@ export function useModState(selectedProject: Project | null) {
   const [modMetadata, setModMetadata] = useState<Map<string, any>>(new Map())
   const [depNameMap, setDepNameMap] = useState<Map<string, string>>(new Map())
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
-  const [compatResult, setCompatResult] = useState<any | null>(null)
+  const [compatResult, setCompatResult] = useState<CompatibilityResult | null>(null)
   const [isCheckingCompat, setIsCheckingCompat] = useState(false)
   // Mod ids currently being downloaded/installed from search results.
   const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
@@ -108,6 +110,18 @@ export function useModState(selectedProject: Project | null) {
       setIsCheckingCompat(false)
     }
   }
+
+  // One-click missing-dependency installs (compat panel). Extracted to its
+  // own sub-hook: it owns the in-flight set and the batch/single wrappers.
+  const compatInstall = useCompatInstall(
+    {
+      selectedProject,
+      showToast,
+      loadProjectMods,
+      recheck: handleCheckCompat,
+    },
+    compatResult,
+  )
 
   async function addModToProject(mod: any) {
     if (!selectedProject) return
@@ -273,6 +287,7 @@ export function useModState(selectedProject: Project | null) {
     loadModMetadata,
     handleCheckCompat,
     addModToProject,
+    ...compatInstall,
     removeModFromProject,
     toggleModEnabled,
     handleSearchMods,

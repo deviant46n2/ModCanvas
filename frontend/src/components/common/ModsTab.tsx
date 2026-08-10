@@ -4,6 +4,11 @@ import { List } from 'react-window'
 import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
 import { CategorySelect, CategorySourceHint } from './CategorySelect'
 import { SourceToggles, type ModSource } from './SourceToggles'
+import { ModsTabCompatPanel } from './ModsTabCompatPanel'
+import type {
+  CompatibilityInstall,
+  CompatibilityResult,
+} from '../../services/types'
 
 interface ModMetadata {
   mod_id: string
@@ -22,19 +27,6 @@ interface ModMetadata {
   icon: string | null
   source: 'modrinth' | 'curseforge'
   mismatch?: string | null
-}
-
-interface CompatibilityIssue {
-  severity: string
-  message: string
-  affected_mods: string[]
-  affected_mod_names: string[]
-}
-
-interface CompatibilityResult {
-  compatible: boolean
-  issues: CompatibilityIssue[]
-  warnings: string[]
 }
 
 export interface ModsTabProps {
@@ -67,6 +59,12 @@ export interface ModsTabProps {
   searchCategory: string
   onSearchCategoryChange: (category: string) => void
   installingIds: Set<string>
+  /** One-click install of a missing dependency shown in the compat panel. */
+  onInstallMissing: (install: CompatibilityInstall) => Promise<void>
+  /** Mod ids currently being installed from the compat panel. */
+  installingMissing: Set<string>
+  /** Install every missing dependency the check resolved, in one pass. */
+  onInstallAllMissing: () => Promise<void>
 }
 
 const SEARCH_ROW_HEIGHT = 48
@@ -194,34 +192,13 @@ export function ModsTab(props: ModsTabProps) {
           )}
 
           {props.compatResult && (
-            <div className={`compat-panel ${props.compatResult.compatible ? 'compatible' : 'has-issues'}`}>
-              <div className="compat-header">
-                <span className="compat-status">
-                  {props.compatResult.compatible ? 'All checks passed' : `${props.compatResult.issues.length} issue(s) found`}
-                </span>
-                <button className="btn-close" onClick={props.onCompatResultClose} aria-label="Close compatibility results">{'\u00D7'}</button>
-              </div>
-              {props.compatResult.issues.length > 0 && (
-                <div className="compat-issues">
-                  {props.compatResult.issues.map((issue, i) => (
-                    <div key={i} className={`compat-issue ${issue.severity.toLowerCase()}`}>
-                      <span className="issue-severity">{issue.severity}</span>
-                      <span className="issue-message">{issue.message}</span>
-                      <span className="issue-mods">
-                        {issue.affected_mod_names.join(' \u2194 ')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {props.compatResult.warnings.length > 0 && (
-                <div className="compat-warnings">
-                  {props.compatResult.warnings.map((warn, i) => (
-                    <div key={i} className="compat-warning">{warn}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ModsTabCompatPanel
+              result={props.compatResult}
+              onClose={props.onCompatResultClose}
+              onInstallMissing={props.onInstallMissing}
+              installingMissing={props.installingMissing}
+              onInstallAllMissing={props.onInstallAllMissing}
+            />
           )}
 
           <div className="mod-list">

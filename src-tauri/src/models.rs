@@ -181,12 +181,28 @@ pub struct CompatibilityResult {
     pub warnings: Vec<String>,
 }
 
+/// Everything the frontend needs to install a missing dependency in one
+/// click: the downloader source plus the identity `install_mod_from_search`
+/// resolves the version for. `None` on an issue means the dep could not be
+/// resolved at check time — no button, no blind install.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompatibilityInstall {
+    pub source: String,
+    pub mod_id: String,
+    pub slug: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompatibilityIssue {
     pub severity: IssueSeverity,
     pub message: String,
     pub affected_mods: Vec<String>,
     pub affected_mod_names: Vec<String>,
+    /// Present only for missing-required-dependency issues whose metadata
+    /// resolved at check time.
+    #[serde(default)]
+    pub install: Option<CompatibilityInstall>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

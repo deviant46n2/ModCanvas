@@ -339,7 +339,7 @@ ceiling.
 | Recipes | craft/smelt/stonecut/smith/shapeless, disable, replace ingredient | **~85%** — grid editor, 6 types, unified disable, bulk replace | ~95% | NBT/tag-edge cases, `replaceOutput`, startup-event recipes | Low–Medium (todo.md:349-361 follow-ups) |
 | Quests | tasks, rewards, tables, links, gating, milestones | **~90%** — full canvas parity | ~97% | `quest tags`, multi-page descriptions w/ inline images, theme-file WYSIWYG | Medium (featureparity §7-10) |
 | Configs | flip a setting safely, find a setting | **~60%** — structured forms | ~85% | settings with no typed schema, cross-mod interdependencies | Medium (HOCON arm + schema heuristics + config recommendations) |
-| Mods | find, add, remove, enable/disable, compat-check | **~70%** — search+install+compat | ~90% | dependency-resolution UI, curated recommendations | Low |
+| Mods | find, add, remove, enable/disable, compat-check | **~75%** — search+install+compat + one-click install of resolved missing deps | ~90% | curated recommendations; dep installs for optional/recommended (required-only today) | Low |
 | Progression | gating, ordering, bottlenecks, walls | **~50%** — per-quest fields + sim mode; no campaign surface | ~85% | progression-topology analytics (pure math), cross-chapter staging | Medium |
 | Behaviors | "when X, if Y, do Z" (commands, loot on kill, stage gating) | **~5%** — nothing authorable | ~65% | anything requiring custom logic beyond the action library | **High** (the hard no-code problem; §11) |
 | Loot | table edits, drops, weighted tables | **~5%** — nothing | ~60% | deep loot-table composition (nested pools, conditions-in-JSON) | Medium–High |

@@ -108,8 +108,24 @@ into a category search would make the filter look broken.
 Notes: after installing, the jar is visible to Prism and the game immediately
 (next launch). Quest-editor textures/items for the new jar appear after the
 next Refresh / texture re-index (`scan_instance_textures` validates layer
-metadata so it picks up new jars). Dependencies are not auto-installed yet —
-"Load Dependencies" fills the metadata map for the compat checks.
+metadata so it picks up new jars).
+
+## One-click missing dependencies
+
+The compatibility check (`check_compatibility_async`, `modrinth/compat.rs`)
+already resolves missing required dependencies' metadata while it runs; it now
+carries that resolution back on each missing-dep issue as an `install` payload
+(`CompatibilityInstall` in `models.rs`: source + mod_id + slug + name — exactly
+what `install_mod_from_search` needs). The compat panel renders a per-issue
+**Install** button and an **Install all missing** batch button. Install runs
+through the same proven path as search-install (download → jar inspect → DB
+upsert), then the check re-runs so the panel reflects reality.
+
+Two honesty rules: a dep whose metadata could not be resolved at check time
+gets **no button** (we don't install what we can't identify — e.g. CurseForge
+deps without an API key configured), and only **required** dependencies get
+install payloads (optional/recommended are the player's choice, not a gap to
+auto-fill).
 
 ## Backend & Data Flow
 

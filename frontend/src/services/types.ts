@@ -62,11 +62,22 @@ export interface ModMetadata {
   mismatch?: string | null
 }
 
+/** One-click install data for a missing dependency (Rust-owned, mirrors
+ *  `CompatibilityInstall` in models.rs). Null on an issue means the dep
+ *  could not be resolved at check time — no button, no blind install. */
+export interface CompatibilityInstall {
+  source: 'modrinth' | 'curseforge'
+  mod_id: string
+  slug: string
+  name: string
+}
+
 export interface CompatibilityIssue {
   severity: string
   message: string
   affected_mods: string[]
   affected_mod_names: string[]
+  install: CompatibilityInstall | null
 }
 
 export interface CompatibilityResult {
