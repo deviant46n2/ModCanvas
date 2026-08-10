@@ -273,6 +273,10 @@
       {
         "commit": "bd4016b",
         "reason": "pure structural split (RecipeEditor.css 2033->10 files, byte-identical bundle verified) — doc-less by judgment, s30"
+      },
+      {
+        "commit": "cecace0",
+        "reason": "snbt.rs split — docs synced in-pass (snbt_roundtrip.rs pointers updated to snbt/ submodule layout; trailing-comment indent reference moved to serialize.rs), judged complete"
       }
     ]
   }
