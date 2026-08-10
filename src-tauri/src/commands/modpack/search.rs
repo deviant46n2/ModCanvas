@@ -134,10 +134,11 @@ pub async fn search_mods(
 
     // Search every selected source. Per-source failures are tolerated (logged,
     // not fatal) so one registry being down or unkeyed never blanks the whole
-    // tab. Unknown source strings are skipped, not errors — that is the seam
-    // a future source (e.g. FTB) plugs into: a new match arm + adapter call.
-    for source in &sources {
-        match source.to_lowercase().as_str() {
+    // tab. Unknown source strings pass through active_sources and are skipped
+    // by the match's default arm, not errors — that is the seam a future
+    // source (e.g. FTB) plugs into: a new match arm + adapter call.
+    for source in active_sources(&sources, &categories) {
+        match source.as_str() {
             "modrinth" => {
                 match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version, &categories).await {
                     Ok(mut mods) => results.append(&mut mods),
@@ -145,14 +146,11 @@ pub async fn search_mods(
                 }
             }
             "curseforge" => {
-                // A category filter is a Modrinth facet — CurseForge search
-                // has no equivalent here, so unfiltered CF results mixed into
-                // a category search would make the filter look broken. Pause
-                // CF while a category is selected; the frontend shows why.
-                if !categories.is_empty() {
-                    eprintln!("[ModCanvas] Skipping CurseForge — category filter is Modrinth-only");
-                    continue;
-                }
+                // See active_sources: CurseForge is already excluded when a
+                // category filter is active (the category facet is
+                // Modrinth-only — unfiltered CF results would make the filter
+                // look broken). The frontend shows the pause via
+                // CategorySourceHint.
                 let api_key = resolve_curseforge_api_key(&db)?;
                 if let Some(key) = api_key {
                     match intelligence.search_curseforge(&query, &key).await {
@@ -195,6 +193,21 @@ pub async fn search_mods(
 
     Ok(results)
 }
+/// Which of the selected sources are actually searchable for this request.
+/// CurseForge is paused while a category filter is active: the category facet
+/// is Modrinth-only (ef53cd8), so unfiltered CF results mixed into a category
+/// search would make the filter look broken. Unknown sources pass through —
+/// the match's default arm logs and skips them, keeping the future-source
+/// seam intact. Normalizes case so "CurseForge"/"Modrinth" match.
+fn active_sources(sources: &[String], categories: &[String]) -> Vec<String> {
+    let category_active = !categories.is_empty();
+    sources
+        .iter()
+        .map(|s| s.to_lowercase())
+        .filter(|s| !(s == "curseforge" && category_active))
+        .collect()
+}
+
 /// True when an available MC version covers the requested one: exact match,
 /// or a major-version prefix (e.g. available "1.21" covers requested "1.21.1").
 fn version_compatible(available: &str, requested: &str) -> bool {
@@ -206,11 +219,50 @@ fn version_compatible(available: &str, requested: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::version_compatible;
+    use super::{active_sources, version_compatible};
+
+    fn ss(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
 
     #[test]
     fn exact_match_is_compatible() {
         assert!(version_compatible("1.21.1", "1.21.1"));
+    }
+
+    #[test]
+    fn both_sources_active_without_category() {
+        let sources = active_sources(&ss(&["modrinth", "curseforge"]), &[]);
+        assert_eq!(sources, ss(&["modrinth", "curseforge"]));
+    }
+
+    #[test]
+    fn curseforge_paused_when_category_active() {
+        // The ef53cd8 regression: a category filter is Modrinth-only, so CF
+        // must not be queried — unfiltered CF results made the filter look
+        // broken.
+        let sources = active_sources(&ss(&["modrinth", "curseforge"]), &ss(&["technology"]));
+        assert_eq!(sources, ss(&["modrinth"]));
+    }
+
+    #[test]
+    fn curseforge_only_with_category_yields_nothing() {
+        let sources = active_sources(&ss(&["curseforge"]), &ss(&["technology"]));
+        assert!(sources.is_empty());
+    }
+
+    #[test]
+    fn unknown_sources_pass_through_for_the_default_arm() {
+        // The future-source seam: unknown sources are NOT dropped here — the
+        // match's default arm logs and skips them.
+        let sources = active_sources(&ss(&["modrinth", "ftb"]), &[]);
+        assert_eq!(sources, ss(&["modrinth", "ftb"]));
+    }
+
+    #[test]
+    fn source_case_is_normalized() {
+        let sources = active_sources(&ss(&["Modrinth", "CurseForge"]), &[]);
+        assert_eq!(sources, ss(&["modrinth", "curseforge"]));
     }
 
     #[test]
