@@ -46,3 +46,16 @@ export function CategorySelect({ value, onChange, disabled }: CategorySelectProp
     </select>
   )
 }
+
+// Shown under the search bar when a category is active AND CurseForge is a
+// selected source: the category facet is Modrinth-only, so CF is paused for
+// that search — otherwise unfiltered CF results would make the filter look
+// broken.
+export function CategorySourceHint({ categoryActive, curseForgeActive }: { categoryActive: boolean; curseForgeActive: boolean }) {
+  if (!categoryActive || !curseForgeActive) return null
+  return (
+    <div className="search-empty-hint" role="status">
+      Category filter is Modrinth-only — CurseForge is paused for this search.
+    </div>
+  )
+}

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
 import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
-import { CategorySelect } from './CategorySelect'
+import { CategorySelect, CategorySourceHint } from './CategorySelect'
 import { SourceToggles, type ModSource } from './SourceToggles'
 
 interface ModMetadata {
@@ -274,6 +274,7 @@ export function ModsTab(props: ModsTabProps) {
               Select at least one source to search.
             </div>
           )}
+          <CategorySourceHint categoryActive={!!props.searchCategory} curseForgeActive={props.searchSources.includes('curseforge')} />
           <div className="search-results">
             {props.searchResults.length > 0 && (
               <List<SearchResultRowExtraProps>

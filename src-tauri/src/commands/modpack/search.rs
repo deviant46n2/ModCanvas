@@ -142,6 +142,14 @@ pub async fn search_mods(
                 }
             }
             "curseforge" => {
+                // A category filter is a Modrinth facet — CurseForge search
+                // has no equivalent here, so unfiltered CF results mixed into
+                // a category search would make the filter look broken. Pause
+                // CF while a category is selected; the frontend shows why.
+                if !categories.is_empty() {
+                    eprintln!("[ModCanvas] Skipping CurseForge — category filter is Modrinth-only");
+                    continue;
+                }
                 let api_key = resolve_curseforge_api_key(&db)?;
                 if let Some(key) = api_key {
                     match intelligence.search_curseforge(&query, &key).await {
