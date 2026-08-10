@@ -277,6 +277,10 @@
       {
         "commit": "c39024f",
         "reason": "pure structural split (icons.tsx 301->230, icon-base + icons-align, zero behavior change, 586 tests green) — doc-less by judgment, s30"
+      },
+      {
+        "commit": "6443557",
+        "reason": "pure structural split (export/mod.rs 303->177 + book.rs, zero behavior change, 279 tests green) — doc-less by judgment, s30"
       }
     ]
   }

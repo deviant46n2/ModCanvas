@@ -4,11 +4,13 @@
     "candidate": 3,
     "parked": 0.5
   },
-  "ledger": [
-    {
-      "id": "audit-remaining-300-line-debt",
-      "priority": "P3",
-      "reason": "audit 2026-08-05: next-tier Rust files still >300 (snbt.rs 916, ingest.rs 820, recipes/mod.rs 725, etc.) - parked with written reason, pay by splitting on next touch; progression.rs split into hub + categories/category_map/generation submodules (s29)"
-    }
-  ]
+  "parkedWeights": {
+    "line-limit": [
+      { "min": 301, "max": 400, "weight": 0.5 },
+      { "min": 401, "max": 600, "weight": 1 },
+      { "min": 601, "max": 1000, "weight": 2 },
+      { "min": 1001, "weight": 3 }
+    ]
+  },
+  "ledger": []
 }

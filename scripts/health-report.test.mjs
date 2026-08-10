@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { computeScore, rankWork, loadTrend, appendTrend } from './health-report.mjs'
+import { computeScore, rankWork, loadTrend, appendTrend, parkedWeightFor } from './health-report.mjs'
 
 const ROOT = process.cwd()
 
@@ -99,6 +99,53 @@ test('computeScore: custom weights from the rules file', () => {
     { name: 'line-limit', violations: [{ path: 'a' }], candidates: [], parked: [] },
   ]
   assert.equal(computeScore(results, health).score, 80)
+})
+
+test('computeScore: severity bands weight a monster more than a near-limit park', () => {
+  const health = {
+    weights: { parked: 0.5 },
+    parkedWeights: {
+      'line-limit': [
+        { min: 301, max: 400, weight: 0.5 },
+        { min: 401, max: 600, weight: 1 },
+        { min: 601, max: 1000, weight: 2 },
+        { min: 1001, weight: 3 },
+      ],
+    },
+    ledger: [],
+  }
+  const results = [
+    {
+      name: 'line-limit',
+      violations: [],
+      candidates: [],
+      parked: [
+        { path: 'near.rs', lines: 302 }, // 0.5
+        { path: 'mid.rs', lines: 450 }, // 1
+        { path: 'big.rs', lines: 800 }, // 2
+        { path: 'monster.rs', lines: 2000 }, // 3
+      ],
+    },
+  ]
+  const { score, breakdown } = computeScore(results, health)
+  assert.equal(breakdown['line-limit'].deduction, 6.5) // 0.5 + 1 + 2 + 3
+  assert.equal(score, 94) // 100 - 6.5, integer-rounded
+})
+
+test('computeScore: parked entries without lines fall back to the flat weight', () => {
+  const health = {
+    weights: { parked: 0.5 },
+    parkedWeights: { 'line-limit': [{ min: 301, max: 400, weight: 0.5 }] },
+    ledger: [],
+  }
+  const results = [{ name: 'line-limit', violations: [], candidates: [], parked: [{ path: 'a', reason: 'r' }] }]
+  const { breakdown } = computeScore(results, health)
+  assert.equal(breakdown['line-limit'].deduction, 0.5)
+})
+
+test('parkedWeightFor: entry below the lowest band falls back to the flat weight', () => {
+  const health = { parkedWeights: { 'line-limit': [{ min: 401, max: 600, weight: 1 }] } }
+  assert.equal(parkedWeightFor(health, 'line-limit', { lines: 350 }, 0.5), 0.5)
 })
 
 test('rankWork: violation (P0) above ledger P1 above candidate above parked-tripwire', () => {

@@ -142,6 +142,14 @@ that's the suite's job; this is the ledger's thermometer):
 | parked | 0.5 | known debt WITH a written reason — near-zero so good parks aren't punished (s22) |
 | ledger item | by priority P0 15 / P1 10 / P2 5 / P3 2 | explicit priority field, data not magic |
 
+**Severity bands (s30 — the flat parked weight was undercounting real debt).**
+A section may define `parkedWeights` in `health-rules.json`: the parked
+entry's own metric (line-limit's `lines`) picks a band. Line-limit uses
+`301–400: 0.5 / 401–600: 1 / 601–1000: 2 / 1001+: 3` — a 3226-line App.css
+costs 6× a 301-line file. The score is honest *because* the monsters hurt:
+splitting App.css is worth 3 points, not 0.5. A parked entry without the
+metric (e.g. asset-bundle paths) falls back to the flat 0.5.
+
 **Failure classes are data, not code.** The open-item ledger lives in
 `scripts/health-rules.json` (split from `integrity-rules.json` when the seeded
 ledger + `since` fields pushed it past its own 300-line limit — the s22

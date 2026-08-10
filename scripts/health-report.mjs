@@ -37,6 +37,7 @@ const HEALTH_RULES_PATH = join(process.cwd(), 'scripts', 'health-rules.json')
 
 const DEFAULT_HEALTH = {
   weights: { violation: 10, candidate: 3, parked: 0.5 },
+  parkedWeights: {},
   ledger: [],
 }
 
@@ -49,6 +50,7 @@ export function loadHealthRules() {
     const over = JSON.parse(readFileSync(HEALTH_RULES_PATH, 'utf8'))
     return {
       weights: { ...DEFAULT_HEALTH.weights, ...(over.weights ?? {}) },
+      parkedWeights: { ...DEFAULT_HEALTH.parkedWeights, ...(over.parkedWeights ?? {}) },
       ledger: over.ledger ?? [],
     }
   } catch {
@@ -72,6 +74,20 @@ function countOf(results, name, kind) {
   return results.find((r) => r.name === name)?.[kind]?.length ?? 0
 }
 
+// Parked items default to the flat parked weight, but a section may define
+// SEVERITY BANDS (health.parkedWeights[section] = [{min, max, weight}]): the
+// parked entry's own metric (e.g. line-limit's `lines`) picks a band. This is
+// how a 3226-line App.css costs 6x a 301-line file instead of the same 0.5
+// (s30 — the flat weight was undercounting the real debt; the score lied).
+export function parkedWeightFor(health, section, entry, fallback) {
+  const bands = health.parkedWeights?.[section] ?? []
+  if (bands.length === 0 || entry.lines == null) return fallback
+  for (const b of bands) {
+    if (entry.lines >= b.min && (b.max == null || entry.lines <= b.max)) return b.weight
+  }
+  return fallback
+}
+
 export function computeScore(results, health) {
   const weights = { ...WEIGHT_DEFAULTS, ...(health.weights ?? {}) }
   const breakdown = {}
@@ -80,7 +96,11 @@ export function computeScore(results, health) {
     const nV = countOf(results, section.name, 'violations')
     const nC = countOf(results, section.name, 'candidates') ?? 0
     const nP = countOf(results, section.name, 'parked') ?? 0
-    const d = nV * weights.violation + nC * weights.candidate + nP * weights.parked
+    let parkedDeduction = 0
+    for (const p of section.parked ?? []) {
+      parkedDeduction += parkedWeightFor(health, section.name, p, weights.parked)
+    }
+    const d = nV * weights.violation + nC * weights.candidate + parkedDeduction
     breakdown[section.name] = { violations: nV, candidates: nC, parked: nP, deduction: +d.toFixed(1) }
     deduction += d
   }
