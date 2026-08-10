@@ -16,6 +16,14 @@ pub struct Database {
 
 impl Database {
     pub fn open(path: &Path) -> SqlResult<Self> {
+        // The DB holds the app's data AND (via key_store's fallback path)
+        // potentially the CurseForge API key — enforce owner-only perms so
+        // other local users can never read it. Fixes the default 644.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+        }
         let conn = Connection::open(path)?;
         let db = Self {
             conn: Mutex::new(conn),

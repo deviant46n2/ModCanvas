@@ -53,12 +53,26 @@ export async function exportCurseforgeZip(projectId: string): Promise<string> {
   return invoke<string>('export_curseforge_zip', { projectId })
 }
 
-export async function getCurseforgeApiKey(): Promise<string | null> {
-  return invoke<string | null>('get_curseforge_api_key')
+/** Key storage status for Settings — NEVER the key value itself. The
+ *  renderer only learns whether a key exists and which store holds it. */
+export interface KeyStorageInfo {
+  has_key: boolean
+  /** "keychain" | "database" | "none" */
+  store: string
 }
 
-export async function setCurseforgeApiKey(key: string): Promise<void> {
-  return invoke('set_curseforge_api_key', { key })
+export async function getKeyStorage(): Promise<KeyStorageInfo> {
+  return invoke<KeyStorageInfo>('get_curseforge_api_key')
+}
+
+/** Save the key to the OS keychain (or the app database as a reported
+ *  fallback). Returns the store used: "keychain" | "database". */
+export async function setCurseforgeApiKey(key: string): Promise<string> {
+  return invoke<string>('set_curseforge_api_key', { key })
+}
+
+export async function clearCurseforgeApiKey(): Promise<void> {
+  return invoke('clear_curseforge_api_key')
 }
 
 export async function openPrismLauncher(): Promise<void> {

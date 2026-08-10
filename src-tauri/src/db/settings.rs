@@ -32,4 +32,10 @@ impl Database {
     pub fn set_curseforge_api_key(&self, key: &str) -> SqlResult<()> {
         self.set_setting("curseforge_api_key", key)
     }
+
+    pub fn delete_setting(&self, key: &str) -> SqlResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
+        Ok(())
+    }
 }

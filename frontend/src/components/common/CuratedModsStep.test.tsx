@@ -95,7 +95,7 @@ describe('CuratedModsStep', () => {
         blocked_reason: 'needs a CurseForge API key',
       },
     ])
-    vi.mocked(setCurseforgeApiKey).mockResolvedValue(undefined)
+    vi.mocked(setCurseforgeApiKey).mockResolvedValue('keychain')
     renderStep()
     await screen.findAllByText('FTB Quests')
     fireEvent.change(screen.getByPlaceholderText('CurseForge API key'), { target: { value: 'cf-secret' } })
@@ -147,6 +147,31 @@ describe('CuratedModsStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
     expect(installModFromSearch).not.toHaveBeenCalled()
     expect(onContinue).toHaveBeenCalled()
+  })
+
+  it('failed installs offer a per-mod Retry that re-runs the install', async () => {
+    // One ticked mod, so the failure is unambiguous.
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null },
+    ])
+    vi.mocked(installModFromSearch)
+      .mockRejectedValueOnce('Invalid CurseForge project id: curseforge:289412')
+      .mockResolvedValueOnce({ name: 'installed' })
+    renderStep()
+    await screen.findByText('FTB Quests')
+    fireEvent.click(screen.getByRole('button', { name: /install selected/i }))
+
+    // The failure surfaces with the real error and a Retry button.
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(screen.getByText(/Invalid CurseForge project id/)).toBeInTheDocument()
+    expect(screen.getByText(/check it in Settings/)).toBeInTheDocument()
+
+    fireEvent.click(retry)
+    await waitFor(() => {
+      expect(installModFromSearch).toHaveBeenCalledTimes(2)
+    })
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.getByText('Installed ✓')).toBeInTheDocument()
   })
 
   it('continue after installs refreshes the pack then advances', async () => {

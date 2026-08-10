@@ -36,22 +36,19 @@ impl crate::minecraft::ProgressEmitter for TauriProgressEmitter {
 
 // ... rest of the file
 
-/// Resolve CurseForge API key: runtime env var > compile-time baked key > DB setting.
+/// Resolve the CurseForge API key: runtime env var (dev override) > OS
+/// keychain > database fallback (key_store.rs). The compile-time baked key
+/// path (`option_env!`) was REMOVED 2026-08-10 — a credential compiled into
+/// every distributed binary is a published credential.
 pub(super) fn resolve_curseforge_api_key(db: &Database) -> Result<Option<String>, String> {
-    // 1. Runtime env var (for dev override)
+    // 1. Runtime env var (dev override)
     if let Ok(key) = std::env::var("CURSEFORGE_API_KEY") {
         if !key.is_empty() {
             return Ok(Some(key));
         }
     }
-    // 2. Compile-time baked key (ships with the binary)
-    if let Some(key) = option_env!("CURSEFORGE_API_KEY") {
-        if !key.is_empty() {
-            return Ok(Some(key.to_string()));
-        }
-    }
-    // 3. DB setting (legacy fallback)
-    db.get_curseforge_api_key().map_err(|e| e.to_string())
+    // 2. OS keychain, then the database fallback.
+    Ok(crate::key_store::get(db).0)
 }
 
 /// Load quest graph from a pack directory and save to project config.

@@ -105,14 +105,34 @@ pub fn delete_project(db: State<'_, Database>, project_id: String) -> Result<boo
     db.delete_project(&id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn get_curseforge_api_key(db: State<'_, Database>) -> Result<Option<String>, String> {
-    resolve_curseforge_api_key(&db)
+/// Key storage status for Settings — NEVER the key itself. The renderer
+/// only learns whether a key exists and which store holds it; the value is
+/// read back exclusively inside Rust (resolve_curseforge_api_key).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct KeyStorageInfo {
+    pub has_key: bool,
+    /// "keychain" | "database" | "none"
+    pub store: String,
 }
 
 #[tauri::command]
-pub fn set_curseforge_api_key(db: State<'_, Database>, key: String) -> Result<(), String> {
-    db.set_curseforge_api_key(&key).map_err(|e| e.to_string())
+pub fn get_curseforge_api_key(db: State<'_, Database>) -> Result<KeyStorageInfo, String> {
+    let (key, store) = crate::key_store::get(&db);
+    Ok(KeyStorageInfo {
+        has_key: key.is_some(),
+        store: store.map(|s| s.to_string()).unwrap_or_else(|| "none".to_string()),
+    })
+}
+
+#[tauri::command]
+pub fn set_curseforge_api_key(db: State<'_, Database>, key: String) -> Result<String, String> {
+    let store = crate::key_store::set(&db, &key)?;
+    Ok(store.to_string())
+}
+
+#[tauri::command]
+pub fn clear_curseforge_api_key(db: State<'_, Database>) -> Result<(), String> {
+    crate::key_store::clear(&db)
 }
 
 #[tauri::command]

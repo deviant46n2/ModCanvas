@@ -178,3 +178,23 @@ auto-fill).
   the app toast system. `handleSearchMods` passes the active source tab.
 - `frontend/src/services/mods.ts` — `searchMods`, `installModFromSearch`.
 
+
+## CurseForge API key storage & security
+
+The CurseForge API key is the one secret the app holds. Its storage contract
+(`src-tauri/src/key_store.rs`):
+
+- **OS keychain** (Secret Service on Linux) is the primary store. The key is
+  never written to disk by the app itself — the OS keychain manages it.
+- **Database fallback**: when no keychain daemon exists (headless session,
+  locked keyring), the key falls back to the `settings` table — and Settings
+  SAYS SO. The database file is enforced mode 0600 (`db.rs`) so even the
+  fallback is not readable by other local users.
+- **Never in the binary.** The compile-time baked-key path
+  (`option_env!("CURSEFORGE_API_KEY")` + build.rs dotenv) was removed
+  2026-08-10: a credential compiled into every distributed binary is a
+  published credential. Runtime env var (`CURSEFORGE_API_KEY`) remains as a
+  dev override only.
+- **Never over IPC to the renderer.** `get_curseforge_api_key` returns only
+  `{has_key, store}`; the key value is read back exclusively inside Rust.
+- Precedence: runtime env var > keychain > database fallback.

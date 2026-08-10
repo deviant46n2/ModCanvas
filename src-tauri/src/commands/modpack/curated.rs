@@ -95,8 +95,18 @@ fn filter_curated(
             } else {
                 "modrinth".to_string()
             },
-            // Modrinth metadata's mod_id IS its slug — the installer accepts it.
-            mod_id: meta.mod_id.clone(),
+            // The installer's CF branch parses a bare u64 (search.rs) — the
+            // re-keyed `curseforge:{id}` form must be stripped here, exactly
+            // like compat.rs's install_payload_for does for the compat panel.
+            // One installer contract, both payloads speak it.
+            mod_id: if pick.key.starts_with("curseforge:") {
+                meta.mod_id
+                    .strip_prefix("curseforge:")
+                    .map(str::to_string)
+                    .unwrap_or_else(|| meta.mod_id.clone())
+            } else {
+                meta.mod_id.clone()
+            },
             slug: meta.slug.clone(),
             name: meta.name.clone(),
             description: pick.description.to_string(),

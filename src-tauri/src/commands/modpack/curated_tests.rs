@@ -90,7 +90,10 @@ fn curseforge_pick_resolves_by_its_rekeyed_mod_id() {
     let out = filter_curated(&[ftb], &ModLoader::NeoForge, "1.21.1");
     let ftb = out.iter().find(|m| m.slug == "ftb-quests").expect("ftb quests resolves");
     assert_eq!(ftb.source, "curseforge");
-    assert_eq!(ftb.mod_id, "curseforge:289412");
+    // The installer's CF branch parses a bare u64 — the payload must carry
+    // the STRIPPED id, never the re-keyed form (the "invalid CurseForge
+    // project id: curseforge:289412" install failure, s37 journey).
+    assert_eq!(ftb.mod_id, "289412");
 }
 
 #[test]

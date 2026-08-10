@@ -9,6 +9,7 @@ pub mod indexer;
 pub mod indexer_kubejs;
 pub mod ingest;
 pub mod instance_textures;
+pub mod key_store;
 pub mod ftb_theme;
 pub mod launcher;
 pub mod models;
@@ -22,8 +23,7 @@ pub mod recipes;
 pub mod scriptgen;
 pub mod shared;
 pub mod templates;
-pub mod ws_ipc;
-pub mod ws_protocol;
+pub mod ws_ipc;pub mod ws_protocol;
 
 use std::sync::{Arc, OnceLock};
 use tauri::Manager;
@@ -178,6 +178,7 @@ pub fn run() {
             commands::export_curseforge_zip,
             commands::get_curseforge_api_key,
             commands::set_curseforge_api_key,
+            commands::clear_curseforge_api_key,
             commands::open_prism_launcher,
             commands::get_quest_graph,
             commands::save_quest_graph,

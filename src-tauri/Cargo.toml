@@ -42,6 +42,9 @@ regex = "1"
 base64 = "0.22"
 json5 = "0.4"
 sha2 = "0.10"
+# OS keychain storage for the CurseForge API key (Secret Service on Linux).
+# The key must never live in the app database by default — see key_store.rs.
+keyring = { version = "3", features = ["linux-native"] }
 dirs-next = "2"
 dotenvy = "0.15"
 

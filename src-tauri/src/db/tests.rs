@@ -171,3 +171,16 @@ use uuid::Uuid;
 
         let _ = std::fs::remove_file(&path);
     }
+
+    #[test]
+    fn api_key_setting_round_trips_and_deletes() {
+        // The key_store fallback path stores the CF key as a plain setting —
+        // lock the layer it relies on (set → get → delete).
+        let (db, path) = temp_db();
+        assert_eq!(db.get_curseforge_api_key().unwrap(), None, "no key by default");
+        db.set_curseforge_api_key("cf-key").unwrap();
+        assert_eq!(db.get_curseforge_api_key().unwrap(), Some("cf-key".to_string()));
+        db.delete_setting("curseforge_api_key").unwrap();
+        assert_eq!(db.get_curseforge_api_key().unwrap(), None, "delete clears the key");
+        let _ = std::fs::remove_file(&path);
+    }

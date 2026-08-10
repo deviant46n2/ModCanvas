@@ -10,8 +10,8 @@ import { installModFromSearch, checkCompatibility, listCuratedMods } from '../..
 import { setCurseforgeApiKey } from '../../services/project'
 import type { CuratedMod, CompatibilityInstall } from '../../services/types'
 import type { Project } from '../../services/types'
-
-type ModStatus = 'pending' | 'installing' | 'installed' | 'failed'
+import { CuratedModRow, type ModStatus } from './CuratedModRow'
+import { CuratedDepsList } from './CuratedDepsList'
 
 interface CuratedModsStepProps {
   project: Project
@@ -161,45 +161,22 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
     onContinue()
   }
 
+  async function retryMod(mod: CuratedMod) {
+    setStatus((s) => ({ ...s, [mod.slug]: 'installing' }))
+    const result = await installOne({ source: mod.source, modId: mod.mod_id, slug: mod.slug, name: mod.name })
+    setStatus((s) => ({ ...s, [mod.slug]: result.ok ? 'installed' : 'failed' }))
+    setFailure((f) => {
+      if (result.ok) {
+        const { [mod.slug]: _gone, ...rest } = f
+        return rest
+      }
+      return { ...f, [mod.slug]: result.error ?? 'Install failed' }
+    })
+  }
+
   const installingAny = Object.values(status).some((s) => s === 'installing')
   const canContinue = deps !== null && deps.length === 0 && !busy
-
-  function renderRow(mod: CuratedMod) {
-    const blocked = mod.blocked_reason !== null
-    return (
-      <div
-        key={mod.slug}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-          border: blocked
-            ? '1px dashed var(--color-border)'
-            : ticked.has(mod.slug) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-          borderRadius: 8, marginBottom: 6,
-          cursor: blocked ? 'not-allowed' : 'pointer',
-          opacity: blocked ? 0.6 : 1,
-        }}
-        onClick={() => !blocked && toggle(mod.slug)}
-      >
-        <input
-          type="checkbox"
-          checked={ticked.has(mod.slug)}
-          onChange={() => toggle(mod.slug)}
-          disabled={blocked}
-          aria-label={`Install ${mod.name}`}
-        />
-        <div style={{ flex: 1 }}>
-          <strong>{mod.name}</strong>
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{mod.description}</div>
-        </div>
-        {blocked && <span style={{ fontSize: 12, color: 'var(--color-warning)' }}>{mod.blocked_reason}</span>}
-        {!blocked && status[mod.slug] === 'installing' && <span style={{ color: 'var(--color-text-tertiary)' }}>Installing…</span>}
-        {!blocked && status[mod.slug] === 'installed' && <span style={{ color: 'var(--color-success)' }}>Installed ✓</span>}
-        {!blocked && status[mod.slug] === 'failed' && (
-          <span style={{ color: 'var(--color-warning)' }} title={failure[mod.slug]}>{failure[mod.slug]}</span>
-        )}
-      </div>
-    )
-  }
+  const anyFailed = Object.keys(status).some((k) => status[k] === 'failed')
 
   const coreMods = mods?.filter((m) => m.core) ?? []
   const funMods = mods?.filter((m) => !m.core) ?? []
@@ -249,32 +226,45 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
           Needed by ModCanvas
         </div>
       )}
-      {coreMods.map(renderRow)}
+      {coreMods.map((mod) => (
+        <CuratedModRow
+          key={mod.slug}
+          mod={mod}
+          ticked={ticked.has(mod.slug)}
+          status={status[mod.slug] ?? 'pending'}
+          failure={failure[mod.slug]}
+          installingAny={installingAny}
+          onToggle={toggle}
+          onRetry={retryMod}
+        />
+      ))}
 
       {funMods.length > 0 && (
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', margin: '10px 0 6px' }}>
           Goes great with your pack
         </div>
       )}
-      {funMods.map(renderRow)}
+      {funMods.map((mod) => (
+        <CuratedModRow
+          key={mod.slug}
+          mod={mod}
+          ticked={ticked.has(mod.slug)}
+          status={status[mod.slug] ?? 'pending'}
+          failure={failure[mod.slug]}
+          installingAny={installingAny}
+          onToggle={toggle}
+          onRetry={retryMod}
+        />
+      ))}
 
       {deps !== null && deps.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-            Some mods need a library to work — install them too:
-          </div>
-          {deps.map((dep) => (
-            <div key={dep.mod_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', marginBottom: 4 }}>
-              <span style={{ flex: 1 }}>{dep.name}</span>
-              <button
-                className="btn-primary btn-sm"
-                onClick={() => installDep(dep)}
-                disabled={installingDeps.has(dep.mod_id)}
-              >
-                {installingDeps.has(dep.mod_id) ? 'Installing…' : 'Install'}
-              </button>
-            </div>
-          ))}
+        <CuratedDepsList deps={deps} installingDeps={installingDeps} onInstall={installDep} />
+      )}
+
+      {anyFailed && (
+        <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>
+          Install failed — see the error above and Retry. CurseForge issues usually mean
+          your API key: check it in Settings (gear icon in the top bar).
         </div>
       )}
 
