@@ -1,7 +1,7 @@
 {
     id = "A000000000000001"
     filename = "Exploration_Starter"
-    title = "Exploration Starter"
+    title = "Play Your First Pack"
     order_index = 0
     quests = [
         {

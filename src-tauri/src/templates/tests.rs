@@ -21,13 +21,17 @@ fn scaffold_writes_subdirs_layout() {
     let quests = root.join("config").join("ftbquests").join("quests");
 
     assert!(quests.join("data.snbt").exists(), "book data file missing");
-    let chapter = quests.join("Exploration_Starter").join("chapter.snbt");
-    assert!(chapter.exists(), "chapter file missing in subdirs layout");
+    let play = quests.join("Exploration_Starter").join("chapter.snbt");
+    assert!(play.exists(), "play chapter missing in subdirs layout");
+    let shape = quests.join("Shape_Your_Pack").join("chapter.snbt");
+    assert!(shape.exists(), "shape chapter missing in subdirs layout");
 
-    let content = std::fs::read_to_string(&chapter).unwrap();
-    assert!(content.contains(r#"id = "A000000000000001""#), "chapter id missing");
-    assert!(content.contains("On Your Way"), "milestone quest missing");
-    assert!(content.contains(r#"shape = "rsquare""#), "milestone shape missing");
+    let play_content = std::fs::read_to_string(&play).unwrap();
+    assert!(play_content.contains(r#"id = "A000000000000001""#), "play chapter id missing");
+    assert!(play_content.contains("On Your Way"), "milestone quest missing");
+    assert!(play_content.contains(r#"shape = "rsquare""#), "milestone shape missing");
+    let shape_content = std::fs::read_to_string(&shape).unwrap();
+    assert!(shape_content.contains("Share Your Pack"), "tour milestone missing");
 }
 
 #[test]
@@ -35,16 +39,19 @@ fn scaffolded_pack_imports_cleanly() {
     let (_tmp, root) = scaffolded_root();
     let result = import_ftb_quests(&root).expect("scaffolded pack imports without error");
 
-    assert_eq!(result.graph.chapters.len(), 1, "exactly one chapter expected");
+    assert_eq!(result.graph.chapters.len(), 2, "two chapters expected");
     let quest_count = result
         .graph
         .nodes
         .iter()
         .filter(|n| matches!(n.node_type, QuestNodeType::Quest))
         .count();
-    assert_eq!(quest_count, 7, "all seven template quests must import");
+    assert_eq!(quest_count, 18, "7 play quests + 11 tour quests must import");
 
-    // Task variety survives: one kill task, one crafting task, one checkmark.
+    // Task variety survives: one kill task, one crafting task, twelve
+    // checkmark (app-action) tasks — eleven tour quests plus the play
+    // chapter's own milestone. All must import as checkmarks so players
+    // can complete them by hand.
     let kill = result
         .graph
         .nodes
@@ -59,8 +66,16 @@ fn scaffolded_pack_imports_cleanly() {
         .filter(|n| n.objectives.iter().any(|o| matches!(o.objective_type, ObjectiveType::ItemCrafting)))
         .count();
     assert_eq!(craft, 1, "item_crafting task must import");
+    let checkmarks = result
+        .graph
+        .nodes
+        .iter()
+        .filter(|n| n.objectives.iter().any(|o| matches!(o.objective_type, ObjectiveType::Checkmark)))
+        .count();
+    assert_eq!(checkmarks, 12, "eleven tour quests + the play milestone");
 
-    // The linear chain produces 6 prerequisite edges.
+    // The play chapter's linear chain produces 6 prerequisite edges; the
+    // tour chapter is deliberately dependency-free (self-paced).
     let prereqs = result
         .graph
         .edges
@@ -84,7 +99,7 @@ fn scaffolded_pack_survives_edit_and_reexport() {
     let result2 = import_ftb_quests(export_dir.path()).expect("re-import succeeds");
 
     assert_eq!(result2.graph.nodes.len(), result.graph.nodes.len(), "node count stable");
-    assert_eq!(result2.graph.chapters.len(), 1, "chapter count stable");
+    assert_eq!(result2.graph.chapters.len(), 2, "chapter count stable");
 }
 
 #[test]

@@ -29,8 +29,8 @@ pub struct TemplateMeta {
 
 const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
     id: "exploration",
-    name: "Exploration Starter",
-    description: "A collect-craft-build starter chapter that works on any version.",
+    name: "First Steps — Play & Shape Your Pack",
+    description: "A survival intro that doubles as a ModCanvas tour: quests, recipes, configs, health, launch, export.",
     files: &[
         (
             "data.snbt",
@@ -39,6 +39,10 @@ const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
         (
             "Exploration_Starter/chapter.snbt",
             include_str!("../../templates/exploration/Exploration_Starter/chapter.snbt"),
+        ),
+        (
+            "Shape_Your_Pack/chapter.snbt",
+            include_str!("../../templates/exploration/Shape_Your_Pack/chapter.snbt"),
         ),
     ],
 }];
