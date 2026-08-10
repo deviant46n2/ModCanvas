@@ -190,7 +190,7 @@
       },
       {
         "path": "frontend/src/hooks/useQuestAssetPipeline.ts",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change"
+        "reason": "368 lines after 2026-08-09 extraction of merge policies to services/texture-merge.ts (pure + tested); remainder is the hook effect wiring, structurally intertwined with hook state - revisit on next structural touch"
       },
       {
         "path": "frontend/src/services/quest-types.ts",
