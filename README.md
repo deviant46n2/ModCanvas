@@ -64,7 +64,7 @@ cargo test   # in src-tauri/
 
 - **[Project Bible](docs/PROJECT_BIBLE.md)** — mission, roadmap, and the ruleset that guides development.
 - **[AGENTS.md](AGENTS.md)** — architectural principles & strict boundaries for AI coding agents.
-- **[Design system](design.md)** — the Unity/Blender-class visual language.
+- **[Design system](docs/design.md)** — the Unity/Blender-class visual language.
 - **[Feature parity](featureparity.md)** — ModCanvas ↔ FTB in-game editor gap checklist.
 - **Feature records** — [`docs/`](docs/): quest editor, recipe editor, config editor, progression, history, load-pack flow, workspace actions.
 

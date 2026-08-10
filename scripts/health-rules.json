@@ -6,11 +6,6 @@
   },
   "ledger": [
     {
-      "id": "audit-item-7-stale-docs",
-      "priority": "P2",
-      "reason": "audit item 7 (Pending): README.md + featureparity.md content not re-checked since the audit flagged them; recipe-editor.md already rewritten"
-    },
-    {
       "id": "snbt-parked-holes",
       "priority": "P2",
       "reason": "s23 proptest found 3 parked snbt.rs holes (trailing-comment indent, needs_quoting key classes, f32 -0.0 / integral >= 2^63) - documented in snbt_roundtrip.rs header, fix when the serializer is next touched"

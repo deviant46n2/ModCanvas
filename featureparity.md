@@ -3,14 +3,15 @@
 Reference for closing the gap between the **ModCanvas** desktop workbench and the **FTB Quests** in-game editor. Every item below is a capability the in-game editor exposes; the status column says whether ModCanvas ships it today.
 
 - ✅ **Parity** — ModCanvas covers it.
+- 🟢 **Parity (extra depth)** — covers it AND ships fields/behaviors beyond the base capability (used in task/reward tables where a row's ModCanvas implementation is fuller than the FTB baseline).
 - 🟡 **Partial** — import/export and/or data-model support exists, but no live editor UI (or the round-trip is lossy).
 - ❌ **Missing** — not implemented at all.
 
 FTB source references (`/tmp/ftbq/common/...` or the FTBTeam/FTB-Quests repo) are the authoritative behavior we aim to match. ModCanvas references are the **live** editor only — `frontend/src/QuestBookEditor.tsx`, `frontend/src/components/quest/QuestCanvas.tsx`, `QuestDetailModal.tsx`, `quest-detail-sections.tsx`, `quest-section-groups.tsx`, `ChapterSettings.tsx`, `GroupSettings.tsx`, `book-settings.tsx`. The legacy `QuestGraph.tsx` / `QuestInspector.tsx` / `inspector.tsx` / `toolbar.tsx` / `modals.tsx` stack is dead code (not imported/bundled) and is ignored as evidence of a feature — a field that only exists there is marked ❌.
 
-_Last audited against `d5e233a` (branch `drunk-coding`). Audit note: file-size cap (>300 lines) is violated by 41 non-test files; quest import/export rebuilds SNBT comment-free (comment-preserving AST exists but is unused for quest content); Rust serializers gate Data Components by hardcoded `1.20.5+` heuristics with no adapter — see AGENTS.md._
+_Last audited against `6cd18dc` (s30 re-check). Audit note: file-size cap (>300 lines) is violated by 39 non-test files; quest import/export rebuilds SNBT comment-free (comment-preserving AST exists but is unused for quest content); Rust serializers emit `components` (smart filters) unconditionally — the adapter matrix defines `getSNBTSpec().dataComponents` but no production path consumes it (only adapters/ + tests), so Data Component emission is not version-gated through the spec — see AGENTS.md._
 
-_Updated 2026-08-05: quest import/export now preserves SNBT comments via the raw-SNBT sidecar (`imports/ftb_quests/snbt_sidecar.rs`), including on live export paths and book-level files (`data.snbt`, `chapter_groups.snbt`, `reward_tables/*.snbt`). The file-size cap sweep split 11 of the 12 worst offenders under 300 lines; `imports/ftb_quests/import.rs` (2536 lines) remains monolithic — see `docs/audit-2026-08-05.md`._
+_Updated 2026-08-05: quest import/export now preserves SNBT comments via the raw-SNBT sidecar (`imports/ftb_quests/snbt_sidecar.rs`), including on live export paths and book-level files (`data.snbt`, `chapter_groups.snbt`, `reward_tables/*.snbt`). The file-size cap sweep split 11 of the 12 worst offenders under 300 lines; `imports/ftb_quests/import.rs` (2536 lines) was split into a hub + 14 submodules (`7865e7d`) — see `docs/audit-2026-08-05.md`._
 
 ---
 
@@ -28,7 +29,7 @@ Reached in-game via Settings gear → **Edit File**.
 | Default consume items | ✅ | Editable + exported |
 | Default autoclaim rewards | ✅ | Editable (disabled/enabled/no_toast/invisible) + exported |
 | Detection delay | ✅ | Editable + exported |
-| Default quest size (book-level) | 🟡 | Not surfaced; chapter default exists, book default does not |
+| Default quest size (book-level) | 🟡 | Surfaced (`book-settings.tsx`, Default Quest Width/Height) but **not exported** — no `default_quest_size` key in the `data.snbt` map (`export/mod.rs`) |
 | Emergency items + cooldown | ✅ | Editable (`book-settings.tsx`) + exported + round-trip tested |
 | Drop loot crates | ✅ | Editable + exported |
 | Disable GUI / pause game | ✅ | Editable + exported |
@@ -64,22 +65,23 @@ Reached in-game via Settings gear → **Edit File**.
 | Min width | appearance | 🟡 | UI writes `min_window_width`, export writes `min_width` — round-trip asymmetry |
 | Icon scale | appearance | ✅ | 0.1–2.0 input; 2/3 renderer match verified |
 | Visibility (invisible / invisible-until-X-tasks / hide-details / hide-text-until-complete) | visibility | 🟡 | 6-option `<select>`; the fine-grained tristates (hide_until_deps_complete/_visible, hide_text_until_complete) not individually editable |
-| Hide lock icon | visibility | ✅ | Checkbox in Advanced |
+| Hide lock icon | visibility | ✅ | Checkbox in Visibility section |
+| Hide dependency lines | visibility | ✅ | Checkbox in Visibility section |
+| Hide dependent lines | visibility | ✅ | Checkbox in Visibility section |
+| Hide JEI / recipe mod | visibility | ✅ | "Hide JEI Recipe" checkbox in Visibility section |
+| Min window width | visibility | ✅ | Number input in Visibility section |
 | Dependencies | dependencies | ✅ | Drawn as edges; bulk dep ops missing (§4) |
-| Dependency requirement (ALL/ONE × completed/started) | dependencies | ✅ | `DEPENDENCY_REQUIREMENTS` select in Advanced |
-| Min required dependencies | dependencies | ✅ | Number input in Advanced |
-| Hide dependency lines | dependencies | ✅ | Checkbox |
-| Hide dependent lines | dependencies | ✅ | Checkbox |
-| Max completable dependents | dependencies | ✅ | Number input in Advanced |
-| Guide page | misc | ✅ | Text input in Advanced |
-| Disable JEI / recipe mod | misc | ✅ | "Hide JEI Recipe" checkbox |
-| Repeatable | misc | ✅ | `can_be_repeatable` checkbox |
-| Repeat cooldown | misc | ✅ | Seconds input in Advanced (`repeat_cooldown` FTB-canonical) |
-| Optional | misc | ✅ | Checkbox |
-| Ignore reward blocking | misc | ✅ | Checkbox |
-| Progression mode | misc | ✅ | Dropdown |
-| Require sequential tasks | misc | ✅ | Checkbox |
-| Silently complete / disable toast | misc | ✅ | Checkboxes |
+| Dependency requirement (ALL/ONE × completed/started) | dependencies | ✅ | `DEPENDENCY_REQUIREMENTS` select in Dependencies section |
+| Min required dependencies | dependencies | ✅ | Number input in Dependencies section |
+| Max completable dependents | dependencies | ✅ | Number input in Dependencies section |
+| Optional | dependencies | ✅ | Checkbox in Dependencies section |
+| Guide page | misc | ✅ | Text input in Misc section |
+| Repeatable | misc | ✅ | `can_be_repeatable` checkbox in Misc section |
+| Repeat cooldown | misc | ✅ | Seconds input in Misc section (`repeat_cooldown` FTB-canonical) |
+| Progression mode | misc | ✅ | Dropdown in Misc section |
+| Require sequential tasks | misc | ✅ | Checkbox in Misc section |
+| Silently complete / disable toast | misc | ✅ | Checkboxes in Misc section |
+| Ignore reward blocking | misc | ✅ | Checkbox in Misc section |
 | Disable reward (pause_reward) | misc | 🟡 | Parsed/exported, no UI |
 | Quest background | extra | 🟡 | Parsed/exported, no UI |
 
@@ -266,7 +268,7 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Dependency cycle detection + warning | ✅ |
 | Edge draw / reconnect / delete | ✅ |
 | Quest search / filter bar | ✅ Type-to-filter by label/id/subtitle/objective target; dims non-matches, Enter focuses the first match |
-| Hover dependency highlight | ✅ | Gentle: hovered quest's edges brighten to full opacity, others dim to 28% (opacity-only — no stroke-width jump, no CSS `filter`, so nothing blurry or pixel-shifting inside the scaled viewport) |
+| Hover dependency highlight | ✅ | Hovered quest's edges brighten, others dim (stroke → `#777`, width 1.5→1, opacity 0.28 — `useQuestCanvasModel.ts`); hover bumps stroke to 3 (`QuestCanvas.css`). No CSS `filter` anywhere in this path — the anti-blur rule inside the scaled viewport (s25) |
 | **Undo / redo (Ctrl+Z/Y)** | ✅ | Full-graph snapshot history in `QuestBookEditor`; ↩/↪ toolbar buttons + Ctrl+Z / Ctrl+Y |
 | **Bezier control-point editing per edge** | ✅ | Per-edge curve handles (`EdgeBezierEditor`); one undoable step per drag; stored in the editor graph (not in SNBT — FTB's format has no field) |
 | Editing-mode toggle | ✅ 🔒 View / ✏️ Edit: read-only lock disables move/connect/delete/add while keeping selection + navigation |
@@ -345,7 +347,7 @@ integrity + coverage) is shipped** — see `docs/pack-health.md`.
 
 Ordered by value / effort. Items 1–2 are done. Items 3–4 are the remaining cheap wins; 5–6 are the biggest editing gaps; 7 is the deep WYSIWYG work.
 
-1. ✅ **Resurface orphaned per-quest fields in the live modal** — `repeat_cooldown`, `hide_lock_icon`, `guide_page`, `max_completable_dependents`, `dependency_requirement`, `min_required_dependencies` now all editable in the Advanced section of `QuestDetailModal.tsx`.
+1. ✅ **Resurface orphaned per-quest fields in the live modal** — `repeat_cooldown`, `hide_lock_icon`, `guide_page`, `max_completable_dependents`, `dependency_requirement`, `min_required_dependencies` now all editable in `QuestDetailModal.tsx` (Visibility/Dependencies/Misc sections — there is no "Advanced" section; the modal is Appearance/Visibility/Dependencies/Misc).
 2. ✅ **Reward-table editor screen** — `RewardTablesModal.tsx` (🏆 Rewards toolbar button): weighted entries, loot_size/empty_weight, reorder, usage count; `RewardCard` gets a table `<select>` for choice/all_table/random rewards.
 3. ✅ **Right-click context menus** — node menu (Edit/Duplicate/Copy ID/Complete/Reset/Delete, bulk variants on multi-selection) and empty-pane menu (Add Quest, Add Link, New Quest with Task, Paste Quest), with right-click-to-position placement at the cursor via `QuestContextMenu.tsx`.
 4. ✅ **Undo / redo (Ctrl+Z/Y)** — full-graph snapshot history on every `commitGraph` mutation, ↩/↪ toolbar buttons with disabled states.
