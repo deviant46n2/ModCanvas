@@ -39,6 +39,12 @@
       "README.md",
       "AGENTS.md"
     ],
-    "lookback": 10
+    "lookback": 10,
+    "judgments": [
+      {
+        "commit": "1f53dee",
+        "reason": "the curated CF-pick behavior doc landed one commit later (c0d49bd): roadmap §9.3 step 4 — 'the CF pick resolves DIRECTLY... surfaces as a blocked row with the precise reason'"
+      }
+    ]
   }
 }
