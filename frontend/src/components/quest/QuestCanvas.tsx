@@ -15,7 +15,7 @@ import { useQuestCanvasContextMenu } from './useQuestCanvasContextMenu';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasArea } from './CanvasArea';
 import '@xyflow/react/dist/style.css';
-import './QuestCanvas.css';
+import './quest-canvas-styles';
 
 export { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model';
 

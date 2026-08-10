@@ -1,0 +1,175 @@
+.react-flow__edge-path {
+  stroke-width: 2;
+  fill: none;
+}
+
+.quest-edge-casing {
+  fill: none;
+}
+
+/* Hover/selected glow WITHOUT CSS `filter`. Applying a filter to an edge path
+   inside ReactFlow's transformed viewport forces the browser to rasterize that
+   subtree at CSS-pixel resolution, which visually degrades (pixelates) the
+   whole canvas on hover. A plain brighter stroke reads the same without the
+   compositing-layer penalty. */
+.react-flow__edge:hover .react-flow__edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+.quest-edge-label {
+  fill: var(--ftb-text-bright);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  paint-order: stroke;
+  stroke: var(--ftb-bg);
+  stroke-width: 3px;
+}
+
+.quest-edge-chevron {
+  pointer-events: none;
+}
+
+.quest-edge-source-dot {
+  pointer-events: none;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dashoffset: -20;
+  animation: ftb-dash 0.8s linear infinite;
+}
+
+@keyframes ftb-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* Connect mode: reveal the quest connection ports so dependencies can be
+   created by dragging between quests. Only the source handles are made
+   interactive: with the loose connection mode the start node becomes the edge
+   source, so allowing grabs from target handles would silently invert the
+   dependency direction. */
+.connect-mode-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--ftb-accent);
+  color: var(--ftb-bg, #1a1a1e);
+  border: 2px solid var(--ftb-accent-hover);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.connect-mode-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.connect-mode-close:hover {
+  color: #fff;
+}
+
+/* React Flow v12 renders source handles with a bare `source` class (the
+   old `react-flow__handle-source` selector was removed in v12), so match on
+   `.react-flow__handle.source` to reveal the connection ports in connect mode. */
+.quest-canvas-wrapper.connect-mode .react-flow__handle.source {
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--ftb-accent) !important;
+  border: 2px solid #f4f4f5 !important;
+  border-radius: 50% !important;
+  cursor: crosshair;
+  z-index: 5;
+}
+
+.quest-canvas-wrapper.connect-mode .react-flow__handle.source:hover {
+  background: var(--ftb-accent-hover) !important;
+  transform: translate(-50%, -50%) scale(1.35) !important;
+}
+
+/* Floating action chip for the currently selected dependency arrow. */
+.edge-action-chip {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(13, 14, 19, 0.96);
+  border: 1px solid var(--ftb-accent);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.edge-action-label {
+  color: var(--ftb-text);
+  white-space: nowrap;
+}
+
+.edge-action-delete {
+  background: var(--ftb-surface-alt, #2d2d33);
+  border: 1px solid var(--ftb-danger, #e74c3c);
+  color: var(--ftb-danger, #ff8a8a);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edge-action-delete:hover {
+  background: var(--ftb-danger, #e74c3c);
+  color: #fff;
+}
+
+.edge-action-ghost {
+  background: transparent;
+  border: 1px solid var(--ftb-border, #3d3d44);
+  color: var(--ftb-text);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edge-action-ghost:hover {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.edge-action-ghost.edge-action-active {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent-hover);
+  color: #1a1a1e;
+}
+
+/* MiniMap customization */

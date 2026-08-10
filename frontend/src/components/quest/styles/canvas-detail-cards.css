@@ -1,0 +1,254 @@
+.quest-detail-card-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quest-detail-card-toggle {
+  display: flex;
+}
+
+.quest-detail-ghost-btn {
+  background: transparent;
+  border: none;
+  color: #6a6a72;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-ghost-btn:hover {
+  color: var(--ftb-accent);
+}
+
+.quest-detail-card-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2a2a30;
+}
+
+/* Fields */
+.quest-detail-field-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.quest-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quest-detail-field label {
+  font-size: 9px;
+  color: #6a6a72;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-field input,
+.quest-detail-field select {
+  background: #18181c;
+  border: 1px solid #3d3d44;
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 6px;
+  outline: none;
+}
+
+.quest-detail-field input:focus,
+.quest-detail-field select:focus {
+  border-color: var(--ftb-accent);
+}
+
+.quest-detail-field input[type="color"] {
+  width: 100%;
+  height: 30px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.quest-detail-field input[type="number"] {
+  width: 100%;
+}
+
+/* Scale slider row */
+.quest-detail-field-scale {
+  flex: 1;
+}
+
+.quest-detail-scale-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.quest-detail-scale-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--ftb-accent);
+  cursor: pointer;
+  background: transparent;
+}
+
+.quest-detail-scale-value {
+  min-width: 92px;
+  font-size: 11px;
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Checkboxes row */
+.quest-detail-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.quest-detail-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ftb-text);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  user-select: none;
+}
+
+.quest-detail-checkbox input[type="checkbox"] {
+  accent-color: var(--ftb-accent);
+}
+
+/* Icon picker styling */
+.quest-detail-icon-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quest-detail-icon-preview {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #18181c;
+  border: 1px solid #3d3d44;
+}
+
+.quest-detail-icon-preview img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.quest-detail-icon-preview span {
+  font-size: 14px;
+}
+
+.quest-detail-small-btn {
+  background: #3d3d44;
+  border: 1px solid #5a5a62;
+  color: var(--ftb-text);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.quest-detail-small-btn:hover {
+  background: var(--ftb-accent);
+  color: #1a1a1e;
+  border-color: var(--ftb-accent);
+}
+
+/* Delete button */
+.quest-detail-delete-btn {
+  background: transparent;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-detail-delete-btn:hover {
+  background: #e74c3c;
+  color: #fff;
+}
+
+/* Footer bar */
+.quest-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #0d0e13;
+  border-top: 2px solid var(--ftb-border);
+}
+
+.quest-detail-footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+.quest-detail-footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.quest-detail-sim-btn {
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.6);
+  color: #4ade80;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-detail-sim-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+}
+
+.quest-detail-save-btn {
+  background: var(--ftb-accent);
+  border: 1px solid var(--ftb-accent-hover);
+  color: #fff;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  padding: 6px 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-detail-save-btn:hover {
+  background: var(--ftb-accent-hover);
+}
+
+/* ─── Chapter decoration editor ─────────────────────────────────── */
+
+.toolbar-btn-active {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent-hover);
+  color: #fff;
+}

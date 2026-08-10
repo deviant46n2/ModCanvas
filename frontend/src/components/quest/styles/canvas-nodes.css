@@ -1,0 +1,278 @@
+.chapter-add-button {
+  padding: 6px 14px;
+  background: var(--ftb-accent);
+  color: var(--ftb-bg, #1a1a1e);
+  border: 2px solid var(--ftb-accent-hover);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.15s ease;
+  opacity: 0.85;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.chapter-add-button:hover {
+  opacity: 1;
+  background: var(--ftb-accent-hover);
+}
+
+/* FTB Quest Node - in-game style */
+.ftb-quest-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Hover highlight WITHOUT a CSS `filter`. Inside ReactFlow's transformed
+   viewport a `filter: brightness()` forces the browser to rasterize the node
+   into its own compositing layer at CSS-pixel resolution, which makes the
+   pixelated icon blurry and can nudge it by a sub-pixel. A box-shadow ring
+   reads as the same feedback without any rasterization cost. */
+.ftb-quest-node:hover .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 2px rgba(242, 201, 76, 0.45), 0 0 12px rgba(242, 201, 76, 0.15);
+}
+
+.ftb-quest-node.selected .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 3px var(--ftb-accent), 0 0 16px rgba(91, 155, 213, 0.35);
+}
+
+.ftb-quest-node.optional .ftb-quest-shape-wrap {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+/* Progress simulation overlays ("Simulate" mode) */
+.ftb-quest-node.sim-hidden {
+  opacity: 0.25;
+  filter: grayscale(0.9);
+}
+.ftb-quest-node.sim-locked .ftb-quest-shape-wrap {
+  filter: saturate(0.45) brightness(0.8);
+}
+.ftb-quest-node.sim-complete .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.6), 0 0 12px rgba(74, 222, 128, 0.35);
+}
+.ftb-quest-sim-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #fff;
+  z-index: 3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.ftb-quest-sim-hidden {
+  background: rgba(148, 163, 184, 0.9);
+}
+.ftb-quest-sim-locked {
+  background: rgba(251, 146, 60, 0.92);
+}
+.ftb-quest-sim-done {
+  background: rgba(74, 222, 128, 0.95);
+  font-size: 12px;
+  padding: 2px 5px;
+}
+
+/* Quest link (cross-chapter reference) badge */
+.ftb-quest-node.quest-link .ftb-quest-shape-wrap {
+  border-style: dashed;
+}
+.ftb-quest-link-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgba(56, 130, 246, 0.92);
+  color: #fff;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Shape wrapper: the colored shape tile */
+.ftb-quest-shape-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  position: relative;
+  transition: box-shadow 0.15s;
+}
+
+/* Quest icon centered inside the shape */
+.ftb-quest-node-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+}
+
+.ftb-quest-node-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  /* NO CSS `filter` here. A drop-shadow once lived on this rule and blurred
+     every icon: inside ReactFlow's transformed viewport a filter forces the
+     icon into its own compositing layer at CSS-pixel resolution, and the
+     viewport resamples that layer with bilinear smoothing ON TOP of the hard
+     pixels — stairs plus fuzz (s25 regression, fixed by removing it). Depth
+     cues must be box-shadow or baked into the texture, never a filter. */
+}
+
+.ftb-quest-node-icon-fallback {
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+/* Quest title below the shape */
+.ftb-quest-node-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ftb-text-bright);
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  max-width: 160px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  pointer-events: auto;
+  cursor: text;
+}
+
+/* Node handles — invisible, only exist for edge routing */
+.ftb-node-handle {
+  width: 4px !important;
+  height: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* FTB shape clip-paths */
+.shape-default {
+  border-radius: 0;
+}
+
+.shape-circle {
+  border-radius: 50%;
+}
+
+.shape-square {
+  border-radius: 0;
+}
+
+.shape-roundedsquare {
+  border-radius: 8px;
+}
+
+.shape-rsquare {
+  border-radius: 8px;
+}
+
+/* shape "none" renders no shape in-game (its textures are empty); the
+   fallback must not draw a plate/border behind the icon either. */
+.shape-none {
+  border: none;
+  background-color: transparent;
+}
+
+.shape-rounded_square {
+  border-radius: 8px;
+}
+
+.shape-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  /* PARKED s25 (latent twin of the icon-blur bug): this recolor filter also
+     forces the shape-wrap into a CSS-pixel-resolution layer inside the
+     transformed viewport, blurring any icon it contains — but only on the
+     fallback path (instances WITHOUT real FTB shape textures, where the
+     baked-tile path sets `filter: none` above). The filter is load-bearing
+     here (paints the solid silhouette under the ~13%-alpha tint fill), so
+     removing it needs a filter-free recolor design (nested clipped elements
+     or SVG fills). Parked with this written reason; revisit when a
+     texture-less instance matters. */
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
+}
+
+.shape-pentagon {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
+}
+
+.shape-hexagon {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
+}
+
+.shape-octagon {
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
+}
+
+.shape-heart {
+  border-radius: 0;
+}
+
+.shape-gear {
+  clip-path: polygon(35% 0%, 65% 0%, 70% 20%, 80% 30%, 100% 35%, 100% 65%, 80% 70%, 70% 80%, 65% 100%, 35% 100%, 30% 80%, 20% 70%, 0% 65%, 0% 35%, 20% 30%, 30% 20%);
+  filter: drop-shadow(0 0 0 var(--shape-color, #000));
+}
+
+/* When the instance's real FTB shape textures are available, the whole tile
+   (grey fill + tinted/white outline) is baked once into a single square PNG by
+   `bakeShapeTile` (shape-textures.ts) at the node's display size, then shown as
+   a plain <img>. Baking avoids all CSS stretching (`background-size`,
+   `object-fit`, `image-rendering: pixelated`), which distorted the shape
+   geometry and painted a grey plate box under WebKit. The texture's own alpha
+   defines the silhouette, so only the shape shows — no box behind it. */
+.ftb-quest-shape-wrap.has-texture {
+  clip-path: none;
+  border: none;
+  border-radius: 0;
+  filter: none;
+}
+
+.ftb-quest-shape-tile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Chapter images layer */
+/* No overflow: hidden here: the layer box is anchored at flow origin and moves
+   with pan, so clipping at its boundary would slice images whose flow coords are
+   negative (FTB chapters commonly place art above/left of origin). The containing
+   .quest-canvas-wrapper clips at the true screen edge instead. */

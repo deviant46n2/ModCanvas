@@ -1,0 +1,61 @@
+.quest-shortcuts-close {
+  background: transparent;
+  border: none;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.quest-shortcuts-close:hover {
+  color: var(--ftb-text-bright);
+}
+
+.quest-shortcuts-body {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  overflow-y: auto;
+  flex-wrap: wrap;
+}
+
+.quest-shortcuts-col {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quest-shortcuts-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ftb-text-dim);
+  opacity: 0.7;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 2px;
+}
+
+.quest-shortcut-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.quest-shortcut-key {
+  flex-shrink: 0;
+  min-width: 130px;
+  background: #25252a;
+  border: 1px solid #3d3d44;
+  border-radius: 4px;
+  color: var(--ftb-text-bright);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  padding: 2px 6px;
+  text-align: center;
+}
+
+.quest-shortcut-label {
+  color: var(--ftb-text);
+}

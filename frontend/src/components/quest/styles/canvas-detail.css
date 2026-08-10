@@ -1,0 +1,265 @@
+.quest-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.quest-detail-modal {
+  background: var(--ftb-surface, #12131a);
+  border: 2px solid var(--ftb-border);
+  border-radius: 8px;
+  outline: 1px solid rgba(91, 155, 213, 0.3);
+  width: 560px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.quest-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #222226;
+  border-bottom: 2px solid var(--ftb-accent);
+}
+
+.quest-detail-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.quest-detail-icon img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.quest-detail-icon-fallback {
+  font-size: 22px;
+  opacity: 0.5;
+}
+
+.quest-detail-title-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quest-detail-title-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--ftb-text-bright);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.quest-detail-title-input:focus {
+  border-bottom-color: var(--ftb-accent);
+}
+
+.quest-detail-subtitle-input {
+  background: transparent;
+  border: none;
+  color: var(--ftb-text-dim);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 4px;
+  outline: none;
+}
+
+.quest-detail-subtitle-input:focus {
+  color: var(--ftb-text);
+}
+
+.quest-detail-close {
+  background: transparent;
+  border: none;
+  color: var(--ftb-text-dim);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.quest-detail-close:hover {
+  color: var(--ftb-text-bright);
+}
+
+.quest-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quest-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quest-detail-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid #3d3d44;
+  padding-bottom: 6px;
+}
+
+.quest-detail-section-icon {
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.quest-detail-add-btn {
+  margin-left: auto;
+  background: #3d3d44;
+  border: 1px solid #5a5a62;
+  color: var(--ftb-text);
+  font-size: 16px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-add-btn:hover {
+  background: var(--ftb-accent);
+  color: #1a1a1e;
+  border-color: var(--ftb-accent);
+}
+
+.quest-detail-empty {
+  font-size: 11px;
+  color: #6a6a72;
+  font-style: italic;
+  padding: 4px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-textarea {
+  background: #1e1e22;
+  border: 1px solid #3d3d44;
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 8px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.5;
+  min-height: 48px;
+}
+
+.quest-detail-textarea:focus {
+  border-color: var(--ftb-accent);
+}
+
+/* Cards for tasks/rewards */
+.quest-detail-card {
+  background: #1e1e22;
+  border: 1px solid #3d3d44;
+}
+
+.quest-detail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: #25252a;
+  border-bottom: 1px solid #3d3d44;
+}
+
+.quest-detail-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-card-title select {
+  background: #1e1e22;
+  border: 1px solid #3d3d44;
+  color: var(--ftb-text);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 4px;
+}
+
+.quest-detail-task-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #18181c;
+  border: 1px solid #3d3d44;
+  flex-shrink: 0;
+}
+
+.quest-detail-task-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.quest-detail-item-fallback {
+  font-size: 12px;
+  opacity: 0.4;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-card-index {
+  color: #6a6a72;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.quest-detail-card-remove {
+  background: transparent;
+  border: none;
+  color: #6a6a72;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.quest-detail-card-remove:hover {
+  color: #e74c3c;
+}

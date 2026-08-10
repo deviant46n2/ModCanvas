@@ -1,0 +1,48 @@
+.chapter-images-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  /* Must paint BELOW quest nodes. This layer is portaled into
+     .react-flow__viewport-portal, which ReactFlow mounts AFTER the node layer in
+     the DOM; with z-index:0 it stacked above the nodes (which use z-index:auto).
+     A negative value keeps the art behind quests/edges while still above the
+     canvas background. */
+  z-index: -1;
+}
+
+.chapter-image {
+  position: absolute;
+  /* FTB renders chapter images stretched to fill their box (ImageIconRenderer
+     blits the full texture rect), so mirror that with 100% 100% instead of
+     `contain`, which letterboxes and shifts decorations out of alignment. */
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: opacity 0.2s ease;
+}
+
+.chapter-image:hover {
+  opacity: 1 !important;
+}
+
+.chapter-image[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--ftb-text-bright);
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  border: 1px solid var(--ftb-accent);
+  pointer-events: none;
+  z-index: 999;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Edge styles.
+   Dependency arrows are rendered by the `dependency` edge component as a dark
+   casing stroke under a bright core (see quest-edges.tsx) so they read over any
+   chapter background; the CSS here only covers fallbacks and interaction. */

@@ -1,0 +1,65 @@
+.react-flow__minimap {
+  background: var(--ftb-surface, #25252a);
+  border: 2px solid var(--ftb-border);
+  border-radius: 0;
+}
+
+/* Controls */
+.react-flow__controls {
+  background: var(--ftb-surface, #25252a);
+  border: 2px solid var(--ftb-border);
+  border-radius: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__controls-button {
+  background: var(--ftb-surface-alt, #2d2d33);
+  border: 1px solid var(--ftb-border);
+  border-radius: 0;
+  color: var(--ftb-text);
+  fill: var(--ftb-text);
+  width: 28px;
+  height: 28px;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--ftb-input-bg, #1e1e22);
+  border-color: var(--ftb-accent);
+}
+
+.react-flow__controls-button svg {
+  stroke: var(--ftb-text);
+  fill: var(--ftb-text);
+}
+
+/* Attribution */
+.react-flow__attribution {
+  background: var(--ftb-surface, #25252a);
+  border-top: 2px solid var(--ftb-border);
+  color: var(--ftb-text-dim);
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.react-flow__attribution a {
+  color: var(--ftb-text-dim);
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: rgba(91, 155, 213, 0.08);
+  border: 2px solid var(--ftb-accent);
+}
+
+/* Background grid pattern override */
+.react-flow__background {
+  background-color: var(--ftb-bg, #1e1e1e);
+}
+
+/* When an in-game quest background backdrop is active, keep the editor grid dots
+   but drop the opaque fill so the theme texture shows through behind them. */
+.quest-canvas-wrapper.has-backdrop .react-flow__background {
+  background-color: transparent !important;
+}
+
+/* === Quest Detail Modal === */

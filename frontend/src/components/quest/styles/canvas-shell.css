@@ -1,0 +1,285 @@
+.quest-canvas-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ftb-bg, #1e1e1e);
+  border: 1px solid var(--ftb-border);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--ftb-surface, #25252a);
+  border-bottom: 2px solid var(--ftb-border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 2px solid var(--ftb-border);
+  border-radius: 0;
+  color: var(--ftb-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  background: var(--ftb-surface-alt, #2d2d33);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolbar-btn:disabled:hover {
+  background: var(--ftb-input-bg, #1e1e22);
+  border-color: var(--ftb-border);
+  color: var(--ftb-text);
+}
+
+/* ─── Canvas search bar ─────────────────────────────────────────── */
+.canvas-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-search-input {
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 5px 26px 5px 8px;
+  width: 170px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.canvas-search-input:focus {
+  border-color: var(--ftb-accent);
+}
+
+.canvas-search-count {
+  position: absolute;
+  right: 22px;
+  font-size: 10px;
+  color: var(--ftb-accent);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.canvas-search-clear {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.canvas-search-clear:hover {
+  color: var(--ftb-text-bright);
+}
+
+/* Search-result highlighting on quest nodes */
+.ftb-quest-node.search-dim {
+  opacity: 0.18;
+  filter: grayscale(0.85);
+}
+
+.ftb-quest-node.search-match .ftb-quest-shape-wrap {
+  box-shadow: 0 0 0 3px var(--ftb-accent), 0 0 18px rgba(91, 155, 213, 0.55);
+}
+
+.ftb-quest-node.search-match .ftb-quest-node-title {
+  color: var(--ftb-accent);
+}
+
+/* ─── Align / distribute buttons ────────────────────────────────── */
+.align-distribute-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.align-btn {
+  min-width: 30px;
+  padding: 6px 7px;
+  text-align: center;
+}
+
+.align-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ftb-border);
+  margin: 0 4px;
+}
+
+/* ─── Book theme preset picker ──────────────────────────────────── */
+.canvas-theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--ftb-text-dim);
+}
+
+.canvas-theme-label {
+  white-space: nowrap;
+}
+
+.canvas-theme-picker select {
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 6px;
+  outline: none;
+  max-width: 220px;
+}
+
+.canvas-theme-picker select:focus {
+  border-color: var(--ftb-accent);
+}
+
+/* ─── Bezier control-point editor ───────────────────────────────── */
+.edge-bezier-editor {
+  z-index: 15;
+}
+
+.edge-bezier-guides line {
+  stroke: var(--ftb-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.8;
+}
+
+.edge-bezier-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--ftb-accent);
+  border: 2px solid var(--ftb-accent-hover);
+  color: #1a1a1e;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.edge-bezier-handle:active {
+  cursor: grabbing;
+}
+
+.edge-bezier-handle:hover {
+  background: var(--ftb-accent-hover);
+}
+
+.toolbar-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ftb-text-dim);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
+
+.toolbar-group input[type="checkbox"] {
+  accent-color: var(--ftb-accent);
+}
+
+.canvas-stats {
+  font-size: 11px;
+  color: var(--ftb-text-dim);
+  padding: 4px 8px;
+  background: var(--ftb-input-bg, #1e1e22);
+  border: 1px solid var(--ftb-border);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cycle-warning {
+  color: var(--ftb-danger);
+  margin-left: 8px;
+  font-weight: 700;
+}
+
+.quest-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.quest-canvas-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.quest-canvas-wrapper .react-flow {
+  height: 100%;
+  width: 100%;
+}
+
+.canvas-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.chapter-add-link-button {
+  background: rgba(56, 130, 246, 0.25);
+  border-color: rgba(56, 130, 246, 0.8);
+  color: #93c5fd;
+}
+
+.chapter-add-link-button:hover {
+  background: rgba(56, 130, 246, 0.4);
+  color: #fff;
+}
