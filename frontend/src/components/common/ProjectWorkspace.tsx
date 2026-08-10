@@ -43,6 +43,7 @@ export interface ProjectWorkspaceProps {
   onExport: () => void
   onDelete: () => void
   onBackToProjects: () => void
+  onOpenSettings: () => void
   onRefresh: () => void
   onForceReindex: () => void
 
@@ -114,6 +115,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onRefresh={props.onRefresh}
         onForceReindex={props.onForceReindex}
         onClosePack={props.onBackToProjects}
+        onOpenSettings={props.onOpenSettings}
       />
 
             <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes'] as const).map((tab) => (

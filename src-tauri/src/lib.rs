@@ -143,6 +143,7 @@ pub fn run() {
             commands::get_project_mods,
             commands::search_mods,
             commands::install_mod_from_search,
+            commands::list_curated_mods,
             commands::get_project_mod_metadata,
             commands::check_compatibility_async,
             commands::get_dep_names,

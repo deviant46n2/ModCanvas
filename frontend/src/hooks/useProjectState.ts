@@ -95,9 +95,10 @@ export function useProjectState() {
     )
     setProjects([project, ...projects])
     // Select it in the launcher; useAppState.handleCreateProject decides
-    // whether to open it (which runs the full load pipeline).
+    // whether to open it (which runs the full load pipeline). The wizard
+    // stays open through its post-create steps (curated mods, green check)
+    // and closes itself on Done/Launch.
     setSelectedProject(project)
-    setShowWizard(false)
     return project
   }
 

@@ -2,7 +2,7 @@
 // and the primary Test action plus the overflow Project menu on the right.
 // Rare/destructive actions live in the menu, not the toolbar.
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDownIcon } from '../ui/icons'
+import { ChevronDownIcon, SettingsIcon } from '../ui/icons'
 import { HistoryDrawer } from '../history/HistoryDrawer'
 
 interface TopBarProps {
@@ -16,6 +16,7 @@ interface TopBarProps {
   onDeployCompanion: () => void
   onExport: () => void
   onDelete: () => void
+  onOpenSettings: () => void
   packLoaded: boolean
   onBackToProjects: () => void
   onRefresh: () => void
@@ -34,6 +35,7 @@ export function TopBar({
   onDeployCompanion,
   onExport,
   onDelete,
+  onOpenSettings,
   packLoaded,
   onBackToProjects,
   onRefresh,
@@ -85,6 +87,9 @@ export function TopBar({
           }
         >
           {isTesting ? 'Testing...' : 'Test'}
+        </button>
+        <button className="btn-secondary" onClick={onOpenSettings} title="Settings (CurseForge API key)" aria-label="Open settings">
+          <SettingsIcon size={14} />
         </button>
         <HistoryDrawer />
         <div ref={menuRef} className="project-menu-wrap">

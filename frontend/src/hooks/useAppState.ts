@@ -38,6 +38,8 @@ export function useAppState() {
   const [packLoaded, setPackLoaded] = useState(false)
   // Save / Discard / Cancel guard shown when leaving a dirty pack.
   const [showLeavePack, setShowLeavePack] = useState(false)
+  // Settings modal (CurseForge API key).
+  const [showSettings, setShowSettings] = useState(false)
   const autoReopenDone = useRef(false)
 
   // Listen for granular progress events emitted by the backend during ingest
@@ -88,12 +90,14 @@ export function useAppState() {
     await runLoadPipeline(project, force, true)
   }
 
-  /** Create a project, then open it (full cache-aware load). Errors propagate
-   *  to the wizard so it can stay open and show why the create failed. */
-  async function handleCreateProject(input: CreateProjectInput) {
+  /** Create a project, then open it (full cache-aware load) under the still-
+   *  open wizard. Errors propagate so the wizard can show why. Returns the
+   *  project so the wizard can continue to its post-create steps. */
+  async function handleCreateProject(input: CreateProjectInput): Promise<Project> {
     const project = await projectState.handleCreateProject(input)
     setActiveTab('mods')
     await openPack(project)
+    return project
   }
 
   /** Dismiss the load modal. If a fresh open failed, also leave the workspace. */
@@ -245,6 +249,7 @@ export function useAppState() {
     dismissLoadModal,
     showLeavePack,
     requestClosePack,
+    showSettings, setShowSettings,
     saveAndClosePack,
     discardAndClosePack,
     cancelLeavePack,

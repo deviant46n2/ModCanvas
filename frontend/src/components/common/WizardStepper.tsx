@@ -5,28 +5,52 @@ import {
   type MinecraftInstance,
 } from '../../services/instances'
 import { listProjectTemplates } from '../../services/project'
-import type { CreateProjectInput, ProjectTemplate } from '../../services/types'
+import type { CreateProjectInput, Project, ProjectTemplate } from '../../services/types'
 import { ScratchForm } from './scratch-form'
+import { CuratedModsStep } from './CuratedModsStep'
+import { HealthLaunchStep } from './HealthLaunchStep'
 
 export type { CreateProjectInput } from '../../services/types'
 
 interface WizardStepperProps {
   show: boolean
   onClose: () => void
-  onCreate: (input: CreateProjectInput) => Promise<void>
+  /** Create + open the pack (the App runs the load pipeline). Resolves with
+   *  the created project so the wizard can continue to its post-create steps;
+   *  throws on failure so the wizard stays open and shows why. */
+  onCreate: (input: CreateProjectInput) => Promise<Project>
+  /** Re-run the load pipeline (after curated installs, so the green check
+   *  sees the new mods). */
+  onRefresh: () => Promise<void>
+  packLoaded: boolean
+  /** Close the wizard (Done / after Launch). The pack stays open. */
+  onDone: () => void
 }
 
 type Mode = 'instance' | 'scratch'
 
+const STEP_LABELS: Record<number, string> = {
+  1: 'where your pack lives',
+  2: 'what it is about',
+  3: 'review and create',
+  4: 'some mods to start',
+  5: 'green check',
+}
+
 /**
- * The First-Pack wizard (roadmap P0-WIZARD, §9.3 steps 1-3): pick where the
- * pack lives, pick what it's about, create. Steps 1-2 have zero side effects
- * — nothing is written until Create — so closing the wizard at any step
- * strands nobody. The classic 3-field form lives inside as "start from
- * scratch"; the beginner path is "use a Prism instance", which derives the
- * version/loader/path from the instance so no technical question is asked.
+ * The First-Pack wizard (roadmap P0-WIZARD, §9.3). Steps 1-2 have zero side
+ * effects — nothing is written until Create — so closing the wizard at any
+ * point strands nobody. After Create the pack loads underneath the wizard and
+ * steps 4-5 (curated mods, green check + launch) run against the live pack.
  */
-export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
+export function WizardStepper({
+  show,
+  onClose,
+  onCreate,
+  onRefresh,
+  packLoaded,
+  onDone,
+}: WizardStepperProps) {
   const [step, setStep] = useState(1)
   const [mode, setMode] = useState<Mode>('instance')
   const [instances, setInstances] = useState<MinecraftInstance[] | null>(null)
@@ -36,6 +60,7 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
   const [scratch, setScratch] = useState({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [project, setProject] = useState<Project | null>(null)
 
   useEffect(() => {
     if (!show) return
@@ -46,6 +71,7 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
     setScratch({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
     setError(null)
     setCreating(false)
+    setProject(null)
     setInstances(null)
     setTemplates(null)
     listMcInstances().then(setInstances).catch((e) => setError(String(e)))
@@ -82,7 +108,9 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
     setCreating(true)
     setError(null)
     try {
-      await onCreate(buildInput())
+      const created = await onCreate(buildInput())
+      setProject(created)
+      setStep(4)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -106,8 +134,7 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of 3{step === 2 ? ' — what is your pack about?' : ''}
-          {step === 3 ? ' — review and create' : ''}
+          Step {step} of 5 — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -128,6 +155,10 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
               <strong>Start from scratch</strong>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                 Create an empty pack folder with just a version and loader.
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>
+                No launcher instance — this pack can't be launched from ModCanvas. Use it
+                with external tools (e.g. export it and run it through Prism).
               </div>
             </div>
 
@@ -168,7 +199,7 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
           <>
             <div style={{ color: 'var(--color-text-secondary)', fontSize: 14, marginBottom: 10 }}>
               Pick a starting point for <strong>{mode === 'instance' ? instance?.name : scratch.name}</strong>.
-              Templates add a starter quest chapter — you can always edit or delete it later.
+              Templates add a starter quest book — you can always edit or delete it later.
             </div>
             {templates === null && <div style={{ color: 'var(--color-text-tertiary)' }}>Loading templates…</div>}
             {templates?.map((t) => (
@@ -209,18 +240,37 @@ export function WizardStepper({ show, onClose, onCreate }: WizardStepperProps) {
           </div>
         )}
 
+        {step === 4 && project && (
+          <CuratedModsStep
+            project={project}
+            onRefresh={onRefresh}
+            onContinue={() => setStep(5)}
+          />
+        )}
+
+        {step === 5 && project && (
+          <HealthLaunchStep
+            project={project}
+            packLoaded={packLoaded}
+            launchable={mode === 'instance'}
+            onDone={onDone}
+          />
+        )}
+
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
-          {step > 1 && (
+          {step > 1 && step < 4 && (
             <button className="btn-secondary" onClick={() => setStep(step - 1)} disabled={creating}>Back</button>
           )}
-          {step < 3 ? (
-            <button className="btn-primary" onClick={() => setStep(step + 1)} disabled={!step1Complete}>
-              Next
-            </button>
-          ) : (
+          {step === 1 && (
+            <button className="btn-primary" onClick={() => setStep(2)} disabled={!step1Complete}>Next</button>
+          )}
+          {step === 2 && (
+            <button className="btn-primary" onClick={() => setStep(3)}>Next</button>
+          )}
+          {step === 3 && (
             <button className="btn-primary" onClick={handleCreate} disabled={creating}>
-              {creating ? 'Creating…' : 'Create Pack'}
+              {creating ? 'Creating…' : 'Create & continue'}
             </button>
           )}
         </div>

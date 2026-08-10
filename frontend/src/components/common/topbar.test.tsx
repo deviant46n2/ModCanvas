@@ -15,6 +15,7 @@ const base = {
   onExport: vi.fn(),
   onDelete: vi.fn(),
   onBackToProjects: vi.fn(),
+  onOpenSettings: vi.fn(),
   onRefresh: vi.fn(),
   onForceReindex: vi.fn(),
   onClosePack: vi.fn(),

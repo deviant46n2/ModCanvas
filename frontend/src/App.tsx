@@ -28,6 +28,7 @@ import { Launcher } from './components/launcher/Launcher'
 import { ProjectWorkspace } from './components/common/ProjectWorkspace'
 import { ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
 import { WizardStepper } from './components/common/WizardStepper'
+import { SettingsModal } from './components/common/SettingsModal'
 import { LeavePackModal } from './components/common/LeavePackModal'
 import { LoadPackModal } from './components/common/LoadPackModal'
 import { useAppState } from './hooks/useAppState'
@@ -123,6 +124,7 @@ function AppRoot() {
           onExport={() => s.setShowExport(true)}
           onDelete={() => s.setConfirmCloseProject(true)}
           onBackToProjects={s.requestClosePack}
+          onOpenSettings={() => s.setShowSettings(true)}
           onRefresh={() => s.refreshPack(false)}
           onForceReindex={() => s.refreshPack(true)}
           modsTab={{
@@ -202,10 +204,14 @@ function AppRoot() {
         />
       )}
 
+      <SettingsModal show={s.showSettings} onClose={() => s.setShowSettings(false)} />
       <WizardStepper
         show={s.showWizard}
         onClose={() => s.setShowWizard(false)}
         onCreate={s.handleCreateProject}
+        onRefresh={() => s.refreshPack(false)}
+        packLoaded={s.packLoaded}
+        onDone={() => s.setShowWizard(false)}
       />
 
       <ImportModal

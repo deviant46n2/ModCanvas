@@ -210,7 +210,8 @@ fn active_sources(sources: &[String], categories: &[String]) -> Vec<String> {
 
 /// True when an available MC version covers the requested one: exact match,
 /// or a major-version prefix (e.g. available "1.21" covers requested "1.21.1").
-fn version_compatible(available: &str, requested: &str) -> bool {
+/// Shared with the curated-mod filter (curated.rs) — one rule, one source.
+pub(crate) fn version_compatible(available: &str, requested: &str) -> bool {
     if available == requested {
         return true;
     }

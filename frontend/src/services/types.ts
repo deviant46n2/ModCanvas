@@ -86,6 +86,22 @@ export interface CompatibilityResult {
   warnings: string[]
 }
 
+/** A curated mod the First-Pack wizard can offer (filtered by Rust to what
+ *  the pack's loader/version actually supports; `ticked` is the default).
+ *  `core` picks back a ModCanvas feature (quest book, recipe scripting) and
+ *  render in their own section; `blocked_reason` shows a pick that cannot be
+ *  installed (e.g. CurseForge without an API key) instead of hiding it. */
+export interface CuratedMod {
+  source: 'modrinth' | 'curseforge'
+  mod_id: string
+  slug: string
+  name: string
+  description: string
+  ticked: boolean
+  core: boolean
+  blocked_reason: string | null
+}
+
 export interface ConfigFileInfo {
   path: string
   name: string

@@ -47,8 +47,30 @@ beforeEach(() => {
 })
 
 async function renderWizard() {
-  const onCreate = vi.fn<(input: CreateProjectInput) => Promise<void>>().mockResolvedValue(undefined)
-  render(<WizardStepper show onClose={() => {}} onCreate={onCreate} />)
+  const created = {
+    id: 'p1',
+    name: 'Starter World',
+    description: '',
+    minecraft_version: '1.21.1',
+    mod_loader: 'NeoForge',
+    pack_version: '1.0.0',
+    author: '',
+    created_at: '',
+    updated_at: '',
+    path: '/prism/instances/starter-world/minecraft',
+    source: 'modcanvas',
+  }
+  const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
+  render(
+    <WizardStepper
+      show
+      onClose={() => {}}
+      onCreate={onCreate}
+      onRefresh={vi.fn().mockResolvedValue(undefined)}
+      packLoaded={false}
+      onDone={() => {}}
+    />,
+  )
   await screen.findByText('Starter World')
   return onCreate
 }
@@ -61,7 +83,7 @@ describe('WizardStepper', () => {
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Exploration Starter'))
     fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create Pack'))
+    fireEvent.click(screen.getByText('Create & continue'))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     expect(onCreate).toHaveBeenCalledWith({
@@ -88,7 +110,7 @@ describe('WizardStepper', () => {
     fireEvent.click(screen.getByText('Next'))
     // Start empty (no template) is the default for the veteran path.
     fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create Pack'))
+    fireEvent.click(screen.getByText('Create & continue'))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     expect(onCreate).toHaveBeenCalledWith({

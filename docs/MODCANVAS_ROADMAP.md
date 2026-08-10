@@ -136,7 +136,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Partially implemented (P0-WIZARD chunks 1–2).** The wizard UI (`components/common/WizardStepper.tsx`) replaced the new-project modal: instance pick (or start-from-scratch with the classic form), template pick, review-and-create. `create_project` scaffolds template packages (chunk 1). Steps 4–6 (curated mod picks, guided first quest, green check + Launch handoff) pending. |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3).** `WizardStepper.tsx`: instance pick or start-from-scratch → template pick → review → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). `create_project` scaffolds template packages. Step 5 (guided first quest) lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: a 2-chapter book — a 7-quest survival intro plus an 11-quest ModCanvas tour). Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
@@ -563,15 +563,33 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    book titled "First Steps — Play & Shape Your Pack" (a 7-quest vanilla survival chain
    plus an 11-quest ModCanvas tour — add quests/chapters/connections, recipes, configs,
    mods, health, launch, export). The `WizardStepper` UI (chunk 2) lets a user pick it.
-4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
-   pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
-   **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
-   file (mod IDs + one-line "why this").
-5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
-   the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
-   export path. The zero-code proof point.
-6. **The green check + Launch** — run Pack Health's `analyzePackHealth` over the scaffolded
-   pack; show blocking/recommended; one button: **Launch** (reuse `test_project`).
+ 4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
+    pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
+    **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
+    file (mod IDs + one-line "why this").     **Status (chunk 3):** implemented — `list_curated_mods` (`commands/modpack/curated.rs`)
+    serves the list filtered per pack by loader/version (trust rule: unknown support = kept,
+    not dropped). Two **core** picks back ModCanvas's own features — FTB Quests (the quest
+    book, CurseForge-only, id 289412) and KubeJS (recipe scripts, Modrinth, all loaders) —
+    and render in their own "Needed by ModCanvas" section. A CurseForge pick with no API
+    key configured shows **blocked with a reason**, never a silent absence. The wizard's
+    step 4 installs the pre-ticked picks sequentially, then auto-runs the compat check so
+    transitive libraries (FTB Library, Rhino, Architectury) appear as one-click installs,
+    then refreshes the pack so the green check sees the new mods.
+ 5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
+    the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
+    export path. The zero-code proof point. **Pending** (P0-MINIWIZ arc).
+ 6. **The green check + Launch** — run Pack Health's `analyzePackHealth` over the scaffolded
+    pack; show blocking/recommended; one button: **Launch** (reuse `test_project`).
+    **Status (chunk 3):** implemented — the wizard's step 5 computes the same pure report
+    the Health tab renders (from the already-materialized stores, no rescans) and offers
+    Launch via `test_project` with the same defaults as the topbar Test button. Honesty
+    rule: a pack created via "start from scratch" has no Prism instance, so Launch is
+    hidden with an explanation — the wizard never offers a launch it cannot perform.
+    **Parked: "link a scratch pack to an instance".** Written reason: recreating via the
+    instance path is free before content exists (the current scratch packs have none); a
+    real link feature means moving the pack home (path swap), merging app-managed content
+    into the instance with a clobber guard, and handling orphaned source dirs — build it
+    when someone with substantial scratch content actually asks.
 
 Completion criteria (P0-WIZARD): a fresh-eyes tester completes steps 1–6 on 1.21.1/NeoForge
 without opening a code file, a raw config, or the KubeJS drawer; the wizard is restartable

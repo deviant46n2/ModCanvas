@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ModMetadata, CompatibilityResult } from './types'
+import type { ModMetadata, CompatibilityResult, CuratedMod } from './types'
 
 export async function addMod(
   projectId: string,
@@ -54,6 +54,11 @@ export async function getDepNames(
 
 export async function checkCompatibility(projectId: string): Promise<CompatibilityResult> {
   return invoke<CompatibilityResult>('check_compatibility_async', { projectId })
+}
+
+/** Curated mod picks for the First-Pack wizard, filtered to this pack. */
+export async function listCuratedMods(projectId: string): Promise<CuratedMod[]> {
+  return invoke<CuratedMod[]>('list_curated_mods', { projectId })
 }
 
 export async function searchMods(
