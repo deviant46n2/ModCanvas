@@ -5,6 +5,7 @@ pub mod mrpack;
 pub mod packwiz;
 pub mod prism;
 pub mod search;
+pub mod search_merge;
 
 pub use curseforge::*;
 pub use exports::*;

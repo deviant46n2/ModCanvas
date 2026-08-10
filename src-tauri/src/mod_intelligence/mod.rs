@@ -5,8 +5,10 @@ use reqwest::Client;
 mod types;
 mod modrinth;
 mod curseforge;
+mod curseforge_search;
 
 pub use modrinth::{search_modrinth, search_modpacks};
+pub(crate) use curseforge_search::normalize_slug;
 pub use types::{CurseForgeResponse, CurseForgeModInfo, CurseForgeCategory, CurseForgeAuthor, CurseForgeLinks, CurseForgeFileResponse, CurseForgeFileInfo};
 
 pub struct ModIntelligence {

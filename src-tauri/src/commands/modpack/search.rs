@@ -6,6 +6,7 @@ use crate::mod_intelligence::{ModIntelligence, search_modpacks as search_modpack
 use crate::models::*;
 
 use super::resolve_curseforge_api_key;
+use super::search_merge::merge_search_results;
 /// Download a mod from Modrinth or CurseForge into the selected instance's
 /// `mods/` folder and record it in the project DB so Prism/the game can load
 /// it. Returns the resulting `ModEntry` (with real jar-derived metadata when
@@ -186,10 +187,11 @@ pub async fn search_mods(
         }
     }
 
-    // Sort exact matches first (so duplicate entries across registries resolve
-    // to the rich Modrinth record), then deduplicate by mod_id.
-    results.sort_by_key(|m| (m.mismatch.is_some(), m.mod_id.clone()));
-    results.dedup_by(|a, b| a.mod_id == b.mod_id);
+    // Cross-source merge: stable sort (mismatches sink, registry relevance
+    // survives), dedup by mod_id, then the exact-match lift — a result whose
+    // slug equals the query rises above loose matches from any registry
+    // (s33: 'matching results not at top'). See search_merge.rs.
+    results = merge_search_results(results, &query);
 
     Ok(results)
 }

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::models::{ModMetadata, ModpackMetadata};
+use crate::models::ModMetadata;
 
 use super::types::*;
 use super::ModIntelligence;
@@ -179,114 +179,4 @@ impl ModIntelligence {
         self.download_curseforge_mod(project_id, file_id, api_key, dest_path).await
     }
     
-    /// Search CurseForge mods by query
-    pub async fn search_curseforge(
-        &self,
-        query: &str,
-        api_key: &str,
-    ) -> anyhow::Result<Vec<ModMetadata>> {
-        // gameId is required by the API; classId=6 scopes to mods (without it
-        // the search returns modpacks and other project types).
-        let url = format!(
-            "{}/mods/search?gameId={}&classId=6&searchFilter={}",
-            CURSEFORGE_API,
-            CURSEFORGE_MINECRAFT_GAME_ID,
-            urlencoding::encode(query)
-        );
-        let resp = self.client.get(&url)
-            .header("x-api-key", api_key)
-            .header("Accept", "application/json")
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            anyhow::bail!("CurseForge API returned {}", resp.status());
-        }
-
-        #[derive(Deserialize)]
-        struct SearchResponse {
-            data: Vec<CurseForgeModInfo>,
-        }
-
-        let search_resp: SearchResponse = resp.json().await?;
-
-        Ok(search_resp.data.into_iter().map(|info| {
-            let author = info.authors.first().map(|a| a.name.clone()).unwrap_or_default();
-            ModMetadata {
-                mod_id: info.id.to_string(),
-                slug: info.slug,
-                name: info.name,
-                description: info.summary.unwrap_or_default(),
-                author,
-                categories: info.categories.iter().map(|c| c.name.clone()).collect(),
-                dependencies: vec![],
-                supported_loaders: vec![],
-                supported_versions: info.gameVersions.clone(),
-                downloads: info.downloadCount.unwrap_or(0),
-                source_url: info.links.as_ref().and_then(|l| l.websiteUrl.clone()),
-                issues_url: info.links.as_ref().and_then(|l| l.issuesUrl.clone()),
-                documentation_url: None,
-                icon: info.logo.as_ref().and_then(|l| l.thumbnail_url.clone()),
-                source: "curseforge".to_string(),
-                mismatch: None,
-            }
-        }).collect())
-    }
-
-    /// Search CurseForge modpacks by query
-    pub async fn search_curseforge_modpacks(
-        &self,
-        query: &str,
-        api_key: &str,
-        mc_version: Option<&str>,
-        loader: Option<&str>,
-    ) -> anyhow::Result<Vec<ModpackMetadata>> {
-        let mut url = format!(
-            "{}/mods/search?gameId={}&classId=4471&searchFilter={}",
-            CURSEFORGE_API,
-            CURSEFORGE_MINECRAFT_GAME_ID,
-            urlencoding::encode(query)
-        );
-        
-        if let Some(version) = mc_version {
-            url.push_str(&format!("&gameVersion={}", urlencoding::encode(version)));
-        }
-        
-        if let Some(loader) = loader {
-            url.push_str(&format!("&modLoaderType={}", urlencoding::encode(loader)));
-        }
-
-        let resp = self.client.get(&url)
-            .header("x-api-key", api_key)
-            .header("Accept", "application/json")
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            anyhow::bail!("CurseForge API returned {}", resp.status());
-        }
-
-        #[derive(Deserialize)]
-        struct SearchResponse {
-            data: Vec<CurseForgeModInfo>,
-        }
-
-        let search_resp: SearchResponse = resp.json().await?;
-
-        Ok(search_resp.data.into_iter().map(|info| {
-            let author = info.authors.first().map(|a| a.name.clone()).unwrap_or_default();
-            let categories: Vec<String> = info.categories.iter().map(|c| c.name.clone()).collect();
-            ModpackMetadata {
-                project_id: info.id.to_string(),
-                slug: info.slug,
-                name: info.name,
-                description: info.summary.unwrap_or_default(),
-                author,
-                categories,
-                downloads: info.downloadCount.unwrap_or(0),
-                versions: info.gameVersions.clone(),
-                project_type: "modpack".to_string(),
-            }
-        }).collect())
-    }
 }

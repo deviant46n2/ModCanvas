@@ -57,6 +57,19 @@ the row→file link by scanning jars would be the aliasing trap).
 
 ## Install Flow
 
+**Result ordering** (s33): each registry returns its own relevance order, and
+the merged list preserves it — a stable sort sinks version-mismatched rows to
+the bottom without reordering the rest. On top of that, an **exact-match
+lift**: if a result's slug equals the query normalized (lowercase, spaces and
+punctuation stripped — `"project e"` → `projecte`), it rises above all loose
+matches from either registry, because an exact slug is definitionally the best
+answer. CurseForge gets a **slug fallback**: CF's fuzzy `searchFilter` can
+miss an exact-name mod entirely (ProjectE returns only its addons), so when
+the fuzzy pass doesn't already contain the mod, a second `slug=` query runs
+and prepends the hit. Merge lives in
+`src-tauri/src/commands/modpack/search_merge.rs` (sort + dedup + lift);
+normalization shared with `mod_intelligence/curseforge_search.rs`.
+
 Search rows carry a **version-mismatch note** when a CurseForge result's
 latest file targets a different MC version than the project. Mismatched rows
 show an **"Unavailable"** button (disabled, mismatch as tooltip) — a click
