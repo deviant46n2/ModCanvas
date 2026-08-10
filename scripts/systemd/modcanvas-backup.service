@@ -1,9 +1,13 @@
 [Unit]
-Description=ModCanvas tutor-state backup (memory store + .tutor archive)
+Description=ModCanvas tutor-state backup (memory store + .tutor archive) + memory-check
 
 [Service]
 Type=oneshot
 # The backup script resolves .tutor/ and backups/ from cwd — pin it to the repo.
 WorkingDirectory=/home/deviant/Projects/ModCanvas
 # Absolute paths only: systemd user units don't inherit the login shell PATH.
+# Backup first (the archive must exist regardless), then the handoff-reference
+# gate. A memory-check failure marks the unit failed — that is the passive
+# anti-rot alarm: a skipped boundary ritual surfaces as a red unit, not silence.
 ExecStart=/home/deviant/.local/bin/node /home/deviant/Projects/ModCanvas/scripts/backup-state.mjs
+ExecStart=/home/deviant/.local/bin/node /home/deviant/Projects/ModCanvas/scripts/memory-check.mjs --quiet

@@ -155,7 +155,10 @@ at the moments they exist for** — that is the point of having built them:
   arc (`.tutor` + memory store + config) — automated daily via the
   `modcanvas-backup.timer` systemd user unit, so a forgotten boundary run no
   longer leaves the arc unprotected (s30); manual runs still fine at
-  boundaries.
+  boundaries. `pnpm memory-check` validates every handoff's `GOTCHAS:` /
+  `DECISIONS:` pointers resolve to real entries — chained after backup in the
+  same timer unit, so a skipped boundary ritual surfaces as a failed unit
+  (s33 compressed-handoff contract).
 - **Repo health, before trusting a diff:** `pnpm integrity`
   (`node scripts/integrity-check.mjs` — 8 sections: line-limit,
   asset-bundle, stale-binary, diff-hygiene, adapter-matrix, doc-sync,
