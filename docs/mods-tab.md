@@ -67,8 +67,10 @@ The Add Mods search has a **category filter** (Modrinth only): a dropdown
 with Modrinth's mod categories (Magic, Technology, …). The selected slug is
 added to the search facets as `["categories:<slug>"]` — the same facet
 mechanism the loader filter uses — so results are scoped to the category for
-the project's loader + MC version. CurseForge has no equivalent facet in
-this flow and is unaffected.
+the project's loader + MC version. CurseForge has no equivalent facet: while
+a category is selected, the CurseForge source is **paused** (skipped
+server-side) and the UI shows why — otherwise unfiltered CF results mixed
+into a category search would make the filter look broken.
 
 `+ Add` on a search result now performs a **real install** (not just a DB row):
 
