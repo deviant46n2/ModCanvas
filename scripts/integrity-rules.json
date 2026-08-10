@@ -272,6 +272,10 @@
       {
         "commit": "cecace0",
         "reason": "snbt.rs split — docs synced in-pass (snbt_roundtrip.rs pointers updated to snbt/ submodule layout; trailing-comment indent reference moved to serialize.rs), judged complete"
+      },
+      {
+        "commit": "69c6e06",
+        "reason": "ingest.rs split — internal module restructure + command registration path (lib.rs); no user-facing behavior/doc surface changed, dead code removed — doc-less by judgment"
       }
     ]
   }
