@@ -56,14 +56,25 @@ interface UseQuestAssetPipelineOptions {
   projectId: string
 }
 
+/// Merge engine-render results, but never let a render CLOBBER an existing
+/// displayable value. Engine renders exist for items with NO offline source
+/// (`bake:` keys, materialization not-found) — for those, the incoming render
+/// replaces the descriptor/undefined. But a flat `jar:` texture that already
+/// resolved to a bright data URL (registry `texture_data_url`, materialized
+/// URL, or earlier render) is strictly better than a later engine render:
+/// the companion renders in-game lighting, which comes back ~50% darker than
+/// the jar bytes (s26: flat items went dark after the engine drain). Keep the
+/// existing usable value; only write over descriptors/undefined.
 function mergeIndex(prev: Record<string, string>, updates: Record<string, string>): Record<string, string> {
   let changed = false
   const merged = { ...prev }
   for (const [k, v] of Object.entries(updates)) {
-    if (prev[k] !== v) {
-      merged[k] = v
-      changed = true
-    }
+    if (!v) continue
+    const existing = prev[k]
+    if (isUsableTextureValue(existing)) continue
+    if (existing === v) continue
+    merged[k] = v
+    changed = true
   }
   return changed ? merged : prev
 }
@@ -93,6 +104,13 @@ function mergeIndexNoDowngrade(
 /// missing or still a compact descriptor, but never clobber an existing
 /// displayable value (an engine render may have landed between plan build and
 /// apply — overwriting it with a different base64 string would blink the icon).
+/// EXCEPTION (s26): a materialized offline URL — which only ever exists for
+/// `jar:`/`kubejs:` sources, never `bake:` — MUST overwrite a dark engine
+/// render of the same flat item. The engine renders in-game lighting and its
+/// flat-item output is ~50% darker than the jar bytes (iron_mesh 216→110);
+/// the offline materializer reads the jar directly and is always the
+/// authoritative flat texture. bake: keys never materialize offline, so a
+/// materialized URL arriving here can never be a bake: item.
 function mergeIndexUpgradeOnly(
   prev: Record<string, string>,
   updates: Record<string, string>,
@@ -101,8 +119,9 @@ function mergeIndexUpgradeOnly(
   const merged = { ...prev }
   for (const [k, v] of Object.entries(updates)) {
     const existing = prev[k]
-    if (isUsableTextureValue(existing)) continue
+    if (!v) continue
     if (existing === v) continue
+    if (isUsableTextureValue(existing) && !isUsableTextureValue(v)) continue
     merged[k] = v
     changed = true
   }
@@ -282,9 +301,21 @@ export function useQuestAssetPipeline({
     // need the engine. (Re-scoped from the items array's texture_data_url,
     // which the flat materializer never populates — that made every item
     // look textureless and dumped the whole registry into the engine queue.)
+    //
+    // s26 fix: an item with a registry `texture_data_url` (the bright
+    // straight-from-jar data URL) must NEVER be engine-queued, even when its
+    // `textureIndex` entry hasn't landed yet. The index fills asynchronously
+    // (ingest/scan race the items cache read), and during that window items
+    // look "missing" here — queuing them sent flat textures to the engine,
+    // whose in-game renders came back ~50% darker than the jar bytes and
+    // clobbered the good URLs via mergeIndex. The registry URL proves the
+    // item is resolvable offline; the engine is only for items with no URL
+    // AND no index entry (or bake: keys, handled by the baked-keys effect).
     // Runs whenever items/textureIndex change, but queueEngineRenders is
     // idempotent (queueSet/inflight/failed dedupe), so re-runs are cheap.
-    const missingRegistry = items.filter((i) => !textureIndex[i.id]).map((i) => i.id)
+    const missingRegistry = items
+      .filter((i) => !i.texture_data_url && !textureIndex[i.id])
+      .map((i) => i.id)
     if (missingRegistry.length > 0) queueEngineRenders(missingRegistry)
   }, [wsConnected, items, textureIndex])
   useEffect(() => {

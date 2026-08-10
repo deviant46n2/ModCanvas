@@ -10,7 +10,9 @@ import { SmartFilterIcon } from './SmartFilterIcon';
 
 // Fallback shape plate (only when the instance's real shape textures are not
 // available): a dark tile like the in-game quest book's, instead of a light one.
-const SHAPE_PLATE_GREY = 'rgba(45, 50, 60, 0.85)';
+// Opaque — a semi-transparent fill let the blue chapter-background image bleed
+// through and every plate read steel-blue (s26, same class as the bake fix).
+const SHAPE_PLATE_GREY = 'rgba(45, 50, 60, 1)';
 const SHAPE_OUTLINE_GREY = '#9aa3b2';
 
 const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: NodeProps) {

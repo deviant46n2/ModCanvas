@@ -3,13 +3,15 @@ import { loadImage } from './sprite-sheet'
 const bakeCache = new Map<string, Promise<string | null>>()
 
 // Shape backgrounds are white filled silhouettes with a radial alpha falloff
-// (measured: ~0.99 alpha at center → ~0.32 at corners). The tile matches the
-// game (vision-verified from an in-game screenshot): a dark charcoal radial
-// gradient, DARKER at the center (~#3E3E3E), LIGHTER toward the border
-// (~#6A6A6A), with a light-grey outline ring. Edge-in, center-out-dark.
-const PLATE_CENTER = 'rgba(62, 62, 62, 0.95)'
-const PLATE_MID = 'rgba(78, 78, 78, 0.95)'
-const PLATE_EDGE = 'rgba(96, 96, 96, 0.95)'
+// (measured: ~0.99 alpha at center → ~0.32 at corners). In-game, the quest tile
+// plate is a FLAT, SOLID dark grey — measured (63,63,70) across a 28px run of
+// an in-game screenshot (2026-08-09), no gradient, no transparency bleed. The
+// editor previously used a center-dark → edge-light gradient at 0.95 alpha,
+// which let the blue chapter-background image bleed through the plate and made
+// every tile read steel-blue. Fixed: flat opaque fill.
+const PLATE_CENTER = 'rgba(63, 63, 70, 1)'
+const PLATE_MID = 'rgba(63, 63, 70, 1)'
+const PLATE_EDGE = 'rgba(63, 63, 70, 1)'
 // The game's outline is a LIGHT GREY (~#6A6A6A–#787878, vision-verified),
 // lighter than the center — NOT white, NOT very dark. Quests with an explicit
 // color tint the outline to that color instead (like the game).
@@ -87,18 +89,19 @@ export interface ShapeTileInput {
   backgroundUrl: string
   outlineUrl: string
   /** Quest color (hex) to tint the outline, or undefined for the default
-   *  near-white outline. */
+   *  light-grey outline. */
   color?: string | undefined
   /** Square display size in CSS px; the tile is rasterized at this size so the
    *  browser never re-scales it (keeping circles round under every WebView). */
   size: number
 }
 
-/** Bake a complete quest shape tile (light-body plate + dark-grey/colored
- *  outline) into a single square PNG data URL at the display size. The plate
- *  is the silhouette filled with a center-light → edge-dark radial gradient
- *  via `source-in`, matching the game's bright-shape-on-dark-book look; the
- *  outline is tinted to the quest color (or the default dark grey) and drawn
+/** Bake a complete quest shape tile (flat dark-grey plate + tinted outline)
+ *  into a single square PNG data URL at the display size. The plate is the
+ *  silhouette filled with a flat opaque dark grey via `source-in` (quest
+ *  colors tint the center, fading to grey at the rim), then the alpha is
+ *  flattened so the editor's chapter background can't bleed through; the
+ *  outline is tinted to the quest color (or the default light grey) and drawn
  *  on the rim. Memoized per inputs. Returns null when the textures can't
  *  load or the size is invalid. */
 export function bakeShapeTile(input: ShapeTileInput): Promise<string | null> {
@@ -132,15 +135,16 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   // the 128px source textures are downscaled to small quest tiles.
   ctx.imageSmoothingEnabled = true
 
-  // 1. Plate: the silhouette filled with a radial gradient — DARK charcoal at
-  //    the center, LIGHTER toward the border (the game's edge-in gradient,
-  //    vision-verified). Quests with an explicit color get the quest color as
-  //    the center fill at ~55% alpha — the game tints the whole shape with
-  //    the quest color, which is why some quests' tiles read lighter in the
-  //    center than others (verified: the pack stores `color:` as a decimal
-  //    int, e.g. 16755200 = #ffa200; 21 quests have it). The texture's own
-  //    alpha falloff (0.99 center → 0.32 corners) keeps the center solid; the
-  //    outline (step 2) carries the light border.
+  // 1. Plate: the silhouette filled with a FLAT solid dark grey (in-game the
+  //    quest tile plate is flat opaque grey, measured (63,63,70); the old
+  //    center-dark → edge-light gradient at 0.95 alpha let the blue chapter
+  //    background bleed through and read steel-blue). Quests with an explicit
+  //    color get the quest color as the center fill at ~55% alpha — the game
+  //    tints the whole shape with the quest color, which is why some quests'
+  //    tiles read lighter in the center than others (verified: the pack stores
+  //    `color:` as a decimal int, e.g. 16755200 = #ffa200; 21 quests have it).
+  //    The texture's own alpha falloff (0.99 center → 0.32 corners) defines the
+  //    silhouette edge; the outline (step 2) carries the light border.
   let center = PLATE_CENTER
   if (input.color) {
     const rgb = parseHexColor(input.color)
@@ -155,6 +159,18 @@ async function doBake(input: ShapeTileInput): Promise<string | null> {
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, size, size)
   ctx.globalCompositeOperation = 'source-over'
+  // Flatten the plate's alpha: `background.png` carries a radial alpha falloff
+  // across the WHOLE tile (measured 111 → 252, i.e. ~43% → ~99%), and source-in
+  // preserves it — so over the editor's blue chapter background every plate
+  // read steel-blue (in-game renders the plate as a SOLID grey, measured
+  // (63,63,70) flat). Threshold the alpha so the interior is opaque and only
+  // the silhouette's outer anti-aliased rim stays soft.
+  const plateData = ctx.getImageData(0, 0, size, size)
+  const dpx = plateData.data
+  for (let i = 3; i < dpx.length; i += 4) {
+    if (dpx[i] > 40) dpx[i] = 255
+  }
+  ctx.putImageData(plateData, 0, 0)
 
   // 2. Outline: the game's outline is a very dark grey, NOT white. The
   //    near-white outline texture is tinted dark (or to the quest color when

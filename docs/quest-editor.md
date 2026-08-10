@@ -155,16 +155,20 @@ Assets").
    tile **once into a single square PNG at the node's display size** (0.95 of
    the node's smaller dimension — matching the game, where the shape IS the
    tile; 0.8 rendered it visibly small): the white
-   `background.png` silhouette is baked in TWO passes — first re-filled to a
-   dark plate via a `source-in` fill (the editor's analog of the game's dark
-   quest-book tile), then the same silhouette re-filled with the shape body
-   color at ~58% alpha (FTB's `quest_not_started_color`, white by default,
-   tinted to the quest color when set). The texture's own radial falloff
-   (alpha ~0.99 center → ~0.32 corners, measured) makes the bright body fade
-   into the dark plate at the edges — the in-game look. Then `outline.png` is
-   composited on top at ~58% opacity — FTB's `quest_not_started_color` is white
-   at 58% alpha. Quests with an explicit `color` have the outline tinted to that
-   color first (`tintTexture`, exact hex via `source-in`). The resulting `<img>`
+   `background.png` silhouette is filled ONCE via a `source-in` fill with a
+   FLAT solid dark-grey plate — measured (63,63,70) across a 28px run of an
+   in-game screenshot (2026-08-09); the game's plate has no gradient and no
+   transparency. Quests with an explicit `color` tint the plate center to that
+   color at ~55% alpha, fading to grey at the rim (the game tints the whole
+   shape with the quest color, which is why some quests' tiles read lighter in
+   the center than others — the pack stores `color:` as a decimal int, e.g.
+   16755200 = #ffa200; 21 quests have it). The plate alpha is then flattened
+   (alpha > 40 → 255): `background.png`'s radial falloff (measured 111→252,
+   ~43%→~99%) would otherwise let the editor's blue chapter background bleed
+   through every plate, making them all read steel-blue. Only the silhouette's
+   outer anti-aliased rim stays soft. Then `outline.png` is tinted to the quest
+   color (or the default light grey `#6e6e6e`) and composited on the rim at
+   ~95% opacity. The resulting `<img>`
    is shown 1:1 with `object-fit: contain`, so no CSS `background-size` /
    `image-rendering` stretching can distort the geometry (gear teeth, octagon
    sides, hexagon orientation) — this is what kept circles round under WebKit

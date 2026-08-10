@@ -165,8 +165,12 @@ renders) — and all merges are directional:
 - Baked (`bake:`) keys are offered to the engine **once per instance
   registration** (`queuedBakedRef`); retries after that belong to the
   engine-render failed-set (`MAX_ATTEMPTS`), not to index-churn re-offers.
-- The "registry item with no texture entry" queue is gated until the texture
-  index lands, so boot can't dump the whole registry into the engine queue.
+- The "registry item with no texture entry" queue never fires for items that
+  already carry a registry `texture_data_url` (the bright straight-from-jar
+  URL — offline-resolvable, so the engine can't improve on it and its darker
+  in-game render would only clobber it). The queue is further gated until the
+  texture index lands, so boot can't dump the whole registry into the engine
+  queue.
 - `withItemTextures` is reference-stable: it returns the previous `items` array
   when nothing changed, so identity-based consumers don't re-run per batch.
 
