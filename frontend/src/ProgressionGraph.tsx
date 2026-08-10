@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import {
   useNodesState,
   useEdgesState,
@@ -11,6 +11,7 @@ import {
   saveProgressionGraph,
   analyzeProgression,
   autoGenerateProgression,
+  scanInstanceTextures,
 } from './services/api'
 import type {
   ProgressionGraphData,
@@ -22,16 +23,37 @@ import ProgressionNodeInspector from './components/progression/ProgressionNodeIn
 import ProgressionAnalysisOverlay from './components/progression/ProgressionAnalysisOverlay'
 import { buildVanillaTemplate } from './core/progression/vanilla-template'
 import { computePhaseBands } from './core/progression/phase-bands'
+import {
+  textureDisplayUrl,
+  requestMaterialize,
+  isTexturePending,
+  subscribeMaterialized,
+} from './services/texture-loader'
 import { FlagIcon } from './components/ui/icons'
 import './ProgressionGraph.css'
 
 interface ProgressionGraphProps {
   projectId: string
+  instancePath?: string
 }
 
-export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
+/** Best texture key for a node: explicit `icon` wins, else first `item_refs`
+ *  (the vanilla template puts the hero item first), else first `mod_refs`. */
+function nodeTextureKey(node: Node): string {
+  const d = (node.data as Record<string, unknown>) || {}
+  const icon = d.icon as string
+  if (icon) return icon
+  const items = (d.item_refs as string[]) || []
+  if (items.length > 0) return items[0]
+  const mods = (d.mod_refs as string[]) || []
+  return mods[0] || ''
+}
+
+export default function ProgressionGraph({ projectId, instancePath }: ProgressionGraphProps) {
   const [graph, setGraph] = useState<ProgressionGraphData | null>(null)
   const [analysis, setAnalysis] = useState<ProgressionAnalysis | null>(null)
+  const [textureIndex, setTextureIndex] = useState<Record<string, string>>({})
+  const [textureTick, setTextureTick] = useState(0)
   const [selectedNodeType, setSelectedNodeType] = useState<string>('milestone')
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
   const [showAnalysis, setShowAnalysis] = useState(false)
@@ -62,7 +84,20 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
     }))
   }, [nodes])
 
-  const visibleNodes = useMemo(() => [...bandNodes, ...nodes], [bandNodes, nodes])
+  const visibleNodes = useMemo(() => {
+    const enriched = nodes.map((n) => {
+      const key = nodeTextureKey(n)
+      return {
+        ...n,
+        data: {
+          ...(n.data as Record<string, unknown>),
+          textureKey: key,
+          textureUrl: key ? textureDisplayUrl(textureIndex, key) : undefined,
+        },
+      }
+    })
+    return [...bandNodes, ...enriched]
+  }, [bandNodes, nodes, textureIndex])
 
   const toRfNodes = useCallback((graph: ProgressionGraphData): Node[] => {
     return graph.nodes.map((n) => {
@@ -294,6 +329,41 @@ export default function ProgressionGraph({ projectId }: ProgressionGraphProps) {
   )
 
   useMemo(() => { loadGraph() }, [loadGraph])
+
+  // Textures: scan the instance index once, then re-render whenever the lazy
+  // materializer lands new data URLs (same pattern as the quest editor).
+  useEffect(() => {
+    if (!instancePath) return
+    let cancelled = false
+    scanInstanceTextures(instancePath).then((idx) => {
+      if (cancelled || !idx || Object.keys(idx).length === 0) return
+      setTextureIndex(prev => ({ ...prev, ...idx }))
+      setTextureTick(t => t + 1)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [instancePath])
+
+  useEffect(() => {
+    let pending = false
+    const schedule = () => {
+      if (pending) return
+      pending = true
+      setTimeout(() => { pending = false; setTextureTick(t => t + 1) }, 0)
+    }
+    const unsub = subscribeMaterialized(schedule)
+    return unsub
+  }, [])
+
+  // Request lazy materialization for any node key that is pending (in the
+  // index but not yet a displayable URL). Runs on graph load + tick.
+  useEffect(() => {
+    if (!instancePath) return
+    const targets = visibleNodes
+      .filter((n) => n.type !== 'phaseBand')
+      .map(nodeTextureKey)
+      .filter((k) => !!k && isTexturePending(textureIndex, k))
+    if (targets.length > 0) requestMaterialize(targets, instancePath)
+  }, [textureTick, visibleNodes, textureIndex, instancePath])
 
   const modRefs = (selectedNode?.data?.mod_refs as string[]) || []
 

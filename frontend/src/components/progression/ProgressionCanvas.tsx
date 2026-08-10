@@ -11,31 +11,51 @@ import { nodeTypeColor, hexToRgba } from '../../core/progression/phase-bands'
 function ProgressionNodeComponent({ data, selected }: NodeProps<Node>) {
   const nodeType = (data.nodeType as string) || 'milestone'
   const icons: Record<string, ReactNode> = {
-    milestone: <FlagIcon size={18} />, unlock: <LockOpenIcon size={18} />, phase: <ZapIcon size={18} />,
-    achievement: <TrophyIcon size={18} />, content: <PackageIcon size={18} />,
+    milestone: <FlagIcon size={13} />, unlock: <LockOpenIcon size={13} />, phase: <ZapIcon size={13} />,
+    achievement: <TrophyIcon size={13} />, content: <PackageIcon size={13} />,
   }
   const modCount = ((data.mod_refs as string[]) || []).length
+  const itemCount = ((data.item_refs as string[]) || []).length
   const label = (data.label as string) || 'Node'
   const desc = (data.description as string) || ''
   const phase = (data.phase as string) || ''
   const accent = (data.color as string) || nodeTypeColor(nodeType)
+  const textureUrl = (data.textureUrl as string) || ''
+  const textureKey = (data.textureKey as string) || ''
 
   return (
     <div
       className={`progression-node ${nodeType}-node ${selected ? 'selected' : ''}`}
       style={{ '--node-accent': accent } as CSSProperties}
     >
-      <div className="node-header">
-        <div className="node-icon" style={{ color: accent, background: hexToRgba(accent, 0.14) }}>
+      <div className="node-texture">
+        {textureUrl ? (
+          <img src={textureUrl} alt={label} draggable={false} className="node-texture-img" />
+        ) : (
+          <div className="node-texture-fallback" style={{ background: hexToRgba(accent, 0.14) }}>
+            {icons[nodeType]}
+          </div>
+        )}
+        <span className="node-type-badge" style={{ color: accent, background: hexToRgba(accent, 0.18) }}>
           {icons[nodeType]}
-        </div>
+        </span>
+      </div>
+      <div className="node-header">
         <div className="node-title">
           <div className="node-label">{label}</div>
           {phase && <span className="node-phase">{phase}</span>}
         </div>
       </div>
       {desc && <div className="node-desc">{desc.length > 80 ? desc.slice(0, 80) + '...' : desc}</div>}
-      {modCount > 0 && <span className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</span>}
+      {(modCount > 0 || itemCount > 0) && (
+        <div className="node-counts">
+          {itemCount > 0 && <span className="node-mod-count">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>}
+          {modCount > 0 && <span className="node-mod-count">{modCount} mod{modCount !== 1 ? 's' : ''}</span>}
+        </div>
+      )}
+      {textureKey && !textureUrl && (
+        <span className="node-texture-pending" title="Texture resolving…">…</span>
+      )}
       <Handle type="target" position={RFPosition.Top} />
       <Handle type="source" position={RFPosition.Bottom} />
     </div>
@@ -54,11 +74,12 @@ function PhaseBandNode({ data }: NodeProps<Node>) {
       style={{
         width: data.width as number,
         height: data.height as number,
-        background: hexToRgba(color, 0.06),
-        border: `1px solid ${hexToRgba(color, 0.25)}`,
+        background: `linear-gradient(180deg, ${hexToRgba(color, 0.14)} 0%, ${hexToRgba(color, 0.05)} 60%, transparent 100%)`,
+        border: `1px solid ${hexToRgba(color, 0.3)}`,
+        boxShadow: `inset 0 0 40px ${hexToRgba(color, 0.08)}`,
       }}
     >
-      <div className="phase-band-header" style={{ color }}>
+      <div className="phase-band-header" style={{ color, background: hexToRgba(color, 0.14), border: `1px solid ${hexToRgba(color, 0.35)}` }}>
         {phase}
         {count > 0 && <span className="phase-band-count">{count}</span>}
       </div>

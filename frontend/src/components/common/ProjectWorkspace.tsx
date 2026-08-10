@@ -152,7 +152,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </div>
           <div id="tabpanel-progression" role="tabpanel" aria-labelledby="tab-progression" className={activeTab === 'progression' ? '' : 'tab-hidden'}>
             <ErrorBoundary>
-              <ProgressionGraph projectId={project.id} />
+              <ProgressionGraph projectId={project.id} instancePath={ingestResult?.active_instance || project.path} />
             </ErrorBoundary>
           </div>
           <div id="tabpanel-quests" role="tabpanel" aria-labelledby="tab-quests" className={activeTab === 'quests' ? '' : 'tab-hidden'}>

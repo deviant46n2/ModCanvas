@@ -74,6 +74,9 @@
 .progression-canvas .react-flow {
   width: 100%;
   height: 100%;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+    var(--color-bg-sunken);
 }
 
 /* Node */
@@ -81,7 +84,7 @@
   position: relative;
   min-width: 176px;
   max-width: 220px;
-  background: var(--color-bg-surface-1);
+  background: linear-gradient(180deg, var(--color-bg-surface-1) 0%, var(--color-bg-surface-2) 100%);
   border: 1px solid var(--color-border-default);
   border-left: 3px solid var(--node-accent, var(--color-border-default));
   border-radius: var(--radius-md);
@@ -90,34 +93,96 @@
   cursor: grab;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  overflow: hidden;
 }
 
 .progression-node:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border-color: var(--node-accent, var(--color-border-strong));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), 0 0 12px var(--node-accent);
   transform: translateY(-1px);
 }
 
 .progression-node.selected {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-subtle), 0 0 16px var(--color-accent);
+  border-color: var(--node-accent);
+  box-shadow: 0 0 0 2px var(--node-accent), 0 0 20px var(--node-accent);
+}
+
+/* Hero texture — the node's visual anchor, phase-tinted glow behind it */
+.node-texture {
+  position: relative;
+  height: 52px;
+  margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1) var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 60%, var(--node-accent) 0%, transparent 65%),
+    var(--color-bg-surface-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.node-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, var(--color-bg-surface-1) 100%);
+  pointer-events: none;
+}
+
+.node-texture-img {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
+.node-texture-fallback {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--node-accent);
+}
+
+/* Type glyph — small corner badge over the hero texture */
+.node-type-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+/* Pending indicator while the lazy materializer resolves */
+.node-texture-pending {
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  animation: progression-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes progression-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 .node-header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-/* Icon chip — tinted rounded square, color-coded per type */
-.node-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .node-title {
@@ -153,9 +218,15 @@
   line-height: 1.4;
 }
 
+.node-counts {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  flex-wrap: wrap;
+}
+
 .node-mod-count {
   display: inline-block;
-  margin-top: var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
   background: var(--color-bg-surface-2);
@@ -163,7 +234,7 @@
   padding: 1px 8px;
 }
 
-/* Phase lanes — derived tinted columns behind each phase's nodes */
+/* Phase lanes — gradient-tinted columns behind each phase's nodes */
 .phase-band {
   position: relative;
   border-radius: var(--radius-md);
@@ -172,13 +243,14 @@
 
 .phase-band-header {
   position: absolute;
-  top: 12px;
-  left: 16px;
+  top: 10px;
+  left: 12px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  opacity: 0.9;
+  padding: 3px 10px;
+  border-radius: 999px;
 }
 
 .phase-band-count {
@@ -316,15 +388,18 @@
 .react-flow__edge-path {
   stroke: var(--edge-color, var(--color-border-default));
   stroke-width: 1.5;
+  filter: drop-shadow(0 0 3px var(--edge-color, transparent));
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
   stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px var(--edge-color, transparent));
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--color-accent);
   stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px var(--color-accent));
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
@@ -393,17 +468,4 @@
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-3);
-}
-
-/* Glyph-free node type icons */
-.node-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.node-icon svg {
-  width: 18px;
-  height: 18px;
-  display: block;
 }
