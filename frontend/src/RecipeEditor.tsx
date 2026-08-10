@@ -33,7 +33,7 @@ import {
   reloadPackRecipes,
   scanItemRegistry,
 } from './components/recipe/recipe-editor-utils';
-import './RecipeEditor.css';
+import './recipe-editor-styles';
 
 interface RecipeEditorProps {
   projectId: string;

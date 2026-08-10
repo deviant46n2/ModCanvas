@@ -1,0 +1,141 @@
+/* Visual recipe-type picker: a card per type with a mini grid glyph. */
+.recipe-type-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.recipe-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  min-width: 64px;
+  transition: all 0.12s ease;
+}
+
+.recipe-type-card:hover {
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.recipe-type-card.active {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.recipe-type-glyph {
+  display: grid;
+  gap: 2px;
+  height: 20px;
+  align-content: center;
+}
+
+.recipe-type-glyph .glyph-cell {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+}
+
+.recipe-type-card.active .glyph-cell.filled {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.recipe-type-glyph .glyph-cell.filled {
+  background: var(--color-text-secondary);
+  border-color: var(--color-text-secondary);
+}
+
+.recipe-type-card-label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.output-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.output-section.has-issues input {
+  border-color: var(--color-warning);
+}
+
+.output-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.output-editor > input[type="text"] {
+  flex: 1;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.output-editor > input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.output-icon {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.recipe-field-issue {
+  color: var(--color-warning);
+  cursor: help;
+}
+
+/* Validation issue list */
+.recipe-issue-list {
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--text-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.recipe-issue-list.has-errors {
+  background: var(--color-danger-subtle);
+  border: 1px solid var(--color-danger);
+}
+
+.recipe-issue-list.has-warnings {
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+}
+
+.recipe-issue-error {
+  color: var(--color-danger);
+}
+
+.recipe-issue-warning {
+  color: var(--color-warning);
+}
+
+.recipe-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

@@ -163,11 +163,6 @@
         "since": "2026-08-09T03:33:00"
       },
       {
-        "path": "frontend/src/RecipeEditor.css",
-        "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
-        "since": "2026-08-09T03:33:00"
-      },
-      {
         "path": "frontend/src/components/QuestTile.css",
         "reason": "pre-existing at tool introduction (2026-08-09); parked — revisit on next touching change",
         "since": "2026-08-09T03:33:00"
@@ -275,6 +270,10 @@
       {
         "commit": "9eea70c",
         "reason": "pure structural split (App.css 3225->224 into 19 feature files, byte-identical bundle verified) — doc-less by judgment, s30"
+      },
+      {
+        "commit": "10efe0b",
+        "reason": "pure structural split (QuestCanvas.css 2099->12 files, byte-identical bundle verified) — doc-less by judgment, s30"
       }
     ]
   }

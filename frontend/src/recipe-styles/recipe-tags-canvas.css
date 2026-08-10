@@ -1,0 +1,284 @@
+/* Tags tab: expanded tag member rows (below a tag row) */
+.tag-member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 8px 2px 46px;
+  cursor: grab;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.tag-member-row:hover {
+  background: var(--color-bg-surface-1);
+}
+
+.tag-member-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.tag-member-bullet {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.tag-member-id {
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-member-overflow {
+  padding: 2px 8px 2px 46px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* Tags tab: the `#` ribbon on the tag row */
+.palette-item.tag-item .tag-badge {
+  margin-left: auto;
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent-subtle);
+  font-weight: 600;
+}
+
+.palette-item.tag-item .palette-item-icon {
+  cursor: pointer;
+}
+
+.palette-item.tag-item .palette-item-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-tertiary);
+}
+
+/* Canvas (center) */
+.recipe-canvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.recipe-list-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface-0);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  gap: var(--space-2);
+}
+
+/* The explorer is the fixed left rail of the editor body. */
+.recipe-explorer {
+  flex: 0 0 320px;
+  min-width: 0;
+}
+
+.recipe-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recipe-list-header h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.recipe-list-filters {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.recipe-list-search {
+  flex: 1;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.recipe-list-search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.recipe-list-filters select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.recipe-list {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Multi-column recipe grid cell: compact card with name (top) and output
+   (bottom) so the panel shows many recipes without a wide empty gap between
+   the recipe name and its output. */
+.recipe-grid-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-half);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.recipe-grid-item:hover {
+  background: var(--color-bg-surface-1);
+}
+
+.recipe-grid-item.selected {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+}
+
+.recipe-grid-item.bulk-selected {
+  background: var(--color-accent-subtle);
+}
+
+.recipe-grid-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.recipe-grid-output {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-left: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  min-width: 0;
+}
+
+.recipe-grid-output span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipe-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.recipe-list-item:hover {
+  background: var(--color-bg-surface-1);
+}
+
+.recipe-list-item.selected {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+}
+
+.recipe-list-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.recipe-type-badge {
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+.recipe-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipe-list-output {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.recipe-output-icon {
+  width: 20px;
+  height: 20px;
+  image-rendering: pixelated;
+}
+
+/* Editing panel */
+.crafting-grid-panel {
+  background: var(--color-bg-surface-0);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.crafting-grid-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.recipe-group-input {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.recipe-group-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
