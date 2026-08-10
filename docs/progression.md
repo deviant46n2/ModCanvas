@@ -52,23 +52,43 @@ inspector, and the ReactFlow surface. The canvas gets its height from the
 `height: 100%` flex columns), so the graph is visible without any scroll
 hijacking.
 
-### Visual design (2026-08-06)
+### Visual design
 
-- **Node tiles:** each card carries a type-colored left accent bar, a tinted
-  icon chip, the label, an uppercase phase pill, clamped description, and a
-  mod-count badge. Type colors live in
-  `frontend/src/core/progression/phase-bands.ts` (`NODE_TYPE_COLORS`, single
-  source for tiles, edges, minimap); a node's own `color` overrides the type
-  color via the `--node-accent` CSS var.
-- **Phase lanes:** `computePhaseBands` (pure, tested) derives a tinted lane
-  per phase from the real nodes' bounding boxes — added to the canvas as
+Tokens come from `docs/design.md` (the dark dev-tool system — zinc surfaces,
+blue accent, 4px grid, `--text-xs` floor). Node/edge/phase colors live in
+`frontend/src/core/progression/phase-bands.ts` (`NODE_TYPE_COLORS`, single
+source for tiles, edges, minimap); a node's own `color` overrides the type
+color via the `--node-accent` CSS var.
+
+- **Node tiles:** each card carries a type-colored left accent bar, a **hero
+  texture** as the visual anchor (a 44px pixelated sprite in a phase-tinted
+  radial glow well), the type glyph demoted to a small corner badge, the
+  label, an uppercase phase pill, clamped description, and item + mod count
+  chips.
+- **Node textures:** each node resolves its best texture key (`icon` > first
+  `item_ref` > first `mod_ref`), requests materialization from the lazy
+  texture pipeline (`texture-loader.ts`, same as the quest editor), and
+  re-renders as data URLs land. `bake:` keys (3D items the companion must
+  render in-game) never materialize offline — those nodes show the honest
+  "run the instance to capture" cue, never an infinite pending spinner (the
+  s29 design-review fix: `isTexturePending` excludes `bake:` keys). **No CSS
+  `filter` on the sprite** — inside ReactFlow's transformed viewport a filter
+  forces the icon into its own compositing layer at CSS-pixel resolution,
+  resampled with bilinear smoothing (the s25 regression, same rule as
+  `QuestCanvas.css`); depth cues are box-shadow or baked, never a filter.
+- **Phase lanes:** `computePhaseBands` (pure, tested) derives a gradient-tinted
+  lane per phase from the real nodes' bounding boxes — added to the canvas as
   non-selectable, non-draggable `phaseBand` nodes with `zIndex: -1`. Bands are
   **derived, never persisted**: `saveGraph` iterates the real `nodes` state,
-  so bands can never leak into a save. `phaseColor` maps phase names to a
-  stable palette (hash-based, deterministic across reloads).
-- **Edges:** tinted by their source node's type color (`--edge-color` CSS var
-  + matching `ArrowClosed` marker). The selected state overrides the stroke
-  via CSS; optional edges render as animated dashed lines.
+  so bands can never leak into a save. Each lane carries a tinted pill header
+  (phase name + count). `phaseColor` maps phase names to a stable palette
+  (hash-based, deterministic across reloads).
+- **Edges:** stroke tinted by the source node's type color (`--edge-color`
+  CSS var + matching `ArrowClosed` marker). Glow is **hover/selected only**
+  (design.md §2.7 — a permanent glow on every edge reads neon, not tool);
+  rest is the tinted stroke. Optional edges render as animated dashed lines.
+- **Canvas:** a subtle radial vignette behind the grid (`radial-gradient`
+  overlay on `.react-flow`).
 - **Empty state:** a designed panel (icon, headline, copy, "Load Vanilla
   Template" + "Load from Pack" CTAs) replaces the canvas when the graph has
   zero nodes — never a blank void. Auto-load was deliberately rejected: the

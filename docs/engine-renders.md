@@ -151,8 +151,12 @@ rename). Commands:
 
 ### Merge discipline & once-per-instance offering
 
-`useQuestAssetPipeline.ts` guards the live texture index against churn. The
-index holds two kinds of values — compact descriptors (`jar:`/`kubejs:`/`bake:`)
+The merge policies themselves live in `frontend/src/services/texture-merge.ts`
+— a pure, unit-tested module (the "three merge functions, three guard levels"
+contract, s26) so the semantics are reviewable and pinned by tests.
+`useQuestAssetPipeline.ts` applies them to the live texture index to guard it
+against churn. The index holds two kinds of values — compact descriptors
+(`jar:`/`kubejs:`/`bake:`)
 from scans/ingests and displayable data URLs (offline materializer + engine
 renders) — and all merges are directional:
 
