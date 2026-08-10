@@ -18,7 +18,7 @@
     {
       "id": "audit-remaining-300-line-debt",
       "priority": "P3",
-      "reason": "audit 2026-08-05: next-tier Rust files still >300 (snbt.rs 916, progression.rs 876, ingest.rs 820, recipes/mod.rs 725, etc.) - parked with written reason, pay by splitting on next touch"
+      "reason": "audit 2026-08-05: next-tier Rust files still >300 (snbt.rs 916, ingest.rs 820, recipes/mod.rs 725, etc.) - parked with written reason, pay by splitting on next touch; progression.rs split into hub + categories/category_map/generation submodules (s29)"
     }
   ]
 }
