@@ -56,7 +56,7 @@ async fn try_resolve_mod(
     // Strategy 2: Try each query on Modrinth
     for query in &queries {
         eprintln!("[ModCanvas]   Searching Modrinth with query: '{}'", query);
-        if let Ok(mods) = mod_intelligence.search_modrinth(query, loader.clone(), mc_version).await {
+        if let Ok(mods) = mod_intelligence.search_modrinth(query, loader.clone(), mc_version, &[]).await {
             if let Some(matched) = find_best_match(&mods, query, unmod.version.as_deref()) {
                 return Some(ResolvedMod {
                     mod_id: matched.mod_id.clone(),

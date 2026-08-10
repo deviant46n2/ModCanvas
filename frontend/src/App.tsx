@@ -151,6 +151,8 @@ function AppRoot() {
             getModNameById: s.getModNameById,
             searchSources: s.searchSources,
             onSearchSourcesChange: s.setSearchSources,
+            searchCategory: s.searchCategory,
+            onSearchCategoryChange: s.setSearchCategory,
             installingIds: s.installingIds,
           }}
           configsTab={{

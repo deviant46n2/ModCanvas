@@ -276,6 +276,26 @@
       {
         "commit": "69c6e06",
         "reason": "ingest.rs split — internal module restructure + command registration path (lib.rs); no user-facing behavior/doc surface changed, dead code removed — doc-less by judgment"
+      },
+      {
+        "commit": "accfab5",
+        "reason": "recipe barrel import fix — repaired a build break (dangling CSS imports); internal import path, no doc surface — doc-less by judgment, s32"
+      },
+      {
+        "commit": "29b92c6",
+        "reason": "create-project path fix (expand ~ + mkdir) — bug fix so behavior matches the documented load-pack flow; no new surface — doc-less by judgment, s32"
+      },
+      {
+        "commit": "afb8749",
+        "reason": "ModrinthVersionFile serde rename — internal deserialization bug fix, no user-facing surface; fixture test added — doc-less by judgment, s32"
+      },
+      {
+        "commit": "29a326c",
+        "reason": "source toggles clear stale search results — UI bug fix, behavior now matches intent; no doc record for the toggles existed — doc-less by judgment, s32"
+      },
+      {
+        "commit": "1707af8",
+        "reason": "version-mismatch gating + CF error text — user-visible behavior; documented in docs/mods-tab.md with the category-feature commit, s32"
       }
     ]
   }

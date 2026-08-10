@@ -42,7 +42,7 @@ pub async fn search_items(
     
     // First, try to search Modrinth for projects matching the query
     let loader_enum = crate::models::ModLoader::from_str(&loader);
-    let modrinth_results = intelligence.search_modrinth(&query, loader_enum, &mc_version).await
+    let modrinth_results = intelligence.search_modrinth(&query, loader_enum, &mc_version, &[]).await
         .map_err(|e| e.to_string())?;
     
     for project in modrinth_results {
@@ -73,7 +73,7 @@ pub async fn search_tags(
 
     // Search for mods that might provide the tag
     let loader_enum = crate::models::ModLoader::from_str(&loader);
-    let modrinth_results = intelligence.search_modrinth(&query, loader_enum, &mc_version).await
+    let modrinth_results = intelligence.search_modrinth(&query, loader_enum, &mc_version, &[]).await
         .map_err(|e| e.to_string())?;
     
     let mut results = Vec::new();

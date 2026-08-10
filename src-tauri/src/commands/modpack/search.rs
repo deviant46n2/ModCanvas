@@ -116,6 +116,7 @@ pub async fn search_mods(
     loader: String,
     mc_version: String,
     sources: Vec<String>,
+    categories: Vec<String>,
     db: State<'_, Database>,
     intelligence: State<'_, ModIntelligence>,
 ) -> Result<Vec<ModMetadata>, String> {
@@ -135,7 +136,7 @@ pub async fn search_mods(
     for source in &sources {
         match source.to_lowercase().as_str() {
             "modrinth" => {
-                match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version).await {
+                match intelligence.search_modrinth(&query, loader_enum.clone(), &mc_version, &categories).await {
                     Ok(mut mods) => results.append(&mut mods),
                     Err(e) => eprintln!("[ModCanvas] Modrinth mod search failed: {}", e),
                 }

@@ -45,6 +45,9 @@ export function useModState(selectedProject: Project | null) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searchSources, setSearchSources] = useState<Array<'modrinth' | 'curseforge'>>(['modrinth', 'curseforge'])
+  // Modrinth category facet for the mod search ('' = all categories). Only
+  // Modrinth supports category facets; CurseForge results are unaffected.
+  const [searchCategory, setSearchCategory] = useState('')
   const [projectMods, setProjectMods] = useState<any[]>([])
   const [modFilter, setModFilter] = useState('')
   const [modFilterInput, setModFilterInput] = useState('')
@@ -247,6 +250,7 @@ export function useModState(selectedProject: Project | null) {
         selectedProject.mod_loader,
         selectedProject.minecraft_version,
         searchSources,
+        searchCategory ? [searchCategory] : [],
       )
       setSearchResults(results)
     } catch (e) {
@@ -297,6 +301,7 @@ export function useModState(selectedProject: Project | null) {
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
     searchSources, setSearchSources: handleSearchSourcesChange,
+    searchCategory, setSearchCategory,
     modFilterInput, setModFilterInput,
     modMetadata,
     isLoadingMetadata,

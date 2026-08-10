@@ -176,7 +176,7 @@ impl ModIntelligence {
         Ok(Some(project.into()))
     }
     
-    pub async fn search_modrinth(&self, query: &str, loader: ModLoader, mc_version: &str) -> anyhow::Result<Vec<ModMetadata>> {
+    pub async fn search_modrinth(&self, query: &str, loader: ModLoader, mc_version: &str, categories: &[String]) -> anyhow::Result<Vec<ModMetadata>> {
         let loader_str = match loader {
             ModLoader::Fabric => "fabric",
             ModLoader::Quilt => "quilt",
@@ -185,10 +185,19 @@ impl ModIntelligence {
             ModLoader::Vanilla => "vanilla",
         };
         
-        let facets = format!(
-            r#"[["project_type:mod"],["categories:{}"],["versions:{}"]]"#,
-            loader_str, mc_version
-        );
+        // Facets: loader and MC version are AND-ed with the query; each
+        // category is its own sub-array (Modrinth ORs across sub-arrays), so
+        // passing ["magic", "technology"] means magic OR technology — the
+        // same mechanism the loader facet already uses.
+        let mut facet_parts = vec![
+            format!(r#"["project_type:mod"]"#),
+            format!(r#"["categories:{}"]"#, loader_str),
+            format!(r#"["versions:{}"]"#, mc_version),
+        ];
+        for c in categories {
+            facet_parts.push(format!(r#"["categories:{}"]"#, c));
+        }
+        let facets = format!("[{}]", facet_parts.join(","));
         
         let url = format!(
             "{}/search?query={}&facets={}&limit=20",

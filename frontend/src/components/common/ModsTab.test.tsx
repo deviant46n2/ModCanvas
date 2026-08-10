@@ -46,6 +46,8 @@ function baseProps(overrides: Partial<ModsTabProps> = {}): ModsTabProps {
     getModNameById: (id: string) => id,
     searchSources: ['modrinth'],
     onSearchSourcesChange: vi.fn(),
+    searchCategory: '',
+    onSearchCategoryChange: vi.fn(),
     installingIds: new Set(),
     ...overrides,
   }

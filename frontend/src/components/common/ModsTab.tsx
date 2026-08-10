@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
 import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
+import { CategorySelect } from './CategorySelect'
 import { SourceToggles, type ModSource } from './SourceToggles'
 
 interface ModMetadata {
@@ -63,6 +64,8 @@ export interface ModsTabProps {
   getModNameById: (modId: string) => string
   searchSources: ModSource[]
   onSearchSourcesChange: (sources: ModSource[]) => void
+  searchCategory: string
+  onSearchCategoryChange: (category: string) => void
   installingIds: Set<string>
 }
 
@@ -255,6 +258,11 @@ export function ModsTab(props: ModsTabProps) {
               onChange={(e) => props.onSearchQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && canSearch && props.onSearchMods()}
               aria-label={canSearch ? 'Search mods' : 'Select a source to search'}
+              disabled={!canSearch}
+            />
+            <CategorySelect
+              value={props.searchCategory}
+              onChange={props.onSearchCategoryChange}
               disabled={!canSearch}
             />
             <button onClick={handleSearchMods} aria-label="Search" disabled={!canSearch}>

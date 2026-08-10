@@ -57,6 +57,19 @@ the row→file link by scanning jars would be the aliasing trap).
 
 ## Install Flow
 
+Search rows carry a **version-mismatch note** when a CurseForge result's
+latest file targets a different MC version than the project. Mismatched rows
+show an **"Unavailable"** button (disabled, mismatch as tooltip) — a click
+can no longer dead-end into a cryptic download error. The CurseForge
+no-file error itself names the requested loader + MC version.
+
+The Add Mods search has a **category filter** (Modrinth only): a dropdown
+with Modrinth's mod categories (Magic, Technology, …). The selected slug is
+added to the search facets as `["categories:<slug>"]` — the same facet
+mechanism the loader filter uses — so results are scoped to the category for
+the project's loader + MC version. CurseForge has no equivalent facet in
+this flow and is unaffected.
+
 `+ Add` on a search result now performs a **real install** (not just a DB row):
 
 1. `install_mod_from_search` (`src-tauri/src/commands/modpack.rs`) resolves the
