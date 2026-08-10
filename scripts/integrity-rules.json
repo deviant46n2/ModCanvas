@@ -274,6 +274,10 @@
       {
         "commit": "10efe0b",
         "reason": "pure structural split (QuestCanvas.css 2099->12 files, byte-identical bundle verified) — doc-less by judgment, s30"
+      },
+      {
+        "commit": "bd4016b",
+        "reason": "pure structural split (RecipeEditor.css 2033->10 files, byte-identical bundle verified) — doc-less by judgment, s30"
       }
     ]
   }
