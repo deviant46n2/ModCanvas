@@ -1,0 +1,21 @@
+/* Glyph-free small controls */
+.ftb-popup-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.quest-detail-small-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.quest-detail-close svg,
+.quest-inspector-close-btn svg,
+.quest-inspector-card-remove svg,
+.quest-detail-card-remove svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}

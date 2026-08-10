@@ -1,0 +1,133 @@
+/* ── Quest book loading skeleton ── */
+
+.quest-skeleton-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quest-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quest-skeleton-block {
+  background: linear-gradient(90deg, #2a2a30 25%, #3a3a42 37%, #2a2a30 63%);
+  background-size: 400% 100%;
+  animation: quest-skeleton-shimmer 1.4s ease infinite;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.quest-icon-skeleton {
+  display: inline-block;
+  border-radius: 4px;
+}
+
+@keyframes quest-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.quest-skeleton-chapter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ftb-surface-alt);
+}
+
+.quest-skeleton-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.quest-skeleton-chapter-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.quest-skeleton-count {
+  margin-left: auto;
+  border-radius: 3px;
+}
+
+.quest-skeleton-canvas {
+  position: relative;
+}
+
+.quest-skeleton-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ftb-surface-alt);
+}
+
+.quest-skeleton-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, #33333a 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.quest-skeleton-nodes {
+  position: absolute;
+  inset: 0;
+}
+
+.quest-skeleton-node {
+  position: absolute;
+  border-radius: 8px;
+  background: var(--ftb-surface);
+  box-shadow: 0 0 0 1px var(--ftb-surface-alt), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.quest-texture-loading {
+  position: fixed;
+  bottom: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--ftb-surface, #1e1e24);
+  border: 1px solid var(--ftb-surface-alt, #3a3a42);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.quest-texture-loading-track {
+  width: 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.quest-texture-loading-fill {
+  height: 100%;
+  width: 40%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #5b9bd5, #89b6e0);
+  animation: quest-texture-loading-slide 1s ease-in-out infinite;
+}
+
+@keyframes quest-texture-loading-slide {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+.quest-texture-loading-label {
+  font-size: 12px;
+  color: var(--ftb-text);
+  white-space: nowrap;
+}
+

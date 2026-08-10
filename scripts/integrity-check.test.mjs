@@ -257,3 +257,25 @@ test('build-smoke: rules.buildSmoke.skip turns the section into info', () => {
   assert.equal(violations.length, 0)
   assert.equal(info.length, 1)
 })
+
+// --- report() candidate formatting ----------------------------------------
+
+import { formatCandidate } from './integrity-check.mjs'
+
+test('formatCandidate: doc-sync candidate renders commit + files', () => {
+  assert.equal(
+    formatCandidate({ commit: 'abc123', files: ['src/a.rs'] }),
+    'commit abc123 changed code without docs: src/a.rs',
+  )
+})
+
+test('formatCandidate: path-shaped candidate (suite-self) renders its path, not "commit undefined" (s34)', () => {
+  assert.equal(
+    formatCandidate({ path: 'docs/x.md: plain pnpm reference "foo"' }),
+    'docs/x.md: plain pnpm reference "foo"',
+  )
+})
+
+test('formatCandidate: message-only candidate falls back to the message', () => {
+  assert.equal(formatCandidate({ message: 'something needs judgment' }), 'something needs judgment')
+})

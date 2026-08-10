@@ -6,7 +6,7 @@
 // companion mod (engine-render pipeline) and never become data URLs offline.
 // No image bytes are ever stored in the index cache.
 
-use super::compact_index;
+use super::index::compact_index;
 use std::collections::{HashMap, VecDeque};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};

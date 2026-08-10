@@ -1,0 +1,204 @@
+/* ── FTB-themed form elements ── */
+
+.book-section {
+  margin-bottom: 16px;
+}
+
+.book-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.section-icon {
+  font-size: 14px;
+}
+
+.book-field {
+  margin-bottom: 8px;
+}
+
+.book-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ftb-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.book-field input[type="text"],
+.book-field input[type="number"],
+.book-field textarea,
+.book-field select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--ftb-input-bg);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  box-sizing: border-box;
+}
+
+.book-field input[type="text"]:focus,
+.book-field input[type="number"]:focus,
+.book-field textarea:focus,
+.book-field select:focus {
+  outline: none;
+  border-color: var(--ftb-accent);
+}
+
+.book-field textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.book-field-half {
+  display: flex;
+  gap: 8px;
+}
+
+.book-field-half .book-field {
+  flex: 1;
+}
+
+.book-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.book-checkbox label {
+  font-size: 11px;
+  color: var(--ftb-text);
+  cursor: pointer;
+}
+
+.book-checkbox input[type="checkbox"] {
+  accent-color: var(--ftb-accent);
+}
+
+.book-card {
+  background: var(--ftb-input-bg);
+  border: 1px solid var(--ftb-border);
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.book-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.book-card-index {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.book-card-remove {
+  background: none;
+  border: none;
+  color: var(--ftb-danger);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.book-card-remove:hover {
+  color: #ff6666;
+}
+
+.book-page-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--ftb-surface);
+  border: 2px solid var(--ftb-border);
+  color: var(--ftb-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  transition: all 0.15s;
+}
+
+.book-page-btn:hover {
+  background: var(--ftb-surface-alt);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-page-btn.accent {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-page-btn.accent:hover {
+  background: var(--ftb-accent);
+  color: var(--ftb-bg);
+}
+
+.book-btn {
+  background: var(--ftb-surface);
+  border: 2px solid var(--ftb-border);
+  border-radius: 0;
+  color: var(--ftb-text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.book-btn:hover {
+  background: var(--ftb-surface-alt);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}
+
+.book-btn.primary {
+  background: var(--ftb-accent);
+  border-color: var(--ftb-accent);
+  color: var(--ftb-bg);
+  font-weight: 700;
+}
+
+.book-btn.primary:hover {
+  background: var(--ftb-accent-hover);
+  border-color: var(--ftb-accent-hover);
+}
+
+.book-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.book-btn.danger {
+  border-color: var(--ftb-danger);
+  color: var(--ftb-danger);
+}
+
+.book-btn.danger:hover {
+  background: var(--ftb-danger);
+  color: var(--ftb-bg);
+}
+

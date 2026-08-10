@@ -1,113 +1,21 @@
+// Recipe store (zustand + persist). Types live in `./recipe-store/types` and
+// the undo/redo history stack in `./recipe-store/history`.
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export type RecipeType = 'shaped' | 'shapeless' | 'smithing' | 'stonecutting' | 'smelting' | 'blasting' | 'smoking' | 'campfire';
-
-export type RecipeOrigin = 'vanilla' | 'kubejs' | 'crafttweaker' | 'authored';
-
-export interface RecipeIngredient {
-  item: string;
-  /** Absent counts arrive as `undefined` (authored) or `null` (loaded pack
-   *  recipes — Rust `Option<i32>::None` serializes to null). */
-  count?: number | null;
-  tag?: boolean;
-  nbt?: Record<string, unknown>;
-}
-
-export interface RecipeOutput {
-  item: string;
-  count: number;
-  nbt?: Record<string, unknown>;
-}
-
-export interface Recipe {
-  id: string;
-  type: RecipeType;
-  name: string;
-  group?: string;
-  pattern?: string[];
-  key?: Record<string, RecipeIngredient>;
-  ingredients?: RecipeIngredient[];
-  output: RecipeOutput;
-  experience?: number;
-  cookingTime?: number;
-  category?: string;
-  /** Provenance of the recipe: where it was loaded from. */
-  origin?: RecipeOrigin;
-  /** Absolute path of the source file (present for discovered recipes). */
-  source?: string;
-  /** False ⟺ read-only mod-jar recipe (cannot be edited in place). Sent by the
-   *  backend on discovered recipes; absent/undefined on authored recipes. */
-  editable?: boolean;
-  /** 1-based line range of the call in `source` (KubeJS/CraftTweaker only) —
-   *  the target of the comment-out disable mechanism. */
-  sourceLines?: { start: number; end: number };
-  /** Authored only: disabled ⟹ excluded from script emission. */
-  disabled?: boolean;
-  /** Authored only: edited/created since the last save. Powers the "Changed"
-   *  filter; cleared by `markClean`. */
-  modified?: boolean;
-}
-
-/** A comment-out disable of a KubeJS/CraftTweaker recipe call, persisted so it
- *  stays visible + re-enable-able after a rescan removes the recipe from the
- *  pack list. `fingerprint` = SHA-256 (hex) of the original pre-comment lines. */
-export interface DisabledScriptEntry {
-  file: string;
-  startLine: number;
-  endLine: number;
-  name: string;
-  outputItem: string;
-  type: RecipeType;
-  fingerprint: string;
-}
-
-interface RecipeSnapshot {
-  recipes: Recipe[];
-  selectedRecipeId: string | null;
-}
-
-const MAX_UNDO = 50;
-let undoStack: RecipeSnapshot[] = [];
-let redoStack: RecipeSnapshot[] = [];
-
-function takeSnapshot(state: { recipes: Recipe[]; selectedRecipeId: string | null }): RecipeSnapshot {
-  return {
-    recipes: JSON.parse(JSON.stringify(state.recipes)),
-    selectedRecipeId: state.selectedRecipeId,
-  };
-}
-
-interface RecipeState {
-  recipes: Recipe[];
-  selectedRecipeId: string | null;
-  dirty: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  /** Resource ids (`ns:file`) disabled via remove-by-id emission (vanilla/jar). */
-  disabledIds: string[];
-  /** Comment-out disables of KubeJS/CraftTweaker calls (persisted manifest). */
-  disabledScripts: DisabledScriptEntry[];
-  addRecipe: (recipe: Omit<Recipe, 'id'>) => string;
-  updateRecipe: (id: string, updates: Partial<Recipe>) => void;
-  deleteRecipe: (id: string) => void;
-  bulkDeleteRecipes: (ids: string[]) => void;
-  reorderRecipes: (from: number, to: number) => void;
-  selectRecipe: (id: string | null) => void;
-  setRecipes: (recipes: Recipe[]) => void;
-  loadRecipesFromPack: (recipes: Recipe[]) => number;
-  markClean: () => void;
-  markDirty: () => void;
-  duplicateRecipe: (id: string) => string | null;
-  getSelectedRecipe: () => Recipe | null;
-  toggleDisableById: (id: string) => void;
-  toggleDisableAuthored: (id: string) => void;
-  addDisabledScript: (entry: DisabledScriptEntry) => void;
-  removeDisabledScript: (file: string, startLine: number) => void;
-  isDisabled: (recipe: Recipe | null | undefined) => boolean;
-  undo: () => void;
-  redo: () => void;
-}
+import type { RecipeState } from './recipe-store/types';
+import {
+  takeSnapshot,
+  recordMutation,
+  clearHistory,
+  popUndo,
+  pushUndo,
+  pushRedo,
+  popRedo,
+  undoDepth,
+  redoDepth,
+} from './recipe-store/history';
+export type { RecipeType, RecipeOrigin, RecipeIngredient, RecipeOutput, Recipe, DisabledScriptEntry } from './recipe-store/types';
 
 export const useRecipeStore = create<RecipeState>()(
   persist(
@@ -131,14 +39,12 @@ export const useRecipeStore = create<RecipeState>()(
           modified: true,
         };
         set((state) => {
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           return {
             recipes: [...state.recipes, newRecipe],
             selectedRecipeId: id,
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -147,9 +53,7 @@ export const useRecipeStore = create<RecipeState>()(
 
       updateRecipe: (id, updates) => {
         set((state) => {
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           return {
             recipes: state.recipes.map((r) => {
               if (r.id !== id) return r;
@@ -159,7 +63,7 @@ export const useRecipeStore = create<RecipeState>()(
               return { ...r, ...updates, modified };
             }),
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -167,14 +71,12 @@ export const useRecipeStore = create<RecipeState>()(
 
       deleteRecipe: (id) => {
         set((state) => {
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           return {
             recipes: state.recipes.filter((r) => r.id !== id),
             selectedRecipeId: state.selectedRecipeId === id ? null : state.selectedRecipeId,
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -183,15 +85,13 @@ export const useRecipeStore = create<RecipeState>()(
       bulkDeleteRecipes: (ids) => {
         set((state) => {
           const idSet = new Set(ids);
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           const remaining = state.recipes.filter((r) => !idSet.has(r.id));
           return {
             recipes: remaining,
             selectedRecipeId: idSet.has(state.selectedRecipeId ?? '') ? (remaining[0]?.id ?? null) : state.selectedRecipeId,
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -199,16 +99,14 @@ export const useRecipeStore = create<RecipeState>()(
 
       reorderRecipes: (from, to) => {
         set((state) => {
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           const next = [...state.recipes];
           const [moved] = next.splice(from, 1);
           next.splice(to, 0, moved);
           return {
             recipes: next,
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -219,8 +117,7 @@ export const useRecipeStore = create<RecipeState>()(
       },
 
       setRecipes: (recipes) => {
-        undoStack = [];
-        redoStack = [];
+        clearHistory();
         set({ recipes, dirty: false, canUndo: false, canRedo: false });
       },
 
@@ -274,13 +171,11 @@ export const useRecipeStore = create<RecipeState>()(
           modified: true,
         };
         set((state) => {
-          undoStack.push(takeSnapshot(state));
-          if (undoStack.length > MAX_UNDO) undoStack.shift();
-          redoStack = [];
+          recordMutation(takeSnapshot(state));
           return {
             recipes: [...state.recipes, newRecipe],
             dirty: true,
-            canUndo: undoStack.length > 0,
+            canUndo: undoDepth() > 0,
             canRedo: false,
           };
         });
@@ -353,29 +248,29 @@ export const useRecipeStore = create<RecipeState>()(
 
       undo: () => {
         const state = get();
-        if (undoStack.length === 0) return;
-        const snapshot = undoStack.pop()!;
-        redoStack.push(takeSnapshot(state));
+        const snapshot = popUndo();
+        if (!snapshot) return;
+        pushRedo(takeSnapshot(state));
         set({
           recipes: snapshot.recipes,
           selectedRecipeId: snapshot.selectedRecipeId,
           dirty: true,
-          canUndo: undoStack.length > 0,
-          canRedo: redoStack.length > 0,
+          canUndo: undoDepth() > 0,
+          canRedo: redoDepth() > 0,
         });
       },
 
       redo: () => {
         const state = get();
-        if (redoStack.length === 0) return;
-        const snapshot = redoStack.pop()!;
-        undoStack.push(takeSnapshot(state));
+        const snapshot = popRedo();
+        if (!snapshot) return;
+        pushUndo(takeSnapshot(state));
         set({
           recipes: snapshot.recipes,
           selectedRecipeId: snapshot.selectedRecipeId,
           dirty: true,
-          canUndo: undoStack.length > 0,
-          canRedo: redoStack.length > 0,
+          canUndo: undoDepth() > 0,
+          canRedo: redoDepth() > 0,
         });
       },
     }),

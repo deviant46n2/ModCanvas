@@ -1,52 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { wsIpcGetStatus } from '../services/api'
+// Quest asset pipeline hook: owns the texture index + items state and wires the
+// per-concern sync effects (ingest/scan, engine renders, runtime textures,
+// materialization plan). Effect bodies live in `./useQuestAssetPipeline/*`.
+
+import { useState } from 'react'
 import type { QuestGraphData, QuestNodeData } from '../services/quest-types'
 import type { IngestResult, ItemRegistryEntry } from '../services/quest-types'
+import { getBakedTextureCount } from '../services/texture-loader'
+import { usePrefetchTextures } from './useQuestAssetPipeline/prefetch'
+import { useIngestSync, useScanSync } from './useQuestAssetPipeline/ingest'
 import {
-  subscribeMaterialized,
-  subscribeLoadingChange,
-  subscribeNotFound,
-  getMaterialized,
-  requestMaterialize,
-  buildTexturePathIndex,
-  prefetchAllChapterTextures,
-  registerBakedKeysFromIndex,
-  subscribeBakedKeys,
-  getBakedTextureCount,
-  getBakedTextureKeys,
-  unmarkBakedKeys,
-} from '../services/texture-loader'
-import { requestResolveTags } from '../services/smart-filter-tags'
+  useBakedCountSync,
+  useEngineRenderSync,
+  useEngineQueue,
+  useNotFoundEngineQueue,
+  useBakedQueue,
+} from './useQuestAssetPipeline/engine'
 import {
-  initEngineRenderListener,
-  setEngineRenderConnected,
-  subscribeEngineRenders,
-  queueEngineRenders,
-  queueEngineRendersPriority,
-  getEngineRenderCache,
-  persistEngineRenders,
-  normalizeItemId,
-} from '../services/engine-render'
+  useRuntimeTextureRequest,
+  useRuntimeTextureSync,
+} from './useQuestAssetPipeline/runtime'
 import {
-  initRuntimeTextureListener,
-  subscribeRuntimeTextures,
-  getRuntimeTextureCache,
-  saveRuntimeTextureCache,
-  mergeRuntimeTextures,
-  questRuntimeNamespaces,
-  requestRuntimeTextures,
-} from '../services/runtime-textures'
-import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, getQuestThemeBackground } from '../services/recipes'
-import { registerModItems } from '../services/smart-filter-mods'
-import { resolveAssetUrl } from '../services/asset-resolver'
-import { resolveIconKey } from '../components/quest/questIcons'
-import { buildMaterializationPlan } from './quest-materialization'
-import {
-  mergeIndex,
-  mergeIndexNoDowngrade,
-  mergeIndexUpgradeOnly,
-  withItemTextures,
-} from '../services/texture-merge'
+  useMaterializationActivity,
+  useThemeBackground,
+} from './useQuestAssetPipeline/activity'
+import { useMaterializationPlan } from './useQuestAssetPipeline/plan'
 
 interface UseQuestAssetPipelineOptions {
   instancePath: string
@@ -60,17 +37,8 @@ interface UseQuestAssetPipelineOptions {
   projectId: string
 }
 
-export function useQuestAssetPipeline({
-  instancePath,
-  ingestResult,
-  kubejsNamespace,
-  wsConnected,
-  graph,
-  activeChapter,
-  selectedNode,
-  packLoaded,
-  projectId,
-}: UseQuestAssetPipelineOptions) {
+export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
+  const { instancePath, ingestResult, kubejsNamespace, wsConnected, graph, activeChapter, selectedNode, packLoaded, projectId } = options
   const [textureIndex, setTextureIndex] = useState<Record<string, string>>({})
   const [animations, setAnimations] = useState<Record<string, string>>({})
   const [ingestIndex, setIngestIndex] = useState<Record<string, string>>({})
@@ -80,274 +48,21 @@ export function useQuestAssetPipeline({
   const [bakedCount, setBakedCount] = useState(() => getBakedTextureCount())
   const [questBackgroundUrl, setQuestBackgroundUrl] = useState<string | null>(null)
   const [items, setItems] = useState<ItemRegistryEntry[]>([])
-  const prefetchedFor = useRef<string | null>(null)
-  const runtimeRequestedRef = useRef<string | null>(null)
-  // Debounced engine-render persist buffer (see the subscribeEngineRenders
-  // handler): results accumulate here and hit the disk on the flush interval.
-  const pendingRendersRef = useRef<Record<string, string>>({})
-  useEffect(() => {
-    if (!packLoaded || !graph || !graph.chapters.length) return
-    if (!instancePath) return
-    const key = `${projectId}|${instancePath}`
-    if (prefetchedFor.current === key) return
-    prefetchedFor.current = key
-    const count = prefetchAllChapterTextures(graph, instancePath)
-    // eslint-disable-next-line no-console
-    console.log(`[ModCanvas] Pre-warming ${count} quest textures in the background…`)
-  }, [packLoaded, graph, projectId, instancePath])
-  useEffect(() => {
-    if (ingestResult?.asset_registry?.by_id) {
-      registerBakedKeysFromIndex(ingestResult.asset_registry.by_id)
-      setIngestIndex(ingestResult.asset_registry.by_id)
-      // No-downgrade: ingest carries compact descriptors; never clobber an
-      // already-rendered data URL back to a placeholder.
-      setTextureIndex(prev => mergeIndexNoDowngrade(prev, ingestResult.asset_registry.by_id))
-    }
-    if (ingestResult?.active_instance) {
-      scanInstanceItems(ingestResult.active_instance, kubejsNamespace).then((registry) => {
-        setItems(registry);
-        registerModItems(registry);
-      }).catch((e) => console.error('[QuestBookEditor] Failed to scan instance items:', e));
-    }
-  }, [ingestResult, kubejsNamespace])
-  useEffect(() => subscribeBakedKeys(() => setBakedCount(getBakedTextureCount())), [])
-  useEffect(() => {
-    let disposed = false
-    initEngineRenderListener()
-    setEngineRenderConnected(!!wsConnected)
 
-    let pollTimer: ReturnType<typeof setInterval> | undefined
-    const syncStatus = () => {
-      wsIpcGetStatus().then((st) => {
-        if (!disposed) setEngineRenderConnected(st.connected)
-      }).catch(() => {})
-    }
-    pollTimer = setInterval(syncStatus, 5000)
-    syncStatus()
+  usePrefetchTextures({ packLoaded, graph, projectId, instancePath })
+  useIngestSync({ ingestResult, kubejsNamespace, setIngestIndex, setTextureIndex, setItems })
+  useBakedCountSync({ setBakedCount })
+  useEngineRenderSync({ instancePath, wsConnected, setTextureIndex, setItems })
+  useRuntimeTextureRequest({ wsConnected, graph, projectId })
+  useRuntimeTextureSync({ instancePath, setTextureIndex })
+  useEngineQueue({ wsConnected, items, textureIndex })
+  useNotFoundEngineQueue({ wsConnected })
+  useBakedQueue({ wsConnected, instancePath })
+  useScanSync({ instancePath, setTextureIndex, setAnimations })
+  useMaterializationActivity({ setTextureTick, setTexturesLoading, setTexturesRemaining })
+  useThemeBackground({ instancePath, activeChapter, textureIndex, textureTick, setQuestBackgroundUrl })
+  useMaterializationPlan({ graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, instancePath, wsConnected, setTextureIndex })
 
-    if (instancePath) {
-      getEngineRenderCache(instancePath)
-        .then((cached) => {
-          if (disposed || !cached || Object.keys(cached).length === 0) return
-          unmarkBakedKeys(Object.keys(cached))
-          setTextureIndex((prev) => mergeIndex(prev, cached))
-          setItems((prev) => withItemTextures(prev, cached))
-        })
-        .catch(() => {})
-    }
-
-    const unsubRenders = subscribeEngineRenders((rendered) => {
-      unmarkBakedKeys(Object.keys(rendered))
-      setTextureIndex((prev) => mergeIndex(prev, rendered))
-      setItems((prev) => withItemTextures(prev, rendered))
-      if (instancePath) {
-        // Debounced disk persist: save_engine_renders_cmd rewrites the WHOLE
-        // cache file per call, so persisting per 256-icon batch would make the
-        // write grow with the drain (O(cache) per batch) and eventually gate
-        // the rate. Live injection above is immediate; only the disk copy lags
-        // by up to the flush interval. Flushed on the interval and on cleanup.
-        if (!pendingRendersRef.current) pendingRendersRef.current = {}
-        Object.assign(pendingRendersRef.current, rendered)
-      }
-    })
-    const flushInterval = window.setInterval(() => {
-      const pending = pendingRendersRef.current
-      if (!pending || Object.keys(pending).length === 0) return
-      pendingRendersRef.current = {}
-      persistEngineRenders(instancePath, pending).catch((e) => {
-        console.error('[QuestBookEditor] persistEngineRenders failed:', e)
-        // Re-buffer so the next interval retries rather than losing the icons.
-        Object.assign(pendingRendersRef.current, pending)
-      })
-    }, 4000)
-
-    return () => {
-      disposed = true
-      if (pollTimer) clearInterval(pollTimer)
-      window.clearInterval(flushInterval)
-      const pending = pendingRendersRef.current
-      if (pending && Object.keys(pending).length > 0) {
-        pendingRendersRef.current = {}
-        persistEngineRenders(instancePath, pending).catch(() => {})
-      }
-      unsubRenders()
-    }
-  }, [instancePath, wsConnected])
-  useEffect(() => {
-    if (!wsConnected || !graph) return
-    if (runtimeRequestedRef.current === projectId) return
-    runtimeRequestedRef.current = projectId
-    const namespaces = questRuntimeNamespaces(graph)
-    requestRuntimeTextures(namespaces).catch((e) => console.error('[QuestBookEditor] requestRuntimeTextures failed:', e))
-  }, [wsConnected, graph, projectId])
-  useEffect(() => {
-    let disposed = false
-    initRuntimeTextureListener()
-    if (instancePath) {
-      getRuntimeTextureCache(instancePath)
-        .then((cached) => {
-          if (disposed || !cached || Object.keys(cached).length === 0) return
-          setTextureIndex((prev) => mergeRuntimeTextures(prev, cached))
-        })
-        .catch((e) => console.error('[QuestBookEditor] getRuntimeTextureCache failed:', e))
-    }
-    const unsub = subscribeRuntimeTextures((textures) => {
-      setTextureIndex((prev) => mergeRuntimeTextures(prev, textures))
-      if (instancePath) {
-        saveRuntimeTextureCache(instancePath, textures).catch((e) =>
-          console.error('[QuestBookEditor] saveRuntimeTextureCache failed:', e),
-        )
-      }
-    })
-    return () => {
-      disposed = true
-      unsub()
-    }
-  }, [instancePath])
-  useEffect(() => {
-    if (!wsConnected) return
-    // Wait for the texture index to land before treating registry items as
-    // textureless — at boot the index is empty, and a naive run here would
-    // dump the entire registry into the engine queue.
-    if (Object.keys(textureIndex).length === 0) return
-    // Registry items with NO texture entry at all — the true "?" slots. Any
-    // index entry means the item is known: jar:/kubejs: descriptors
-    // materialize offline, bake: descriptors are queued by the baked-keys
-    // effect below, data URLs are already rendered. Only fully-unknown items
-    // need the engine. (Re-scoped from the items array's texture_data_url,
-    // which the flat materializer never populates — that made every item
-    // look textureless and dumped the whole registry into the engine queue.)
-    //
-    // s26 fix: an item with a registry `texture_data_url` (a compact `jar:`
-    // descriptor — the scan's enumeration-only proof that the item has an
-    // offline texture source) must NEVER be engine-queued, even when its
-    // `textureIndex` entry hasn't landed yet. The index fills asynchronously
-    // (ingest/scan race the items cache read), and during that window items
-    // look "missing" here — queuing them sent flat textures to the engine,
-    // whose in-game renders came back ~50% darker than the jar bytes and
-    // clobbered the good URLs via mergeIndex. The registry descriptor proves
-    // the item is resolvable offline; the engine is only for items with no
-    // descriptor AND no index entry (or bake: keys, handled by the baked-keys
-    // effect). Runs whenever items/textureIndex change, but queueEngineRenders
-    // is idempotent (queueSet/inflight/failed dedupe), so re-runs are cheap.
-    const missingRegistry = items
-      .filter((i) => !i.texture_data_url && !textureIndex[i.id])
-      .map((i) => i.id)
-    if (missingRegistry.length > 0) queueEngineRenders(missingRegistry)
-  }, [wsConnected, items, textureIndex])
-  useEffect(() => {
-    if (!wsConnected) return
-    // Materialization not-found keys (offline materializer gave up) are the
-    // engine's job. Subscribed ONCE — this is a subscription, not a queue
-    // computation, so it must not re-establish itself on every index change.
-    const unsub = subscribeNotFound((keys) => {
-      const itemLike = keys.map(normalizeItemId).filter((k): k is string => !!k)
-      if (itemLike.length > 0) queueEngineRenders(itemLike)
-    })
-    return unsub
-  }, [wsConnected])
-  // Track which baked keys we've already offered to the engine, keyed per
-  // instance. Retries are the engine-render failed-set's job (MAX_ATTEMPTS),
-  // so each baked key is queued exactly once per registration — never
-  // re-queued by textureIndex churn during the drain.
-  const queuedBakedRef = useRef<{ instance: string | null; keys: Set<string> }>({
-    instance: null,
-    keys: new Set(),
-  })
-  useEffect(() => {
-    if (!wsConnected) return
-    if (queuedBakedRef.current.instance !== instancePath) {
-      queuedBakedRef.current = { instance: instancePath, keys: new Set() }
-    }
-    const offerBaked = () => {
-      const pending = getBakedTextureKeys().filter((k) => !queuedBakedRef.current.keys.has(k))
-      if (pending.length === 0) return
-      for (const k of pending) queuedBakedRef.current.keys.add(k)
-      queueEngineRenders(pending)
-    }
-    offerBaked()
-    // Fires on both mark (scan/ingest register bake: keys) and unmark (engine
-    // render replaces them); the queuedBakedRef guard keeps this idempotent.
-    return subscribeBakedKeys(offerBaked)
-  }, [wsConnected, instancePath])
-  useEffect(() => {
-    let cancelled = false
-    if (!instancePath) return
-    scanInstanceTextures(instancePath).then((idx) => {
-      if (cancelled || !idx || Object.keys(idx).length === 0) return
-      registerBakedKeysFromIndex(idx)
-      setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
-    }).catch(() => {})
-    scanInstanceAnimations(instancePath).then((map) => {
-      if (cancelled || !map || Object.keys(map).length === 0) return
-      setAnimations(prev => ({ ...prev, ...map }))
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [instancePath])
-  useEffect(() => {
-    let timer: number | undefined
-    let pending = false
-    const schedule = () => {
-      if (pending) return
-      pending = true
-      timer = window.setTimeout(() => {
-        pending = false
-        setTextureTick(t => t + 1)
-      }, 120)
-    }
-    const unsubMat = subscribeMaterialized(schedule)
-    const unsubLoading = subscribeLoadingChange((isLoading, remaining) => {
-      setTexturesLoading(isLoading)
-      setTexturesRemaining(remaining)
-    })
-    return () => {
-      unsubMat()
-      unsubLoading()
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-  }, [])
-  useEffect(() => {
-    if (!instancePath || !activeChapter) {
-      setQuestBackgroundUrl(null)
-      return
-    }
-    let cancelled = false
-    getQuestThemeBackground(instancePath, activeChapter)
-      .then((bgKey) => {
-        if (cancelled || !bgKey) return
-        const key = resolveIconKey(bgKey)
-        const url = resolveAssetUrl(bgKey, textureIndex) || getMaterialized(key)
-        if (url) {
-          setQuestBackgroundUrl(prev => (prev === url ? prev : url))
-        } else {
-          requestMaterialize([key], instancePath)
-        }
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [activeChapter, textureIndex, textureTick, instancePath])
-
-  const ingestPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(ingestIndex)), [ingestIndex])
-  const scanPathIndex = useMemo(() => buildTexturePathIndex(Object.keys(textureIndex)), [textureIndex])
-  useEffect(() => {
-    if (!graph) return
-    if (!instancePath) return
-    const plan = buildMaterializationPlan({ graph, activeChapter, selectedNode, scanPathIndex, ingestPathIndex, textureIndex, wsConnected })
-    if (Object.keys(plan.inject).length > 0) {
-      // Upgrade-only: injects are materialized data URLs for keys whose index
-      // value is still a descriptor; never clobber an engine-rendered value.
-      setTextureIndex(prev => mergeIndexUpgradeOnly(prev, plan.inject))
-    }
-    if (plan.toFetch.size > 0) {
-      requestMaterialize([...plan.toFetch], instancePath)
-    }
-    if (plan.tags.length > 0) {
-      requestResolveTags(plan.tags, instancePath)
-    }
-    if (plan.bakedInView.length > 0) {
-      queueEngineRendersPriority(plan.bakedInView)
-    }
-  }, [graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, ingestPathIndex, scanPathIndex, instancePath, wsConnected])
   return {
     textureIndex,
     animations,

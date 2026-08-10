@@ -137,7 +137,7 @@ workbench. Do not "fix" the type scale to web defaults.
 The quest editor historically had its own FTB-themed palette (gold/brown
 parchment). **That was removed** — the parchment accents are gone and the FTB
 layer now *aliases the app tokens* (`frontend/src/components/quest/
-editor-theme.css`): `--ftb-accent: var(--color-accent)`, `--ftb-surface:
+editor-theme-styles`): `--ftb-accent: var(--color-accent)`, `--ftb-surface:
 var(--color-bg-surface-1)`, etc.
 
 Legacy `--ftb-*` literal values still exist in `App.css:109–120` for
@@ -268,5 +268,5 @@ token block was stale — App.css `:root` + this file's §2 are the truth).
 ---
 
 *Related: `frontend/src/App.css` (token definitions), `frontend/src/components/
-quest/editor-theme.css` (FTB aliasing), `docs/tutor-agent.md` (agent design
+quest/editor-theme-styles` (FTB aliasing), `docs/tutor-agent.md` (agent design
 review flow).*

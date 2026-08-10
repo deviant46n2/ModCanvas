@@ -30,7 +30,7 @@ opening the Chapters/Quests screen later is instant.
 2. **Frontend load** — `QuestBookEditor` calls `scanInstanceAnimations(instancePath)` when an instance is loaded and exposes the map via `AnimationProvider` (`animation-context.tsx`). Components read it with `useAnimationMap()` — no prop drilling.
 3. **Parsing** — `animated-texture.ts` (pure, unit-tested) parses `{"animation":{frametime,interpolate,frames[],frameheight}}`. Ticks are converted to milliseconds (`50 ms/tick`); `frames[]` remapping and interpolation produce a frame order/duration schedule.
 4. **Sheet preparation** — `sprite-sheet.ts` `prepareAnimatedSheet` bakes reordered/interpolated sheets onto a canvas in display order (one frame per row, top-to-bottom). Natural-order, non-interpolated sheets are animated directly.
-5. **Rendering** — `AnimatedSprite` renders a CSS `steps()` background-position animation over the strip (`@keyframes quest-frame-strip` in `editor-theme.css`), falling back to a plain `<img>`/background box when the texture has no `.mcmeta`. Icons that were `<img>` tags now use `AnimatedSprite` (quest nodes, tiles, objectives, rewards, smart filter members, chapter tabs, quest detail/inspector, chapter decorations).
+5. **Rendering** — `AnimatedSprite` renders a CSS `steps()` background-position animation over the strip (`@keyframes quest-frame-strip` in `quest/editor-theme-styles`), falling back to a plain `<img>`/background box when the texture has no `.mcmeta`. Icons that were `<img>` tags now use `AnimatedSprite` (quest nodes, tiles, objectives, rewards, smart filter members, chapter tabs, quest detail/inspector, chapter decorations).
 
 ## Integration points
 

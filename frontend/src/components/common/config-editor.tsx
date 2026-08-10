@@ -1,27 +1,20 @@
+// Config editor for TOML/JSON5 config files. Recursively renders objects,
+// groups and arrays; the scalar leaf editors live in `./config-editor/fields`
+// and the props interface in `./config-editor/props`.
+
 import { useState } from 'react'
-import type { ConfigValue } from '../../core/config/types'
 import { matchesQuery } from '../../core/config/tree'
+import {
+  ConfigFieldControls,
+  ConfigStringField,
+  ConfigNumberField,
+  ConfigBooleanField,
+  ConfigEnumField,
+  ConfigColorField,
+} from './config-editor/fields'
+import { keyName, type ConfigValueEditorProps } from './config-editor/props'
 
 export type { ConfigValue, ParsedConfig, ConfigFileInfo } from '../../core/config/types'
-
-interface ConfigValueEditorProps {
-  value: ConfigValue
-  path: string[]
-  onChange: (path: string[], value: ConfigValue) => void
-  depth?: number
-  query?: string
-  collapsed?: boolean
-  onAddArrayItem?: (path: string[]) => void
-  onRemoveAt?: (path: string[]) => void
-  onAddField?: (path: string[]) => void
-  onMoveArrayItem?: (arrayPath: string[], from: number, to: number) => void
-  onDuplicateAt?: (path: string[]) => void
-}
-
-function keyName(path: string[]): string {
-  const last = path[path.length - 1]
-  return last === '[]' ? '[item]' : last
-}
 
 export function ConfigValueEditor({
   value,
@@ -42,146 +35,28 @@ export function ConfigValueEditor({
 
   if (!matching) return null
 
-  const fieldControls = onRemoveAt || onDuplicateAt ? (
-    <span className="config-field-controls">
-      {onDuplicateAt && (
-        <button
-          className="config-icon-btn config-duplicate"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDuplicateAt(path)
-          }}
-          title="Duplicate"
-          aria-label={`Duplicate ${label}`}
-        >
-          {'\u2398'}
-        </button>
-      )}
-      {onRemoveAt && (
-        <button
-          className="config-icon-btn config-remove"
-          onClick={(e) => {
-            e.stopPropagation()
-            onRemoveAt(path)
-          }}
-          title="Remove"
-          aria-label={`Remove ${label}`}
-        >
-          {'\u00D7'}
-        </button>
-      )}
-    </span>
-  ) : null
+  const controls = (
+    <ConfigFieldControls onRemoveAt={onRemoveAt} onDuplicateAt={onDuplicateAt} path={path} label={label} />
+  )
 
   if (value.type === 'string') {
-    return (
-      <div className="config-field" style={{ marginLeft: depth * 16 }}>
-        <label className="config-key">{label}</label>
-        <input
-          type="text"
-          className="config-input"
-          value={value.value as string}
-          onChange={(e) => onChange(path, { ...value, value: e.target.value })}
-        />
-        {value.comment && <span className="config-comment">{value.comment}</span>}
-        {fieldControls}
-      </div>
-    )
+    return <ConfigStringField path={path} label={label} value={value} depth={depth} onChange={onChange} controls={controls} />
   }
 
   if (value.type === 'number') {
-    const hasRange = value.min !== undefined && value.max !== undefined
-    return (
-      <div className="config-field" style={{ marginLeft: depth * 16 }}>
-        <label className="config-key">{label}</label>
-        {hasRange ? (
-          <div className="config-slider-group">
-            <input
-              type="range"
-              className="config-slider"
-              min={value.min}
-              max={value.max}
-              step={value.step || 1}
-              value={value.value as number}
-              onChange={(e) => onChange(path, { ...value, value: parseFloat(e.target.value) })}
-            />
-            <span className="config-value-display">
-              {value.value}{value.unit ? ` ${value.unit}` : ''}
-            </span>
-          </div>
-        ) : (
-          <input
-            type="number"
-            className="config-input config-number"
-            value={value.value as number}
-            step={value.step || 'any'}
-            onChange={(e) => onChange(path, { ...value, value: parseFloat(e.target.value) })}
-          />
-        )}
-        {value.comment && <span className="config-comment">{value.comment}</span>}
-        {fieldControls}
-      </div>
-    )
+    return <ConfigNumberField path={path} label={label} value={value} depth={depth} onChange={onChange} controls={controls} />
   }
 
   if (value.type === 'boolean') {
-    return (
-      <div className="config-field" style={{ marginLeft: depth * 16 }}>
-        <label className="config-key">{label}</label>
-        <button
-          className={`config-toggle ${value.value ? 'on' : 'off'}`}
-          onClick={() => onChange(path, { ...value, value: !value.value })}
-          aria-pressed={value.value as boolean}
-        >
-          {value.value ? 'ON' : 'OFF'}
-        </button>
-        {value.comment && <span className="config-comment">{value.comment}</span>}
-        {fieldControls}
-      </div>
-    )
+    return <ConfigBooleanField path={path} label={label} value={value} depth={depth} onChange={onChange} controls={controls} />
   }
 
   if (value.type === 'enum' && value.options) {
-    return (
-      <div className="config-field" style={{ marginLeft: depth * 16 }}>
-        <label className="config-key">{label}</label>
-        <select
-          className="config-select"
-          value={value.value as string}
-          onChange={(e) => onChange(path, { ...value, value: e.target.value })}
-        >
-          {value.options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-        {value.comment && <span className="config-comment">{value.comment}</span>}
-        {fieldControls}
-      </div>
-    )
+    return <ConfigEnumField path={path} label={label} value={value} depth={depth} onChange={onChange} controls={controls} />
   }
 
   if (value.type === 'color') {
-    return (
-      <div className="config-field" style={{ marginLeft: depth * 16 }}>
-        <label className="config-key">{label}</label>
-        <div className="config-color-group">
-          <input
-            type="color"
-            className="config-color-picker"
-            value={value.value as string}
-            onChange={(e) => onChange(path, { ...value, value: e.target.value })}
-          />
-          <input
-            type="text"
-            className="config-input config-color-text"
-            value={value.value as string}
-            onChange={(e) => onChange(path, { ...value, value: e.target.value })}
-          />
-        </div>
-        {value.comment && <span className="config-comment">{value.comment}</span>}
-        {fieldControls}
-      </div>
-    )
+    return <ConfigColorField path={path} label={label} value={value} depth={depth} onChange={onChange} controls={controls} />
   }
 
   if (value.type === 'object' || value.type === 'group') {
@@ -196,7 +71,7 @@ export function ConfigValueEditor({
           <span className="config-expand-icon">{showExpanded ? '\u25BC' : '\u25B6'}</span>
           <span className="config-section-title">{title}</span>
           <span className="config-field-count">{fieldCount} fields</span>
-          {fieldControls}
+          {controls}
         </div>
         {value.comment && <span className="config-comment" style={{ marginLeft: 20 }}>{value.comment}</span>}
         {showExpanded && (
@@ -240,7 +115,7 @@ export function ConfigValueEditor({
           <span className="config-expand-icon">{showExpanded ? '\u25BC' : '\u25B6'}</span>
           <span className="config-section-title">{label}</span>
           <span className="config-field-count">{value.items.length} items</span>
-          {fieldControls}
+          {controls}
         </div>
         {value.comment && <span className="config-comment" style={{ marginLeft: 20 }}>{value.comment}</span>}
         {showExpanded && (

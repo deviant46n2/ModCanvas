@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::tempdir;
 
+pub(super) mod layers;
 pub(super) mod resolve;
 
 pub(super) fn write_jar_entries(path: &Path, entries: &[(&str, &[u8])]) {

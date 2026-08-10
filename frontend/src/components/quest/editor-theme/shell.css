@@ -1,0 +1,146 @@
+:root {
+  /* FTB quest editor follows the app-wide dark mode tokens; the parchment
+   * gold/brown accents were removed and surface colors now inherit from
+   * App.css (--color-*). */
+  --ftb-bg: var(--color-bg-base);
+  --ftb-surface: var(--color-bg-surface-1);
+  --ftb-surface-alt: var(--color-bg-surface-2);
+  --ftb-border: var(--color-border-default);
+  --ftb-border-light: var(--color-border-strong);
+  --ftb-accent: var(--color-accent);
+  --ftb-accent-hover: var(--color-accent-hover);
+  --ftb-text: var(--color-text-primary);
+  --ftb-text-dim: var(--color-text-tertiary);
+  --ftb-text-bright: var(--color-text-secondary);
+  --ftb-input-bg: var(--color-bg-sunken);
+  --ftb-danger: var(--color-error);
+  --ftb-success: var(--color-success);
+}
+
+.book-panel {
+  background-color: var(--ftb-bg);
+  color: var(--ftb-text);
+}
+
+.quest-editor-chapters {
+  width: 250px;
+  min-width: 250px;
+  background: var(--ftb-surface);
+  border-right: 2px solid var(--ftb-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.quest-editor-canvas {
+  flex: 1;
+  min-height: 0;
+  background: var(--ftb-bg);
+  overflow: hidden;
+  position: relative;
+}
+
+.quest-canvas-container {
+  background: var(--ftb-bg);
+  height: 100%;
+}
+
+.quest-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ftb-bg);
+  color: var(--ftb-text);
+  overflow: hidden;
+}
+
+.quest-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--ftb-surface);
+  border-bottom: 2px solid var(--ftb-border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.quest-editor-toolbar-left,
+.quest-editor-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest-editor-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ftb-text-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 12px;
+}
+
+.quest-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.quest-editor-inspector {
+  width: 340px;
+  min-width: 340px;
+  background: var(--ftb-surface);
+  border-left: 2px solid var(--ftb-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-in-right 0.2s ease-out;
+}
+
+@keyframes slide-in-right {
+  from { width: 0; min-width: 0; opacity: 0; }
+  to { width: 340px; min-width: 340px; opacity: 1; }
+}
+
+.quest-editor-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--ftb-surface-alt);
+  border-bottom: 2px solid var(--ftb-border);
+  flex-shrink: 0;
+}
+
+.quest-editor-inspector-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ftb-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quest-editor-inspector-close {
+  background: none;
+  border: none;
+  color: var(--ftb-text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+.quest-editor-inspector-close:hover {
+  color: var(--ftb-accent);
+}
+
+.quest-editor-inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+

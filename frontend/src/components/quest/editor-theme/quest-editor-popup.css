@@ -1,0 +1,15 @@
+/* ── Quest editor popup ── */
+
+.quest-editor-popup {
+  width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.quest-editor-popup .ftb-popup-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+

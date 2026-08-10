@@ -1,0 +1,5 @@
+/* ── Chapter tree node hover states ── */
+.ch-tree-chapter:hover {
+  background: var(--ftb-surface-alt) !important;
+}
+

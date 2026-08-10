@@ -1,0 +1,18 @@
+/* Glyph-free modal close (inline SVG replaces the text glyph) */
+.ftb-popup-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.ftb-popup-close svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.ftb-popup-close:hover svg {
+  color: var(--ftb-accent);
+}
+

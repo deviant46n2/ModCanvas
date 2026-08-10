@@ -1,45 +1,15 @@
+// Mod management hook: search, install/remove, metadata + dependency lookup,
+// and compatibility checks. Types live in `./useModState/types` and the pure
+// lookups in `./useModState/helpers`.
+
 import { useState, useMemo, useCallback } from 'react'
 import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, searchMods, addMod, removeMod, scanInstanceMods, installModFromSearch } from '../services/api'
 import { useToast } from '../components/ui/Toast'
 import { debounce } from '../core/utils/debounce'
 import type { Project } from './useProjectState'
+import { filterMods, findMissingDependencies, resolveModName } from './useModState/helpers'
 
-export interface ModDependency {
-  mod_id: string
-  dependency_type: string
-}
-
-export interface ModMetadata {
-  mod_id: string
-  slug: string
-  name: string
-  description: string
-  author: string
-  categories: string[]
-  dependencies: ModDependency[]
-  supported_loaders: string[]
-  supported_versions: string[]
-  downloads: number
-  source_url: string | null
-  issues_url: string | null
-  documentation_url: string | null
-  icon: string | null
-  source: 'modrinth' | 'curseforge'
-  mismatch?: string | null
-}
-
-export interface CompatibilityIssue {
-  severity: string
-  message: string
-  affected_mods: string[]
-  affected_mod_names: string[]
-}
-
-export interface CompatibilityResult {
-  compatible: boolean
-  issues: CompatibilityIssue[]
-  warnings: string[]
-}
+export type { ModDependency, ModMetadata, CompatibilityIssue, CompatibilityResult } from './useModState/types'
 
 export function useModState(selectedProject: Project | null) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -65,11 +35,7 @@ export function useModState(selectedProject: Project | null) {
     []
   )
   const filteredMods = useMemo(() => {
-    return projectMods.filter(mod =>
-      !modFilter ||
-      mod.name.toLowerCase().includes(modFilter.toLowerCase()) ||
-      mod.author.toLowerCase().includes(modFilter.toLowerCase())
-    )
+    return filterMods(projectMods, modFilter)
   }, [projectMods, modFilter])
 
   async function loadProjectMods(projectId?: string) {
@@ -271,22 +237,11 @@ export function useModState(selectedProject: Project | null) {
   }, [])
 
   function getMissingDependencies(modId: string) {
-    const meta = modMetadata.get(modId)
-    if (!meta) return []
-    return meta.dependencies.filter((dep: ModDependency) => {
-      if (dep.dependency_type !== 'required') return false
-      return !projectMods.some(m => m.mod_id === dep.mod_id)
-    })
+    return findMissingDependencies(modMetadata, projectMods, modId)
   }
 
   function getModNameById(modId: string): string {
-    const mod = projectMods.find(m => m.mod_id === modId)
-    if (mod) return mod.name
-    const meta = modMetadata.get(modId)
-    if (meta) return meta.name
-    const depName = depNameMap.get(modId)
-    if (depName) return depName
-    return modId
+    return resolveModName(projectMods, modMetadata, depNameMap, modId)
   }
 
   function resetModState() {

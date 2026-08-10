@@ -159,6 +159,17 @@ export function checkStaleBinary(rules, root) {
 
 // --- reporting -----------------------------------------------------------
 
+/** Render one candidate by shape: doc-sync candidates carry { commit, files };
+ *  other sections (e.g. suite-self) carry { path } or { message }. Rendering
+ *  every candidate as a doc-sync candidate printed "commit undefined" (s34 —
+ *  a suite-self plain-pnpm candidate was misrendered as a doc-sync one). */
+export function formatCandidate(c) {
+  if (c.commit) {
+    return `commit ${c.commit} changed code without docs: ${(c.files ?? []).join(', ')}`
+  }
+  return c.path ?? c.message ?? 'unknown candidate'
+}
+
 export function report(results) {
   let violationCount = 0
   for (const section of results) {
@@ -170,7 +181,7 @@ export function report(results) {
       console.log(`VIOLATION: ${v.path ?? v.message}${v.lines ? ` (${v.lines} lines)` : ''}`)
     }
     for (const c of section.candidates ?? []) {
-      console.log(`CANDIDATE: commit ${c.commit} changed code without docs: ${(c.files ?? []).join(', ')}`)
+      console.log(`CANDIDATE: ${formatCandidate(c)}`)
     }
     for (const p of section.parked ?? []) {
       console.log(`PARKED:    ${p.path} — ${p.reason}`)

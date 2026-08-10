@@ -1,17 +1,33 @@
+//! WebSocket IPC hub for the companion bridge.
+//!
+//! Peers are classified by their CLIENT_INFO frame (see `ws_protocol`), and
+//! frames are routed by role via the pure decision logic in [`routing`].
+//! Per-connection handling lives in [`handlers`], the Tauri commands in
+//! [`commands`]. [`WsIpcServer`] owns the port, the client registry, and the
+//! Tauri event fan-out.
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, RwLock};
-use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info};
 
-use crate::ws_protocol::{classify_client_info, events, ClientRole, ConnectionStatus, ModEvent};
+use crate::ws_protocol::{events, ClientRole, ConnectionStatus, ModEvent};
+
+mod commands;
+mod handlers;
+mod routing;
+
+pub use commands::*;
+
+#[cfg(test)]
+mod tests;
 
 const DEFAULT_PORT: u16 = 9876;
 
@@ -87,7 +103,7 @@ impl WsIpcServer {
                                 let clients = clients.clone();
                                 let app_handle = app_handle.clone();
                                 let last_companion_info = last_companion_info.clone();
-                                tokio::spawn(handle_connection(
+                                tokio::spawn(handlers::handle_connection(
                                     stream,
                                     addr,
                                     clients,
@@ -133,7 +149,7 @@ impl WsIpcServer {
         let clients = self.clients.read().await;
         let mut count = 0;
         for client in clients.values() {
-            if client.role == ClientRole::Companion || client.role == ClientRole::Unidentified {
+            if routing::is_broadcast_target(client.role) {
                 count += 1;
                 if client.sender.send(message.clone()).is_err() {
                     debug!("Failed to send to client (may be disconnected)");
@@ -150,7 +166,7 @@ impl WsIpcServer {
         let message = Message::Text(json.into());
         let clients = self.clients.read().await;
         for client in clients.values() {
-            if client.role == ClientRole::App {
+            if routing::is_app_target(client.role) {
                 let _ = client.sender.send(message.clone());
             }
         }
@@ -163,7 +179,7 @@ impl WsIpcServer {
         let port = *self.port.read().await;
         let companion_clients = clients
             .values()
-            .filter(|c| c.role == ClientRole::Companion || c.role == ClientRole::Unidentified)
+            .filter(|c| routing::is_broadcast_target(c.role))
             .count();
         ConnectionStatus {
             connected: companion_clients > 0,
@@ -194,207 +210,4 @@ impl WsIpcServer {
                 .await;
         }
     }
-}
-
-async fn handle_connection(
-    stream: tokio::net::TcpStream,
-    addr: SocketAddr,
-    clients: Arc<RwLock<HashMap<String, WsClient>>>,
-    last_companion_info: Arc<RwLock<Option<Value>>>,
-    app_handle: AppHandle,
-    actual_port: u16,
-) {
-    let client_id = format!("{}:{}", addr.ip(), addr.port());
-
-    let ws_stream = match accept_async(stream).await {
-        Ok(ws) => ws,
-        Err(e) => {
-            error!("WebSocket handshake failed for {}: {}", addr, e);
-            return;
-        }
-    };
-
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
-
-    {
-        let mut clients = clients.write().await;
-        clients.insert(
-            client_id.clone(),
-            WsClient {
-                id: client_id.clone(),
-                sender: tx.clone(),
-                role: ClientRole::Unidentified,
-            },
-        );
-    }
-
-    // Announce the new peer so app peers update the connection pill.
-    let _ = app_handle.state::<Arc<WsIpcServer>>().emit_status().await;
-
-    let forward_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if ws_sender.send(msg).await.is_err() {
-                break;
-            }
-        }
-    });
-
-    let client_id_recv = client_id.clone();
-    let clients_recv = clients.clone();
-    let app_handle_recv = app_handle.clone();
-    let last_companion_info_recv = last_companion_info.clone();
-    let recv_task = tokio::spawn(async move {
-        while let Some(msg) = ws_receiver.next().await {
-            match msg {
-                Ok(Message::Text(text)) => {
-                    debug!("Received from {}: {}", client_id_recv, text);
-                    let Ok(event) = serde_json::from_str::<ModEvent>(&text) else {
-                        continue;
-                    };
-                    route_frame(
-                        &client_id_recv,
-                        event,
-                        &clients_recv,
-                        &last_companion_info_recv,
-                        &app_handle_recv,
-                        actual_port,
-                    )
-                    .await;
-                }
-                Ok(Message::Close(_)) => {
-                    debug!("Client {} sent close frame", client_id_recv);
-                    break;
-                }
-                Ok(Message::Ping(data)) => {
-                    let _ = tx.send(Message::Pong(data));
-                }
-                Err(e) => {
-                    error!("WebSocket error from {}: {}", client_id_recv, e);
-                    break;
-                }
-                _ => {}
-            }
-        }
-    });
-
-    tokio::select! {
-        _ = forward_task => {},
-        _ = recv_task => {},
-    }
-
-    {
-        let mut clients = clients.write().await;
-        clients.remove(&client_id);
-    }
-    let _ = app_handle
-        .state::<Arc<WsIpcServer>>()
-        .emit_status()
-        .await;
-
-    debug!("Client {} disconnected", client_id);
-}
-
-/// Route one parsed frame based on the sender's role.
-async fn route_frame(
-    sender_id: &str,
-    event: ModEvent,
-    clients: &Arc<RwLock<HashMap<String, WsClient>>>,
-    last_companion_info: &Arc<RwLock<Option<Value>>>,
-    app_handle: &AppHandle,
-    actual_port: u16,
-) {
-    // CLIENT_INFO is the handshake: it may change the sender's role.
-    if event.event == events::CLIENT_INFO {
-        let payload = event.payload.clone();
-        let role = classify_client_info(payload.as_ref());
-        {
-            let mut clients = clients.write().await;
-            if let Some(client) = clients.get_mut(sender_id) {
-                client.role = role;
-            }
-        }
-        match role {
-            ClientRole::App => {
-                // Push the current state so a freshly-connected app peer is
-                // immediately in sync, and replay the last companion identity.
-                let _ = app_handle.state::<Arc<WsIpcServer>>().emit_status().await;
-                let _ = app_handle
-                    .state::<Arc<WsIpcServer>>()
-                    .replay_companion_info_to_app()
-                    .await;
-                return;
-            }
-            ClientRole::Companion => {
-                if let Some(payload) = payload {
-                    let mut cached = last_companion_info.write().await;
-                    *cached = Some(payload.clone());
-                    // forward the identity to the app peer
-                    let _ = app_handle
-                        .state::<Arc<WsIpcServer>>()
-                        .send_to_app_clients(ModEvent::new(events::CLIENT_INFO).with_payload(payload))
-                        .await;
-                }
-                return;
-            }
-            ClientRole::Unidentified => return,
-            // Tool peers get no replay (status / companion identity) — they
-            // are fire-and-forget trigger clients.
-            ClientRole::Tool => return,
-        }
-    }
-
-    // Non-handshake frames: route by role.
-    let sender_role = {
-        let clients = clients.read().await;
-        clients
-            .get(sender_id)
-            .map(|c| c.role)
-            .unwrap_or(ClientRole::Unidentified)
-    };
-    let server = app_handle.state::<Arc<WsIpcServer>>();
-    match sender_role {
-        // Companion and tool frames flow to the app peer (the frontend
-        // orchestrator). Tool peers are external triggers (e.g. a restart
-        // script) whose commands the frontend acts on.
-        ClientRole::Companion | ClientRole::Unidentified | ClientRole::Tool => {
-            let _ = server.send_to_app_clients(event).await;
-        }
-        // App frames are commands for the companions.
-        ClientRole::App => {
-            let _ = server.broadcast(event).await;
-        }
-    }
-}
-
-#[tauri::command]
-pub async fn ws_ipc_send_event(
-    event_type: String,
-    path: Option<String>,
-    payload: Option<Value>,
-    state: State<'_, Arc<WsIpcServer>>,
-) -> Result<usize, String> {
-    let mut event = ModEvent::new(event_type);
-    if let Some(path) = path {
-        event = event.with_path(path);
-    }
-    if let Some(payload) = payload {
-        event = event.with_payload(payload);
-    }
-    state.broadcast(event).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn ws_ipc_get_status(
-    state: State<'_, Arc<WsIpcServer>>,
-) -> Result<ConnectionStatus, String> {
-    Ok(state.get_status().await)
-}
-
-#[tauri::command]
-pub async fn ws_ipc_restart(
-    state: State<'_, Arc<WsIpcServer>>,
-) -> Result<(), String> {
-    state.stop().await;
-    state.start().await.map_err(|e| e.to_string())
 }

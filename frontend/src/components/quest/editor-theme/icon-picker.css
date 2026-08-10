@@ -1,0 +1,38 @@
+/* ── Icon picker ── */
+
+.icon-picker-modal {
+  width: 520px;
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+
+.icon-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--ftb-input-bg);
+  border: 2px solid var(--ftb-border);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.icon-picker-item:hover {
+  border-color: var(--ftb-accent);
+}
+
+.icon-picker-label {
+  font-size: 8px;
+  color: var(--ftb-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
+}
+

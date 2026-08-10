@@ -22,7 +22,7 @@ import { TextureLoadingBar } from './TextureLoadingBar'
 import { EngineRenderPrompt } from './EngineRenderPrompt'
 import { AnimationProvider } from './animation-context'
 import { resolveIconKey, getIconUrl } from './questIcons'
-import './editor-theme.css'
+import './editor-theme-styles'
 
 interface QuestEditorLayoutProps {
   graph: QuestGraphData

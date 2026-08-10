@@ -1,0 +1,19 @@
+/* Minecraft `.mcmeta` animated textures: the full sprite strip is laid out as
+ * a background sized so each frame fills the box, then stepped 0% → 100% of
+ * the strip height (last frame) once per frame. The step count, duration and
+ * number of frames are injected inline by AnimatedSprite. */
+@keyframes quest-frame-strip {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 100%;
+  }
+}
+
+.quest-anim-sprite {
+  display: inline-block;
+  background-position: 0 0;
+  will-change: background-position;
+}
+

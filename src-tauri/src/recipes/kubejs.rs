@@ -3,11 +3,16 @@
 // calls and recovers output + inputs, never failing on exotic DSL. Unparseable
 // lines are skipped silently so a pack with hand-written helpers still loads.
 
-use crate::models::{Recipe, RecipeIngredient, RecipeOutput, RecipeType};
+
+use crate::models::{Recipe, RecipeOutput, RecipeType};
 use crate::recipes::base_recipe;
 use crate::recipes::scan::{line_of, line_starts, OpaqueRegions};
 use crate::recipes::{LineSpan, ParsedRecipe};
 use regex::Regex;
+use super::kubejs_helpers::{
+    array_literals, body_after_output, capture_number, first_string_literal, object_key_map,
+    pattern_from_body, string_literals, string_to_ingredient,
+};
 
 /// Parse a KubeJS script body, returning every recipe call we can recover with
 /// its 1-based line span. Calls inside `//` / `/* */` comments or string
@@ -169,81 +174,6 @@ fn kind_for(method: &str) -> Option<RecipeType> {
     }
 }
 
-fn first_string_literal(s: &str) -> Option<String> {
-    let re = Regex::new(r#"['"]([^'"]+)['"]"#).unwrap();
-    re.captures(s).map(|c| c[1].to_string())
-}
-
-fn string_literals(s: &str) -> Vec<String> {
-    let re = Regex::new(r#"['"]([^'"]+)['"]"#).unwrap();
-    re.captures_iter(s).map(|c| c[1].to_string()).collect()
-}
-
-fn array_literals(s: &str) -> Vec<String> {
-    string_literals(s)
-}
-
-fn object_key_map(body: &str) -> std::collections::HashMap<String, RecipeIngredient> {
-    let mut map = std::collections::HashMap::new();
-    let re = Regex::new(r#"(['"]?([A-Za-z0-9])['"]?\s*:\s*)(['"][^'"]+['"]|#\S+)"#).unwrap();
-    for cap in re.captures_iter(body) {
-        let letter = cap[2].to_string();
-        let raw = cap[3].to_string();
-        let clean = raw.trim_matches(['\'', '"']);
-        if let Some(ing) = string_to_ingredient(clean) {
-            map.insert(letter, ing);
-        }
-    }
-    map
-}
-
-fn pattern_from_body(body: &str) -> Vec<String> {
-    let re = Regex::new(r#"['"]([ A-Za-z0-9]+)['"]"#).unwrap();
-    re.captures_iter(body)
-        .filter_map(|c| {
-            let s = c[1].to_string();
-            // Pattern rows are pure letter/space strings of equal-ish length.
-            if s.chars().all(|ch| ch.is_ascii_uppercase() || ch == ' ' || ch.is_ascii_lowercase() || ch.is_ascii_digit()) && s.len() >= 1 {
-                Some(s)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-fn string_to_ingredient(raw: &str) -> Option<RecipeIngredient> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    if let Some(tag) = trimmed.strip_prefix('#') {
-        return Some(RecipeIngredient {
-            item: tag.to_string(),
-            count: None,
-            tag: Some(true),
-            nbt: None,
-        });
-    }
-    Some(RecipeIngredient {
-        item: trimmed.to_string(),
-        count: None,
-        tag: Some(false),
-        nbt: None,
-    })
-}
-
-fn body_after_output(s: &str) -> Option<&str> {
-    let re = Regex::new(r#"['"][^'"]+['"]\s*,\s*"#).unwrap();
-    let m = re.find(s)?;
-    Some(&s[m.end()..])
-}
-
-fn capture_number(s: &str, key: &str) -> Option<f32> {
-    let re = Regex::new(&format!(r"\.{key}\s*\(\s*([0-9.]+)\s*\)")).unwrap();
-    re.captures(s)
-        .and_then(|c| c[1].parse::<f32>().ok())
-}
 
 #[cfg(test)]
 mod tests {

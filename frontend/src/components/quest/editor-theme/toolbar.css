@@ -1,0 +1,42 @@
+/* ================================================================
+   TOOLBAR — glyph-free controls
+   ================================================================ */
+
+.book-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.book-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.quest-toolbar-texture-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ftb-text-dim);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.quest-toolbar-save-message {
+  font-size: 11px;
+  margin-left: 8px;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.quest-toolbar-save-message[data-ok="true"] {
+  color: var(--ftb-accent);
+}
+
+.quest-toolbar-save-message[data-ok="false"] {
+  color: var(--ftb-danger);
+}
+

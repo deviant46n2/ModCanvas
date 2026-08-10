@@ -1,4 +1,4 @@
-use crate::instance_textures::{jars_under, resource_pack_order, vanilla_jars};
+use crate::instance_textures::layers::{jars_under, resource_pack_order, vanilla_jars};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
