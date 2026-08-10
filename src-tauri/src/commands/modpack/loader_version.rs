@@ -21,10 +21,21 @@ use reqwest::Client;
 
 /// Latest NeoForge version for `mc` from Prism's own index. Pure — the
 /// fetch happens in `resolve_loader_version`; this picks from the JSON.
-fn latest_from_prism_index(index: &serde_json::Value, mc: &str) -> Option<String> {
-    let versions = index.get("versions")?.as_array()?;
-    let mut candidates: Vec<(String, String)> = versions
-        .iter()
+/// The wizard never pins a just-released version: the component files for a
+/// fresh release propagate through Prism's CDN/caches with a lag, and Prism
+/// fails with "could not download metadata" until they settle (observed with
+/// 21.1.248, released <1h before the failure, 2026-08-10). A settling window
+/// plus a component-availability check closes the class.
+const FRESH_RELEASE_WINDOW: chrono::Duration = chrono::Duration::hours(24);
+
+/// Candidates for `mc` from Prism's index, newest-first by releaseTime.
+/// Pure — the network happens in `resolve_loader_version`.
+fn sorted_candidates(index: &serde_json::Value, mc: &str) -> Vec<(String, String)> {
+    let mut candidates: Vec<(String, String)> = index
+        .get("versions")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
         .filter_map(|v| {
             let matches_mc = v
                 .get("requires")
@@ -47,11 +58,13 @@ fn latest_from_prism_index(index: &serde_json::Value, mc: &str) -> Option<String
     // Newest first by releaseTime (ISO-8601 sorts lexically). The index is
     // already newest-first, but sort explicitly to be order-agnostic.
     candidates.sort_by(|a, b| b.1.cmp(&a.1));
-    candidates.first().map(|(v, _)| v.clone())
+    candidates
 }
 
 /// Latest NeoForge version for the wizard's supported combo, from Prism's
-/// own index. None = unresolvable — callers fail loudly, never guess.
+/// own index — skipping versions still inside the freshness window and
+/// verifying the chosen component actually serves. None = unresolvable —
+/// callers fail loudly, never guess.
 pub async fn resolve_loader_version(mc_version: &str, loader: &str) -> Result<Option<String>, String> {
     // Defensive: the wizard only ever asks for 1.21.1 + neoforge, but the
     // resolver refuses everything else rather than guessing.
@@ -68,7 +81,28 @@ pub async fn resolve_loader_version(mc_version: &str, loader: &str) -> Result<Op
         return Ok(None);
     }
     let index: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    Ok(latest_from_prism_index(&index, mc_version))
+    let now = chrono::Utc::now();
+    for (version, release_time) in sorted_candidates(&index, mc_version) {
+        let settled = chrono::DateTime::parse_from_rfc3339(&release_time)
+            .map(|t| now.signed_duration_since(t.with_timezone(&chrono::Utc)) > FRESH_RELEASE_WINDOW)
+            .unwrap_or(true);
+        if !settled {
+            continue;
+        }
+        // Propagation check: the component file must actually serve. A
+        // version listed in the index but not yet behind the CDN is the
+        // "could not download metadata" failure Prism surfaces.
+        let comp = client
+            .get(format!("https://meta.prismlauncher.org/v1/net.neoforged/{version}.json"))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
+        if comp {
+            return Ok(Some(version));
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -93,19 +127,22 @@ mod tests {
     fn picks_latest_servable_version_for_the_mc_series() {
         // 21.1.245 is the Maven-latest-but-PRISM-SKIPS case (index-absent
         // in reality); the resolver picks the newest the INDEX lists.
-        assert_eq!(latest_from_prism_index(&fixture(), "1.21.1").unwrap(), "21.1.248");
+        assert_eq!(sorted_candidates(&fixture(), "1.21.1")[0].0, "21.1.248");
+        assert_eq!(sorted_candidates(&fixture(), "1.21.1")[1].0, "21.1.245");
     }
 
     #[test]
     fn other_mc_series_do_not_leak_in() {
         // A 26.2-series version released AFTER 21.1.248 must not win for a
         // 1.21.1 pack — the requires filter is the gate.
-        assert_eq!(latest_from_prism_index(&fixture(), "1.21.1").unwrap(), "21.1.248");
+        let cands = sorted_candidates(&fixture(), "1.21.1");
+        assert!(cands.iter().all(|(_, t)| !t.contains("26.2")));
+        assert_eq!(cands[0].0, "21.1.248");
     }
 
     #[test]
     fn unknown_mc_series_resolves_to_none() {
-        assert_eq!(latest_from_prism_index(&fixture(), "1.7.10"), None);
+        assert!(sorted_candidates(&fixture(), "1.7.10").is_empty());
     }
 
     #[test]
