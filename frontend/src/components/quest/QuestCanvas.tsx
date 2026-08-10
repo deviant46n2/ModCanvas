@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -8,6 +8,7 @@ import type {
   QuestGraphData, QuestChapter, QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel,
 } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
+import { isMilestoneShape } from '../../core/quest/quest-shapes';
 import { useQuestCanvasModel } from './useQuestCanvasModel';
 import { useChapterDisplayState } from './useChapterDisplayState';
 import { useQuestCanvasKeyboard } from './useQuestCanvasKeyboard';
@@ -107,6 +108,7 @@ function QuestCanvasInner({
   const [selectedDecoIndex, setSelectedDecoIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [milestoneOnly, setMilestoneOnly] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
   const [bezierEditEdgeId, setBezierEditEdgeId] = useState<string | null>(null);
   const { fitView, screenToFlowPosition } = useReactFlow();
@@ -118,7 +120,7 @@ function QuestCanvasInner({
     setHoveredNodeId,
   } = useQuestCanvasModel({
     questGraph, chapters, activeChapter, textureIndex, selectedIds, simMode,
-    simProgress, searchQuery, renameNonce, onUpdateNode, fitView,
+    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, fitView,
   });
 
   const { clipboardRef, copySelected, pasteClipboard, alignSelected, distributeSelected } =
@@ -196,6 +198,11 @@ function QuestCanvasInner({
   const { activeChapterName, moveToChapters, activeChapterNodes, activeChapterImages } =
     useChapterDisplayState(chapters, activeChapter, questGraph.nodes);
 
+  const milestoneCount = useMemo(
+    () => questGraph.nodes.filter((n: QuestNodeData) => n.chapter_id === activeChapter && isMilestoneShape(n.shape)).length,
+    [questGraph.nodes, activeChapter],
+  );
+
   const selectedEdge = selectedEdgeId
     ? filteredEdges.find((e: QuestEdgeData) => e.id === selectedEdgeId) || null
     : null;
@@ -234,6 +241,8 @@ function QuestCanvasInner({
         onShowShortcuts={() => setShowShortcuts(true)}
         searchQuery={searchQuery} searchMatchCount={searchMatchIds ? searchMatchIds.size : 0}
         onQueryChange={setSearchQuery} onFocusFirst={focusFirstSearchMatch}
+        milestoneOnly={milestoneOnly} milestoneCount={milestoneCount}
+        onToggleMilestones={() => setMilestoneOnly(v => !v)}
         themePreset={questGraph.active_theme} onApplyThemePreset={onApplyThemePreset}
         selectedCount={selectedIds.size} onAlign={alignSelected} onDistribute={distributeSelected}
         decorEditMode={decorEditMode} onToggleDecorEdit={handleToggleDecorEdit}

@@ -9,6 +9,7 @@ import {
   questSizeToPixels,
   setQuestScale,
 } from './quest-form-constants'
+import { isMilestoneShape } from '../../core/quest/quest-shapes'
 import { QuestIcon } from './QuestIcon'
 import { AnimatedSprite } from './AnimatedSprite'
 import { DetailSection } from './quest-detail-sections'
@@ -20,10 +21,11 @@ interface GroupProps {
   onToggle: () => void
 }
 
-export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl, iconPending, onPickIcon }: GroupProps & {
+export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl, iconPending, onPickIcon, onSetMilestone }: GroupProps & {
   iconUrl?: string
   iconPending: boolean
   onPickIcon: () => void
+  onSetMilestone?: (on: boolean) => void
 }) {
   return (
     <DetailSection
@@ -97,6 +99,22 @@ export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl,
           />
         </div>
       </div>
+      {onSetMilestone && (
+        <div className="quest-detail-milestone">
+          <button
+            className={`quest-detail-small-btn quest-detail-milestone-btn${isMilestoneShape(node.shape) ? ' quest-detail-milestone-active' : ''}`}
+            onClick={() => onSetMilestone(!isMilestoneShape(node.shape))}
+            title="Milestones are quests with a diamond shape — a real FTB field that renders in-game; the Milestones filter shows exactly these."
+          >
+            {isMilestoneShape(node.shape) ? 'Milestone' : 'Mark as Milestone'}
+          </button>
+          <span className="quest-detail-milestone-hint">
+            {isMilestoneShape(node.shape)
+              ? 'Diamond + gold accent, renders in-game. Click to unmark.'
+              : 'Diamond shape + gold accent; renders in-game and shows in the Milestones filter.'}
+          </span>
+        </div>
+      )}
     </DetailSection>
   )
 }

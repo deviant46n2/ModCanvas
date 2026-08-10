@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react'
 import type { QuestNodeData, RewardTableData } from '../../services/api'
 import { questIconUrl, resolveIconKey } from './questIcons'
 import { isTexturePending } from '../../services/texture-loader'
+import { MILESTONE_COLOR } from './quest-form-constants'
+import { MILESTONE_SHAPE } from '../../core/quest/quest-shapes'
 import { QuestIcon } from './QuestIcon'
 import { AnimatedSprite } from './AnimatedSprite'
 import { CheckSquareIcon, FileTextIcon, TrophyIcon, XIcon } from '../ui/icons'
@@ -70,6 +72,19 @@ export function QuestDetailModal({
       onUpdateNode(node.id, { [field]: value } as Partial<QuestNodeData>)
     },
     [node.id, onUpdateNode]
+  )
+
+  // Milestone preset = diamond shape + gold accent when the quest has no
+  // colour of its own. Both are real FTB SNBT fields (shape + color); a
+  // single onUpdateNode call keeps it one undo step. Unmarking resets the
+  // shape to 'default' (inherit chapter default) and leaves the colour alone.
+  const handleSetMilestone = useCallback(
+    (on: boolean) => {
+      onUpdateNode(node.id, on
+        ? { shape: MILESTONE_SHAPE, color: node.color || MILESTONE_COLOR }
+        : { shape: 'default' })
+    },
+    [node.id, node.color, onUpdateNode]
   )
 
   const jumpToSection = useCallback((id: QuestSectionId) => {
@@ -223,6 +238,7 @@ export function QuestDetailModal({
             iconUrl={iconUrl}
             iconPending={iconPending}
             onPickIcon={() => openIconPicker({ type: 'quest', nodeId: node.id })}
+            onSetMilestone={handleSetMilestone}
           />
           <VisibilitySection
             node={node}

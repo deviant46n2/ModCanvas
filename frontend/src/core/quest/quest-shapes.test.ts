@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shapeFolder, shapeTextureKeys, effectiveShape } from './quest-shapes';
+import { shapeFolder, shapeTextureKeys, effectiveShape, isMilestoneShape } from './quest-shapes';
 
 describe('quest-shapes texture keys', () => {
   it('maps canonical shapes to their on-disk folders', () => {
@@ -54,5 +54,21 @@ describe('effectiveShape (chapter-default inheritance)', () => {
     expect(effectiveShape(undefined, undefined)).toBe('');
     // "default" is FTB's explicit-inherit marker — treat as no override.
     expect(effectiveShape('', 'default')).toBe('');
+  });
+});
+
+describe('isMilestoneShape', () => {
+  it('is true only for an explicit diamond shape', () => {
+    expect(isMilestoneShape('diamond')).toBe(true);
+    expect(isMilestoneShape('DIAMOND')).toBe(true);
+  });
+
+  it('is false for inherit, empty, and every other shape', () => {
+    expect(isMilestoneShape('')).toBe(false);
+    expect(isMilestoneShape('default')).toBe(false);
+    expect(isMilestoneShape(null)).toBe(false);
+    expect(isMilestoneShape(undefined)).toBe(false);
+    expect(isMilestoneShape('circle')).toBe(false);
+    expect(isMilestoneShape('heart')).toBe(false);
   });
 });

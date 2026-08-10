@@ -512,6 +512,30 @@ in one click from the sticky nav chips at the top of the modal body
   `per_quest_repeat_and_visibility_fields_roundtrip` and
   `repeat_fields_export_uses_ftb_canonical_keys` in `export_tests.rs`.
 
+## Milestones (diamond quests)
+
+FTB Quests has no "achievement" entity, so a milestone IS a quest with an
+**explicit diamond shape** — a real FTB shape id that renders in-game and
+survives export byte-faithfully (the PROGRESSION-TAB-KILL fold-in: the old
+progression tab's hand-drawn "achievement" nodes died with it; the concept
+survives as a quest property).
+
+- **Marking** — the Appearance section in the quest detail modal has a
+  "Mark as Milestone" button: one atomic `onUpdateNode({ shape: 'diamond',
+  color })` commit (single undo step). The gold accent (`#FFD700`) is applied
+  only when the quest has no colour of its own — a user-set colour is never
+  overwritten. Unmarking resets `shape` to `'default'` (inherit chapter
+  default) and leaves the colour alone.
+- **Semantics** — `isMilestoneShape` in `core/quest/quest-shapes.ts`
+  (normalize + compare to `MILESTONE_SHAPE = 'diamond'`); unit-tested. Empty /
+  `default` / any other shape is not a milestone.
+- **Filter** — the canvas toolbar "Milestones" chip dims every non-diamond
+  quest in the active chapter via the same `searchStatus` dim mechanism as
+  search; the two filters intersect when both are active. The chip shows the
+  chapter's milestone count.
+- The colour round-trips as FTB's integer `color` field
+  (`export/quest.rs` writes `parse_hex_color` → int; import reads it back).
+
 ## Editor toolbar
 
 `import-export.tsx` (presentation) + `quest-toolbar-actions.ts` (save / import

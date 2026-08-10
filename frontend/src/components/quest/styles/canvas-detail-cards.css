@@ -172,6 +172,24 @@
   color: #1a1a1e;
   border-color: var(--ftb-accent);
 }
+.quest-detail-milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+.quest-detail-milestone-btn {
+  align-self: flex-start;
+}
+.quest-detail-milestone-active {
+  background: #3a3a10;
+  border-color: #ffd700;
+  color: #ffd700;
+}
+.quest-detail-milestone-hint {
+  font-size: 11px;
+  opacity: 0.65;
+}
 
 /* Delete button */
 .quest-detail-delete-btn {

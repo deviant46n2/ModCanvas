@@ -21,6 +21,11 @@ export const SHAPES = [
   { value: 'gear', label: 'Gear' },
 ]
 
+// Accent colour applied by the "Mark as Milestone" preset (diamond shape).
+// Only used when the quest has no explicit colour yet — a user-set colour is
+// theirs and is never overwritten. Both fields are real FTB SNBT fields.
+export const MILESTONE_COLOR = '#FFD700'
+
 // Shape semantics live in core/quest/quest-shapes.ts (normalizeShape +
 // folder mapping). Re-exported here so components importing from this file
 // keep working — never redefine shape logic in two places.

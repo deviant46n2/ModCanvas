@@ -61,6 +61,10 @@ interface BuildNodesArgs {
   simProgress: ProgressState
   searchActive: boolean
   searchMatchIds: Set<string> | null
+  /** Milestones filter: when active, dim every quest that is not an explicit
+   *  diamond-shape quest (the milestone marker). Intersects with search. */
+  milestoneOnly: boolean
+  milestoneMatchIds: Set<string> | null
   renameNonce: { nodeId: string; n: number } | null
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
   /** Chapter id → default_quest_shape. Quests without an explicit shape
@@ -71,8 +75,8 @@ interface BuildNodesArgs {
 export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
   const {
     nodes, filteredNodeIds, textureIndex, selectedIds, simMode, simStatusById,
-    simProgress, searchActive, searchMatchIds, renameNonce, onUpdateNode,
-    chapterDefaults,
+    simProgress, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds,
+    renameNonce, onUpdateNode, chapterDefaults,
   } = args
   return nodes
     .filter((n: QuestNodeData) => filteredNodeIds.has(n.id))
@@ -121,7 +125,16 @@ export function buildCanvasNodes(args: BuildNodesArgs): Node[] {
           ),
           simStatus: simMode ? simStatusById[node.id] : undefined,
           simComplete: simMode ? simProgress[node.id] === 'complete' : false,
-          searchStatus: searchActive ? (searchMatchIds?.has(node.id) ? 'match' : 'dim') : undefined,
+          // Dim filter status: search and the milestones filter both dim
+          // non-matching quests via the same mechanism; when both are active
+          // a quest must match both to stay lit.
+          searchStatus: (() => {
+            const anyFilter = searchActive || milestoneOnly
+            if (!anyFilter) return undefined
+            const inSearch = !searchActive || (searchMatchIds?.has(node.id) ?? false)
+            const inMilestone = !milestoneOnly || (milestoneMatchIds?.has(node.id) ?? false)
+            return inSearch && inMilestone ? 'match' : 'dim'
+          })(),
           onRename: (label: string) => onUpdateNode(node.id, { label }),
           renameNonce: renameNonce?.nodeId === node.id ? renameNonce.n : 0,
         },

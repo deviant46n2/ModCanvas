@@ -78,3 +78,14 @@ export function shapeTextureKeys(shape: string): ShapeTextures {
     shape: `ftbquests:textures/shapes/${folder}/shape.png`,
   }
 }
+
+// The "milestone" marker is the diamond shape — a real FTB shape id that
+// renders in-game and survives export byte-faithfully. There is no separate
+// "achievement" entity in the FTB Quests format, so a milestone IS a quest
+// with an explicit diamond shape (the preset in the Appearance section also
+// adds a gold accent colour). The Milestones filter shows exactly these.
+export const MILESTONE_SHAPE = 'diamond'
+
+export function isMilestoneShape(shape: string | null | undefined): boolean {
+  return normalizeShape(shape) === MILESTONE_SHAPE
+}

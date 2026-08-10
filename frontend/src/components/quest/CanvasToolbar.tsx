@@ -27,6 +27,9 @@ interface CanvasToolbarProps {
   searchMatchCount: number
   onQueryChange: (q: string) => void
   onFocusFirst: () => void
+  milestoneOnly: boolean
+  milestoneCount: number
+  onToggleMilestones: () => void
   themePreset?: string
   onApplyThemePreset?: (id: string) => void
   selectedCount: number
@@ -64,6 +67,9 @@ export function CanvasToolbar({
   searchMatchCount,
   onQueryChange,
   onFocusFirst,
+  milestoneOnly,
+  milestoneCount,
+  onToggleMilestones,
   themePreset,
   onApplyThemePreset,
   selectedCount,
@@ -112,6 +118,13 @@ export function CanvasToolbar({
           onQueryChange={onQueryChange}
           onFocusFirst={onFocusFirst}
         />
+        <button
+          className={`toolbar-btn${milestoneOnly ? ' toolbar-btn-active' : ''}`}
+          onClick={onToggleMilestones}
+          title={`Milestones only: quests with a diamond shape (${milestoneCount} in this chapter) — dims the rest`}
+        >
+          Milestones{milestoneCount > 0 ? ` (${milestoneCount})` : ''}
+        </button>
         <ThemePresetPicker value={themePreset} onApply={(id) => onApplyThemePreset?.(id)} />
       </div>
       <div className="toolbar-group">

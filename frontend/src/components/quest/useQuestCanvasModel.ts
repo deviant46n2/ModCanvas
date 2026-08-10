@@ -6,6 +6,7 @@ import { subscribeEngineConnectChange } from '../../services/engine-render';
 import { NORMAL_COLOR, CYCLE_COLOR, detectCycles } from './quest-edges';
 import { computeVisibility, isLocked, type ProgressState } from '../../core/quest/progress';
 import { searchQuestNodes } from '../../core/quest/search';
+import { isMilestoneShape } from '../../core/quest/quest-shapes';
 import { buildCanvasNodes, buildCanvasEdges, chapterDefaultShapes } from './quest-canvas-model'
 
 interface UseQuestCanvasModelArgs {
@@ -17,6 +18,7 @@ interface UseQuestCanvasModelArgs {
   simMode: boolean
   simProgress: ProgressState
   searchQuery: string
+  milestoneOnly: boolean
   renameNonce: { nodeId: string; n: number } | null
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
   fitView: (options?: { duration?: number; padding?: number; maxZoom?: number; nodes?: Array<{ id: string }> }) => void
@@ -25,7 +27,7 @@ interface UseQuestCanvasModelArgs {
 export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
   const {
     questGraph, chapters, activeChapter, textureIndex, selectedIds, simMode,
-    simProgress, searchQuery, renameNonce, onUpdateNode, fitView,
+    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, fitView,
   } = args
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -73,6 +75,23 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     )
     return searchQuestNodes(chapterNodes, searchQuery)
   }, [searchActive, searchQuery, questGraph.nodes, filteredNodeIds])
+
+  // Milestones filter: dims every quest that is not an explicit diamond-shape
+  // quest (the milestone marker). Shares the search dim mechanism — both
+  // filters intersect when active together.
+  const milestoneMatchIds = useMemo(() => {
+    if (!milestoneOnly) return null
+    return new Set(
+      questGraph.nodes
+        .filter(
+          (n: QuestNodeData) =>
+            filteredNodeIds.has(n.id) &&
+            (n.node_type === 'quest' || n.node_type === 'side_quest') &&
+            isMilestoneShape(n.shape)
+        )
+        .map((n: QuestNodeData) => n.id)
+    )
+  }, [milestoneOnly, questGraph.nodes, filteredNodeIds])
 
   const cycleEdges = useMemo(() => detectCycles(filteredEdges), [filteredEdges])
   const isCycleEdge = useCallback(
@@ -125,6 +144,8 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
       simProgress,
       searchActive,
       searchMatchIds,
+      milestoneOnly,
+      milestoneMatchIds,
       renameNonce,
       onUpdateNode,
       chapterDefaults: chapterDefaultShapes(questGraph.chapters),
@@ -137,7 +158,7 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     })
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, cycleColor, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
+  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds, cycleColor, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
 
   useEffect(() => {
     if (nodes.length > 0) {
