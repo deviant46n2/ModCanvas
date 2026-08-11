@@ -18,6 +18,8 @@ mod export_comment_tests;
 #[cfg(test)]
 mod export_global_tests;
 #[cfg(test)]
+mod export_ids_tests;
+#[cfg(test)]
 mod export_images_tests;
 #[cfg(test)]
 mod export_kill_task_tests;

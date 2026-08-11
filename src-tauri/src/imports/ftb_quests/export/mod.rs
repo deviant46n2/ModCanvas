@@ -14,10 +14,11 @@ mod quest;
 mod reward;
 mod task;
 
+pub use ids::{is_valid_ftb_id, rebase_invalid_ids};
+
 pub(crate) use helpers::ce;
 use chapter::{build_flat_chapters_quests, build_subdirs_chapter_map};
 use helpers::{chapter_images_to_snbt, sanitize_filename};
-use ids::rebase_invalid_ids;
 use quest::quest_to_snbt;
 use book::{write_book_snbt, write_reward_tables_snbt};
 
