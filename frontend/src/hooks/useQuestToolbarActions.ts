@@ -5,6 +5,7 @@ import {
   importFtbQuestsFromDir,
   exportFtbQuestsToDir,
   saveQuestGraph,
+  getQuestGraph,
   wsIpcGetStatus,
   wsIpcRestart,
   listPrismInstances,
@@ -162,22 +163,37 @@ export function useQuestToolbarActions({
 
   useEffect(() => { refreshWsStatus() }, [refreshWsStatus])
 
+  // First-open import for wizard-created packs: the scaffolded quest files
+  // need one import to materialize the graph. GATED on the CACHE being empty
+  // (s42 fix): this effect used to fire whenever the in-memory graph was
+  // momentarily null (it races the cache load on every open) and re-imported
+  // the on-disk files, OVERWRITING a saved cache with the file state — that
+  // is how a pack lost its dependency edges (an import of mid-edit files
+  // replaced the cached graph, the editor reloaded it, and the next save
+  // exported the edgeless state). A non-empty cache is authoritative.
   useEffect(() => {
-    if (!projectPath || !graph || graph.chapters.length > 0 || graph.nodes.length > 0) return
-    if (importedRef.current) return
+    if (!projectPath || importedRef.current) return
     importedRef.current = true
-    importFtbQuestsFromDir(projectPath).then((result) => {
-      if (result.graph && result.chapter_count > 0) {
-        setGraph(result.graph)
-        saveQuestGraph(projectId, result.graph).catch((e) =>
-          console.error('Failed to save imported quest graph:', e)
-        )
+    getQuestGraph(projectId).then((cached) => {
+      if (cached && (cached.chapters.length > 0 || cached.nodes.length > 0)) {
+        return // the cache has a saved graph — never clobber it
       }
+      importFtbQuestsFromDir(projectPath).then((result) => {
+        if (result.graph && result.chapter_count > 0) {
+          setGraph(result.graph)
+          saveQuestGraph(projectId, result.graph).catch((e) =>
+            console.error('Failed to save imported quest graph:', e)
+          )
+        }
+      }).catch((e) => {
+        console.error('FTB Quests import failed:', e)
+        importedRef.current = false
+      })
     }).catch((e) => {
-      console.error('FTB Quests import failed:', e)
+      console.error('Failed to read cached quest graph:', e)
       importedRef.current = false
     })
-  }, [graph, projectPath, projectId, setGraph])
+  }, [projectPath, projectId, setGraph])
 
 
   const handleImportFtb = useCallback(async () => {
