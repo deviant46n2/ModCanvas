@@ -1,112 +1,112 @@
 {
-    id = "A000000000000001"
+    id = "100000000000001"
     filename = "Exploration_Starter"
     title = "Play Your First Pack"
     order_index = 0
     quests = [
         {
-            id = "A000000000000101"
+            id = "1000000000000101"
             x = 0.0d
             y = 0.0d
             title = "Woodland Basics"
             description = ["Chop down a few trees to get started.", "Wood is the foundation of everything you will build."]
             icon = "minecraft:oak_log"
             tasks = [
-                { id = "B000000000000101", type = "item", title = "Collect Oak Logs", item = "minecraft:oak_log", count = 8L }
+                { id = "2000000000000101", type = "item", title = "Collect Oak Logs", item = "minecraft:oak_log", count = 8L }
             ]
             rewards = [
-                { id = "C000000000000101", type = "xp", xp = 100 }
+                { id = "3000000000000101", type = "xp", xp = 100 }
             ]
         }
         {
-            id = "A000000000000102"
+            id = "1000000000000102"
             x = 4.0d
             y = 0.0d
             title = "Home Sweet Home"
             description = ["A crafting table turns logs into tools.", "Craft one to unlock the next steps."]
             icon = "minecraft:crafting_table"
-            dependencies = ["A000000000000101"]
+            dependencies = ["1000000000000101"]
             tasks = [
-                { id = "B000000000000102", type = "item_crafting", title = "Craft a Crafting Table", item = "minecraft:crafting_table" }
+                { id = "2000000000000102", type = "item_crafting", title = "Craft a Crafting Table", item = "minecraft:crafting_table" }
             ]
             rewards = [
-                { id = "C000000000000102", type = "xp", xp = 150 }
+                { id = "3000000000000102", type = "xp", xp = 150 }
             ]
         }
         {
-            id = "A000000000000103"
+            id = "1000000000000103"
             x = 8.0d
             y = 0.0d
             title = "Stone Age"
             description = ["Mine stone with your wooden pickaxe until it breaks.", "Cobblestone is the workhorse material of early Minecraft."]
             icon = "minecraft:cobblestone"
-            dependencies = ["A000000000000102"]
+            dependencies = ["1000000000000102"]
             tasks = [
-                { id = "B000000000000103", type = "item", title = "Collect Cobblestone", item = "minecraft:cobblestone", count = 16L }
+                { id = "2000000000000103", type = "item", title = "Collect Cobblestone", item = "minecraft:cobblestone", count = 16L }
             ]
             rewards = [
-                { id = "C000000000000103", type = "item", item = "minecraft:stone_pickaxe" }
+                { id = "3000000000000103", type = "item", item = "minecraft:stone_pickaxe" }
             ]
         }
         {
-            id = "A000000000000104"
+            id = "1000000000000104"
             x = 12.0d
             y = -4.0d
             title = "Light Your Way"
             description = ["Coal keeps you safe above ground and below.", "Gather enough to craft a stack of torches."]
             icon = "minecraft:coal"
-            dependencies = ["A000000000000103"]
+            dependencies = ["1000000000000103"]
             tasks = [
-                { id = "B000000000000104", type = "item", title = "Collect Coal", item = "minecraft:coal", count = 8L }
+                { id = "2000000000000104", type = "item", title = "Collect Coal", item = "minecraft:coal", count = 8L }
             ]
             rewards = [
-                { id = "C000000000000104", type = "item", item = { id = "minecraft:torch", count = 8 } }
+                { id = "3000000000000104", type = "item", item = { id = "minecraft:torch", count = 8 } }
             ]
         }
         {
-            id = "A000000000000105"
+            id = "1000000000000105"
             x = 16.0d
             y = -4.0d
             title = "Night Defenders"
             description = ["Mobs come out at night. Prove you can hold your own.", "Zombies are slow — use that."]
             icon = "minecraft:zombie_spawn_egg"
-            dependencies = ["A000000000000104"]
+            dependencies = ["1000000000000104"]
             tasks = [
-                { id = "B000000000000105", type = "kill", title = "Defeat Zombies", entity = "minecraft:zombie", value = 2L }
+                { id = "2000000000000105", type = "kill", title = "Defeat Zombies", entity = "minecraft:zombie", value = 2L }
             ]
             rewards = [
-                { id = "C000000000000105", type = "xp", xp = 200 }
+                { id = "3000000000000105", type = "xp", xp = 200 }
             ]
         }
         {
-            id = "A000000000000106"
+            id = "1000000000000106"
             x = 20.0d
             y = -4.0d
             title = "Mining Adventure"
             description = ["Iron is the first metal worth your time.", "Find it below y=16 and bring it home."]
             icon = "minecraft:raw_iron"
-            dependencies = ["A000000000000105"]
+            dependencies = ["1000000000000105"]
             tasks = [
-                { id = "B000000000000106", type = "item", title = "Collect Raw Iron", item = "minecraft:raw_iron", count = 4L }
+                { id = "2000000000000106", type = "item", title = "Collect Raw Iron", item = "minecraft:raw_iron", count = 4L }
             ]
             rewards = [
-                { id = "C000000000000106", type = "item", item = { id = "minecraft:iron_ingot", count = 2 } }
+                { id = "3000000000000106", type = "item", item = { id = "minecraft:iron_ingot", count = 2 } }
             ]
         }
         {
-            id = "A000000000000107"
+            id = "1000000000000107"
             x = 24.0d
             y = -8.0d
             title = "On Your Way"
             description = ["Logs, stone, torches, iron — you have the loop.", "Follow the quest book as your pack grows."]
             icon = "minecraft:compass"
             shape = "rsquare"
-            dependencies = ["A000000000000106"]
+            dependencies = ["1000000000000106"]
             tasks = [
-                { id = "B000000000000107", type = "checkmark", title = "Reach this quest" }
+                { id = "2000000000000107", type = "checkmark", title = "Reach this quest" }
             ]
             rewards = [
-                { id = "C000000000000107", type = "xp", xp = 500 }
+                { id = "3000000000000107", type = "xp", xp = 500 }
             ]
         }
     ]

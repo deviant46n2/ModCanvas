@@ -26,6 +26,11 @@ export const PROGRESSION_MODES = [
 export function generateFtbHexId(): string {
   const array = new Uint8Array(8)
   crypto.getRandomValues(array)
+  // FTB ids must fit Long.parseLong(s, 16) — a value > Long.MAX_VALUE throws
+  // (quest then registers under a random id; dependencies resolve to 0 and are
+  // silently dropped — the s42 "no dependency lines" bug). Clearing the top
+  // bit keeps the first nibble ≤ 7, so every generated id is positive.
+  array[0] &= 0x7f
   return Array.from(array, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('')
 }
 

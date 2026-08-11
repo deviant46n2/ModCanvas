@@ -30,7 +30,10 @@ fn scaffold_writes_flat_chapters_layout() {
     assert!(!quests.join("Exploration_Starter").exists(), "no subdirs chapter folders");
 
     let play_content = std::fs::read_to_string(&play).unwrap();
-    assert!(play_content.contains(r#"id = "A000000000000001""#), "play chapter id missing");
+    // Template ids are 1/2/3-prefixed (positive) — FTB's Long.parseLong throws
+    // on ids > Long.MAX_VALUE (the s42 "no dependency lines" bug), so the
+    // scaffold must never ship A/B/C-prefixed ids.
+    assert!(play_content.contains(r#"id = "100000000000001""#), "play chapter id missing");
     assert!(play_content.contains("On Your Way"), "milestone quest missing");
     assert!(play_content.contains(r#"shape = "rsquare""#), "milestone shape missing");
     let shape_content = std::fs::read_to_string(&shape).unwrap();

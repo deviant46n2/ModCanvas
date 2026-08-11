@@ -9,6 +9,7 @@ use std::path::Path;
 mod book;
 mod chapter;
 mod helpers;
+mod ids;
 mod quest;
 mod reward;
 mod task;
@@ -16,6 +17,7 @@ mod task;
 pub(crate) use helpers::ce;
 use chapter::{build_flat_chapters_quests, build_subdirs_chapter_map};
 use helpers::{chapter_images_to_snbt, sanitize_filename};
+use ids::rebase_invalid_ids;
 use quest::quest_to_snbt;
 use book::{write_book_snbt, write_reward_tables_snbt};
 
@@ -58,6 +60,12 @@ pub fn export_ftb_quests_snbt_for_layout(
 ) -> Result<()> {
     let quests_dir = output_dir.join("config").join("ftbquests").join("quests");
 
+    // FTB's Long.parseLong(s, 16) throws for ids > Long.MAX_VALUE (s42):
+    // quests then register under random ids and dependencies silently drop —
+    // the "no dependency lines" bug. Re-base invalid ids deterministically so
+    // the output is always loadable; the app's internal graph ids stay as-is.
+    let graph = rebase_invalid_ids(graph);
+
     // Live export paths (export_ftb_quests_to_dir, write_quest_graph_to_instance)
     // have no import-produced sidecar. Recover comments from whatever already
     // exists on disk so a re-export of an existing pack preserves user comments.
@@ -71,7 +79,7 @@ pub fn export_ftb_quests_snbt_for_layout(
 
     std::fs::create_dir_all(&quests_dir)?;
 
-    write_book_snbt(graph, &quests_dir, effective_sidecar)?;
+    write_book_snbt(&graph, &quests_dir, effective_sidecar)?;
 
     // Group quests by chapter
     let mut chapter_quests: HashMap<String, Vec<&QuestNode>> = HashMap::new();
@@ -282,7 +290,7 @@ pub fn export_ftb_quests_snbt_for_layout(
     }
     }
 
-    write_reward_tables_snbt(graph, &quests_dir, effective_sidecar)?;
+    write_reward_tables_snbt(&graph, &quests_dir, effective_sidecar)?;
 
     Ok(())
 }

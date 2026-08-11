@@ -3,8 +3,7 @@
 Minecraft items, chapter icons and decorations that animate in-game (vertical frame-strip PNG + adjacent `*.png.mcmeta` animation metadata) play in the editor instead of showing as a flat sprite strip.
 
 > **Engine-rendered icons:** icons that can't be shown as a flat texture (3D
-> block/hand-modeled items, custom mod models, fluids) are rendered by the
-> in-game companion mod and cached — see [`engine-renders.md`](engine-renders.md).
+> block/hand-modeled items, custom mod models, fluids) are rendered by the> in-game companion mod and cached — see [`engine-renders.md`](engine-renders.md).
 
 ## Background prefetch of all chapters
 
@@ -362,6 +361,22 @@ the in-game quest editor's placement behavior:
   layouts), so FTB picks the value up.
 - `src-tauri/src/quest/types/node.rs` stores it as `icon_scaling: f64` (default 1.0);
   the node renderer multiplies the 2/3 icon size by it (see above).
+
+## Quest id validity (FTB `Long.parseLong`)
+
+FTB parses every id with `Long.parseLong(s, 16)` (BaseQuestFile) — ids whose
+value exceeds `Long.MAX_VALUE` (0x7FFF…) make it THROW: the quest then
+registers under a random id and its dependencies resolve to 0 and are silently
+dropped (s42: "quests visible, no dependency lines" — the template's
+A/B/C-prefixed ids and ~50% of the app's generated ids were affected). Rules:
+- `generateFtbHexId` (frontend `quest-helpers.ts`) masks the top bit — the
+  first nibble is always ≤ 7, every generated id is positive.
+- The template ships 1/2/3-prefixed ids only.
+- `export/ids.rs` deterministically re-bases any FTB-shaped id (16 hex chars)
+  that FTB can't parse, so a graph holding legacy bad ids still exports
+  loadable files; export → import → export round-trips are stable (same bad
+  id → same new id). Non-shaped ids ("q1" — synthetic/test data only) are out
+  of scope and pass through.
 
 ## Smart filter icons (FTB Filter System parity)
 
