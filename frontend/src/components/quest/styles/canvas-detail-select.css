@@ -1,0 +1,75 @@
+/* QuestSelect — the dark dropdown that replaces native <select>. WebKitGTK
+   renders the native popup white regardless of the trigger's CSS; shipping
+   our own list keeps the drawer fully dark. Popup is position:fixed at the
+   trigger's viewport rect (QuestSelect.tsx) so the drawer's scroll container
+   can't clip it; z-index sits above the drawer's own stacking. */
+
+.quest-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  background: #18181c;
+  border: 1px solid #3d3d44;
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 6px;
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.quest-select:hover {
+  border-color: #52525b;
+}
+
+.quest-select:focus-visible {
+  border-color: var(--ftb-accent);
+}
+
+.quest-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.quest-select-popup {
+  position: fixed;
+  z-index: 1400;
+  background: #1e1e22;
+  border: 1px solid #3d3d44;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.quest-select-option {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--ftb-text);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.quest-select-option:hover {
+  background: #2a2a2e;
+}
+
+.quest-select-option.selected {
+  background: #3f3f46;
+  color: var(--ftb-accent);
+}

@@ -18,7 +18,10 @@ use helpers::{chapter_images_to_snbt, sanitize_filename};
 use quest::quest_to_snbt;
 use book::{write_book_snbt, write_reward_tables_snbt};
 
-/// Export a QuestGraph as FTB Quests SNBT files to a directory (both Subdirs and FlatChapters formats)
+/// Export a QuestGraph as FTB Quests SNBT files to a directory — in the ONE
+/// layout the pack already uses (Subdirs or FlatChapters; stale copies of the
+/// other layout are cleaned up, so a pack can never accumulate two copies of
+/// the same book — that doubled dependency edges on re-import).
 ///
 /// `sidecar` is the raw-SNBT map returned from `import_ftb_quests`.  When
 /// non-empty, the exporter re-parses the original SNBT to recover user comments
@@ -51,14 +54,34 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
         }
     }
 
-    // Build deps map once
+    // Build deps map once. Dedupe per target: a graph that inherited doubled
+    // edges (duplicate chapter dirs imported before the import-side guard)
+    // must not emit `dependencies: [id, id]`.
     let mut deps_map: HashMap<String, Vec<String>> = HashMap::new();
     for edge in &graph.edges {
         if edge.edge_type == EdgeType::Prerequisite {
-            deps_map.entry(edge.target.clone()).or_default().push(edge.source.clone());
+            let deps = deps_map.entry(edge.target.clone()).or_default();
+            if !deps.contains(&edge.source) {
+                deps.push(edge.source.clone());
+            }
         }
     }
 
+    // Write ONE layout — the one the pack already uses. Writing both used to
+    // create a second, stale copy of the book on every save; the game can
+    // load both, and re-importing the doubled dirs doubled dependency edges
+    // (retitled chapter folders + the other layout's files accumulated until
+    // the pack had two copies of the same quests).
+    // The layout travels with the graph (set by the import); a fresh graph
+    // falls back to what the target dir already has.
+    let layout_is_subdirs = if graph.layout.is_empty() {
+        crate::imports::ftb_quests::detect_layout(&quests_dir)
+            == crate::imports::ftb_quests::FtBQuestsLayout::Subdirs
+    } else {
+        graph.layout == "Subdirs"
+    };
+
+    if layout_is_subdirs {
     // Export chapters in Subdirs format (quests_dir/{filename}/chapter.snbt)
     for chapter_node in graph.nodes.iter().filter(|n| matches!(n.node_type, QuestNodeType::Chapter)) {
         let chapter_meta = graph.chapters.iter().find(|c| c.id == chapter_node.id);
@@ -89,6 +112,39 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
             .map_err(|e| anyhow::anyhow!("{e}"))?;
     }
 
+    // Subdirs cleanup: remove chapter dirs that are stale duplicates of a
+    // current chapter (same chapter id, wrong folder name — a retitled
+    // chapter's old folder), and the flat chapters/ dir this exporter used
+    // to write. Dirs whose chapter id is NOT in the graph are left alone.
+    let current_chapters: Vec<String> = graph.chapters.iter().map(|c| c.id.clone()).collect();
+    if let Ok(entries) = std::fs::read_dir(&quests_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() || !p.join("chapter.snbt").exists() {
+                continue;
+            }
+            let content = std::fs::read_to_string(p.join("chapter.snbt")).unwrap_or_default();
+            let dir_id = crate::imports::snbt::parse_snbt(&content)
+                .ok()
+                .and_then(|v| v.get_str("id").map(|s| s.to_string()))
+                .unwrap_or_default();
+            let current_title = graph.chapters.iter()
+                .find(|c| c.id == dir_id)
+                .map(|c| crate::imports::ftb_quests::export::helpers::sanitize_filename(&c.title));
+            let is_managed = current_title.as_ref().is_some_and(|t| {
+                p.file_name().map(|n| n.to_string_lossy().to_string()) == Some(t.clone())
+            });
+            if current_chapters.contains(&dir_id) && !is_managed {
+                std::fs::remove_dir_all(&p).map_err(|e| anyhow::anyhow!("{e}"))?;
+                eprintln!("[ModCanvas] Removed stale duplicate chapter dir {:?}", p);
+            }
+        }
+    }
+    let flat_dir = quests_dir.join("chapters");
+    if flat_dir.is_dir() {
+        std::fs::remove_dir_all(&flat_dir).map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+    } else {
     // Export chapters in FlatChapters format (quests_dir/chapters/{filename}.snbt)
     // We read the existing file, replace the quests array, and preserve all other chapter metadata.
     let chapters_dir = quests_dir.join("chapters");
@@ -124,7 +180,10 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
         // Build new quests array from graph data
         let new_quests = build_flat_chapters_quests(chapter_node, &chapter_quests, &deps_map);
 
-        // Try to parse existing chapter file to preserve metadata (images, icon, group, etc.)
+        // Try to parse existing chapter file to preserve metadata (images, icon, group, etc.);
+        // for a fresh export (no existing file), build the FULL metadata map so
+        // subtitle/visibility/size defaults survive the round-trip — the flat
+        // exporter used to start from an empty map, silently dropping them.
         let mut chapter_compound = if chapter_path.exists() {
             match crate::imports::snbt::parse_snbt_compound(
                 &std::fs::read_to_string(&chapter_path).unwrap_or_default()
@@ -133,21 +192,12 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
                 Err(_) => HashMap::new(),
             }
         } else {
-            HashMap::new()
+            build_subdirs_chapter_map(chapter_node, chapter_meta, &filename)
         };
 
         // Always set/update id, filename
         chapter_compound.insert("id".to_string(), ce(SnbtValue::String(chapter_node.id.clone())));
         chapter_compound.insert("filename".to_string(), ce(SnbtValue::String(filename.to_string())));
-
-        // Try sidecar merge: preserve comments on unchanged quest fields
-        if let Some(merged) = snbt_sidecar::merge_quests_in_chapter(effective_sidecar, &chapter_node.id, &chapter_compound, &new_quests) {
-            chapter_compound = merged;
-        } else {
-            // Fallback: no sidecar data, just insert quests directly
-            let quests = build_flat_chapters_quests(chapter_node, &chapter_quests, &deps_map);
-            chapter_compound.insert("quests".to_string(), ce(SnbtValue::List(quests)));
-        }
 
         // Set chapter title if non-empty, preserve existing otherwise
         if !chapter_node.label.is_empty() {
@@ -167,8 +217,30 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
             }
         }
 
+        // Sidecar merge LAST: preserve comments on unchanged chapter fields and
+        // quests. All graph overrides (id/filename/title/order_index/images)
+        // must land BEFORE this, or they'd wipe the merged comments.
+        if let Some(merged) = snbt_sidecar::merge_quests_in_chapter(effective_sidecar, &chapter_node.id, &chapter_compound, &new_quests) {
+            chapter_compound = merged;
+        } else {
+            // Fallback: no sidecar data, just insert quests directly
+            chapter_compound.insert("quests".to_string(), ce(SnbtValue::List(new_quests)));
+        }
+
         crate::path_safety::atomic_write_str(&chapter_path, &compound_to_snbt(&chapter_compound))
             .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    // Flat cleanup: remove the subdirs chapter folders this exporter used to
+    // write alongside the flat files (they are duplicates of the same book).
+    if let Ok(entries) = std::fs::read_dir(&quests_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() && p.join("chapter.snbt").exists() {
+                std::fs::remove_dir_all(&p).map_err(|e| anyhow::anyhow!("{e}"))?;
+            }
+        }
+    }
     }
 
     write_reward_tables_snbt(graph, &quests_dir, effective_sidecar)?;

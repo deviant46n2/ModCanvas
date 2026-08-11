@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import type { QuestNodeData } from '../../services/api'
-import { ArrowRightIcon, BookIcon, InfoIcon, LockIcon, SquareIcon } from '../ui/icons'
+import { BookIcon } from '../ui/icons'
+import { QuestSelect } from './QuestSelect'
 import {
   SHAPES,
   VISIBILITY_OPTIONS,
@@ -12,29 +14,31 @@ import {
 import { isMilestoneShape } from '../../core/quest/quest-shapes'
 import { QuestIcon } from './QuestIcon'
 import { AnimatedSprite } from './AnimatedSprite'
-import { DetailSection } from './quest-detail-sections'
 
 interface GroupProps {
   node: QuestNodeData
   onUpdateNode: (field: string, value: unknown) => void
-  open: boolean
-  onToggle: () => void
 }
 
-export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl, iconPending, onPickIcon, onSetMilestone }: GroupProps & {
+/** Plain panel wrapper for the config groups — stacked under the content
+ *  surface (the rail is gone), compact so the column scrolls as one. */
+function PanelSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="quest-detail-panel quest-detail-stack-section">
+      <div className="quest-detail-panel-title">{title}</div>
+      {children}
+    </div>
+  )
+}
+
+export function AppearanceSection({ node, onUpdateNode, iconUrl, iconPending, onPickIcon, onSetMilestone }: GroupProps & {
   iconUrl?: string
   iconPending: boolean
   onPickIcon: () => void
   onSetMilestone?: (on: boolean) => void
 }) {
   return (
-    <DetailSection
-      id="quest-section-appearance"
-      title="Appearance"
-      icon={<SquareIcon size={14} />}
-      open={open}
-      onToggle={onToggle}
-    >
+    <PanelSection title="Appearance">
       <div className="quest-detail-field">
         <label>Scale</label>
         <div className="quest-detail-scale-control">
@@ -83,9 +87,12 @@ export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl,
       <div className="quest-detail-field-row">
         <div className="quest-detail-field">
           <label>Shape</label>
-          <select value={node.shape} onChange={(e) => onUpdateNode('shape', e.target.value)}>
-            {SHAPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          <QuestSelect
+            value={node.shape}
+            onChange={(v) => onUpdateNode('shape', v)}
+            ariaLabel="Shape"
+            options={SHAPES}
+          />
         </div>
         <div className="quest-detail-field">
           <label>Icon Scale</label>
@@ -115,25 +122,22 @@ export function AppearanceSection({ node, onUpdateNode, open, onToggle, iconUrl,
           </span>
         </div>
       )}
-    </DetailSection>
+    </PanelSection>
   )
 }
 
-export function VisibilitySection({ node, onUpdateNode, open, onToggle }: GroupProps) {
+export function VisibilitySection({ node, onUpdateNode }: GroupProps) {
   return (
-    <DetailSection
-      id="quest-section-visibility"
-      title="Visibility"
-      icon={<LockIcon size={14} />}
-      open={open}
-      onToggle={onToggle}
-    >
+    <PanelSection title="Visibility">
       <div className="quest-detail-field-row">
         <div className="quest-detail-field">
           <label>Visibility</label>
-          <select value={node.visibility} onChange={(e) => onUpdateNode('visibility', e.target.value)}>
-            {VISIBILITY_OPTIONS.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-          </select>
+          <QuestSelect
+            value={node.visibility}
+            onChange={(v) => onUpdateNode('visibility', v)}
+            ariaLabel="Visibility"
+            options={VISIBILITY_OPTIONS}
+          />
         </div>
         <div className="quest-detail-field">
           <label>Min Width</label>
@@ -158,25 +162,22 @@ export function VisibilitySection({ node, onUpdateNode, open, onToggle }: GroupP
           <span>Hide JEI Recipe</span>
         </label>
       </div>
-    </DetailSection>
+    </PanelSection>
   )
 }
 
-export function DependenciesSection({ node, onUpdateNode, open, onToggle }: GroupProps) {
+export function DependenciesSection({ node, onUpdateNode }: GroupProps) {
   return (
-    <DetailSection
-      id="quest-section-dependencies"
-      title="Dependencies"
-      icon={<ArrowRightIcon size={14} />}
-      open={open}
-      onToggle={onToggle}
-    >
+    <PanelSection title="Dependencies">
       <div className="quest-detail-field-row">
         <div className="quest-detail-field">
           <label>Dependency Requirement</label>
-          <select value={node.dependency_requirement || 'all_completed'} onChange={(e) => onUpdateNode('dependency_requirement', e.target.value)}>
-            {DEPENDENCY_REQUIREMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-          </select>
+          <QuestSelect
+            value={node.dependency_requirement || 'all_completed'}
+            onChange={(v) => onUpdateNode('dependency_requirement', v)}
+            ariaLabel="Dependency requirement"
+            options={DEPENDENCY_REQUIREMENTS}
+          />
         </div>
         <div className="quest-detail-field">
           <label>Min Required Deps</label>
@@ -193,25 +194,22 @@ export function DependenciesSection({ node, onUpdateNode, open, onToggle }: Grou
           <span>Optional</span>
         </label>
       </div>
-    </DetailSection>
+    </PanelSection>
   )
 }
 
-export function MiscSection({ node, onUpdateNode, open, onToggle }: GroupProps) {
+export function MiscSection({ node, onUpdateNode }: GroupProps) {
   return (
-    <DetailSection
-      id="quest-section-misc"
-      title="Misc"
-      icon={<InfoIcon size={14} />}
-      open={open}
-      onToggle={onToggle}
-    >
+    <PanelSection title="Misc">
       <div className="quest-detail-field-row">
         <div className="quest-detail-field">
           <label>Progression</label>
-          <select value={node.progression_mode} onChange={(e) => onUpdateNode('progression_mode', e.target.value)}>
-            {PROGRESSION_MODES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+          <QuestSelect
+            value={node.progression_mode}
+            onChange={(v) => onUpdateNode('progression_mode', v)}
+            ariaLabel="Progression mode"
+            options={PROGRESSION_MODES}
+          />
         </div>
         <div className="quest-detail-field">
           <label>Repeat Cooldown (s)</label>
@@ -248,6 +246,6 @@ export function MiscSection({ node, onUpdateNode, open, onToggle }: GroupProps) 
           <span>Ignore Reward Blocking</span>
         </label>
       </div>
-    </DetailSection>
+    </PanelSection>
   )
 }

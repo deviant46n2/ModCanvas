@@ -1,0 +1,211 @@
+/* ItemBrowser — the shared JEI-style item browser. One surface for the
+   recipes-tab palette and the picker popup, so both stay visually identical.
+   JEI's signature: a dense slot grid with a bottom search bar and hover
+   tooltips, themed with the app's own colors (no gold). */
+
+.item-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 6px;
+}
+
+/* The slot grid — dense, JEI-like: square slots with hard pixel icons. */
+.item-browser-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+.browser-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 2px;
+  background: var(--color-bg-sunken, #1a1a24);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.browser-slot:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-surface-1, #222230);
+}
+
+.browser-slot img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.browser-slot-fallback {
+  color: var(--color-text-tertiary, #444);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Browse-mode ⇄ affordance — appears on hover, like the palette's per-row
+   button but over the slot corner. */
+.browser-using {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-default);
+  border-radius: 50%;
+  background: var(--color-bg-overlay, #111118);
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.browser-slot:hover .browser-using {
+  opacity: 1;
+}
+
+.browser-using:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* Tag chips — `#tag` search (or a tag-name match) surfaces these above the
+   search bar; one click picks the tag ingredient. */
+.item-browser-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  max-height: 96px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.browser-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-border-accent);
+  color: var(--color-text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.browser-tag:hover {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+
+.browser-tag-glyph {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.browser-tag-count {
+  color: var(--color-text-tertiary, #888);
+  font-size: 10px;
+}
+
+/* Bottom search bar — JEI's signature placement, with prefix hints. */
+.item-browser-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.item-browser-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  background: var(--color-bg-input, #18181c);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  border-radius: 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.item-browser-input:focus {
+  border-color: var(--color-accent);
+}
+
+.item-browser-input::placeholder {
+  color: var(--color-text-tertiary, #555);
+}
+
+.item-browser-count {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.item-browser-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-tertiary, #555);
+  font-size: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Hover tooltip: JEI-style name + id + mod readout. */
+.browser-tooltip {
+  position: fixed;
+  z-index: 1200;
+  background: var(--color-bg-overlay, #111118);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  padding: 6px 10px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.browser-tooltip-name {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.browser-tooltip-id {
+  color: var(--color-text-tertiary, #7777aa);
+  font-size: 10px;
+  margin-top: 2px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.browser-tooltip-mod {
+  color: var(--color-text-tertiary);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 1px;
+}

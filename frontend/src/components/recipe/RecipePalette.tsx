@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 import type { ItemRegistryEntry, ItemTagInfo } from '../../services/api';
-import { PackageIcon, ChevronRightIcon, ChevronDownIcon } from '../ui/icons'
+import { ChevronRightIcon, ChevronDownIcon } from '../ui/icons'
 import { setDragPayload, clearDragPayload } from '../../core/recipe/dnd';
 import { getTagItems, requestResolveTags, subscribeTagChanges } from '../../services/smart-filter-tags';
-import { filterRegistryItems } from '../../services/item-registry';
 import { filterTagCatalog } from '../../core/recipe/tag-filter';
+import { ItemBrowser } from './ItemBrowser';
 
 interface RecipePaletteProps {
   /** Full instance item registry (filtered internally). */
@@ -19,55 +19,8 @@ interface RecipePaletteProps {
   onShowRecipesUsing: (itemOrTagId: string) => void;
 }
 
-const ITEM_ROW_HEIGHT = 56;
-const TAG_ROW_HEIGHT = 48;
 const MEMBER_ROW_HEIGHT = 24;
 const MAX_MEMBERS_SHOWN = 40;
-
-type ItemRowData = {
-  items: ItemRegistryEntry[];
-  getUrl: (id: string) => string | null;
-  onShowRecipesUsing: (itemOrTagId: string) => void;
-};
-
-function ItemRow({ index, style, items, getUrl, onShowRecipesUsing }: RowComponentProps<ItemRowData>) {
-  const item = items[index];
-  if (!item) return <div style={style} />;
-  const url = getUrl(item.id);
-  return (
-    <div style={style}>
-      <div
-        className="palette-item"
-        draggable
-        onDragStart={(e) => {
-          setDragPayload(e.dataTransfer, { item: item.id, name: item.name });
-        }}
-        onDragEnd={() => clearDragPayload()}
-      >
-        <div className="palette-item-icon">
-          {url ? (
-            <img src={url} alt={item.name} />
-          ) : (
-            <PackageIcon size={16} />
-          )}
-        </div>
-        <div className="palette-item-info">
-          <span className="palette-item-name">{item.name}</span>
-          <span className="palette-item-id">{item.id}</span>
-          {item.mod_id && <span className="palette-item-mod">{item.mod_id}</span>}
-        </div>
-        <button
-          type="button"
-          className="palette-using"
-          onClick={(e) => { e.stopPropagation(); onShowRecipesUsing(item.id); }}
-          title="Show recipes using this item"
-        >
-          ⇄
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Tags are virtualized as a flat list of rows: a collapsed tag row, or an
 // expanded tag row followed by its member rows (variable heights).
@@ -85,7 +38,7 @@ type TagRowData = {
 };
 
 function tagRowHeight(row: TagRow): number {
-  return row.kind === 'tag' ? TAG_ROW_HEIGHT : MEMBER_ROW_HEIGHT;
+  return row.kind === 'tag' ? 48 : MEMBER_ROW_HEIGHT;
 }
 
 function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShowRecipesUsing }: RowComponentProps<TagRowData>) {
@@ -97,11 +50,6 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShow
       <div style={style}>
         <div
           className="palette-item tag-item"
-          draggable
-          onDragStart={(e) => {
-            setDragPayload(e.dataTransfer, { item: `#${row.tag.id}`, name: row.tag.id, tag: true });
-          }}
-          onDragEnd={() => clearDragPayload()}
           onClick={() => onToggle(row.tag.id)}
           title={isOpen ? 'Collapse tag members' : `Expand ${row.tag.id} members`}
         >
@@ -141,6 +89,7 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShow
         onDragStart={(e) => {
           setDragPayload(e.dataTransfer, { item: row.item, name: row.item });
         }}
+        onDragEnd={() => clearDragPayload()}
         title={`Drag ${row.item} into the grid`}
       >
         {url ? <img src={url} alt="" className="tag-member-icon" /> : <span className="tag-member-bullet">•</span>}
@@ -150,6 +99,12 @@ function TagRowRenderer({ index, style, rows, getUrl, onToggle, expanded, onShow
   );
 }
 
+/**
+ * The recipes-tab right rail. Items render the shared JEI-style ItemBrowser
+ * in browse mode (drag into the grid, ⇄ for recipes-using) — the same
+ * surface the picker popup uses. Tags keep the expandable member list; the
+ * palette also exposes a tags-first view to mirror the browser's #tag search.
+ */
 export function RecipePalette({
   items,
   tags,
@@ -178,7 +133,6 @@ export function RecipePalette({
     });
   };
 
-  const itemsFiltered = useMemo(() => filterRegistryItems(items, query), [items, query]);
   const tagsFiltered = useMemo(() => filterTagCatalog(tags, query), [tags, query]);
 
   const rows = useMemo<TagRow[]>(() => {
@@ -197,11 +151,6 @@ export function RecipePalette({
     return out;
   }, [activeTab, tagsFiltered, expanded]);
 
-  const count =
-    activeTab === 'items'
-      ? `${itemsFiltered.length} / ${items.length} items`
-      : `${tagsFiltered.length} / ${tags.length} tags`;
-
   return (
     <aside className="recipe-palette">
       <div className="palette-header">
@@ -210,53 +159,48 @@ export function RecipePalette({
           <button className={activeTab === 'tags' ? 'active' : ''} onClick={() => setActiveTab('tags')}>Tags</button>
         </div>
       </div>
-      <div className="palette-search-row">
-        <input
-          type="text"
-          placeholder="Filter items/tags…  (@mod)"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="recipe-list-search"
-        />
-        <span className="result-count">{count}</span>
-      </div>
-      <div className="palette-grid">
-        {activeTab === 'items' &&
-          (itemsFiltered.length === 0 ? (
-            <div className="palette-empty">
-              {items.length === 0
-                ? 'No instance items. Load a pack to index its item registry.'
-                : 'No items match your query.'}
-            </div>
-          ) : (
-            <List
-              style={{ height: '100%' }}
-              rowComponent={ItemRow}
-              rowCount={itemsFiltered.length}
-              rowHeight={ITEM_ROW_HEIGHT}
-              rowProps={{ items: itemsFiltered, getUrl: getTextureUrl, onShowRecipesUsing }}
-              overscanCount={8}
-            />
-          ))}
 
-        {activeTab === 'tags' &&
-          (tagsFiltered.length === 0 ? (
-            <div className="palette-empty">
-              {tags.length === 0
-                ? 'No item tags found in the instance.'
-                : 'No tags match your query.'}
-            </div>
-          ) : (
-            <List
-              style={{ height: '100%' }}
-              rowComponent={TagRowRenderer}
-              rowCount={rows.length}
-              rowHeight={(index) => tagRowHeight(rows[index])}
-              rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onShowRecipesUsing }}
-              overscanCount={8}
+      {activeTab === 'items' ? (
+        <div className="palette-browser">
+          <ItemBrowser
+            items={items}
+            tags={tags}
+            getTextureUrl={getTextureUrl}
+            mode="browse"
+            onDragStart={() => {}}
+            onShowRecipesUsing={onShowRecipesUsing}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="palette-search-row">
+            <input
+              type="text"
+              placeholder="Filter tags…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="recipe-list-search"
             />
-          ))}
-      </div>
+            <span className="result-count">{tagsFiltered.length} / {tags.length}</span>
+          </div>
+          <div className="palette-grid">
+            {tagsFiltered.length === 0 ? (
+              <div className="palette-empty">
+                {tags.length === 0 ? 'No item tags found in the instance.' : 'No tags match your query.'}
+              </div>
+            ) : (
+              <List
+                style={{ height: '100%' }}
+                rowComponent={TagRowRenderer}
+                rowCount={rows.length}
+                rowHeight={(index) => tagRowHeight(rows[index])}
+                rowProps={{ rows, getUrl: getTextureUrl, onToggle: toggleTag, expanded, onShowRecipesUsing }}
+                overscanCount={8}
+              />
+            )}
+          </div>
+        </>
+      )}
     </aside>
   );
 }

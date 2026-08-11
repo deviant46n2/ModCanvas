@@ -4,6 +4,7 @@
 
 import { smartFilterMembers, memberKey } from '../../core/quest/smart-filter'
 import { shapeTextureKeys } from '../../core/quest/quest-shapes'
+import { TYPE_TEXTURE_KEYS } from '../../core/quest/type-icons'
 
 export function isUsableTextureValue(value: string | null | undefined): boolean {
   return (
@@ -89,6 +90,9 @@ function objectiveTargets(obj: {
   }
   if (obj.objective_type === 'fluid') return [obj.fluid_id]
   if (obj.objective_type === 'entity_kill') return [obj.entity_id]
+  // Types with a fixed in-game icon (XP → enchanting bottle) carry no target
+  // but still need their texture materialized — same plan path as a target.
+  if (TYPE_TEXTURE_KEYS[obj.objective_type]) return [TYPE_TEXTURE_KEYS[obj.objective_type]]
   return [obj.target]
 }
 
@@ -123,6 +127,7 @@ export function collectNeededTargets(
     }
     for (const r of n.rewards || []) {
       push(r.item_id || r.items?.[0] || r.item_tag)
+      if (TYPE_TEXTURE_KEYS[r.reward_type]) push(TYPE_TEXTURE_KEYS[r.reward_type])
       if (r.smart_filter) {
         for (const key of smartFilterMembers(r.smart_filter).map(memberKey)) push(key)
       }
@@ -134,6 +139,7 @@ export function collectNeededTargets(
     }
     for (const r of selectedNode.rewards || []) {
       push(r.item_id || r.items?.[0] || r.item_tag)
+      if (TYPE_TEXTURE_KEYS[r.reward_type]) push(TYPE_TEXTURE_KEYS[r.reward_type])
       if (r.smart_filter) {
         for (const key of smartFilterMembers(r.smart_filter).map(memberKey)) push(key)
       }

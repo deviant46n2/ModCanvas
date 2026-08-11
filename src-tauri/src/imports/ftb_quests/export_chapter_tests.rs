@@ -159,8 +159,9 @@ fn quest_link_roundtrips_through_export() {
     let export_dir = tempfile::tempdir().unwrap();
     export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
 
-    // Subdirs layout: chapter dir is the sanitized chapter title.
-    let link_path = export_dir.path().join("config").join("ftbquests").join("quests").join("Chapter_B").join("chapter.snbt");
+    // The pack is FlatChapters — the exporter writes ONE layout (the pack's),
+    // so the link chapter lives in the flat chapters/ dir.
+    let link_path = export_dir.path().join("config").join("ftbquests").join("quests").join("chapters").join("Chapter_B.snbt");
     let content = std::fs::read_to_string(&link_path).expect("chapter b written");
     assert!(content.contains("linked_quest"), "linked_quest exported");
 
@@ -190,4 +191,40 @@ fn quest_link_no_linked_target_stays_link() {
     let link = graph.nodes.iter().find(|n| n.id == "broken_link").expect("node parsed");
     assert_eq!(link.node_type, QuestNodeType::QuestLink, "empty linked_quest still a link");
     assert_eq!(link.link_target, "");
+}
+
+#[test]
+fn dependency_edges_are_deduplicated_in_export() {
+    // A graph that inherited doubled prerequisite edges (the pre-dedupe import
+    // doubled them from stale duplicate chapter dirs) must export ONE
+    // dependencies entry per source — never `dependencies: [id, id]`.
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+    std::fs::write(chapters_dir.join("a.snbt"), r#"{
+    id = "ch_a"
+    title = "Chapter A"
+    quests = [
+        { id: "q1", x: 0.0d, y: 0.0d, tasks: [] },
+        { id: "q2", x: 4.0d, y: 0.0d, dependencies = ["q1"] }
+    ]
+}"#).unwrap();
+
+    let mut graph = import_ftb_quests(tmp.path()).unwrap().graph;
+    assert_eq!(graph.edges.len(), 1, "fixture imports one dependency edge");
+    // Simulate the legacy doubled-edge state.
+    let dup = graph.edges[0].clone();
+    graph.edges.push(dup);
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path(), &std::collections::HashMap::new()).unwrap();
+    let exported = std::fs::read_to_string(
+        export_dir.path().join("config").join("ftbquests").join("quests").join("chapters").join("Chapter_A.snbt")
+    ).unwrap();
+    let deps_line = exported.lines()
+        .find(|l| l.trim_start().starts_with("dependencies:"))
+        .expect("q2 has dependencies");
+    assert_eq!(deps_line.trim(), "dependencies: [ \"q1\" ]", "doubled edge exports a single dependency");
 }

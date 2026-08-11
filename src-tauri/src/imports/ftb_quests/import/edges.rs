@@ -35,6 +35,15 @@ pub(super) fn build_dependency_edges(graph: &mut QuestGraph, result: &mut FtBQue
                     }
                 };
 
+                // Skip if this dependency edge already exists. Stale duplicate
+                // chapter dirs or repeated imports can present the same
+                // dependency twice; exporting an edge twice emits
+                // `dependencies: [id, id]`, which bloats the SNBT and reads as
+                // a duplicated dependency in-game.
+                if graph.edges.iter().any(|e| e.source == target_id && e.target == node.id) {
+                    continue;
+                }
+
                 graph.edges.push(QuestEdge {
                     id: Uuid::new_v4().to_string(),
                     source: target_id,

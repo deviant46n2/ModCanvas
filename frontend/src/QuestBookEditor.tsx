@@ -3,6 +3,8 @@ import { useHistory } from './hooks/history-provider'
 import { getQuestGraph } from './services/api'
 import type { QuestGraphData } from './services/quest-types'
 import type { IngestResult } from './services/quest-types'
+import type { ItemTagInfo } from './services/quest-types'
+import { listItemTags } from './services/recipes'
 import { QuestBookSkeleton } from './components/quest/QuestBookSkeleton'
 import type { ToolbarAPI } from './components/quest/import-export'
 import { getAdapter } from './adapters'
@@ -100,6 +102,20 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   const { textureIndex, animations, texturesLoading, texturesRemaining, bakedCount, questBackgroundUrl, items } =
     useQuestAssetPipeline({ instancePath, ingestResult, kubejsNamespace, wsConnected, graph, activeChapter, selectedNode, packLoaded, projectId })
 
+  // Item/tag catalog for the shared JEI-style picker: items come from the
+  // pipeline, tags from the same instance scan the recipe editor uses.
+  const [tagCatalog, setTagCatalog] = useState<ItemTagInfo[]>([])
+  useEffect(() => {
+    let disposed = false
+    if (!instancePath) return
+    listItemTags(instancePath)
+      .then((tags) => {
+        if (!disposed) setTagCatalog(tags)
+      })
+      .catch((e) => console.error('[QuestBookEditor] Failed to load item tags:', e))
+    return () => { disposed = true }
+  }, [instancePath])
+
   // Item picker icons resolve lazily through the live texture index first
   // (shared lazy materializer), falling back to the registry's own data URL —
   // so opening the picker never deepens the base64 registry dependency.
@@ -193,6 +209,7 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       enginePromptDismissed={enginePromptDismissed}
       setEnginePromptDismissed={setEnginePromptDismissed}
       items={items}
+      tags={tagCatalog}
       getPickerTextureUrl={getPickerTextureUrl}
       questBackgroundUrl={questBackgroundUrl}
       texturesLoading={texturesLoading}

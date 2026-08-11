@@ -31,10 +31,13 @@ own).
   - Type `<select>` + **JEI-grammar search** (see below).
   - Validation is memoized over authored recipes only; read-only rows get no
     status dot. Non-authored rows have an **Edit a copy** action.
-- **Palette** (right rail): two tabs (Items / Tags) with its own search input and
-  `filtered/total` counts. It filters the full instance item registry and local
-  tag catalog locally. Every row has a **⇄ recipes using this** action that
-  drives the explorer search to `>item` / `#tag`.
+- **Palette** (right rail): two tabs (Items / Tags). The Items tab renders the
+  shared JEI-style browser (`ItemBrowser.tsx`) — a dense slot grid with a
+  bottom search bar (`@mod` / `#tag` prefixes), hover tooltips, drag-to-grid,
+  and a per-slot **⇄ recipes using this** action that drives the explorer
+  search to `>item` / `#tag`. The Tags tab keeps its own search input and
+  expandable member lists. The same browser backs the popup picker, so the
+  palette and the picker are the same surface by construction.
 - **Editor** (center): `CraftingGridPanel` with a visual **type picker** (card
   per type, mini grid glyph). Switching crafting → non-crafting confirms first
   ("…keeps only the first ingredient; the pattern will be discarded"); furnace
@@ -122,9 +125,10 @@ closing paren.
 
 ### Also in this surface (carried forward)
 
-- Local-only 2-tab palette + shared `ItemPickerModal`, KubeJS item indexing
-  (`indexer_kubejs.rs`), MC-authentic stateless `RecipeGrid`/`RecipeSlot`/
-  `OutputSlotField` (pure CSS, no bundled Minecraft assets).
+- Local-only 2-tab palette + shared `ItemBrowser` (JEI-style grid, items +
+  `#tag` search — replaces the old golden `ItemPickerModal`), KubeJS item
+  indexing (`indexer_kubejs.rs`), MC-authentic stateless `RecipeGrid`/
+  `RecipeSlot`/`OutputSlotField` (pure CSS, no bundled Minecraft assets).
 - Bidirectional loading: `scan_pack_recipes` walks mod jars + vanilla `data/`
   (both `recipes/` and 1.21+ `recipe/`), KubeJS `server_scripts`, CraftTweaker
   `scripts`; dedupes by resource id preferring pack overrides; cache-aware
@@ -189,9 +193,10 @@ the write target, and resolves the default KubeJS namespace via
   and **type-picker confirm** semantics are as described in Status above; the
   pure logic (`filter.ts`, `bulk-replace.ts`, `type-picker.ts`) is fully tested.
 - The crafting grid is stateless (`RecipeGrid`): the editor owns the 3×3 `cells`
-  and writes back through `gridToPattern`/`gridToIngredients`. Grid cells and the
-  output slot open the shared `ItemPickerModal`; filled cells get a right-click
-  context menu; double-click clears.
+  and writes back through `gridToPattern`/`gridToIngredients`. Grid cells and
+  the output slot open the shared `ItemBrowser` picker (`RecipeItemPicker`,
+  slide-in from off-screen, items + `#tag` — output slots take items only);
+  filled cells get a right-click context menu; double-click clears.
 - Comment-out caveat: after commenting a call, the next `scan_pack_recipes` no
   longer returns it — the `disabledScripts` manifest keeps it in the Disabled
   filter and enables Re-enable. If the user hand-edits the file, the fingerprint

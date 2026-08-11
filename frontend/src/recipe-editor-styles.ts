@@ -7,5 +7,6 @@ import './recipe-styles/recipe-import-script.css';
 import './recipe-styles/recipe-list-status.css';
 import './recipe-styles/recipe-disable-bulk.css';
 import './recipe-styles/recipe-bulk-replace.css';
+import './recipe-styles/recipe-item-picker.css';
 import './recipe-styles/recipe-browser-controls.css';
 import './recipe-styles/recipe-slots.css';

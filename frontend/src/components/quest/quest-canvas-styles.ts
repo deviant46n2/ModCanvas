@@ -9,6 +9,8 @@ import './styles/canvas-edges.css';
 import './styles/canvas-rf.css';
 import './styles/canvas-detail.css';
 import './styles/canvas-detail-cards.css';
+import './styles/canvas-detail-strip.css';
+import './styles/canvas-detail-select.css';
 import './styles/canvas-deco.css';
 import './styles/canvas-ctx.css';
 import './styles/canvas-utils.css';

@@ -207,12 +207,13 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   // Item picker target: a grid cell or the output slot.
   const [pickTarget, setPickTarget] = useState<{ kind: 'cell'; row: number; col: number } | { kind: 'output' } | null>(null);
 
-  const handlePickItem = useCallback((itemId: string) => {
+  const handlePickItem = useCallback((value: { item: string; tag: boolean }) => {
     if (!selectedRecipe) return;
     if (pickTarget?.kind === 'cell') {
-      handleCellChange(pickTarget.row, pickTarget.col, { item: itemId, count: 1, tag: false });
+      handleCellChange(pickTarget.row, pickTarget.col, { item: value.item, count: 1, tag: value.tag });
     } else if (pickTarget?.kind === 'output') {
-      updateRecipe(selectedRecipe.id, { output: { ...selectedRecipe.output, item: itemId } });
+      // The output slot is always a concrete item, never a tag.
+      updateRecipe(selectedRecipe.id, { output: { ...selectedRecipe.output, item: value.item } });
     }
     setPickTarget(null);
   }, [pickTarget, selectedRecipe, handleCellChange, updateRecipe]);

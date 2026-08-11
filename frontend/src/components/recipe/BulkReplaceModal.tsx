@@ -180,12 +180,12 @@ export function BulkReplaceModal({
   const canApply = !!from && !!to && !sameRef && affected.length > 0;
 
   return (
-    <div className="item-picker-overlay">
-      <div className="item-picker-backdrop" onClick={onClose} />
-      <div className="item-picker-panel bulk-replace-panel">
-        <div className="item-picker-header">
-          <span className="item-picker-title">Replace ingredient…</span>
-          <button className="item-picker-close" onClick={onClose} aria-label="Close">
+    <div className="recipe-picker-overlay">
+      <div className="recipe-picker-backdrop" onClick={onClose} />
+      <div className="recipe-picker-panel bulk-replace-panel">
+        <div className="recipe-picker-header">
+          <span className="recipe-picker-title">Replace ingredient…</span>
+          <button className="recipe-picker-close" onClick={onClose} aria-label="Close">
             <XIcon size={14} />
           </button>
         </div>
@@ -240,7 +240,7 @@ export function BulkReplaceModal({
           )}
         </div>
 
-        <div className="item-picker-actions">
+        <div className="recipe-picker-actions">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
           <button
             type="button"

@@ -180,6 +180,15 @@
   gap: var(--space-1);
 }
 
+/* Items tab: the shared JEI-style browser fills the rail. */
+.palette-browser {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  display: flex;
+  flex-direction: column;
+}
+
 .palette-item {
   display: flex;
   align-items: center;
@@ -226,22 +235,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.palette-item-id {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.palette-item-mod {
-  font-size: var(--text-2xs);
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .palette-empty {

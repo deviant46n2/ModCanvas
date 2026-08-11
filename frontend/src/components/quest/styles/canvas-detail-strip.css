@@ -1,0 +1,100 @@
+/* The task/reward icon tile — QuestSlotIcon's slot. Shared by card headers
+   (one tile, size prop drives it) and the icon strips (one tile per entry);
+   both render the same component so they can never drift. Width/height are
+   set inline from the size prop; the rules below are the base style. */
+.quest-detail-task-icon {
+  background: #18181c;
+  border: 1px solid #3d3d44;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+.quest-detail-task-icon img {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.quest-detail-item-fallback {
+  opacity: 0.4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+/* Checkmark-type tasks render a self-authored green checkmark (mirrors the
+   in-game glyph; no copied asset). Full opacity — it's a deliberate icon,
+   not a fallback. */
+.quest-detail-checkmark {
+  color: #4ade80;
+}
+
+/* The divider between the content surface and the Settings groups — the
+   grouped heading that replaces the old config rail. */
+.quest-detail-settings-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ftb-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+.quest-detail-settings-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #3d3d44;
+}
+
+/* Icon strip — the in-game style task/reward row: one tile per entry,
+   click to select; the selected entry's card renders below the strip. */
+.quest-detail-icon-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 4px;
+}
+
+.quest-detail-icon-strip .quest-detail-task-icon {
+  cursor: pointer;
+  border-color: #3d3d44;
+  transition: border-color 0.1s ease;
+}
+
+.quest-detail-icon-strip .quest-detail-task-icon:hover {
+  border-color: #6a6a72;
+}
+
+.quest-detail-icon-strip .quest-detail-task-icon.selected {
+  border-color: var(--ftb-accent);
+  box-shadow: 0 0 0 1px var(--ftb-accent) inset;
+}
+
+.quest-detail-add-tile {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px dashed #3d3d44;
+  color: #6a6a72;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.quest-detail-add-tile:hover {
+  border-color: var(--ftb-accent);
+  color: var(--ftb-accent);
+}

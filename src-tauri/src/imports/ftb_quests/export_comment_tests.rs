@@ -70,12 +70,11 @@ fn comment_preservation_roundtrip() {
     let export_dir = tempfile::tempdir().unwrap();
     export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
 
-    // Read the exported chapter file — prefer FlatChapters, fall back to Subdirs
-    let flat_path = export_dir.path()
-        .join("config").join("ftbquests").join("chapters").join("Test_Chapter.snbt");
-    let subdirs_path = export_dir.path()
-        .join("config").join("ftbquests").join("quests").join("Test_Chapter").join("chapter.snbt");
-    let exported_chapter = if flat_path.exists() { flat_path } else { subdirs_path };
+    // Read the exported chapter file — the pack is FlatChapters, and the
+    // exporter now writes ONE layout (the pack's), so the flat file is the
+    // only copy.
+    let exported_chapter = export_dir.path()
+        .join("config").join("ftbquests").join("quests").join("chapters").join("Test_Chapter.snbt");
     assert!(exported_chapter.exists(), "exported chapter exists");
     let exported = std::fs::read_to_string(&exported_chapter).unwrap();
 
@@ -107,11 +106,8 @@ fn comment_preservation_roundtrip() {
     let export_dir2 = tempfile::tempdir().unwrap();
     export_ftb_quests_snbt(&graph2, export_dir2.path(), &import_result2.sidecar).unwrap();
 
-    let flat_path2 = export_dir2.path()
-        .join("config").join("ftbquests").join("chapters").join("Test_Chapter.snbt");
-    let subdirs_path2 = export_dir2.path()
-        .join("config").join("ftbquests").join("quests").join("Test_Chapter").join("chapter.snbt");
-    let exported_chapter2 = if flat_path2.exists() { flat_path2 } else { subdirs_path2 };
+    let exported_chapter2 = export_dir2.path()
+        .join("config").join("ftbquests").join("quests").join("chapters").join("Test_Chapter.snbt");
     let exported2 = std::fs::read_to_string(&exported_chapter2).unwrap();
 
     // Since the parser attributes `/* Quest x position */` as trailing on `id`
@@ -134,11 +130,8 @@ fn comment_preservation_roundtrip() {
     let export_dir3 = tempfile::tempdir().unwrap();
     export_ftb_quests_snbt(&graph3, export_dir3.path(), &import_result3.sidecar).unwrap();
 
-    let flat_path3 = export_dir3.path()
-        .join("config").join("ftbquests").join("chapters").join("Test_Chapter.snbt");
-    let subdirs_path3 = export_dir3.path()
-        .join("config").join("ftbquests").join("quests").join("Test_Chapter").join("chapter.snbt");
-    let exported_chapter3 = if flat_path3.exists() { flat_path3 } else { subdirs_path3 };
+    let exported_chapter3 = export_dir3.path()
+        .join("config").join("ftbquests").join("quests").join("chapters").join("Test_Chapter.snbt");
     let exported3 = std::fs::read_to_string(&exported_chapter3).unwrap();
 
     // `y` didn't change so the trailing `/* Quest title */` comment survives

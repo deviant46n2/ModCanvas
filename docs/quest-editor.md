@@ -501,10 +501,10 @@ ModCanvas stores them as quest nodes with
 The per-quest advanced settings in the live `QuestDetailModal.tsx` expose the
 remaining per-quest settings that were previously model-only (and only surfaced
 in the dead `inspector.tsx` legacy stack — that inspector is not
-imported/bundled). They are grouped into four individually-collapsible
-sections — **Appearance**, **Visibility**, **Dependencies**, **Misc** — reachable
-in one click from the sticky nav chips at the top of the modal body
-(`quest-detail-sections.tsx` / `quest-section-groups.tsx`):
+imported/bundled). They are grouped into four sections — **Appearance**,
+**Visibility**, **Dependencies**, **Misc** — stacked below the content surface
+under a **Settings** divider in the single scrollable column
+(`quest-detail-panels.tsx` / `quest-section-groups.tsx`):
 
 - **Repeat cooldown** — FTB-canonical `repeat_cooldown` (plain seconds cooldown)
   + `can_repeat` tristate. Export emits `can_repeat: 1b` and
@@ -744,15 +744,38 @@ components + pure logic in `src/core/quest/`):
 The editor keeps common edits to one or two clicks — no nested dialogs for
 frequent operations:
 
-- **Quest modal is a single flat scroll** (`QuestDetailModal.tsx`, 266 lines):
-  no internal tab switch. The header icon is clickable (hover shows a "Change"
-  badge → icon picker), and the title/subtitle are inline text inputs with the
-  section content flowing below. Four sticky **nav chips** (Appearance /
-  Visibility / Dependencies / Misc) jump the scroll (`quest-detail-sections.tsx`);
-  the settings themselves live in collapsible groups
-  (`quest-section-groups.tsx`). The footer is **Done / Cancel / Delete Quest**
-  (plus Complete/Reset in Simulate mode) — the old verb–noun "Save Quest" label
-  is gone.
+- **Quest modal is a single flat scroll** (`QuestDetailModal.tsx`): no tabs, no
+  rail, no nav chips. Description, Tasks and Rewards stack as one content
+  surface (Description auto-sizes to its text, 5-line minimum); a **Settings**
+  divider leads into the four config groups (Appearance / Visibility /
+  Dependencies / Misc) stacked below (`quest-section-groups.tsx`). The header
+  icon is clickable (hover shows a "Change" badge → icon picker), and the
+  title/subtitle are inline text inputs with the section content flowing
+  below. The footer is **Done / Cancel / Delete Quest** (plus Complete/Reset
+  in Simulate mode) — the old verb–noun "Save Quest" label is gone.
+- **Tasks and rewards are per-type editors.** Each objective/reward type
+  renders only its own fields, dispatched through a registry
+  (`objective-editors.tsx` / `reward-editors.tsx`): switching the type
+  dropdown swaps the whole editor. Adding a new type = one component + one
+  registry entry; the card shells (`objective-card.tsx` / `reward-card.tsx`)
+  never grow. Reward cards keep a shared **Advanced** block (auto-claim +
+  team/exclude/ignore/blur flags) that applies to every type.
+- **The dropdowns are custom** (`QuestSelect.tsx`): WebKitGTK renders native
+  `<select>` popups white regardless of CSS, so the editor ships a dark
+  fixed-position list. It closes on outside mousedown / Escape / outside
+  scroll — but ignores scrolls that originate inside its own option list, so
+  long type lists stay scrollable.
+- **Tasks/rewards use in-game style icon strips** (`quest-slot-icon.tsx`):
+  one tile per entry, click to select, the selected entry's full card below.
+  Type-derived icons render real textures when the type has a fixed in-game
+  icon (XP → `minecraft:experience_bottle`, resolved from the instance via
+  the materialization plan in `targets.ts`); `checkmark` tasks render a
+  self-authored green ✓ SVG (never a copied asset).
+- **Item picking is the shared JEI-style browser** — the same
+  `ItemBrowser`/`RecipeItemPicker` the recipe editor uses (items + `#tag`
+  search, dense slot grid, bottom search bar, hover tooltip). Tag picks land
+  in the objective/reward `item_tag` field, item picks in `target`/`item_id`,
+  matching the FTB data model. The old golden `ItemPickerModal` is deleted.
 - **Inline rename on the canvas** — double-click a quest's title on the canvas
   turns it into an inline input (Enter/blur commits, Esc cancels). The node
   context menu's **Rename** item starts the same edit programmatically

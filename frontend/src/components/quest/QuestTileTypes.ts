@@ -130,13 +130,22 @@ export function getRewardIcon(rew: QuestRewardData): string | null {
   return null
 }
 
+/**
+ * Objective/reward types whose in-game icon is a fixed item, not the task's
+ * own target: FTB shows the enchanting bottle for every XP task. The drawer
+ * resolves these from the instance texture index at runtime (descriptor →
+ * lazy materialization — never bundled), so the strip renders the real
+ * in-game icon even when the task carries no target item.
+ */
+export { TYPE_TEXTURE_KEYS } from '../../core/quest/type-icons'
+
 export function getFallbackIcon(type: string): string {
   const icons: Record<string, string> = {
     item: '\u{1F4E6}', item_tag: '\u{1F3F7}\uFE0F', fluid: '\u{1F4A7}', energy: '\u26A1',
     xp: '\u2728', entity: '\u{1F47E}', location: '\u{1F4CD}', command: '\u{1F4BB}',
     advancement: '\u{1F3C6}', stat: '\u{1F4CA}', observation: '\u{1F441}\uFE0F', biome: '\u{1F332}', structure: '\u{1F3F0}',
     experience: '\u2728', loot_table: '\u{1F3B0}', game_stage: '\u{1F3AE}', choice: '\u{1F914}',
-    xp_levels: '\u2728', toast: '\u{1F4AC}', loot_table_table: '\u{1F3B0}'
+    xp_levels: '\u2728', toast: '\u{1F4AC}', loot_table_table: '\u{1F3B0}', checkmark: '\u2713'
   }
   return icons[type] || '\u{1F4E6}'
 }

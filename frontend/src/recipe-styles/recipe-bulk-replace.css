@@ -1,5 +1,7 @@
-/* Bulk-replace modal */
-.bulk-replace-panel {
+/* Bulk-replace modal — reuses the shared recipe-picker slide-in shell; this
+   override widens the panel beyond the picker's 396px. Compound selector so
+   it wins the cascade regardless of import order. */
+.recipe-picker-panel.bulk-replace-panel {
   width: 520px;
   max-width: 92vw;
   max-height: 80vh;
@@ -157,7 +159,7 @@
   color: var(--color-text-secondary);
 }
 
-.item-picker-actions {
+.recipe-picker-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);

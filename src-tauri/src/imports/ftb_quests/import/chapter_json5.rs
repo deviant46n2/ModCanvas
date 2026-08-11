@@ -17,6 +17,13 @@ pub(super) fn parse_json5_chapter_file(path: &Path, graph: &mut QuestGraph, resu
     let chapter_id = val.get("id").and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // Dedupe by chapter id BEFORE parsing quests — same stale-duplicate-dir
+    // guard as the SNBT parser (retitled chapter folders double their
+    // quests' dependency edges otherwise).
+    if graph.chapters.iter().any(|c| c.id == chapter_id) {
+        return Ok((0, chapter_id));
+    }
     let title = val.get("title").and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .unwrap_or_else(|| {

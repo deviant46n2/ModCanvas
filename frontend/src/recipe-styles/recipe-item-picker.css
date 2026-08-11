@@ -1,0 +1,94 @@
+/* RecipeItemPicker — the recipe editor's ingredient picker popup. A thin
+   slide-in shell (the drawer pop, like the quest detail surface) around the
+   shared JEI-style ItemBrowser — the grid, search, tooltip and tag chips all
+   live in item-browser.css so the popup and the recipes-tab palette share
+   one visual. This file owns only the popup chrome. */
+
+.recipe-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.recipe-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Slide in from off-screen: the panel starts fully outside the right edge
+   and pops into place — same gesture as the quest detail drawer. */
+.recipe-picker-panel {
+  position: relative;
+  width: 396px;
+  height: 100%;
+  background: var(--color-bg-surface, #12131a);
+  border-left: 2px solid var(--color-border-strong);
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.7);
+  animation: recipe-picker-slide-in 0.22s ease-out;
+}
+
+@keyframes recipe-picker-slide-in {
+  from { transform: translateX(100%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.recipe-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--color-bg-surface-2, #1e1e24);
+  border-bottom: 2px solid var(--color-accent);
+  flex-shrink: 0;
+}
+
+.recipe-picker-title {
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.recipe-picker-close {
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-tertiary, #aaa);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recipe-picker-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+.recipe-picker-close svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* Body: the shared ItemBrowser fills the panel below the header. */
+.recipe-picker-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+}

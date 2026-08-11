@@ -69,6 +69,12 @@ pub struct QuestGraph {
     pub book_background_image: String,
     #[serde(default)]
     pub quest_color: String,
+    /// On-disk layout this graph came from ("Subdirs" | "FlatChapters" | "Flat").
+    /// Set by the import; the exporter writes ONE layout (this one when known,
+    /// else the target dir's detected layout) so a pack never accumulates two
+    /// copies of the same book.
+    #[serde(default)]
+    pub layout: String,
     #[serde(default)]
     pub default_quest_size: QuestSize,
     #[serde(default)]
@@ -160,6 +166,7 @@ impl QuestGraph {
             book_icon: String::new(),
             book_background_image: String::new(),
             quest_color: String::new(),
+            layout: String::new(),
             default_quest_size: QuestSize::default(),
             default_quest_shape: QuestShape::Default,
             grid_scale: 0.5,

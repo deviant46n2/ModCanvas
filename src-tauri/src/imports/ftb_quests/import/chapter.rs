@@ -117,6 +117,14 @@ pub(super) fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, resul
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
+    // Dedupe by chapter id BEFORE parsing quests: a stale duplicate chapter
+    // dir (e.g. a retitled chapter's old folder left by a previous export)
+    // presents the same chapter again, which would double its quests and
+    // their dependency edges.
+    if graph.chapters.iter().any(|c| c.id == chapter_id) {
+        return Ok((0, chapter_id));
+    }
+
     // Store raw SNBT in sidecar for comment preservation during export
     snbt_sidecar::store_chapter(&mut result.sidecar, &chapter_id, &content);
 
@@ -193,7 +201,9 @@ pub(super) fn parse_snbt_chapter_file(path: &Path, graph: &mut QuestGraph, resul
         })
         .unwrap_or_default();
 
-    // Chapter metadata
+    // Chapter metadata — dedupe by id: a stale duplicate chapter dir (e.g. a
+    // retitled chapter's old folder left by a previous export) presents the
+    // same chapter again, which would double its quests' dependency edges.
     graph.chapters.push(QuestChapter {
         id: chapter_id.clone(),
         title,

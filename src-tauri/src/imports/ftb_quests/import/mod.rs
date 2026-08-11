@@ -60,6 +60,7 @@ pub fn import_ftb_quests(pack_dir: &Path) -> Result<FtBQuestsImportResult> {
     eprintln!("[ModCanvas] FTB Quests format: {:?}, layout: {:?} at {}", format, layout, quests_dir.display());
 
     let mut graph = QuestGraph::new("", "FTB Quests Import");
+    graph.layout = format!("{:?}", layout);
 
     // Parse global settings and detect version
     if let Some(version) = parse_global_settings(&quests_dir, format, &mut graph, &mut result)? {

@@ -1,6 +1,7 @@
 import { ImportRecipesModal } from './ImportRecipesModal';
 import { BulkReplaceModal } from './BulkReplaceModal';
-import { ItemPickerModal } from '../common/ItemPickerModal';
+import { RecipeItemPicker } from './RecipeItemPicker';
+import type { RecipePickValue } from './ItemBrowser';
 import type { IngredientRef } from '../../core/recipe/bulk-replace';
 import type { Recipe } from '../../core/recipe/recipe-store';
 import type { ImportedRecipe } from '../../core/recipe/json-import';
@@ -11,7 +12,7 @@ interface RecipeEditorModalsProps {
   onCloseImport: () => void;
   onImport: (imported: ImportedRecipe[]) => void;
   pickTarget: { kind: 'cell'; row: number; col: number } | { kind: 'output' } | null;
-  onPickItem: (itemId: string) => void;
+  onPickItem: (value: RecipePickValue) => void;
   onClosePick: () => void;
   bulkReplaceIds: string[] | null;
   recipes: Recipe[];
@@ -44,9 +45,11 @@ export function RecipeEditorModals({
       )}
 
       {pickTarget && (
-        <ItemPickerModal
+        <RecipeItemPicker
           items={itemRegistry}
+          tags={tags}
           getTextureUrl={getTextureUrl}
+          allowTags={pickTarget.kind === 'cell'}
           onSelect={onPickItem}
           onClose={onClosePick}
         />

@@ -1,30 +1,21 @@
-import { useCallback, useState } from 'react'
 import type { QuestNodeData, RewardTableData } from '../../services/api'
 import { questIconUrl, resolveIconKey } from './questIcons'
-import { isTexturePending } from '../../services/texture-loader'
-import { MILESTONE_COLOR } from './quest-form-constants'
-import { MILESTONE_SHAPE } from '../../core/quest/quest-shapes'
-import { QuestIcon } from './QuestIcon'
-import { AnimatedSprite } from './AnimatedSprite'
-import { CheckSquareIcon, FileTextIcon, TrophyIcon, XIcon } from '../ui/icons'
-import { SmartFilterIcon } from './SmartFilterIcon'
-import { ObjectiveCard } from './objective-card'
-import { RewardCard } from './reward-card'
-import {
-  SectionNav,
-  type QuestSectionId,
-} from './quest-detail-sections'
-import {
-  AppearanceSection,
-  VisibilitySection,
-  DependenciesSection,
-  MiscSection,
-} from './quest-section-groups'
+import { textureDisplayUrl, isTexturePending } from '../../services/texture-loader'
+import { shapeTextureKeys } from '../../core/quest/quest-shapes'
+import { EDGE_STATE_COLORS } from '../../core/quest/edge-state'
+import { XIcon } from '../ui/icons'
+import { QuestDetailPanels } from './quest-detail-panels'
+import { QuestTile } from './QuestTile'
+import { QuestSelect } from './QuestSelect'
 import type { ProgressState } from '../../core/quest/progress'
 
 interface QuestDetailModalProps {
   node: QuestNodeData
   textureIndex: Record<string, string>
+  /** Effective quest shape (own shape else chapter default) — matches the canvas. */
+  effectiveShape?: string
+  /** Quest locked (prerequisites unmet) per the sim progress — matches the canvas. */
+  locked?: boolean
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
   onDeleteNode: (nodeId: string) => void
   onAddObjective: (nodeId: string) => void
@@ -47,6 +38,8 @@ interface QuestDetailModalProps {
 export function QuestDetailModal({
   node,
   textureIndex,
+  effectiveShape,
+  locked,
   onUpdateNode,
   onDeleteNode,
   onAddObjective,
@@ -65,209 +58,126 @@ export function QuestDetailModal({
   quests,
   rewardTables,
 }: QuestDetailModalProps) {
-  const [openSections, setOpenSections] = useState<Partial<Record<QuestSectionId, boolean>>>({})
-
-  const setNode = useCallback(
-    (field: string, value: unknown) => {
-      onUpdateNode(node.id, { [field]: value } as Partial<QuestNodeData>)
-    },
-    [node.id, onUpdateNode]
-  )
-
-  // Milestone preset = diamond shape + gold accent when the quest has no
-  // colour of its own. Both are real FTB SNBT fields (shape + color); a
-  // single onUpdateNode call keeps it one undo step. Unmarking resets the
-  // shape to 'default' (inherit chapter default) and leaves the colour alone.
-  const handleSetMilestone = useCallback(
-    (on: boolean) => {
-      onUpdateNode(node.id, on
-        ? { shape: MILESTONE_SHAPE, color: node.color || MILESTONE_COLOR }
-        : { shape: 'default' })
-    },
-    [node.id, node.color, onUpdateNode]
-  )
-
-  const jumpToSection = useCallback((id: QuestSectionId) => {
-    setOpenSections(prev => ({ ...prev, [id]: true }))
-    requestAnimationFrame(() => {
-      document.getElementById(`quest-section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [])
-
-  const toggleSection = useCallback((id: QuestSectionId) => {
-    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }))
-  }, [])
-
   const iconKey = resolveIconKey(node.icon)
   const iconUrl = questIconUrl(node.icon, textureIndex)
   const iconPending = isTexturePending(textureIndex, iconKey)
+  // Smart-filter quests carry their DSL on a task, exactly like the canvas
+  // derives it — the header tile renders the filter when no icon is set.
+  const smartFilter = node.objectives?.find((o) => o.smart_filter)?.smart_filter
+
+  // Header tile renders exactly like the canvas: same effective shape, same
+  // runtime shape textures, same icon scale. The state ring uses the same
+  // palette as the dependency edges so the header and canvas never disagree.
+  const shape = effectiveShape || node.shape || ''
+  const shapeKeys = shapeTextureKeys(shape)
+  const shapeTextures = {
+    background: textureDisplayUrl(textureIndex, shapeKeys.background) || '',
+    outline: textureDisplayUrl(textureIndex, shapeKeys.outline) || '',
+    shape: textureDisplayUrl(textureIndex, shapeKeys.shape) || '',
+  }
+  const hasShapeTextures = !!(shapeTextures.background && shapeTextures.outline)
+  const isComplete = simProgress?.[node.id] === 'complete'
+  const ringColor = isComplete
+    ? EDGE_STATE_COLORS.completed
+    : locked
+      ? EDGE_STATE_COLORS.unavailable
+      : EDGE_STATE_COLORS.uncompleted
+
+  const isLink = node.node_type === 'quest_link'
 
   return (
     <div className="quest-detail-overlay" onClick={onClose}>
-      <div className="quest-detail-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="quest-detail-header">
-          <button
-            className="quest-detail-icon-btn"
-            onClick={() => openIconPicker({ type: 'quest', nodeId: node.id })}
-            title="Change quest icon"
-            style={{ backgroundColor: node.color || 'var(--color-accent)' }}
-          >
-            {!node.icon && node.objectives?.[0]?.smart_filter ? (
-              <SmartFilterIcon
-                dsl={node.objectives[0].smart_filter}
-                textureIndex={textureIndex}
-                fallback="?"
-                size={28}
-              />
-            ) : iconUrl ? (
-              <AnimatedSprite url={iconUrl} textureKey={iconKey} width={28} height={28} alt="" />
-            ) : iconPending ? (
-              <QuestIcon pending url={null} fallback="" size={28} />
-            ) : (
-              <span className="quest-detail-icon-fallback">?</span>
-            )}
-            <span className="quest-detail-icon-badge">Change</span>
-          </button>
+      <div className="quest-detail-drawer" onClick={(e) => e.stopPropagation()}>
+        <header className="quest-detail-header">
+          <div className="quest-detail-tile-ring" style={{ borderColor: ringColor }}>
+            <QuestTile
+              shape={shape}
+              color={node.color}
+              shapeTextures={hasShapeTextures ? shapeTextures : undefined}
+              size={48}
+              icon={node.icon}
+              iconUrl={iconUrl}
+              iconScaling={node.icon_scaling}
+              smartFilter={smartFilter}
+              textureIndex={textureIndex}
+            />
+          </div>
           <div className="quest-detail-title-area">
             <input
               className="quest-detail-title-input"
-              value={node.label}
+              value={node.label || ''}
               onChange={(e) => onUpdateNode(node.id, { label: e.target.value })}
-              placeholder="Quest Title"
+              placeholder="Quest title..."
             />
             <input
               className="quest-detail-subtitle-input"
               value={node.subtitle || ''}
               onChange={(e) => onUpdateNode(node.id, { subtitle: e.target.value })}
-              placeholder="Subtitle (optional)"
+              placeholder="Subtitle..."
             />
           </div>
+          <button
+            className={`quest-detail-state-chip${isComplete ? ' state-complete' : ''}${locked ? ' state-locked' : ''}`}
+            onClick={() => onSetQuestProgress?.(node.id, isComplete ? null : 'complete')}
+            title={locked ? 'Locked — prerequisites not complete (sim)' : isComplete ? 'Completed (sim) — click to reset' : 'Not started — click to mark complete (sim)'}
+          >
+            <span className="quest-detail-state-dot" style={{ background: ringColor }} />
+            {isComplete ? 'Completed' : locked ? 'Locked' : 'Not started'}
+          </button>
           <button className="quest-detail-close" onClick={onClose} aria-label="Close quest details"><XIcon size={14} /></button>
-        </div>
+        </header>
 
-        <div className="quest-detail-body">
-          {node.node_type === 'quest_link' && (
-            <section className="quest-detail-section quest-link-section">
-              <div className="quest-detail-section-header">
-                <span>Quest Link</span>
-              </div>
+        <div className="quest-detail-panel-area">
+          {isLink && (
+            <div className="quest-detail-panel quest-link-section">
+              <div className="quest-detail-panel-title">Quest Link</div>
               <div className="quest-detail-field">
                 <label>Linked Quest</label>
-                <select
+                <QuestSelect
                   value={node.link_target || ''}
-                  onChange={(e) => onUpdateNode(node.id, { link_target: e.target.value })}
-                >
-                  <option value="">— Unlinked —</option>
-                  {(quests || [])
-                    .filter(q => q.id !== node.id)
-                    .map(q => (
-                      <option key={q.id} value={q.id}>{q.label}</option>
-                    ))}
-                </select>
+                  onChange={(v) => onUpdateNode(node.id, { link_target: v })}
+                  ariaLabel="Linked quest"
+                  options={[
+                    { value: '', label: '— Unlinked —' },
+                    ...(quests || [])
+                      .filter(q => q.id !== node.id)
+                      .map(q => ({ value: q.id, label: q.label })),
+                  ]}
+                />
               </div>
-              <div className="quest-detail-empty">A link references a quest in another chapter; the icon and visibility follow the target quest in-game.</div>
-            </section>
+              <div className="quest-detail-empty">
+                A link references a quest in another chapter; the icon and visibility follow the target quest in-game.
+              </div>
+            </div>
           )}
-
-          <SectionNav openSections={openSections} onJump={jumpToSection} />
-
-          <section className="quest-detail-section">
-            <div className="quest-detail-section-header">
-              <span className="quest-detail-section-icon"><FileTextIcon size={14} /></span>
-              <span className="quest-detail-section-title">Description</span>
-            </div>
-            <textarea
-              className="quest-detail-textarea"
-              value={node.description}
-              onChange={(e) => onUpdateNode(node.id, { description: e.target.value })}
-              placeholder="Quest description..."
-              rows={3}
-            />
-          </section>
-
-          <section className="quest-detail-section">
-            <div className="quest-detail-section-header">
-              <span className="quest-detail-section-icon"><CheckSquareIcon size={14} /></span>
-              <span className="quest-detail-section-title">Tasks ({node.objectives.length})</span>
-              <button className="quest-detail-add-btn" onClick={() => onAddObjective(node.id)} title="Add Task">+</button>
-            </div>
-            {node.objectives.length === 0 && <div className="quest-detail-empty">No tasks defined</div>}
-            {node.objectives.map((obj, idx) => (
-              <ObjectiveCard
-                key={obj.id}
-                obj={obj}
-                index={idx}
-                textureIndex={textureIndex}
-                onRemove={() => onRemoveObjective(node.id, obj.id)}
-                onUpdate={(field, value) => onUpdateObjective(node.id, obj.id, field, value)}
-                onOpenItemPicker={onOpenItemPicker ? () => onOpenItemPicker!({ type: 'objective', id: obj.id, nodeId: node.id }) : undefined}
-                onMoveUp={idx > 0 ? () => onMoveObjective(node.id, obj.id, -1) : undefined}
-                onMoveDown={idx < node.objectives.length - 1 ? () => onMoveObjective(node.id, obj.id, 1) : undefined}
-              />
-            ))}
-          </section>
-
-          <section className="quest-detail-section">
-            <div className="quest-detail-section-header">
-              <span className="quest-detail-section-icon"><TrophyIcon size={14} /></span>
-              <span className="quest-detail-section-title">Rewards ({node.rewards.length})</span>
-              <button className="quest-detail-add-btn" onClick={() => onAddReward(node.id)} title="Add Reward">+</button>
-            </div>
-            {node.rewards.length === 0 && <div className="quest-detail-empty">No rewards</div>}
-            {node.rewards.map((rew, idx) => (
-              <RewardCard
-                key={rew.id}
-                rew={rew}
-                index={idx}
-                textureIndex={textureIndex}
-                onRemove={() => onRemoveReward(node.id, rew.id)}
-                onUpdate={(field, value) => onUpdateReward(node.id, rew.id, field, value)}
-                onOpenItemPicker={onOpenItemPicker ? () => onOpenItemPicker!({ type: 'reward', id: rew.id, nodeId: node.id }) : undefined}
-                rewardTables={rewardTables}
-                onMoveUp={idx > 0 ? () => onMoveReward(node.id, rew.id, -1) : undefined}
-                onMoveDown={idx < node.rewards.length - 1 ? () => onMoveReward(node.id, rew.id, 1) : undefined}
-              />
-            ))}
-          </section>
-
-          <AppearanceSection
+          <QuestDetailPanels
             node={node}
-            onUpdateNode={setNode}
-            open={!!openSections.appearance}
-            onToggle={() => toggleSection('appearance')}
-            iconUrl={iconUrl}
+            textureIndex={textureIndex}
+            rewardTables={rewardTables}
+            iconUrl={iconUrl || ''}
             iconPending={iconPending}
+            onUpdateNode={onUpdateNode}
             onPickIcon={() => openIconPicker({ type: 'quest', nodeId: node.id })}
-            onSetMilestone={handleSetMilestone}
-          />
-          <VisibilitySection
-            node={node}
-            onUpdateNode={setNode}
-            open={!!openSections.visibility}
-            onToggle={() => toggleSection('visibility')}
-          />
-          <DependenciesSection
-            node={node}
-            onUpdateNode={setNode}
-            open={!!openSections.dependencies}
-            onToggle={() => toggleSection('dependencies')}
-          />
-          <MiscSection
-            node={node}
-            onUpdateNode={setNode}
-            open={!!openSections.misc}
-            onToggle={() => toggleSection('misc')}
+            onOpenItemPicker={onOpenItemPicker}
+            onAddObjective={onAddObjective}
+            onRemoveObjective={onRemoveObjective}
+            onUpdateObjective={onUpdateObjective}
+            onMoveObjective={onMoveObjective}
+            onAddReward={onAddReward}
+            onRemoveReward={onRemoveReward}
+            onUpdateReward={onUpdateReward}
+            onMoveReward={onMoveReward}
           />
         </div>
 
-        <div className="quest-detail-footer">
+        <footer className="quest-detail-footer">
           <div className="quest-detail-footer-left">
             <button
               className="quest-detail-sim-btn"
-              onClick={() => onSetQuestProgress?.(node.id, simProgress?.[node.id] === 'complete' ? null : 'complete')}
+              onClick={() => onSetQuestProgress?.(node.id, isComplete ? null : 'complete')}
               title="Toggle this quest's completion in the progress simulation (Simulate mode)"
             >
-              {simProgress?.[node.id] === 'complete' ? 'Reset' : 'Complete'}
+              {isComplete ? 'Reset' : 'Complete'}
             </button>
           </div>
           <div className="quest-detail-footer-right">
@@ -275,7 +185,7 @@ export function QuestDetailModal({
             <button className="quest-detail-ghost-btn" onClick={onClose}>Cancel</button>
             <button className="quest-detail-save-btn" onClick={onClose}>Done</button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   )

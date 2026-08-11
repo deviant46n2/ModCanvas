@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import type {
   QuestGraphData,
   QuestNodeData,
@@ -7,7 +6,7 @@ import type {
   ChapterImage,
   QuestEdgeData,
 } from '../../services/api'
-import type { ItemRegistryEntry } from '../../services/quest-types'
+import type { ItemRegistryEntry, ItemTagInfo } from '../../services/quest-types'
 import type { ProgressState } from '../../core/quest/progress'
 import type { ToolbarAPI } from './import-export'
 import { QuestCanvas } from './QuestCanvas'
@@ -16,11 +15,11 @@ import { QuestDetailModal } from './QuestDetailModal'
 import { ChapterSettings } from './ChapterSettings'
 import { GroupSettings } from './GroupSettings'
 import { ImportExportToolbar } from './import-export'
-import { ItemPickerModal } from '../common/ItemPickerModal'
+import { RecipeItemPicker } from '../recipe/RecipeItemPicker'
 import { TextureLoadingBar } from './TextureLoadingBar'
 import { EngineRenderPrompt } from './EngineRenderPrompt'
 import { AnimationProvider } from './animation-context'
-import { resolveIconKey, getIconUrl } from './questIcons'
+import { useChapterIconUrls, useChapterIconKeys, useQuestCounts, useDetailParity } from './quest-editor-selectors'
 import './editor-theme-styles'
 
 interface QuestEditorLayoutProps {
@@ -43,6 +42,7 @@ interface QuestEditorLayoutProps {
   enginePromptDismissed: boolean
   setEnginePromptDismissed: (v: boolean) => void
   items: ItemRegistryEntry[]
+  tags: ItemTagInfo[]
   getPickerTextureUrl: (itemId: string) => string | null
   questBackgroundUrl: string | null
   texturesLoading: boolean
@@ -103,33 +103,14 @@ interface QuestEditorLayoutProps {
 }
 
 export function QuestEditorLayout(props: QuestEditorLayoutProps) {
-  const chapterIcons = useMemo(() => {
-    const map: Record<string, string | undefined> = {}
-    for (const ch of props.graph.chapters) {
-      const key = resolveIconKey(ch.icon)
-      map[ch.id] = key ? getIconUrl(props.textureIndex, key) : undefined
-    }
-    return map
-  }, [props.graph, props.textureIndex])
-
-  const chapterIconKeys = useMemo(() => {
-    const map: Record<string, string | undefined> = {}
-    for (const ch of props.graph.chapters) {
-      const key = resolveIconKey(ch.icon)
-      if (key) map[ch.id] = key
-    }
-    return map
-  }, [props.graph])
-
-  const questCounts = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const ch of props.graph.chapters) {
-      map[ch.id] = props.graph.nodes.filter(n => n.chapter_id === ch.id).length
-    }
-    return map
-  }, [props.graph])
+  const chapterIcons = useChapterIconUrls(props.graph, props.textureIndex)
+  const chapterIconKeys = useChapterIconKeys(props.graph)
+  const questCounts = useQuestCounts(props.graph)
 
   const selectedNode = props.selectedNodeId ? props.graph.nodes.find(n => n.id === props.selectedNodeId) : null
+
+  const { shape: selectedShape, locked: selectedLocked } = useDetailParity(selectedNode, props.graph, props.simProgress)
+
   const pickerTarget = props.itemPickerTarget
   const editChapter = props.editChapterId ? props.graph.chapters.find(c => c.id === props.editChapterId) : null
   const editGroup = props.editGroupId ? props.graph.chapter_groups.find(g => g.id === props.editGroupId) : null
@@ -213,7 +194,10 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
         </main>
         {selectedNode && (
           <QuestDetailModal
+            key={selectedNode.id}
             node={selectedNode}
+            effectiveShape={selectedShape}
+            locked={selectedLocked}
             textureIndex={props.textureIndex}
             onUpdateNode={props.onUpdateNode}
             onDeleteNode={props.onDeleteNode}
@@ -237,15 +221,18 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
           />
         )}
         {pickerTarget && (
-          <ItemPickerModal
+          <RecipeItemPicker
             items={props.items}
+            tags={props.tags}
             getTextureUrl={props.getPickerTextureUrl}
-            onSelect={(itemId) => {
+            onSelect={(value) => {
               const t = pickerTarget
               if (t.type === 'objective') {
-                props.onUpdateObjective(t.nodeId, t.id, 'target', itemId)
+                // A tag pick lands in the objective's item_tag field; an
+                // item pick in target — matching the FTB data model.
+                props.onUpdateObjective(t.nodeId, t.id, value.tag ? 'item_tag' : 'target', value.item)
               } else {
-                props.onUpdateReward(t.nodeId, t.id, 'item_id', itemId)
+                props.onUpdateReward(t.nodeId, t.id, value.tag ? 'item_tag' : 'item_id', value.item)
               }
               props.setItemPickerTarget(null)
             }}
