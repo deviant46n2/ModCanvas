@@ -39,7 +39,7 @@
    pixelated icon blurry and can nudge it by a sub-pixel. A box-shadow ring
    reads as the same feedback without any rasterization cost. */
 .ftb-quest-node:hover .ftb-quest-shape-wrap {
-  box-shadow: 0 0 0 2px rgba(242, 201, 76, 0.45), 0 0 12px rgba(242, 201, 76, 0.15);
+  box-shadow: 0 0 0 2px var(--ftb-accent), 0 0 12px rgba(91, 155, 213, 0.3);
 }
 
 .ftb-quest-node.selected .ftb-quest-shape-wrap {

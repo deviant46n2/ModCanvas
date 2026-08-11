@@ -3,7 +3,8 @@ import { useNodesState, useEdgesState } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import type { QuestGraphData, QuestChapter, QuestNodeData, QuestEdgeData } from '../../services/quest-types';
 import { subscribeEngineConnectChange } from '../../services/engine-render';
-import { NORMAL_COLOR, CYCLE_COLOR, detectCycles } from './quest-edges';
+import { detectCycles } from './quest-edges';
+import { resolveEdgeState, edgeStyleForState } from '../../core/quest/edge-state';
 import { computeVisibility, isLocked, type ProgressState } from '../../core/quest/progress';
 import { searchQuestNodes } from '../../core/quest/search';
 import { isMilestoneShape } from '../../core/quest/quest-shapes';
@@ -33,10 +34,6 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
-
-  // Book-level visual palette (theme presets) overrides the hardcoded defaults.
-  const edgeColor = questGraph.edge_color || NORMAL_COLOR
-  const cycleColor = questGraph.edge_cycle_color || CYCLE_COLOR
 
   // Search-filter state. A non-empty query dims non-matching quests and
   // highlights the matches; Enter focuses the first match.
@@ -121,6 +118,15 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     return status
   }, [questGraph.nodes, questsById, filteredEdges, simProgress])
 
+  // Quest id → locked, for the edge state mapper. Locked quests render their
+  // outgoing edges in the faded "unavailable" state (a fresh pack with no
+  // progress shows exactly what the game shows for an untouched book).
+  const lockedById = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    for (const [id, st] of Object.entries(simStatusById)) map[id] = st.locked
+    return map
+  }, [simStatusById])
+
   const textureVersionRef = useRef(0)
   const prevTextureIndexRef = useRef<Record<string, string> | undefined>(undefined)
   // Rebuild quest icons when the engine-render path toggles: baked icons hide
@@ -154,11 +160,12 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
       edges: filteredEdges,
       nodes: newNodes,
       cycleEdges,
-      cycleColor,
+      progress: simProgress,
+      lockedById,
     })
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds, cycleColor, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
+  }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, lockedById, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -166,36 +173,33 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     }
   }, [nodes.length, fitView])
 
-  // Node-hover highlighting. Keeps each edge's base stroke (e.g. cycle red)
-  // intact while dimming unrelated edges so the active quest's dependencies
-  // pop. The dim/highlight only tweaks opacity — stroke widths stay constant so
-  // hovering never makes lines visibly jump or re-rasterize inside the scaled
-  // viewport (which reads as blur/pixel-shift against a static canvas).
+  // Node-hover highlighting. The hovered quest's fan takes the in-game
+  // requires/required-for hues and marches at the fast speed; every other edge
+  // keeps its static state color and slow march. Cycle red always wins. The
+  // pass only rewrites edge style + data — never node state — so hovering
+  // can't re-render the canvas (the documented frame-loop rule).
   useEffect(() => {
     setEdges((eds) => eds.map((edge) => {
       const isCycle = isCycleEdge(edge)
-      if (!hoveredNodeId) {
-        return {
-          ...edge,
-          style: isCycle ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 } : undefined,
-        }
+      const state = resolveEdgeState(edge, { progress: simProgress, lockedById, hoveredNodeId, isCycle })
+      const spec = edgeStyleForState(state)
+      const currentWidth = Number((edge.style as { strokeWidth?: unknown } | undefined)?.strokeWidth) || 3
+      return {
+        ...edge,
+        style: {
+          stroke: spec.stroke,
+          strokeWidth: isCycle ? 3.5 : currentWidth,
+          opacity: spec.opacity,
+          strokeDasharray: spec.dashArray ?? undefined,
+        },
+        data: { ...(edge.data as object | undefined), state, march: spec.march },
       }
-      const isConnected = edge.source === hoveredNodeId || edge.target === hoveredNodeId
-      if (isConnected) {
-        return {
-          ...edge,
-          style: isCycle
-            ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 }
-            : { stroke: edgeColor, strokeWidth: 1.5, opacity: 1 },
-        }
-      }
-      return { ...edge, style: { stroke: '#777', strokeWidth: 1, opacity: 0.28 } }
     }))
-  }, [hoveredNodeId, isCycleEdge, edgeColor, cycleColor, setEdges])
+  }, [hoveredNodeId, isCycleEdge, simProgress, lockedById, setEdges])
 
   return {
     nodes, setNodes, edges, setEdges, onNodesChange, onEdgesChange,
-    filteredNodeIds, filteredEdges, cycleEdges, searchMatchIds, edgeColor,
+    filteredNodeIds, filteredEdges, cycleEdges, searchMatchIds,
     setHoveredNodeId,
   }
 }

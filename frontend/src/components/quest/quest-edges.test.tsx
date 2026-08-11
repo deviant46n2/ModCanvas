@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { Position } from '@xyflow/react';
-import { DependencyEdge, detectCycles, CYCLE_COLOR } from './quest-edges';
+import { DependencyEdge, detectCycles } from './quest-edges';
+import { EDGE_CASING, EDGE_DASH_ARRAY, EDGE_STATE_COLORS, MARCH_FAST_CLASS, MARCH_SLOW_CLASS } from '../../core/quest/edge-state';
 
 const baseProps = {
   id: 'e1',
@@ -38,54 +39,81 @@ describe('detectCycles', () => {
 });
 
 describe('DependencyEdge', () => {
-  it('renders a dark casing stroke under the bright core for legibility', () => {
+  it('draws a straight line between the quest centers', () => {
     const { container } = render(
       <svg>
         <DependencyEdge {...baseProps} />
+      </svg>
+    );
+    const core = container.querySelector('.react-flow__edge-path');
+    // Center-to-center straight path — no bezier control points.
+    expect(core!.getAttribute('d')).toBe('M 0 0 L 100 50');
+  });
+
+  it('renders a dark casing stroke under the bright core for legibility', () => {
+    const { container } = render(
+      <svg>
+        <DependencyEdge {...baseProps} style={{ stroke: EDGE_STATE_COLORS.completed, strokeWidth: 6.1, opacity: 1, strokeDasharray: EDGE_DASH_ARRAY }} />
       </svg>
     );
     const casing = container.querySelector('.quest-edge-casing');
     const core = container.querySelector('.react-flow__edge-path');
     expect(casing).not.toBeNull();
     expect(core).not.toBeNull();
-    expect(casing!.getAttribute('stroke')).toBe('rgba(10, 12, 18, 0.92)');
-    // jsdom normalizes hex → rgb.
-    expect((core as unknown as SVGPathElement).style.stroke).toBe('rgb(242, 201, 76)');
-    // Casing is always wider than the core so it reads as an outline.
+    expect(casing!.getAttribute('stroke')).toBe(EDGE_CASING);
     expect(Number(casing!.getAttribute('stroke-width'))).toBeGreaterThan(
       Number((core as unknown as SVGPathElement).style.strokeWidth)
     );
-    // The marker (arrowhead) is forwarded straight through.
-    expect(core!.getAttribute('marker-end')).toBe("url('#arrow')");
   });
 
-  it('renders a source dot on the prerequisite end plus a midpoint direction chevron', () => {
+  it('marching state edges carry the slow march class and dash pattern', () => {
     const { container } = render(
       <svg>
-        <DependencyEdge {...baseProps} />
-      </svg>
-    );
-    const dot = container.querySelector('.quest-edge-source-dot');
-    const chevron = container.querySelector('.quest-edge-chevron');
-    expect(dot).not.toBeNull();
-    expect(dot!.getAttribute('cx')).toBe('0');
-    expect(dot!.getAttribute('cy')).toBe('0');
-    expect(chevron).not.toBeNull();
-    expect(chevron!.getAttribute('fill')).toBe('#f2c94c');
-    const d = chevron!.getAttribute('d');
-    expect(d).toMatch(/^M \S+ \S+ L /);
-  });
-
-  it('switches to the cycle palette for circular dependencies', () => {
-    const { container } = render(
-      <svg>
-        <DependencyEdge {...baseProps} style={{ stroke: CYCLE_COLOR, strokeWidth: 3.5, opacity: 1 }} />
+        <DependencyEdge {...baseProps} style={{ stroke: EDGE_STATE_COLORS.uncompleted, strokeWidth: 3, opacity: 0.706, strokeDasharray: EDGE_DASH_ARRAY }} data={{ state: 'uncompleted', march: 'slow' }} />
       </svg>
     );
     const core = container.querySelector('.react-flow__edge-path');
-    // jsdom normalizes hex → rgb.
-    expect((core as unknown as SVGPathElement).style.stroke).toBe('rgb(255, 107, 107)');
+    expect(core!.getAttribute('class')).toContain(MARCH_SLOW_CLASS);
+    expect((core as unknown as SVGPathElement).style.strokeDasharray).toBe(EDGE_DASH_ARRAY);
+    // jsdom normalizes rgba with alpha fraction.
+    expect((core as unknown as SVGPathElement).style.stroke).toMatch(/^rgba?\(204, 163, 163/);
+  });
+
+  it('fan edges use the fast march class', () => {
+    const { container } = render(
+      <svg>
+        <DependencyEdge {...baseProps} style={{ stroke: EDGE_STATE_COLORS.requires, strokeWidth: 3, opacity: 1, strokeDasharray: EDGE_DASH_ARRAY }} data={{ state: 'requires', march: 'fast' }} />
+      </svg>
+    );
+    const core = container.querySelector('.react-flow__edge-path');
+    expect(core!.getAttribute('class')).toContain(MARCH_FAST_CLASS);
+  });
+
+  it('switches to the cycle palette for circular dependencies: solid, red, static, arrowed', () => {
+    const { container } = render(
+      <svg>
+        <DependencyEdge {...baseProps} style={{ stroke: EDGE_STATE_COLORS.cycle, strokeWidth: 3.5, opacity: 1 }} data={{ state: 'cycle', march: null }} markerEnd="url('#arrow')" />
+      </svg>
+    );
+    const core = container.querySelector('.react-flow__edge-path');
+    expect((core as unknown as SVGPathElement).style.stroke).toBe('rgb(248, 113, 113)');
+    // Solid: no dash pattern, no march class.
+    expect((core as unknown as SVGPathElement).style.strokeDasharray).toBe('');
+    expect(core!.getAttribute('class')).not.toContain(MARCH_SLOW_CLASS);
+    expect(core!.getAttribute('class')).not.toContain(MARCH_FAST_CLASS);
+    // Cycle edges keep an arrowhead so loop direction stays readable.
+    expect(core!.getAttribute('marker-end')).toBe("url('#arrow')");
     const title = container.querySelector('title');
     expect(title?.textContent).toContain('Circular dependency');
+  });
+
+  it('renders no arrowhead on state edges — direction comes from the march', () => {
+    const { container } = render(
+      <svg>
+        <DependencyEdge {...baseProps} markerEnd={undefined} />
+      </svg>
+    );
+    const core = container.querySelector('.react-flow__edge-path');
+    expect(core!.getAttribute('marker-end')).toBeNull();
   });
 });

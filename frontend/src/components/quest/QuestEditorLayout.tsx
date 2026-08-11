@@ -6,7 +6,6 @@ import type {
   QuestChapterGroup,
   ChapterImage,
   QuestEdgeData,
-  EdgeBezierRel,
 } from '../../services/api'
 import type { ItemRegistryEntry } from '../../services/quest-types'
 import type { ProgressState } from '../../core/quest/progress'
@@ -71,7 +70,6 @@ interface QuestEditorLayoutProps {
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void
   onAddEdge: (edge: { source: string; target: string }) => void
   onUpdateEdge: (edgeId: string, data: { source?: string; target?: string }) => void
-  onUpdateEdgeBezier: (edgeId: string, bezier: EdgeBezierRel | null) => void
   onApplyThemePreset: (presetId: string) => void
   onDeleteNode: (nodeId: string) => void
   onDeleteNodes: (nodeIds: string[]) => void
@@ -188,7 +186,6 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onUpdateNodes={props.onUpdateNodes}
             onAddEdge={props.onAddEdge}
             onUpdateEdge={props.onUpdateEdge}
-            onUpdateEdgeBezier={props.onUpdateEdgeBezier}
             onApplyThemePreset={props.onApplyThemePreset}
             onDeleteNode={props.onDeleteNode}
             onDeleteNodes={props.onDeleteNodes}

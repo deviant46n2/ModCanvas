@@ -5,7 +5,7 @@ import {
   useViewport,
 } from '@xyflow/react';
 import type {
-  QuestGraphData, QuestChapter, QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel,
+  QuestGraphData, QuestChapter, QuestNodeData, QuestEdgeData, ChapterImage,
 } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
 import { isMilestoneShape } from '../../core/quest/quest-shapes';
@@ -29,7 +29,6 @@ interface QuestCanvasProps {
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void;
   onAddEdge: (edge: { source: string; target: string }) => void;
   onUpdateEdge: (edgeId: string, data: { source?: string; target?: string }) => void;
-  onUpdateEdgeBezier?: (edgeId: string, bezier: EdgeBezierRel | null) => void;
   onApplyThemePreset?: (presetId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteNodes?: (nodeIds: string[]) => void;
@@ -72,7 +71,6 @@ function QuestCanvasInner({
   onUpdateNode,
   onAddEdge,
   onUpdateEdge,
-  onUpdateEdgeBezier,
   onApplyThemePreset,
   onDeleteNode: _onDeleteNode,
   onDeleteNodes,
@@ -110,13 +108,12 @@ function QuestCanvasInner({
   const [searchQuery, setSearchQuery] = useState('');
   const [milestoneOnly, setMilestoneOnly] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
-  const [bezierEditEdgeId, setBezierEditEdgeId] = useState<string | null>(null);
   const { fitView, screenToFlowPosition } = useReactFlow();
   const { zoom } = useViewport();
 
   const {
     nodes, edges, onNodesChange, onEdgesChange, setEdges,
-    filteredNodeIds, filteredEdges, cycleEdges, searchMatchIds, edgeColor,
+    filteredNodeIds, filteredEdges, cycleEdges, searchMatchIds,
     setHoveredNodeId,
   } = useQuestCanvasModel({
     questGraph, chapters, activeChapter, textureIndex, selectedIds, simMode,
@@ -145,13 +142,11 @@ function QuestCanvasInner({
     handleEdgeClick, handleEdgeDoubleClick, handleNodeClick,
     handleNodeMouseEnter, handleNodeMouseLeave, handlePaneClick,
     handleNodeDoubleClick, handleNodeDragStop, handleAddNode, handleFitView,
-    previewEdgeBezier, commitEdgeBezier,
   } = useQuestCanvasInteractions({
     setSelectedIds, setSelectedEdgeId, setSelectedNodeId, setHoveredNodeId,
-    setSelectedDecoIndex, setBezierEditEdgeId,
+    setSelectedDecoIndex,
     onNodesChange, onEdgesChange, setEdges,
     onAddEdge, onUpdateEdge, onDeleteEdge, onUpdateNodes, onAddNode,
-    onUpdateEdgeBezier,
     editLocked, simMode, onSetQuestProgress, simProgress,
     questGridScale: questGraph.grid_scale,
     fitView,
@@ -186,13 +181,11 @@ function QuestCanvasInner({
   const handleToggleConnect = useCallback(() => {
     setConnectMode((m) => !m);
     setSelectedEdgeId(null);
-    setBezierEditEdgeId(null);
   }, []);
 
   const handleToggleDecorEdit = useCallback(() => {
     setDecorEditMode((m) => !m);
     setSelectedDecoIndex(null);
-    setBezierEditEdgeId(null);
   }, []);
 
   const { activeChapterName, moveToChapters, activeChapterNodes, activeChapterImages } =
@@ -206,16 +199,6 @@ function QuestCanvasInner({
   const selectedEdge = selectedEdgeId
     ? filteredEdges.find((e: QuestEdgeData) => e.id === selectedEdgeId) || null
     : null;
-
-  const bezierEditEdge = bezierEditEdgeId
-    ? filteredEdges.find((e: QuestEdgeData) => e.id === bezierEditEdgeId) || null
-    : null;
-  const bezierSourceNode = bezierEditEdge
-    ? questGraph.nodes.find((n: QuestNodeData) => n.id === bezierEditEdge.source)
-    : undefined;
-  const bezierTargetNode = bezierEditEdge
-    ? questGraph.nodes.find((n: QuestNodeData) => n.id === bezierEditEdge.target)
-    : undefined;
 
   const nodeLabelById = useCallback(
     (id: string) => {
@@ -255,10 +238,7 @@ function QuestCanvasInner({
         connectMode={connectMode} onExitConnect={() => setConnectMode(false)}
         decorEditMode={decorEditMode}
         textureIndex={textureIndex} activeChapterImages={activeChapterImages}
-        bezierEditEdge={bezierEditEdge}
-        bezierSourceNode={bezierSourceNode} bezierTargetNode={bezierTargetNode}
         zoom={zoom}
-        onPreviewBezier={previewEdgeBezier} onCommitBezier={commitEdgeBezier}
         nodes={nodes} edges={edges}
         onNodesChange={handleNodesChange} onEdgesChange={handleEdgesChange}
         onConnect={handleConnect} onReconnect={handleReconnect}
@@ -268,7 +248,7 @@ function QuestCanvasInner({
         onEdgeClick={handleEdgeClick} onEdgeDoubleClick={handleEdgeDoubleClick}
         onPaneClick={handlePaneClick} onPaneContextMenu={handlePaneContextMenu}
         onNodeDragStop={handleNodeDragStop}
-        edgeColor={edgeColor} editLocked={editLocked}
+        editLocked={editLocked}
         showMiniMap={showMiniMap} showBackground={showBackground}
         simMode={simMode}
         viewportMenuPos={viewportMenuPos} onCloseCtxMenu={closeCtxMenu}
@@ -283,8 +263,7 @@ function QuestCanvasInner({
         selectedCount={selectedIds.size} hasClipboard={!!clipboardRef.current}
         showShortcuts={showShortcuts} onCloseShortcuts={() => setShowShortcuts(false)}
         activeChapter={activeChapter} onAddNode={handleAddNode} onAddLink={onAddLink}
-        selectedEdge={selectedEdge} bezierEditEdgeId={bezierEditEdgeId}
-        setBezierEditEdgeId={setBezierEditEdgeId} onUpdateEdgeBezier={onUpdateEdgeBezier}
+        selectedEdge={selectedEdge}
         onDeleteEdge={onDeleteEdge} setSelectedEdgeId={setSelectedEdgeId}
         nodeLabelById={nodeLabelById}
         selectedDecoIndex={selectedDecoIndex} onSelectDeco={setSelectedDecoIndex}

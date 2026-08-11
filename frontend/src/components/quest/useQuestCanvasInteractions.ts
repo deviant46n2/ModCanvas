@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction, type MouseEvent as ReactMouseEvent } from 'react'
 import { reconnectEdge } from '@xyflow/react'
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/react'
-import type { QuestNodeData, EdgeBezierRel } from '../../services/quest-types'
+import type { QuestNodeData } from '../../services/quest-types'
 import type { ProgressState } from '../../core/quest/progress'
 import { snapDragUpdates } from './quest-canvas-model'
 
@@ -11,7 +11,6 @@ interface UseQuestCanvasInteractionsArgs {
   setSelectedNodeId: (id: string | null) => void
   setHoveredNodeId: (id: string | null) => void
   setSelectedDecoIndex: (index: number | null) => void
-  setBezierEditEdgeId: Dispatch<SetStateAction<string | null>>
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
   setEdges: (updater: (edges: Edge[]) => Edge[]) => void
@@ -20,7 +19,6 @@ interface UseQuestCanvasInteractionsArgs {
   onDeleteEdge: (edgeId: string) => void
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void
   onAddNode: (chapterId: string, position?: { x: number; y: number }) => void
-  onUpdateEdgeBezier?: (edgeId: string, bezier: EdgeBezierRel | null) => void
   editLocked: boolean
   simMode: boolean
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void
@@ -32,10 +30,10 @@ interface UseQuestCanvasInteractionsArgs {
 export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs) {
   const {
     setSelectedIds, setSelectedEdgeId, setSelectedNodeId, setHoveredNodeId,
-    setSelectedDecoIndex, setBezierEditEdgeId,
+    setSelectedDecoIndex,
     onNodesChange, onEdgesChange, setEdges,
     onAddEdge, onUpdateEdge, onDeleteEdge, onUpdateNodes, onAddNode,
-    onUpdateEdgeBezier, editLocked, simMode, onSetQuestProgress, simProgress,
+    editLocked, simMode, onSetQuestProgress, simProgress,
     questGridScale, fitView,
   } = args
 
@@ -102,9 +100,8 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
       if (editLocked) return
       onDeleteEdge(edge.id)
       setSelectedEdgeId(null)
-      setBezierEditEdgeId(null)
     },
-    [onDeleteEdge, editLocked, setSelectedEdgeId, setBezierEditEdgeId]
+    [onDeleteEdge, editLocked, setSelectedEdgeId]
   )
 
   const handleNodeClick = useCallback(
@@ -127,8 +124,7 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
     setHoveredNodeId(null)
     setSelectedEdgeId(null)
     setSelectedDecoIndex(null)
-    setBezierEditEdgeId(null)
-  }, [setSelectedNodeId, setHoveredNodeId, setSelectedEdgeId, setSelectedDecoIndex, setBezierEditEdgeId])
+  }, [setSelectedNodeId, setHoveredNodeId, setSelectedEdgeId, setSelectedDecoIndex])
 
   const handleNodeMouseLeave = useCallback(() => {
     setHoveredNodeId(null)
@@ -167,23 +163,10 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
     fitView({ duration: 500 })
   }, [fitView])
 
-  // Bezier curve editing: live preview only rewrites the local React Flow edge;
-  // the graph is committed once on pointer-up so history stays clean.
-  const previewEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel) => {
-    setEdges((eds) => eds.map((e) =>
-      e.id === edgeId ? { ...e, data: { ...(e.data as object | undefined), bezierRel: bezier } } : e
-    ))
-  }, [setEdges])
-
-  const commitEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel | null) => {
-    onUpdateEdgeBezier?.(edgeId, bezier)
-  }, [onUpdateEdgeBezier])
-
   return {
     handleConnect, handleNodesChange, handleEdgesChange, handleReconnect,
     handleEdgeClick, handleEdgeDoubleClick, handleNodeClick,
     handleNodeMouseEnter, handleNodeMouseLeave, handlePaneClick,
     handleNodeDoubleClick, handleNodeDragStop, handleAddNode, handleFitView,
-    previewEdgeBezier, commitEdgeBezier,
   }
 }

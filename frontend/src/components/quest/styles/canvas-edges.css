@@ -7,15 +7,36 @@
   fill: none;
 }
 
-/* Hover/selected glow WITHOUT CSS `filter`. Applying a filter to an edge path
-   inside ReactFlow's transformed viewport forces the browser to rasterize that
-   subtree at CSS-pixel resolution, which visually degrades (pixelates) the
-   whole canvas on hover. A plain brighter stroke reads the same without the
-   compositing-layer penalty. */
-.react-flow__edge:hover .react-flow__edge-path,
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 3;
+/* Marching-dash animation: dependency direction flows source → target.
+   Pattern length is 14px (8 dash + 6 gap), so a two-cycle -28 offset loops
+   seamlessly. All state edges march slowly; the hovered quest's fan marches
+   fast (the in-game selected/unselected speed split, made visible — the game
+   ships unselected speed at 0). Cycle edges stay static. */
+.quest-edge-march {
+  animation: ftb-march 2.4s linear infinite;
 }
+
+.quest-edge-march-fast {
+  animation: ftb-march 0.9s linear infinite;
+}
+
+@keyframes ftb-march {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-edge-march,
+  .quest-edge-march-fast {
+    animation: none;
+  }
+}
+
+/* Note: no hover/selected stroke-width rule here anymore. Every edge carries
+   an inline strokeWidth (state-resolved, scaled to the quest size), which
+   overrides any CSS width — hover feedback is the fan colors + fast march,
+   selection feedback is the EdgeActionChip. */
 
 .quest-edge-label {
   fill: var(--ftb-text-bright);
@@ -24,25 +45,6 @@
   paint-order: stroke;
   stroke: var(--ftb-bg);
   stroke-width: 3px;
-}
-
-.quest-edge-chevron {
-  pointer-events: none;
-}
-
-.quest-edge-source-dot {
-  pointer-events: none;
-}
-
-.react-flow__edge.animated .react-flow__edge-path {
-  stroke-dashoffset: -20;
-  animation: ftb-dash 0.8s linear infinite;
-}
-
-@keyframes ftb-dash {
-  to {
-    stroke-dashoffset: -20;
-  }
 }
 
 /* Connect mode: reveal the quest connection ports so dependencies can be
@@ -146,30 +148,6 @@
 .edge-action-delete:hover {
   background: var(--ftb-danger, #e74c3c);
   color: #fff;
-}
-
-.edge-action-ghost {
-  background: transparent;
-  border: 1px solid var(--ftb-border, #3d3d44);
-  color: var(--ftb-text);
-  font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 4px 8px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.edge-action-ghost:hover {
-  border-color: var(--ftb-accent);
-  color: var(--ftb-accent);
-}
-
-.edge-action-ghost.edge-action-active {
-  background: var(--ftb-accent);
-  border-color: var(--ftb-accent-hover);
-  color: #1a1a1e;
 }
 
 /* MiniMap customization */

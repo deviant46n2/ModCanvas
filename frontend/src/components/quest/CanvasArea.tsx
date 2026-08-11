@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react'
 import {
   ReactFlow,
-  MarkerType,
   ConnectionMode,
   ConnectionLineType,
   MiniMap,
@@ -11,8 +10,9 @@ import {
   ViewportPortal,
 } from '@xyflow/react'
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/react'
-import type { QuestNodeData, QuestEdgeData, ChapterImage, EdgeBezierRel } from '../../services/quest-types'
+import type { QuestEdgeData, ChapterImage } from '../../services/quest-types'
 import { nodeTypes } from './quest-nodes'
+import { edgeTypes } from './quest-edges'
 import { OBJECTIVE_TYPES } from './quest-form-constants'
 import type { QuestCtxMenuState, MoveChapterOption } from './QuestContextMenu'
 import { QuestContextMenu } from './QuestContextMenu'
@@ -21,7 +21,6 @@ import { ChapterImagesLayer } from './ChapterImagesLayer'
 import { ChapterDecorationsCanvas } from './ChapterDecorationsCanvas'
 import { DecorationPanel } from './DecorationPanel'
 import { EdgeActionChip } from './EdgeActionChip'
-import { EdgeBezierEditor } from './EdgeBezierEditor'
 import { defaultDecorationImage } from './decoration-picker'
 import { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
 import { XIcon } from '../ui/icons'
@@ -33,12 +32,7 @@ interface CanvasAreaProps {
   decorEditMode: boolean
   textureIndex?: Record<string, string>
   activeChapterImages: ChapterImage[]
-  bezierEditEdge: QuestEdgeData | null
-  bezierSourceNode: QuestNodeData | undefined
-  bezierTargetNode: QuestNodeData | undefined
   zoom: number
-  onPreviewBezier: (edgeId: string, bezier: EdgeBezierRel) => void
-  onCommitBezier: (edgeId: string, bezier: EdgeBezierRel | null) => void
   nodes: Node[]
   edges: Edge[]
   onNodesChange: (changes: NodeChange[]) => void
@@ -55,7 +49,6 @@ interface CanvasAreaProps {
   onPaneClick: () => void
   onPaneContextMenu: (event: ReactMouseEvent | MouseEvent) => void
   onNodeDragStop: (event: any, node: Node, nodes?: Node[]) => void
-  edgeColor: string
   editLocked: boolean
   showMiniMap: boolean
   showBackground: boolean
@@ -83,9 +76,6 @@ interface CanvasAreaProps {
   onAddNode: (chapterId: string) => void
   onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void
   selectedEdge: QuestEdgeData | null
-  bezierEditEdgeId: string | null
-  setBezierEditEdgeId: Dispatch<SetStateAction<string | null>>
-  onUpdateEdgeBezier?: (edgeId: string, bezier: EdgeBezierRel | null) => void
   onDeleteEdge: (edgeId: string) => void
   setSelectedEdgeId: Dispatch<SetStateAction<string | null>>
   nodeLabelById: (id: string) => string
@@ -96,19 +86,19 @@ interface CanvasAreaProps {
 
 export function CanvasArea({
   questBackgroundUrl, connectMode, onExitConnect, decorEditMode, textureIndex,
-  activeChapterImages, bezierEditEdge, bezierSourceNode, bezierTargetNode,
-  zoom, onPreviewBezier, onCommitBezier,
+  activeChapterImages,
+  zoom,
   nodes, edges, onNodesChange, onEdgesChange,
   onConnect, onReconnect, onNodeClick, onNodeDoubleClick, onNodeMouseEnter,
   onNodeMouseLeave, onNodeContextMenu, onEdgeClick, onEdgeDoubleClick,
   onPaneClick, onPaneContextMenu, onNodeDragStop,
-  edgeColor, editLocked, showMiniMap, showBackground, simMode,
+  editLocked, showMiniMap, showBackground, simMode,
   viewportMenuPos, onCloseCtxMenu, onCtxEdit, onCtxRename, onCtxDuplicate,
   onCtxCopyId, onCtxDelete, onCtxComplete, onCtxReset, onCtxAddQuest,
   onCtxAddLink, onCtxPaste, onCtxAddQuestWithTask, onCtxMoveToChapter,
   moveToChapters, selectedCount, hasClipboard,
   showShortcuts, onCloseShortcuts, activeChapter, onAddNode, onAddLink,
-  selectedEdge, bezierEditEdgeId, setBezierEditEdgeId, onUpdateEdgeBezier,
+  selectedEdge,
   onDeleteEdge, setSelectedEdgeId, nodeLabelById, selectedDecoIndex,
   onSelectDeco, onChangeDecorations,
 }: CanvasAreaProps) {
@@ -122,7 +112,7 @@ export function CanvasArea({
       )}
       {connectMode && (
         <div className="connect-mode-banner">
-          Drag from a quest port to another quest to create a dependency arrow.
+          Drag from a quest's center port to another quest to create a dependency arrow.
           <button className="connect-mode-close" onClick={onExitConnect} title="Exit connect mode" aria-label="Exit connect mode">
             <XIcon size={12} />
           </button>
@@ -138,24 +128,11 @@ export function CanvasArea({
           />
         )}
       </ViewportPortal>
-      <ViewportPortal>
-        {bezierEditEdge && bezierSourceNode && bezierTargetNode && !decorEditMode && (
-          <EdgeBezierEditor
-            edge={bezierEditEdge}
-            sourceNode={bezierSourceNode}
-            targetNode={bezierTargetNode}
-            gridScale={GRID_SCALE}
-            bodyScale={NODE_BASE_PX}
-            zoom={zoom}
-            onPreview={onPreviewBezier}
-            onCommit={onCommitBezier}
-          />
-        )}
-      </ViewportPortal>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -170,12 +147,19 @@ export function CanvasArea({
         onPaneClick={onPaneClick}
         onPaneContextMenu={onPaneContextMenu}
         onNodeDragStop={onNodeDragStop}
-        defaultEdgeOptions={{ type: 'dependency', animated: false, style: { stroke: edgeColor, strokeWidth: 1.5, opacity: 0.5 }, markerEnd: { type: MarkerType.ArrowClosed, width: 24, height: 24, color: edgeColor } }}
+        // Per-edge style is resolved by the canvas model (state colors, march).
+        // Newly created edges are restyled on the next graph build; these
+        // options are the momentary default while a connection is in flight.
+        defaultEdgeOptions={{ type: 'dependency', animated: false }}
         connectionMode={ConnectionMode.Loose}
         connectionLineType={ConnectionLineType.Straight}
-        connectionLineStyle={{ stroke: edgeColor, strokeWidth: 2, strokeDasharray: '6 4' }}
+        connectionLineStyle={{ stroke: 'var(--ftb-accent)', strokeWidth: 2, strokeDasharray: '6 4' }}
         edgesReconnectable={!editLocked}
         reconnectRadius={28}
+        // The single target handle sits at the quest CENTER now, so a drop
+        // anywhere on a big quest tile can land far from it — widen the
+        // acceptance radius to cover scaled-up quests.
+        connectionRadius={40}
         fitView={false}
         panOnDrag
         zoomOnScroll
@@ -232,16 +216,11 @@ export function CanvasArea({
 
       {selectedEdge && (
         <EdgeActionChip
-          selectedEdge={selectedEdge}
           edgeLabel={`${nodeLabelById(selectedEdge.source)} → ${nodeLabelById(selectedEdge.target)}`}
-          bezierEditEdgeId={bezierEditEdgeId}
           editLocked={editLocked}
-          onToggleBezier={() => setBezierEditEdgeId((cur) => (cur === selectedEdge.id ? null : selectedEdge.id))}
-          onResetBezier={() => onUpdateEdgeBezier?.(selectedEdge.id, null)}
           onDelete={() => {
             onDeleteEdge(selectedEdge.id)
             setSelectedEdgeId(null)
-            setBezierEditEdgeId(null)
           }}
         />
       )}

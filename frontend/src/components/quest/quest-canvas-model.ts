@@ -2,11 +2,11 @@ import { MarkerType } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import type { QuestNodeData, QuestEdgeData } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
+import { resolveEdgeState, edgeStyleForState } from '../../core/quest/edge-state';
 import { questIconUrl } from './questIcons';
 import { textureDisplayUrl } from '../../services/texture-loader';
 import { shapeTextureKeys, effectiveShape, type ShapeTextures } from '../../core/quest/quest-shapes';
 import { normalizeShape, questSizeToPixels, snapToGridStep } from './quest-form-constants';
-import { pickEdgeHandles } from '../../core/quest/edge-geometry';
 
 // FTB Quests coordinate spacing — display scale, not snap grain.
 // Kept at exactly 7:6 vs NODE_BASE_PX to mirror the in-game quest panel, where
@@ -150,40 +150,44 @@ interface BuildEdgesArgs {
   edges: QuestEdgeData[]
   nodes: Node[]
   cycleEdges: Set<string>
-  cycleColor: string
+  /** Per-quest simulated progress; drives the edge state colors. */
+  progress: ProgressState
+  /** Quest id → true when the quest is locked (its prerequisites unmet). */
+  lockedById: Record<string, boolean>
+}
+
+// Edge stroke thickness: mirrors the game's `dependency_line_thickness` (0.17 ×
+// quest tile size) so scaled-up quests get proportionally heavier lines.
+export function edgeThickness(pixelSize: { width: number; height: number }): number {
+  return Math.max(2.5, Math.round(pixelSize.width * 0.17 * 10) / 10)
 }
 
 export function buildCanvasEdges(args: BuildEdgesArgs): Edge[] {
-  const { edges, nodes, cycleEdges, cycleColor } = args
+  const { edges, nodes, cycleEdges, progress, lockedById } = args
   return edges.map((edge: QuestEdgeData) => {
     const srcNode = nodes.find((n) => n.id === edge.source)
-    const tgtNode = nodes.find((n) => n.id === edge.target)
-    let sourceHandle: string | undefined
-    let targetHandle: string | undefined
-    if (srcNode && tgtNode) {
-      const srcSize = (srcNode.data as any)?.pixelSize || { width: NODE_BASE_PX, height: NODE_BASE_PX }
-      const tgtSize = (tgtNode.data as any)?.pixelSize || { width: NODE_BASE_PX, height: NODE_BASE_PX }
-      const scx = srcNode.position.x + srcSize.width / 2
-      const scy = srcNode.position.y + srcSize.height / 2
-      const tcx = tgtNode.position.x + tgtSize.width / 2
-      const tcy = tgtNode.position.y + tgtSize.height / 2
-      const anchors = pickEdgeHandles(scx, scy, tcx, tcy)
-      sourceHandle = anchors.sourceHandle
-      targetHandle = anchors.targetHandle
-    }
+    const srcSize = (srcNode?.data as any)?.pixelSize || { width: NODE_BASE_PX, height: NODE_BASE_PX }
     const isCycle = cycleEdges.has(`${edge.source}->${edge.target}`)
+    const state = resolveEdgeState(edge, { progress, lockedById, hoveredNodeId: null, isCycle })
+    const spec = edgeStyleForState(state)
     return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle,
-      targetHandle,
-      // Cycle edges are always flagged red (survives the hover-dimming pass).
-      style: isCycle ? { stroke: cycleColor, strokeWidth: 3.5, opacity: 1 } : undefined,
+      // Edges attach to the quest CENTER handle — the in-game dependency lines
+      // run from tile center to tile center, with the tiles drawn on top.
+      sourceHandle: 'c',
+      targetHandle: 'tc',
+      style: {
+        stroke: spec.stroke,
+        strokeWidth: isCycle ? 3.5 : edgeThickness(srcSize),
+        opacity: spec.opacity,
+        strokeDasharray: spec.dashArray ?? undefined,
+      },
       markerEnd: isCycle
-        ? { type: MarkerType.ArrowClosed, width: 24, height: 24, color: cycleColor }
+        ? { type: MarkerType.ArrowClosed, width: 24, height: 24, color: spec.stroke }
         : undefined,
-      data: edge.bezier ? { bezierRel: edge.bezier } : undefined,
+      data: { state, march: spec.march },
     }
   })
 }

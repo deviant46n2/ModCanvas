@@ -1,8 +1,14 @@
 // Book-level visual presets. These are ModCanvas's own, clean-room theme
 // definitions — NOT derived from any FTB theme file. Each preset restyles the
-// whole book: quest plate color, dependency edge colors, default shape and
-// size. Applying one writes the resulting book defaults + repaints every quest
-// node (and each chapter's defaults) through `applyBookTheme`.
+// whole book: quest plate color, default shape and size. Applying one writes
+// the resulting book defaults + repaints every quest node (and each chapter's
+// defaults) through `applyBookTheme`.
+//
+// NOTE: `edgeColor`/`cycleColor` remain in the data model for pack
+// compatibility but are NO LONGER rendered — dependency edges are always
+// state-driven (see `core/quest/edge-state.ts`), so the values here are inert
+// book metadata. The warm gold/amber hues of the old parchment palette were
+// retired; Slate and Crimson Forge now carry cool edge metadata.
 import type { QuestGraphData, QuestChapter } from '../../services/quest-types';
 
 export interface BookThemePreset {
@@ -20,9 +26,9 @@ export const BOOK_THEME_PRESETS: BookThemePreset[] = [
   {
     id: 'slate',
     name: 'Slate',
-    description: 'Cool steel-blue plates, square tiles, amber edges',
+    description: 'Cool steel-blue plates, square tiles',
     questColor: '#6b87a8',
-    edgeColor: '#f2c94c',
+    edgeColor: '#7da2c7',
     cycleColor: '#ff6b6b',
     defaultShape: 'square',
     defaultSize: { width: 24, height: 24 },
@@ -50,9 +56,9 @@ export const BOOK_THEME_PRESETS: BookThemePreset[] = [
   {
     id: 'forge',
     name: 'Crimson Forge',
-    description: 'Ember-red plates, gear tiles, warm amber edges',
+    description: 'Ember-red plates, gear tiles',
     questColor: '#fb923c',
-    edgeColor: '#fcd34d',
+    edgeColor: '#f09292',
     cycleColor: '#f87171',
     defaultShape: 'gear',
     defaultSize: { width: 24, height: 24 },

@@ -100,6 +100,32 @@ minimum elevation that communicates hierarchy.
   `--color-error` `#F87171`, `--color-info` `#60A5FA`. Each has a `-subtle`
   variant (10% alpha) for tinted backgrounds.
 
+#### Dependency-edge palette (quest canvas)
+
+Dependency lines are **state-driven**: the color communicates the prerequisite
+quest's status, mirroring the in-game quest screen's model. Implemented in
+`frontend/src/core/quest/edge-state.ts` (the single source of truth — the
+renderer and canvas model both import it), values match the FTB Quests default
+theme (`dependency_line_*` in `ftb_quests_theme.txt`):
+
+| State | Value | Rendering |
+|---|---|---|
+| completed | `#64DC64` | solid core, full alpha |
+| uncompleted | `rgba(204,163,163,0.706)` | marching dash |
+| unavailable | `rgba(204,163,163,0.392)` | marching dash, faded |
+| requires (hover fan-in) | `#00C8C8` | fast marching dash |
+| required-for (hover fan-out) | `#C8C800` | fast marching dash |
+| cycle (error) | `#F87171` | solid, static, arrowed |
+| casing | `rgba(10,12,18,0.92)` | uniform legibility outline |
+
+Hue = kind, alpha = availability (uncompleted vs unavailable share the pink
+hue). Every state marches source → target except cycles, which stay solid
+red — an error reads best as *not* flowing. Thickness scales with the quest
+tile size (0.17 × tile, the game's `dependency_line_thickness`). The palette
+is deliberately **not** warm-gold/parchment — the old parchment accents are
+retired repo-wide; the one warm hue kept is the game's required-for yellow.
+No game assets are used; the march is a procedural CSS dash animation.
+
 ### 2.5 Typography
 
 | Token | Value | Use |

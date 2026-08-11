@@ -16,7 +16,8 @@ const CANVAS_SHORTCUTS: ShortcutRow[] = [
   { keys: 'Ctrl+Z / Ctrl+Y', label: 'Undo / redo' },
   { keys: 'Drag a quest', label: 'Move it (Shift drags free of the grid snap)' },
   { keys: 'Drag from a port', label: 'Create a dependency arrow' },
-  { keys: 'Click a dependency', label: 'Edit its curve with draggable handles' },
+  { keys: 'Hover a quest', label: 'Light up its dependency fan (cyan in, yellow out)' },
+  { keys: 'Drag an arrow endpoint', label: 'Reconnect the dependency to another quest' },
   { keys: 'Double-click a dependency', label: 'Delete the connection' },
 ]
 

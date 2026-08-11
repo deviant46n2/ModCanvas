@@ -60,40 +60,68 @@ Each edge carries:
 
 ## Rendering
 
-Edges are rendered by `DependencyEdge` (`frontend/src/components/quest/quest-edges.tsx`) as a two-layer stroke so they stay legible over any chapter background artwork:
+Edges are rendered by `DependencyEdge` (`frontend/src/components/quest/quest-edges.tsx`) as a
+**straight line between quest centers** — the same geometry as the in-game quest screen,
+where dependency lines run tile-center to tile-center and the quest tiles draw on top.
 
-- A dark casing (`rgba(10,12,18,0.92)`, core width + 4) provides the outline.
-- A bright gold core (`#f2c94c`) carries the actual line.
-- A **source dot** (`r≈4.5`, same color as the core) marks the prerequisite end.
-- A **direction chevron** sits at the bezier midpoint and is rotated to point along the path tangent (source → target), so arrow direction stays readable over busy chapter artwork. Its control-point math replicates React Flow's `getBezierPath` (curvature `0.25`) via `computeEdgeGeometry` (`src/core/quest/edge-geometry.ts`), which the edge renderer and the bezier editor share.
-- When an edge has manual bezier control points (`EdgeBezierData.bezier`, see "Canvas tools"), the whole path — including the chevron midpoint/tangent — is recomputed from them so curve and arrow stay in agreement.
-- Edges participating in a dependency loop are drawn in bright red (`#ff6b6b`) with a red arrowhead and a "Circular dependency" tooltip.
+The visual model mirrors the in-game quest screen's *state semantics* (the palette and
+logic live in the pure, unit-tested `frontend/src/core/quest/edge-state.ts`):
+
+- **State colors** — the line color communicates the prerequisite quest's status:
+  `completed` = green (`#64DC64`), `uncompleted` = pink (`rgba(204,163,163,0.706)`),
+  `unavailable` (prerequisite quest locked) = the same pink at 0.392 alpha. This holds
+  whenever the canvas has progress data; with none (a fresh pack) the book renders
+  exactly what the game shows for an untouched pack — root quests pink, gated quests
+  faded. The old theme-preset edge colors are no longer rendered.
+- **Marching dash** — every state edge flows source → target via a CSS
+  `stroke-dashoffset` animation (pattern 8/6, seamless at −28). The direction of
+  dependency is conveyed by the motion, so lines never need an arrowhead (the game has
+  none). The hovered quest's fan (see below) marches fast; other edges march slowly —
+  the game's `selected_speed`/`unselected_speed` split, made visible (the game ships
+  unselected speed at 0). `prefers-reduced-motion` degrades the march to a static line.
+- **Hover fan** — hovering a quest recolors its incoming edges to the `requires` hue
+  (`#00C8C8`) and outgoing edges to the `required-for` hue (`#C8C800`), both marching
+  fast. Unrelated edges keep their state. This replaces the old brighten/dim pass.
+- **Two-layer stroke** — a dark casing (`rgba(10,12,18,0.92)`, core width + 4) outlines
+  every core so all states stay legible over arbitrary chapter artwork. It is a
+  legibility device, not a state carrier — uniform for every state.
+- **Thickness** — scales with the source quest's tile size (0.17 × tile, the game's
+  `dependency_line_thickness`), so scaled-up quests get proportionally heavier lines.
+- **Cycle edges** — dependency loops are drawn solid red (`#F87171`), static (no march),
+  with an arrowhead and a "Circular dependency" tooltip, so the error state reads as
+  *not flowing* and loop direction stays visible.
+
+> Removed in this arc: per-edge **bezier control-point editing** and the curve editor.
+> Dependency lines are now always straight center-to-center (in-game parity). The
+> `bezier` field on an edge still round-trips through the graph data untouched — it is
+> simply no longer rendered or editable.
 
 ### Hover behaviour (no blur / no pixel shift)
 
-Hovering a quest highlights its dependency fan: the connected edges brighten to
-full opacity while unrelated edges dim to 28%. This is **opacity-only** — stroke
-widths stay constant and no CSS `filter` is applied. (A `filter: brightness()`
-or a stroke-width jump on a node/edge inside ReactFlow's scaled viewport forces
-the browser to re-rasterize that subtree at CSS-pixel resolution, which reads as
-a full-canvas blur plus a sub-pixel "nudge" on hover.) The quest node itself
-highlights with a gold box-shadow ring instead of a brightness filter, so the
-pixelated icons never go soft.
+Hovering a quest highlights its dependency fan: connected edges flip to the
+requires/required-for hues and march fast. This is **opacity/color-only** — stroke
+widths stay constant and no CSS `filter` is applied. (A `filter: brightness()` or a
+stroke-width jump on a node/edge inside ReactFlow's scaled viewport forces the browser
+to re-rasterize that subtree at CSS-pixel resolution, which reads as a full-canvas blur
+plus a sub-pixel "nudge" on hover.) The quest node itself highlights with an accent-blue
+box-shadow ring instead of a brightness filter, so the pixelated icons never go soft.
 
 Cycle detection (`detectCycles`) flags any edge that is part of a strongly-connected component, so users can find loops before export.
 
 ## Creating Edges
 
-1. Toggle **Connect** in the canvas toolbar. A banner appears and quest nodes expose blue connection ports (React Flow v12 renders source handles with a bare `source` class — the connect-mode CSS targets `.react-flow__handle.source`).
-2. Drag from a port on the prerequisite quest to the quest that depends on it.
+1. Toggle **Connect** in the canvas toolbar. A banner appears and each quest exposes a
+   connection port at its CENTER (React Flow v12 renders source handles with a bare
+   `source` class — the connect-mode CSS targets `.react-flow__handle.source`).
+2. Drag from the port on the prerequisite quest to the quest that depends on it.
 
-Only the **source** ports are interactive in connect mode. Because React Flow is in loose connection mode, grabbing a *target* port would invert the dependency direction; hiding them makes **drag-from-A-to-B always produce "A → B"** (A required before B).
+Only the **source** ports are interactive in connect mode. Because React Flow is in loose connection mode, grabbing a *target* port would invert the dependency direction; hiding them makes **drag-from-A-to-B always produce "A → B"** (A required before B). The connection acceptance radius is widened (`connectionRadius` 40) so a drop anywhere on a large quest tile still lands on its center target handle.
 
 Duplicate edges and self-loops are rejected by the editor.
 
 ## Editing & Deleting Edges
 
-- **Select:** click an edge (its glowing outline highlights, and a floating chip shows `source → target`).
+- **Select:** click an edge (a floating chip shows `source → target`).
 - **Retarget:** drag either endpoint of a selected edge onto another quest to reconnect it.
 - **Delete:** press `Delete`/`Backspace` while an edge is selected, double-click the edge, or click the ✕ on the floating chip.
 
@@ -109,10 +137,12 @@ previous pack's selection can't leak into the next one.
 
 ## Source Files
 
+- `frontend/src/core/quest/edge-state.ts` — pure state resolver + palette (unit-tested; the single source of truth for edge colors/dash/march).
 - `frontend/src/components/quest/quest-edges.tsx` — `DependencyEdge` renderer, `detectCycles`, `edgeTypes`.
 - `frontend/src/components/quest/QuestCanvas.tsx` — canvas composer. Connect mode, selection, reconnect, deletion and cycle styling handlers live in `useQuestCanvasInteractions.ts`; the toolbar in `CanvasToolbar.tsx`; the canvas/overlay JSX in `CanvasArea.tsx`.
-- `frontend/src/QuestBookEditor.tsx` — graph mutations (`onAddEdge` / `onUpdateEdge` / `onDeleteEdge`).
-- `frontend/src/components/quest/QuestCanvas.css` — edge/port/connect-mode styles.
+- `frontend/src/components/quest/useQuestCanvasModel.ts` — edge state resolution (build + hover pass).
+- `frontend/src/components/quest/quest-nodes.tsx` — quest nodes expose a single center source handle (`c`) and center target handle (`tc`).
+- `frontend/src/components/quest/styles/canvas-edges.css` — march keyframes, connect-mode port, edge chip styles.
 
 # Quest Editor — Shape Textures (Lazy Theme Resolution)
 

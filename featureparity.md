@@ -268,9 +268,9 @@ Live UI = `GroupSettings.tsx` (double-click a group header in `ChapterTree.tsx`)
 | Dependency cycle detection + warning | ✅ |
 | Edge draw / reconnect / delete | ✅ |
 | Quest search / filter bar | ✅ Type-to-filter by label/id/subtitle/objective target; dims non-matches, Enter focuses the first match |
-| Hover dependency highlight | ✅ | Hovered quest's edges brighten, others dim (stroke → `#777`, width 1.5→1, opacity 0.28 — `useQuestCanvasModel.ts`); hover bumps stroke to 3 (`QuestCanvas.css`). No CSS `filter` anywhere in this path — the anti-blur rule inside the scaled viewport (s25) |
+| Hover dependency highlight | ✅ | Hovered quest's fan flips to the in-game requires/required-for hues and marches fast; other edges keep their state color and slow march — `useQuestCanvasModel.ts` + `core/quest/edge-state.ts`. No CSS `filter` anywhere in this path — the anti-blur rule inside the scaled viewport (s25) |
 | **Undo / redo (Ctrl+Z/Y)** | ✅ | Full-graph snapshot history in `QuestBookEditor`; ↩/↪ toolbar buttons + Ctrl+Z / Ctrl+Y |
-| **Bezier control-point editing per edge** | ✅ | Per-edge curve handles (`EdgeBezierEditor`); one undoable step per drag; stored in the editor graph (not in SNBT — FTB's format has no field) |
+| ~~Bezier control-point editing per edge~~ | ❌ retired | Curve handles were removed when dependency lines went center-to-center (in-game geometry). `bezier` data still round-trips; it is no longer rendered or edited |
 | Editing-mode toggle | ✅ 🔒 View / ✏️ Edit: read-only lock disables move/connect/delete/add while keeping selection + navigation |
 | Emergency items | ✅ | §1 — editable + exported + round-trip tested |
 | Reward tables screen | ✅ §8 |
@@ -297,7 +297,7 @@ The in-game look is 100% driven by the **theme file** (`ftb_quests_theme.txt`); 
 
 | Rendering detail | ModCanvas | Notes / what to do |
 |---|---|---|
-| Dependency lines as **textured bezier curves** (theme-controlled texture/color/thickness/animation speed) | ❌ | Custom SVG edges with hardcoded colors; no theme texture |
+| Dependency lines: state colors + center-to-center + march | 🟡 | Lines now carry the in-game STATE semantics (green=completed, pink=uncompleted, faded pink=unavailable, cyan/yellow hover fan), run straight between quest centers, and march source→target at the game's selected/unselected speed split — see `core/quest/edge-state.ts`. Still **not** texture-based: we render a procedural stroke with our own palette (no game assets, per the no-bundling rule) and we do not parse custom pack themes' `dependency_line_*` overrides — a pack that re-themes its lines will diverge |
 | Panel/border/background styling from theme selectors | ❌ | `ftb_quests_theme.txt` parsing exists (`src-tauri/src/ftb_theme.rs`) but only resolves chapter `background` keys; panel/border/checkmark selectors still hardcoded |
 | `quest_spacing`, `pinned_quest_size`, `full_screen_quest` | ❌ | Hardcoded layout constants |
 | Checkmark / progress icons from theme | ❌ | Emoji/vector badges |

@@ -152,10 +152,12 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
         height: nodeHeight,
       }}
     >
-      <Handle type="target" position={Position.Top} className="ftb-node-handle" id="t" />
-      <Handle type="target" position={Position.Left} className="ftb-node-handle" id="l" />
-      <Handle type="target" position={Position.Right} className="ftb-node-handle" id="r" />
-      <Handle type="target" position={Position.Bottom} className="ftb-node-handle" id="b" />
+      {/* Dependency edges attach at the visible TILE center (not the node box
+          center — the box also holds the title, so its center sits below the
+          tile). Anchoring inside the tile wrap keeps lines perfectly
+          center-to-center regardless of title length or quest scale. The
+          handles are hidden except in connect mode, where the source handle
+          becomes the port to drag a new dependency from. */}
       <div className={`ftb-quest-shape-wrap shape-${shape}${hasShapeTextures ? ' has-texture' : ''}`} style={{
         ['--shape-color' as string]: fallbackColor,
         backgroundColor: shape === 'none' || hasShapeTextures ? 'transparent' : (hasQuestColor ? `${questColor}22` : SHAPE_PLATE_GREY),
@@ -164,6 +166,13 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
         height: shapeSize,
         ...(hasBorderTexture ? borderStyle : {}),
       }}>
+        <Handle
+          type="target"
+          position={Position.Bottom}
+          className="ftb-node-handle"
+          id="tc"
+          style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+        />
         {hasShapeTextures && tileUrl && (
           <img
             className="ftb-quest-shape-tile"
@@ -192,6 +201,13 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
             />
           </div>
         )}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="ftb-node-handle"
+          id="c"
+          style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+        />
       </div>
       {renaming ? (
         <input
@@ -221,10 +237,6 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
       {isSimHidden && <div className="ftb-quest-sim-badge ftb-quest-sim-hidden" title="Hidden by visibility rules">Hidden</div>}
       {isSimLocked && <div className="ftb-quest-sim-badge ftb-quest-sim-locked" title="Requires missing dependencies">Locked</div>}
       {simComplete && <div className="ftb-quest-sim-badge ftb-quest-sim-done" title="Completed (simulated)"><CheckIcon size={10} /></div>}
-      <Handle type="source" position={Position.Bottom} className="ftb-node-handle" id="sb" />
-      <Handle type="source" position={Position.Right} className="ftb-node-handle" id="sr" />
-      <Handle type="source" position={Position.Left} className="ftb-node-handle" id="sl" />
-      <Handle type="source" position={Position.Top} className="ftb-node-handle" id="st" />
     </div>
   );
 });

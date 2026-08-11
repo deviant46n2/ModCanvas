@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import type { QuestGraphData, QuestNodeData, QuestEdgeData, EdgeBezierRel } from '../services/quest-types'
+import type { QuestGraphData, QuestNodeData, QuestEdgeData } from '../services/quest-types'
 import { generateFtbHexId, defaultObjective, defaultReward, defaultQuestNodeData, moveArrayItem } from '../components/quest/quest-helpers'
 
 interface UseQuestNodeMutationsOptions {
@@ -151,15 +151,6 @@ export function useQuestNodeMutations({
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
-  const onUpdateEdgeBezier = useCallback((edgeId: string, bezier: EdgeBezierRel | null) => {
-    if (!graph) return
-    commitGraph({
-      ...graph,
-      edges: graph.edges.map(e => e.id === edgeId ? { ...e, bezier } : e),
-    })
-    scheduleAutoSave()
-  }, [graph, scheduleAutoSave])
-
   const onAddObjective = useCallback((nodeId: string) => {
     if (!graph) return
     commitGraph({ ...graph, nodes: graph.nodes.map(n =>
@@ -251,7 +242,6 @@ export function useQuestNodeMutations({
     onAddEdge,
     onUpdateEdge,
     onDeleteEdge,
-    onUpdateEdgeBezier,
     onAddObjective,
     onAddReward,
     onRemoveObjective,
