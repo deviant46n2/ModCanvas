@@ -6,12 +6,22 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--space-5);
+  /* Flex column so tabpanels flex-fill instead of percentage-filling: a
+     `height: 100%` link on the tabpanel resolves to auto on re-flow in
+     WebKitGTK — the s43 quest-editor collapse (the engine-render prompt
+     appearing at the title screen re-flowed the quest tab and collapsed the
+     editor to its content height). Same invariant as the quest shell: keep
+     the flex-fill chain, never a percentage height link. */
+  display: flex;
+  flex-direction: column;
 }
 
 .workspace-content > [role="tabpanel"] {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* Flex-fill, NOT height:100% — see .workspace-content. */
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 /* Inactive tabs stay mounted (so state + loaded data persist) but are hidden.

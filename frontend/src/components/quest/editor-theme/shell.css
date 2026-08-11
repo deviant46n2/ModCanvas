@@ -62,13 +62,22 @@
 .quest-editor {
   display: flex;
   flex-direction: column;
-  /* See .quest-canvas-container: flex-fill against the tabpanel (a flex
-     column), never a percentage height. */
-  flex: 1;
-  min-height: 0;
+  /* Absolute fill against the quest tabpanel (position:relative below), NOT
+     flex:1 — s43: WebKitGTK fails to re-propagate a flex-grown height when a
+     flex child is inserted (the engine-render prompt appearing at the title
+     screen collapsed the editor to its content height). inset:0 computes
+     from the containing block's box directly and cannot mis-resolve — the
+     same pattern as .react-flow. */
+  position: absolute;
+  inset: 0;
   background: var(--ftb-bg);
   color: var(--ftb-text);
   overflow: hidden;
+}
+
+/* The quest tabpanel is the .quest-editor's containing block. */
+#tabpanel-quests {
+  position: relative;
 }
 
 .quest-editor-toolbar {

@@ -806,7 +806,20 @@ frequent operations:
   (game launch squishing the app window). The aside is now the flex
   container and the tree root stretches via `align-items: stretch`; the
   scroller got `min-height: 0`. Grep for `height: '100%'` in
-  `components/quest/` before touching quest layout.)
+  `components/quest/` before touching quest layout.
+  s43: TWO outer links failed. The workspace tabpanel rule in
+  `styles/app-mods.css` used `height: 100%` (outside the components/quest/
+  guard) — that alone wasn't the whole story: even flex-filled, the editor
+  collapsed to content height when the engine-render prompt appeared at the
+  title screen, because WebKitGTK fails to re-propagate a flex-grown height
+  when a flex CHILD is inserted. The `.quest-editor` root is now
+  `position: absolute; inset: 0` against `#tabpanel-quests { position:
+  relative }` — the same absolute-fill pattern as `.react-flow` — which
+  computes from the containing block's box and cannot mis-resolve on child
+  insertion or window resize. When touching quest layout, the invariant is
+  now: no percentage link anywhere in the chain, and flex-grown sizes inside
+  the editor must not be expected to re-propagate on child insertion —
+  absolute-fill where that matters.)
 - **Tasks/rewards use in-game style icon strips** (`quest-slot-icon.tsx`):
   one tile per entry, click to select, the selected entry's full card below.
   Type-derived icons render real textures when the type has a fixed in-game
