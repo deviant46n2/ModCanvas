@@ -242,6 +242,7 @@
 
 .quest-canvas-wrapper {
   flex: 1;
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -257,8 +258,12 @@
 }
 
 .quest-canvas-wrapper .react-flow {
-  height: 100%;
-  width: 100%;
+  /* Absolute fill instead of height:100% — same WebKitGTK percentage quirk
+     as the rest of the chain; inset:0 cannot mis-resolve. */
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
 }
 
 .canvas-overlay {

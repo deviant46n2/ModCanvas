@@ -37,17 +37,29 @@
   background: var(--ftb-bg);
   overflow: hidden;
   position: relative;
+  /* Flex container so .quest-canvas-container fills via flex, not percentage. */
+  display: flex;
 }
 
 .quest-canvas-container {
   background: var(--ftb-bg);
-  height: 100%;
+  /* Flex-fill, NOT height:100%: a percentage height inside this chain can
+     resolve to auto in WebKitGTK (the editor then collapses to its content
+     height — visible whenever a pack has few chapters). flex:1 + min-height:0
+     fills the parent's main axis regardless of engine percentage quirks. */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .quest-editor {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* See .quest-canvas-container: flex-fill against the tabpanel (a flex
+     column), never a percentage height. */
+  flex: 1;
+  min-height: 0;
   background: var(--ftb-bg);
   color: var(--ftb-text);
   overflow: hidden;
