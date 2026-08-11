@@ -111,6 +111,8 @@ function AppRoot() {
           project={openProject}
           activeTab={s.activeTab}
           onTabChange={s.handleTabChange}
+          showGuidedQuest={s.showGuidedQuest}
+          onGuidedQuestClose={s.handleGuidedQuestClose}
           onRestartWebSocket={s.restartWebSocket}
           onRestartInstance={s.handleRestartInstance}
           isRestarting={s.isRestarting}
@@ -212,6 +214,7 @@ function AppRoot() {
         onRefresh={() => s.refreshPack(false)}
         packLoaded={s.packLoaded}
         onDone={() => s.setShowWizard(false)}
+        onGuidedQuest={s.handleGuidedQuest}
       />
 
       <ImportModal

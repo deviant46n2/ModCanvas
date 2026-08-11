@@ -765,6 +765,13 @@ frequent operations:
   fixed-position list. It closes on outside mousedown / Escape / outside
   scroll — but ignores scrolls that originate inside its own option list, so
   long type lists stay scrollable.
+- **The editor body is a flex-fill chain, not percentage heights** (s38,
+  8fa95ce): every link in the quest editor shell uses `flex: 1 0 auto` +
+  `min-height: 0`, and react-flow mounts with `position: absolute; inset: 0`.
+  `height: 100%` against flex-grown parents can resolve to `auto` under
+  WebKitGTK, collapsing the editor to content height (visible with few
+  chapters; tall packs mask it by accident). When touching quest layout CSS,
+  keep the flex-fill chain — never reintroduce a `height: 100%` link.
 - **Tasks/rewards use in-game style icon strips** (`quest-slot-icon.tsx`):
   one tile per entry, click to select, the selected entry's full card below.
   Type-derived icons render real textures when the type has a fixed in-game

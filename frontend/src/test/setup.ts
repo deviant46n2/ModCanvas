@@ -34,3 +34,16 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
   configurable: true,
 });
+
+// jsdom lacks ResizeObserver; the ItemBrowser (react-window grid) needs it.
+// Minimal no-op shim: the grid falls back to its measured/initial width.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  value: ResizeObserverStub,
+  writable: true,
+  configurable: true,
+});

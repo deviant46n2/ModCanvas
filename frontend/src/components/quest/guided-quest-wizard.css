@@ -1,0 +1,147 @@
+/* GuidedQuestWizard — modal shell over the shared ItemBrowser.
+   Full-height fixed overlay (the quest editor's overflow chain must not
+   collapse it — s40 picker-shell lesson: the shell imports its own CSS). */
+
+.guided-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guided-wizard {
+  width: 640px;
+  max-width: 92vw;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface-1, #1f1f24);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.guided-wizard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border, #333);
+  font-size: 14px;
+}
+
+.guided-wizard-header span {
+  flex: 1;
+  color: var(--color-text-tertiary, #888);
+  font-size: 12px;
+}
+
+.guided-wizard-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #aaa);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.guided-wizard-step {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guided-wizard-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.guided-wizard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guided-wizard-field > label {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #888);
+}
+
+.guided-wizard-field > input[type='number'],
+.guided-wizard-field > input[type='text'] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--color-bg-surface-2, #16161a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 6px;
+  color: var(--color-text-primary, #ddd);
+  font-size: 13px;
+}
+
+.guided-wizard-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.guided-wizard-radio:has(input:checked) {
+  border-color: var(--color-accent, #5b9bd5);
+}
+
+.guided-wizard-radio span {
+  display: flex;
+  flex-direction: column;
+}
+
+.guided-wizard-radio em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--color-text-tertiary, #888);
+}
+
+.guided-wizard-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg-surface-2, #16161a);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.guided-wizard-review > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guided-wizard-review span {
+  color: var(--color-text-tertiary, #888);
+}
+
+.guided-wizard-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.guided-wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border, #333);
+}

@@ -100,6 +100,8 @@ interface QuestEditorLayoutProps {
   onSetQuestProgress: (questId: string, status: 'started' | 'complete' | null) => void
   onCompleteAll: () => void
   onResetAll: () => void
+  /** Open the guided "Add a quest" wizard (P0-MINIWIZ). */
+  onOpenGuidedQuest?: () => void
 }
 
 export function QuestEditorLayout(props: QuestEditorLayoutProps) {
@@ -127,6 +129,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
         modsDir={props.modsDir}
         setModsDir={props.setModsDir}
         onReady={props.onReady}
+        onOpenGuidedQuest={props.onOpenGuidedQuest}
       />
       {props.packLoaded && !!props.instancePath && props.bakedCount > 0 && (!!props.wsConnected || !props.enginePromptDismissed) && (
         <EngineRenderPrompt

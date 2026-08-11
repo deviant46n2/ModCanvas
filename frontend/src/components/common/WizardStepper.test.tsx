@@ -48,20 +48,21 @@ beforeEach(() => {
   ])
 })
 
+const created = {
+  id: 'p1',
+  name: 'Starter World',
+  description: '',
+  minecraft_version: '1.21.1',
+  mod_loader: 'NeoForge',
+  pack_version: '1.0.0',
+  author: '',
+  created_at: '',
+  updated_at: '',
+  path: '/prism/instances/starter-world/minecraft',
+  source: 'modcanvas',
+}
+
 async function renderWizard() {
-  const created = {
-    id: 'p1',
-    name: 'Starter World',
-    description: '',
-    minecraft_version: '1.21.1',
-    mod_loader: 'NeoForge',
-    pack_version: '1.0.0',
-    author: '',
-    created_at: '',
-    updated_at: '',
-    path: '/prism/instances/starter-world/minecraft',
-    source: 'modcanvas',
-  }
   const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
   render(
     <WizardStepper
@@ -71,6 +72,7 @@ async function renderWizard() {
       onRefresh={vi.fn().mockResolvedValue(undefined)}
       packLoaded={false}
       onDone={() => {}}
+      onGuidedQuest={() => {}}
     />,
   )
   await screen.findByText('Starter World')
@@ -162,5 +164,34 @@ describe('WizardStepper', () => {
       path: '/prism/instances/My_First_Pack/minecraft',
       templateId: 'exploration',
     })
+  })
+
+  it('step 5 is the guided-first-quest handoff: primary button fires onGuidedQuest, skip advances to green check', async () => {
+    const onGuidedQuest = vi.fn()
+    const onDone = vi.fn()
+    const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
+    render(
+      <WizardStepper
+        show
+        onClose={() => {}}
+        onCreate={onCreate}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+        packLoaded={false}
+        onDone={onDone}
+        onGuidedQuest={onGuidedQuest}
+      />,
+    )
+    await screen.findByText('Starter World')
+    fireEvent.click(screen.getByText('Starter World'))
+    fireEvent.click(screen.getByText('Next'))
+    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
+    fireEvent.click(screen.getByText('Next'))
+    fireEvent.click(screen.getByText('Create & continue'))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    // Curated mods step: Skip advances to step 5 (guided quest).
+    fireEvent.click(screen.getByText('Skip'))
+    fireEvent.click(screen.getByText('Add my first quest'))
+    expect(onGuidedQuest).toHaveBeenCalledTimes(1)
+    expect(onDone).not.toHaveBeenCalled()
   })
 })

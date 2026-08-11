@@ -1,6 +1,10 @@
 {
   "judgments": [
     {
+      "commit": "8fa95ce",
+      "reason": "quest editor flex-fill chain fix — behavior documented s41: docs/quest-editor.md 'The editor body is a flex-fill chain, not percentage heights' (WebKitGTK percentage-height collapse + the flex-fill/min-height:0/inset:0 invariant)"
+    },
+    {
       "commit": "22e797d",
       "reason": "progression theme pass — docs written same session (s30): docs/progression.md Visual design section rewritten to the shipped design (5658187)"
     },

@@ -9,6 +9,7 @@ import {
 import { listProjectTemplates } from '../../services/project'
 import type { CreateProjectInput, Project, ProjectTemplate } from '../../services/types'
 import { CuratedModsStep } from './CuratedModsStep'
+import { GuidedQuestStep } from './GuidedQuestStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
 import { WizardWhereStep, type WizardMode } from './WizardWhereStep'
 
@@ -27,6 +28,9 @@ interface WizardStepperProps {
   packLoaded: boolean
   /** Close the wizard (Done / after Launch). The pack stays open. */
   onDone: () => void
+  /** Guided first quest (P0-MINIWIZ): close the wizard, switch to the quests
+   *  tab, and open the guided-quest modal inside the editor. */
+  onGuidedQuest: () => void
 }
 
 type Mode = WizardMode
@@ -36,7 +40,8 @@ const STEP_LABELS: Record<number, string> = {
   2: 'what it is about',
   3: 'review and create',
   4: 'some mods to start',
-  5: 'green check',
+  5: 'add your first quest',
+  6: 'green check',
 }
 
 /**
@@ -52,6 +57,7 @@ export function WizardStepper({
   onRefresh,
   packLoaded,
   onDone,
+  onGuidedQuest,
 }: WizardStepperProps) {
   const [step, setStep] = useState(1)
   const [mode, setMode] = useState<Mode>('instance')
@@ -170,7 +176,7 @@ export function WizardStepper({
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of 5 — {STEP_LABELS[step]}
+          Step {step} of 6 — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -246,6 +252,13 @@ export function WizardStepper({
         )}
 
         {step === 5 && project && (
+          <GuidedQuestStep
+            onAdd={onGuidedQuest}
+            onSkip={() => setStep(6)}
+          />
+        )}
+
+        {step === 6 && project && (
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}

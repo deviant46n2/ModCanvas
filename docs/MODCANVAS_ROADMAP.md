@@ -526,7 +526,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | **Wizard shipped (P0-WIZARD chunks 1–2):** instance pick or start-from-scratch, template pick, review+create — replaces the 3-field modal. Steps 4–6 (curated mods, guided first quest, green check + Launch) still pending. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
+| Create Pack | **Wizard shipped (P0-WIZARD chunks 1–3):** instance pick or start-from-scratch, template pick, review+create, curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -594,10 +594,16 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     then refreshes the pack so the green check sees the new mods.
  5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
     the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
-    export path. The zero-code proof point. **Pending** (P0-MINIWIZ arc).
+    export path. The zero-code proof point. **Implemented (s41, P0-MINIWIZ):** the wizard's
+    step 5 is a handoff — it closes, switches to the quests tab, and opens the
+    `GuidedQuestWizard` modal in the editor (pick item → collect/craft goal → review →
+    create). The quest lands through the same `commitGraph` history path (undoable in one
+    step) and the same export path; a collect-N-get-N reward is the default. A "✨ Add a
+    quest" toolbar button in the quest editor opens the same wizard at any time.
  6. **The green check + Launch** — run Pack Health's `analyzePackHealth` over the scaffolded
     pack; show blocking/recommended; one button: **Launch** (reuse `test_project`).
-    **Status (chunk 3):** implemented — the wizard's step 5 computes the same pure report
+    **Status (chunk 3):** implemented — the wizard's step 6 (moved from 5 when the guided
+    quest step landed, s41) computes the same pure report
     the Health tab renders (from the already-materialized stores, no rescans) and offers
     Launch via `test_project` with the same defaults as the topbar Test button. Honesty
     rule: a pack created via "start from scratch" has no Prism instance, so Launch is
@@ -628,13 +634,17 @@ at any step; every scaffolded artifact is diff-able plain text.
 
 Thin, task-scoped guides over the existing editors. First three:
 
-1. **"Add a quest"** — pick an item → pick a goal (collect/kill/reach) → wizard fills the
+1. **"Add a quest"** — pick an item → pick a goal (collect/craft) → wizard fills the
    quest node (title, task, reward) in the quest editor, visible and editable immediately.
-   Uses `useQuestNodeMutations.ts` + history (undoable).
+   **Implemented (s41):** `GuidedQuestWizard.tsx` collects the spec; the editor commits it
+   through `commitGraph` + history (undoable in one step) via the same path as every other
+   edit — no parallel generation. Goals are item-family only (item_acquisition/craft) for
+   now; kill/reach/XP are future additions to the same component.
 2. **"Add a recipe"** — the wizard reads the item picker, fills the grid, validates via
    `core/recipe/validation.ts:94`, saves through the normal authored-only path.
+   **Pending.**
 3. **"Add a config tweak"** — search a setting by plain words, present it as a typed form,
-   save through `save_structured_config`.
+   save through `save_structured_config`. **Pending.**
 
 Each is a modal/side-panel that **operates the same editor state and routes through the
 global HistoryStore** — so the user can undo the wizard and see exactly what it made

@@ -30,6 +30,9 @@ export interface ProjectWorkspaceProps {
   }
   activeTab: 'mods' | 'configs' | 'quests' | 'recipes' | 'health'
   onTabChange: (tab: 'mods' | 'configs' | 'quests' | 'recipes' | 'health') => void
+  /** Guided "Add a quest" handoff (P0-MINIWIZ, wizard step 5). */
+  showGuidedQuest?: boolean
+  onGuidedQuestClose?: () => void
   onRestartWebSocket: () => void
   onRestartInstance: () => void
   isRestarting: boolean
@@ -164,6 +167,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                   packLoaded={packLoaded}
                   onTest={props.onTest}
                   isTesting={props.isTesting}
+                  showGuidedQuest={props.showGuidedQuest}
+                  onGuidedQuestClose={props.onGuidedQuestClose}
                 />
               </CanvasThemeProvider>
             </ErrorBoundary>

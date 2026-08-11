@@ -20,7 +20,7 @@ export type { LoadPackProgress, ImportResult } from '../services/types'
 
 export function useAppState() {
   const projectState = useProjectState()
-  const { openProject } = projectState
+  const { openProject, setShowWizard } = projectState
   const modState = useModState(openProject)
   const configState = useConfigState(openProject)
   const launchState = useLaunchState(openProject)
@@ -215,6 +215,18 @@ export function useAppState() {
     }
   }
 
+  // Guided-first-quest handoff (P0-MINIWIZ, wizard step 5): close the wizard,
+  // open the quests tab, and pop the guided-quest modal inside the editor.
+  const [showGuidedQuest, setShowGuidedQuest] = useState(false)
+  function handleGuidedQuest() {
+    setShowWizard(false)
+    handleTabChange('quests')
+    setShowGuidedQuest(true)
+  }
+  function handleGuidedQuestClose() {
+    setShowGuidedQuest(false)
+  }
+
   async function handleConfirmDelete() {
     const wasOpen = !!projectState.openProject
     const success = await projectState.handleConfirmDelete()
@@ -247,6 +259,9 @@ export function useAppState() {
     refreshPack,
     closePack,
     dismissLoadModal,
+    showGuidedQuest,
+    handleGuidedQuest,
+    handleGuidedQuestClose,
     showLeavePack,
     requestClosePack,
     showSettings, setShowSettings,

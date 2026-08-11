@@ -27,11 +27,13 @@ interface ImportExportToolbarProps {
   modsDir: string
   setModsDir: (dir: string) => void
   onReady: (api: ToolbarAPI) => void
+  /** Open the guided "Add a quest" wizard (P0-MINIWIZ). */
+  onOpenGuidedQuest?: () => void
 }
 
 export function ImportExportToolbar({
   graph, setGraph, projectId, projectPath,
-  textureIndex, modsDir, setModsDir, onReady,
+  textureIndex, modsDir, setModsDir, onReady, onOpenGuidedQuest,
 }: ImportExportToolbarProps) {
   const [iconPickerState, setIconPickerState] = useState<{ open: boolean; target: IconPickerTarget | null }>({ open: false, target: null })
   const [showBookSettings, setShowBookSettings] = useState(false)
@@ -75,6 +77,11 @@ export function ImportExportToolbar({
           <button className="book-btn" onClick={() => setShowRewardTables(true)} title="Edit weighted reward tables">
             <TrophyIcon size={14} /> Rewards
           </button>
+          {onOpenGuidedQuest && (
+            <button className="book-btn" onClick={onOpenGuidedQuest} title="Guided quest — pick an item and a goal, the wizard writes the quest">
+              ✨ Add a quest
+            </button>
+          )}
         </div>
         <div className="quest-editor-toolbar-right">
           <span className="quest-toolbar-texture-count" title="Loaded textures">

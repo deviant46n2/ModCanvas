@@ -16,6 +16,8 @@ import { useQuestAssetPipeline } from './hooks/useQuestAssetPipeline'
 import { useQuestNodeMutations } from './hooks/useQuestNodeMutations'
 import { useQuestStructureMutations } from './hooks/useQuestStructureMutations'
 import { QuestEditorLayout } from './components/quest/QuestEditorLayout'
+import { GuidedQuestWizard, type GuidedQuestSpec } from './components/quest/GuidedQuestWizard'
+import { defaultObjective, defaultReward, defaultQuestNodeData } from './components/quest/quest-helpers'
 
 interface QuestBookEditorProps {
   projectId: string
@@ -27,11 +29,14 @@ interface QuestBookEditorProps {
   packLoaded?: boolean
   onTest?: () => void
   isTesting?: boolean
+  /** External handoff (P0-MINIWIZ wizard step 5): open the guided quest modal. */
+  showGuidedQuest?: boolean
+  onGuidedQuestClose?: () => void
 }
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting, showGuidedQuest, onGuidedQuestClose }: QuestBookEditorProps) {
   const adapter = useMemo(
     () => getAdapter(minecraftVersion ?? '1.21.1', normalizeLoader(modLoader)),
     [minecraftVersion, modLoader],
@@ -52,6 +57,15 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   const [simProgress, setSimProgress] = useState<ProgressState>({})
   const [simMode, setSimMode] = useState(false)
   const [enginePromptDismissed, setEnginePromptDismissed] = useState(false)
+  const [guidedQuestLocal, setGuidedQuestLocal] = useState(false)
+  // External handoff (wizard step 5) vs internal toolbar button: the external
+  // prop is one-shot (the App clears it after the modal closes) — derive the
+  // effective open state from either source.
+  const guidedQuestOpen = showGuidedQuest || guidedQuestLocal
+  const closeGuidedQuest = useCallback(() => {
+    setGuidedQuestLocal(false)
+    onGuidedQuestClose?.()
+  }, [onGuidedQuestClose])
   const toolbarApiRef = useRef<ToolbarAPI | null>(null)
   const history = useHistory()
 
@@ -94,6 +108,35 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   const scheduleAutoSave = useCallback(() => {
     setTimeout(() => toolbarApiRef.current?.scheduleAutoSave(), 300)
   }, [])
+
+  // Guided quest create (P0-MINIWIZ): build the full node (title + task +
+  // reward) and commit ONCE through the same history path as every other edit,
+  // so the wizard is undoable in a single step. The reward is the collect-N-
+  // get-N loop the template pack teaches; deleting it is one click.
+  const handleGuidedQuestCreate = useCallback((spec: GuidedQuestSpec) => {
+    if (!graph || !activeChapter) return
+    const node = defaultQuestNodeData({
+      chapter_id: activeChapter,
+      label: spec.title || 'New Quest',
+      position: { x: 80, y: 80 },
+    })
+    const objective = {
+      ...defaultObjective(),
+      objective_type: spec.objectiveType,
+      target: spec.target,
+      target_count: spec.count,
+    }
+    const newNode = {
+      ...node,
+      objectives: [objective],
+      rewards: spec.includeReward
+        ? [{ ...defaultReward(), reward_type: 'item', item_id: spec.rewardItem, item_count: spec.rewardCount }]
+        : [],
+    }
+    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] }, { split: true })
+    setSelectedNodeId(newNode.id)
+    scheduleAutoSave()
+  }, [graph, activeChapter, commitGraph, setSelectedNodeId, scheduleAutoSave])
 
   const instancePath = ingestResult?.active_instance || projectPath || ''
 
@@ -189,7 +232,8 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   }
 
   return (
-    <QuestEditorLayout
+    <>
+      <QuestEditorLayout
       graph={graph}
       setGraph={commitGraph}
       projectId={projectId}
@@ -233,8 +277,18 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       onRedo={history.redo}
       canUndo={histStatus.undo}
       canRedo={histStatus.redo}
+      onOpenGuidedQuest={() => setGuidedQuestLocal(true)}
       {...nodeMutations}
       {...structureMutations}
-    />
+      />
+      <GuidedQuestWizard
+        open={guidedQuestOpen}
+        items={items}
+        tags={tagCatalog}
+        getPickerTextureUrl={getPickerTextureUrl}
+        onClose={closeGuidedQuest}
+        onCreate={handleGuidedQuestCreate}
+      />
+    </>
   )
 }
