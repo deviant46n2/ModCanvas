@@ -618,6 +618,15 @@ Completion criteria (P0-WIZARD): a fresh-eyes tester completes steps 1–6 on 1.
 without opening a code file, a raw config, or the KubeJS drawer; the wizard is restartable
 at any step; every scaffolded artifact is diff-able plain text.
 
+**Journey test status (s42):** the fresh-eyes completion pass has been *partially* run by
+the maintainer (wizard → pack → mini-wizards; steps 1–5 of 6) and was interrupted by the
+pre-first-launch "no config files" dead-end (now resolved: empty states name the launch-once
+fact). **PARKED until the P2-HOTSWAP prototype + its mini-wizard exist** — written reason:
+the launch/capture leg (step 6) is exactly the surface hotswap reshapes (reload evidence
+loop, reload-vs-restart honesty), so the full fresh-eyes pass runs once, against the final
+shape, instead of twice. **Tripwire:** run the full 6-step pass in the P2-HOTSWAP landing
+review, before any further P0/P2 item is declared done.
+
 ### 9.4 Beginner Mode (P0-BEGINNER)
 
 - A mode flag on the workspace shell (`ProjectWorkspace.tsx`) that **hides raw/code
@@ -881,6 +890,11 @@ Conventions:
 - **Completion criteria:** a fresh-eyes tester never sees a code file, raw textarea, or
   script drawer in default mode; the toggle is reachable from the topbar; mode persists
   across restarts.
+- **PARKED (s42, written reason):** deferred until after P2-HOTSWAP. The hotswap mini-wizard
+  IS a beginner surface (one-click "apply my tweaks without restarting"), so beginner mode
+  ships better once it exists; the surfaces it hides (raw textarea, script drawer, KubeJS)
+  are stable and small today. **Tripwire:** revisit in the P2 landing review — beginner mode
+  is the remaining P0 UX feature and the P0 gate is not closed without it.
 
 #### P0-MINIWIZ — Mini-wizards (first three)
 
@@ -917,6 +931,11 @@ Conventions:
   Texture capture stays **on-demand** (editor-driven materialization plan) — decided s42,
   no capture-all mode. The cheap non-step surface (configs-tab/wizard empty states naming
   "mods write configs on first launch") landed s42 instead.
+- **Remaining scope is the P2-HOTSWAP ramp (s42):** the pre-launch companion md5 check and
+  the "never a silent failure" messaging (incl. detecting the Prism-refusal signature —
+  CLI exit 0 with no game process — from workarounds #8) are the first steps of the hotswap
+  arc, not a separate item: you cannot test reloads on a launch/connection you cannot
+  verify. Rolled into P2-HOTSWAP below.
 
 #### P0-DISTRIB — Distribution, CI, release pipeline
 
@@ -931,6 +950,11 @@ Conventions:
 - **Completion criteria:** a tagged commit produces downloadable artifacts; CI is the
   gatekeeper for the repo's "green" claim; a fresh machine can run the suite from
   `git clone`.
+- **PARKED (s42, written reason):** deferred until the hotswap arc ships. No CI is not
+  blocking anything local — the integrity gate is the repo's local truth and it runs
+  everywhere; releasing artifacts mid-arc invites users before the flagship feature lands.
+  **Tripwire:** revisit when P2-HOTSWAP lands or when a second machine needs the suite
+  from a clone (then CI is the gatekeeper it claims to be).
 
 #### P0-HYGIENE-1 — Dead code & lying UI
 

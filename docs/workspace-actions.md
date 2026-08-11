@@ -12,7 +12,7 @@ and `frontend/src/components/common/statusbar.tsx`.
 ├──────────────────────────────────────────────────────────────┤
 │ tabs                                                        │
 ├──────────────────────────────────────────────────────────────┤
-│ content (mods / configs / progression / quests / recipes)    │
+│ content (health / mods / configs / quests / recipes)          │
 ├──────────────────────────────────────────────────────────────┤
 │ status bar: [● Instance Connected][⟳]   [run / deploy feedback] │
 └──────────────────────────────────────────────────────────────┘

@@ -28,7 +28,7 @@ Everything reads and writes the **real formats the modding ecosystem already use
 
 ## Status
 
-**Early development.** The veteran workbench core is functional on **Minecraft 1.21.1 / NeoForge** (FTB Quests), including the pack-health go/no-go panel. The beginner layer — first-pack wizard, beginner mode — is the active focus.
+**Early development.** The veteran workbench core is functional on **Minecraft 1.21.1 / NeoForge** (FTB Quests), including the pack-health go/no-go panel. The beginner layer is in place: the first-pack wizard and the mini-wizards ("Add a quest / recipe / config tweak"). The active focus is runtime hot-swapping — applying pack edits to a running game without restarting it.
 
 - **Supported:** 1.21.1 NeoForge · FTB Quests
 - **Planned:** rest of the 1.21.1 loader matrix → newer stable versions (demand-driven)
