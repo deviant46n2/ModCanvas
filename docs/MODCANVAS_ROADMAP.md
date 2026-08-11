@@ -908,6 +908,15 @@ Conventions:
   messaging is the mitigation.
 - **Completion criteria:** launch from a fresh wizard-created pack works; a missing/stale
   companion jar produces a *specific, actionable* message, never a silent failure.
+- **PARKED SCOPE (s42, written reason):** the explicit "first launch materializes the pack"
+  wizard step (state both payoffs — configs appear, 3D icons capture for offline use —
+  then verify the run delivered via an evidence loop: companion connected / config dir
+  grew / texture frames received) is deferred until P2-HOTSWAP builds the same
+  log-evidence machinery. Building it once and reusing it for both is cheaper than two
+  bespoke loops. **Tripwire:** revisit this parked scope in the P2-HOTSWAP landing pass.
+  Texture capture stays **on-demand** (editor-driven materialization plan) — decided s42,
+  no capture-all mode. The cheap non-step surface (configs-tab/wizard empty states naming
+  "mods write configs on first launch") landed s42 instead.
 
 #### P0-DISTRIB — Distribution, CI, release pipeline
 

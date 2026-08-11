@@ -74,7 +74,7 @@ export function ConfigsTab(props: ConfigsTabProps) {
             {filteredFiles.length === 0 ? (
               <div className="empty-state">
                 {props.configFiles.length === 0
-                  ? 'No config files found. Import a modpack to get config files.'
+                  ? 'No config files yet. Mods write their configs on first launch — boot the pack once (join a world), then reopen this tab.'
                   : 'No files match your search.'}
               </div>
             ) : (

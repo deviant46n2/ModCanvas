@@ -134,6 +134,7 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
                 <p className="guided-config-hint">
                   No config files here have searchable settings — quest data, scripts and custom formats are raw text.
                   {' '}Raw-only files (open them in the configs tab and edit in Raw mode): {configFiles.slice(0, 8).map((f) => f.name).join(', ')}{configFiles.length > 8 ? ` and ${configFiles.length - 8} more.` : '.'}
+                  {' '}If this is a fresh pack, launch it once and join a world — the mods write their real configs on first boot, and they will show up here as searchable.
                 </p>
               ) : (
                 <p className="guided-config-hint">No searchable config files match.</p>

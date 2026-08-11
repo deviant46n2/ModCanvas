@@ -164,6 +164,9 @@ describe('GuidedConfigWizard', () => {
     // searchable buttons that dead-end with "No settings match".
     expect(screen.getByText(/data\.snbt/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /data\.snbt/ })).toBeNull()
+    // A fresh pack gets the one fact that explains the emptiness: mods write
+    // their configs on first launch (the s42 lesson, in the wizard itself).
+    expect(screen.getByText(/launch it once and join a world/)).toBeTruthy()
   })
 
   it('lists only searchable files as pickable and counts the raw-only remainder', () => {
