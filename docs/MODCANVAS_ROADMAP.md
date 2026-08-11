@@ -124,6 +124,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
 | Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `search_merge.rs` (s33) |
 | Pack Health | **Implemented (Tier 1)** — go/no-go, 3 honest states, pure derivation | `core/pack-health/index.ts:77`; `PackHealthTab.tsx:80`; `checks/{quests,recipes,pack}.ts` |
+| Loot tab | **MVP (s44)** — read-only scan + list + detail (pack data + mod jars, both `loot_table`/`loot_tables` dirs, full-path ids); editor not built | `components/loot/LootTab.tsx`; `services/loot.ts`; `hooks/useLootTables.ts`; `src-tauri/src/loot/` (`parse.rs` pure, `pack_scan.rs` walker); roadmap §13 P3-LOOT |
 | History / undo | **Implemented** — durable journal, timeline drawer | `core/history/store.ts:86`; `HistoryDrawer.tsx`; `commands/history.rs:11` |
 | Pack lifecycle | **Implemented** — create/load/list/save/delete, import mrpack/CF/packwiz/instance | `commands/project.rs`; `imports/mod.rs` |
 | Launch | **Implemented** — Test → Prism via `LauncherDriver`, companion deploy | `launcher.rs`; `minecraft/launch.rs:11`; `launch_mc_instance` |
@@ -369,7 +370,12 @@ to, appears-in, required-by, gated-by). Should ModCanvas build one?
 There is **no unified model** — and yet the pieces of one are already scattered through the
 codebase as *indexes*:
 
-- **Item registry** — `scan_instance_items_cmd` (`indexer/mod.rs:148`) → per-mod items
+- **Item registry** — `scan_instance_items_cmd` (`indexer/mod.rs:148`) → per-mod items.
+  **UI-label filtering hardened (s44):** lang keys like `item.canUse.unknown`, `item.modifiers.*`,
+  and the no-path labels (`item.color`, `item.disabled`) are vanilla UI strings, not items —
+  the pre-s44 parser emitted `canUse:unknown` (mod_id `canUse`) into the registry (caught by the
+  Pack Index probe on the real client jar). `is_real_item_key` (`indexer/jar.rs`) now requires
+  `item.<ns>.<path>` with a non-UI namespace, verified against the vanilla 1.21.1 client lang.
 - **Tag index** — `resolve_item_tags_cmd` / `list_item_tags_cmd` (`instance_textures/tags.rs`)
 - **Texture descriptor index** — `scan_instance_textures_cmd` (`instance_textures.rs:267`)
 - **Recipe scan cache** — `scan_pack_recipes_cmd` (`recipes/mod.rs:433`)
@@ -1013,6 +1019,15 @@ Conventions:
 - **Completion criteria:** topology findings are deterministic and screenshotable; the
   veteran-facing "wall" readout is demonstrably correct on a real pack with a planted
   unreachable quest.
+- **Status (s44):** topology measurements landed as `checks/topology.ts` (bottlenecks,
+  walls, longest chains — pure graph math over edges, 11 tests). Wired into
+  `analyzePackHealth` as `recommended` findings, behind the recompute (never fast path).
+  Semantics verified by hand-computed tests: bottleneck = removal disconnects >50% of the
+  graph; wall = removal strands ≥1 other quest (roots excluded — an entry point is not a
+  gated stage); chains are cycle-safe (a cyclic quest graph terminates). The
+  quest→item→recipe availability half is PARKED with a written reason: it needs the Pack
+  Index consumer plumbing + the full objective model; the roadmap names it as the hard
+  part, and the measurements here are provable from edges alone.
 
 #### P1-PARITY — Close the remaining FTB parity gaps
 
@@ -1106,11 +1121,32 @@ Conventions:
   GUIs in a `ScreenWrapper` (the book is never the vanilla `Screen`); the client's reload sync
   arrives AFTER the server reload completes; `pauseOnLostFocus` opens the pause menu the moment
   the book closes.
+- **Status (s44):** the KubeJS gate is now ENABLED behind a two-line evidence shape, and the
+  Prism-refusal launch detection landed. KubeJS evidence was probed against the SHIPPED jar
+  (2101.7.2-build.368) — not assumed from the quest shape: bare `kubejs reload` has no executor
+  on 1.21.1 (the tree is `reload config|startup-scripts|server-scripts`), and the script reload
+  alone does not apply recipes (KubeJS's own command message says run `/reload` for datapack
+  things). The companion therefore runs `kubejs reload server-scripts` + `/reload` as a two-
+  command sequence (server-thread FIFO), and the evidence matcher (`commands/hotswap.rs`
+  `ReloadKind::KubeJs`) requires BOTH lines after the pin: "KubeJS server scripts in" (script
+  reload) and "Server resource reload complete!" (datapack apply). Recipe save now runs the
+  evidence-gated loop and reports PASS/FAIL/rotated/no-companion honestly — never an unverified
+  claim. Launch: `do_launch` watches a 20s grace window; a wrapper that exits 0 while no game
+  process appears (the workaround #8 stale-Prism signature) now fails with a specific "close
+  Prism and retry" message instead of reporting "Game exited (code 0)" as success. Both reload
+  types' world-load false-pass lines are handled by the existing pin (never whole-log grep).
 
 ### P3 — Loot, worldgen, distribution depth
 
 - **P3-LOOT** — loot-table editor (scan `data/*/loot_table(s)/*.json`; weighted pools,
   conditions; emits real JSON; Pack Index validated). Class: New. Complexity: Medium–High.
+  **Read-only scan MVP landed (s44):** `src-tauri/src/loot/` walks pack `data/` + mod jars
+  for both historical dir names (`loot_table` 1.21+ / `loot_tables` pre-1.21), parses each
+  into a typed summary via the pure `parse.rs`, dedups by resource id with full-path keys
+  (`minecraft:chests/simple_dungeon` — the game's key form, NOT the bare filename; the first
+  scan silently collapsed nested tables under one wrong id until the live-instance probe
+  caught it). Frontend: `LootTab.tsx` lists + details tables read-only. The editor (pools,
+  conditions, JSON emission) is the remaining build.
 - **P3-WORLDGEN** — worldgen authoring: features/ores first (datapack-JSON-scoped), biomes
   later, dimensions last. Class: New. Complexity: **Very High** — the lowest no-code
   ROI-per-effort; scope tightly or cut. **Recommendation: keep as a "scoped features/ores
