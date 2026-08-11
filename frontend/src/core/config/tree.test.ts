@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { defaultChild, deleteAt, duplicateAt, getAt, matchesQuery, moveArrayAt, setAt } from './tree'
+import { defaultChild, deleteAt, duplicateAt, getAt, matchesQuery, moveArrayAt, setAt, findMatchingPaths } from './tree'
 import type { ConfigValue } from './types'
 
 const tree: ConfigValue = {
@@ -113,5 +113,47 @@ describe('moveArrayAt / duplicateAt', () => {
     const fields = getAt(next, ['server'])?.fields
     expect(Object.keys(fields!)).toContain('port copy')
     expect(getAt(next, ['server', 'port copy'])?.value).toBe(25565)
+  })
+})
+
+describe('findMatchingPaths', () => {
+  function root(fields: Record<string, ConfigValue>): ConfigValue {
+    return { type: 'object', fields }
+  }
+
+  it('matches leaf keys by plain word (path substring)', () => {
+    const tree = root({
+      general: { type: 'group', fields: { keepInventory: { type: 'boolean', value: true } } },
+    })
+    expect(findMatchingPaths(tree, 'keepinventory')).toEqual([['general', 'keepInventory']])
+  })
+
+  it('matches string values, not just keys', () => {
+    const tree = root({ difficulty: { type: 'string', value: 'hard' } })
+    expect(findMatchingPaths(tree, 'hard')).toEqual([['difficulty']])
+  })
+
+  it('matches comments', () => {
+    const tree = root({ tps: { type: 'number', value: 20, comment: 'ticks per second' } })
+    expect(findMatchingPaths(tree, 'per second')).toEqual([['tps']])
+  })
+
+  it('returns the container path when only the container matches', () => {
+    const tree = root({
+      general: { type: 'group', fields: { keepInventory: { type: 'boolean', value: true } } },
+    })
+    expect(findMatchingPaths(tree, 'general')).toEqual([['general', 'keepInventory']])
+  })
+
+  it('returns nothing for a no-match query', () => {
+    const tree = root({ difficulty: { type: 'string', value: 'hard' } })
+    expect(findMatchingPaths(tree, 'zzz')).toEqual([])
+  })
+
+  it('handles arrays', () => {
+    const tree = root({
+      blacklist: { type: 'array', items: [{ type: 'string', value: 'minecraft:bedrock' }] },
+    })
+    expect(findMatchingPaths(tree, 'bedrock')).toEqual([['blacklist', '0']])
   })
 })

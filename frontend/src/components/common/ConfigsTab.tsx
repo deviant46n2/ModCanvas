@@ -3,6 +3,7 @@ import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { List } from 'react-window'
 import { ConfigFileRow, type ConfigRowExtraProps } from './rows'
 import { ConfigValueEditor, type ConfigValue, type ParsedConfig, type ConfigFileInfo } from './config-editor'
+import { GuidedConfigWizard, type GuidedConfigTarget } from './GuidedConfigWizard'
 
 export interface ConfigsTabProps {
   configFiles: ConfigFileInfo[]
@@ -32,6 +33,7 @@ export interface ConfigsTabProps {
 export function ConfigsTab(props: ConfigsTabProps) {
   const [editorSearch, setEditorSearch] = useState('')
   const [collapsedAll, setCollapsedAll] = useState(false)
+  const [showGuidedConfig, setShowGuidedConfig] = useState(false)
 
   const filteredFiles = useMemo(() => {
     const q = props.configSearch.trim().toLowerCase()
@@ -52,6 +54,14 @@ export function ConfigsTab(props: ConfigsTabProps) {
         <div className="configs-sidebar">
           <div className="section-header">
             <h3>Config Files ({props.configFiles.length})</h3>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => setShowGuidedConfig(true)}
+              title="Guided config tweak — search a setting by plain words, edit it, save"
+            >
+              ✨ Add a tweak
+            </button>
           </div>
           <input
             type="text"
@@ -193,6 +203,18 @@ export function ConfigsTab(props: ConfigsTabProps) {
           )}
         </div>
       </div>
+      <GuidedConfigWizard
+        open={showGuidedConfig}
+        configFiles={props.configFiles}
+        openFilePath={props.selectedConfig?.path ?? null}
+        openRoot={props.parsedConfig?.root ?? null}
+        onOpenFile={props.onOpenConfig}
+        onApply={(target: GuidedConfigTarget) => {
+          props.onUpdateConfigValue(target.path, target.value)
+          props.onSaveConfig()
+        }}
+        onClose={() => setShowGuidedConfig(false)}
+      />
     </ErrorBoundary>
   )
 }

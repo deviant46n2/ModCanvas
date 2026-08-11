@@ -648,7 +648,13 @@ Thin, task-scoped guides over the existing editors. First three:
    `useRecipeSave`); live validation via `validateRecipe` blocks create on errors.
    A "✨ Add a recipe" button sits in the recipe editor header.
 3. **"Add a config tweak"** — search a setting by plain words, present it as a typed form,
-   save through `save_structured_config`. **Pending.**
+   save through `save_structured_config`. **Implemented (s41):** `GuidedConfigWizard.tsx` —
+   pick a config file → search a setting by plain words (the editor's own
+   `matchesQuery` semantics, via `findMatchingPaths`) → edit its value as a typed form
+   (reuses the config field editors) → Apply routes through the editor's own
+   `updateConfigValue` + `saveConfigFile` (history + `save_structured_config`). The wizard
+   never parses files itself — it searches the already-open parsed tree. A "✨ Add a tweak"
+   button sits in the configs tab sidebar.
 
 Each is a modal/side-panel that **operates the same editor state and routes through the
 global HistoryStore** — so the user can undo the wizard and see exactly what it made

@@ -90,6 +90,37 @@ export function matchesQuery(
   return false
 }
 
+/** Collect the leaf paths of a tree that match `query` (same semantics as
+ *  `matchesQuery`: key path, comment, or string value). Used by the guided
+ *  config-tweak wizard to present matches to pick from. */
+export function findMatchingPaths(
+  root: ConfigValue,
+  query: string,
+  parents: string[] = [],
+  key = '',
+  out: string[][] = [],
+): string[][] {
+  if (!matchesQuery(root, key, query, parents)) return out
+  const path = [...parents, key].filter(Boolean)
+  if (root.type === 'object' || root.type === 'group') {
+    if (root.fields) {
+      for (const [k, v] of Object.entries(root.fields)) {
+        findMatchingPaths(v, query, path, k, out)
+      }
+    }
+    // Containers match but have no leaf fields: report the container itself.
+    if (!root.fields || Object.keys(root.fields).length === 0) out.push(path)
+  } else if (root.type === 'array') {
+    if (root.items) {
+      root.items.forEach((item, i) => findMatchingPaths(item, query, path, String(i), out))
+    }
+    if (!root.items || root.items.length === 0) out.push(path)
+  } else {
+    out.push(path)
+  }
+  return out
+}
+
 /** Non-mutating insert of `child` at `path` in a copy of `root`. */
 export function setAt(root: ConfigValue, path: string[], child: ConfigValue): ConfigValue {
   const copy = deepClone(root)
