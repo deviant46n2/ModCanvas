@@ -28,13 +28,14 @@ describe('SyncPipeline — Workbench Save & Broadcast', () => {
     expect(pipeline.state.sourceOfLastChange).toBeNull();
   });
 
-  it('should NOT broadcast reload when hotswap is frozen (default)', async () => {
+  it('should NOT broadcast reload when hotswap is explicitly frozen', async () => {
     vi.useFakeTimers();
     const frozen = new SyncPipeline({
       wsIpcSendEvent: mockWsSend as unknown as (eventType: string, path?: string, payload?: unknown) => Promise<number>,
       mcVersion: '1.21.1',
       loader: 'neoforge',
       onStateChange: () => {},
+      hotswapFrozen: true,
     });
     const saveFn = vi.fn().mockResolvedValue(undefined);
 

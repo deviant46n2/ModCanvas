@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +89,12 @@ public class WorkbenchEventHandler {
         LOGGER.info("[WorkbenchEventHandler] Reloading quests from: {}", path);
 
         sendCommand("ftbquests reload");
-        sendToast("Quests reloaded from " + path);
+        // No success toast here, by design (P2-HOTSWAP): the companion cannot
+        // verify the reload (it cannot read its own process's log, and FTB's
+        // editing permission is not client-checkable). Claiming success
+        // without evidence was the lie the app's evidence loop exists to
+        // kill — the app watches the game log for FTB's "Loading quests from"
+        // line and reports PASS/FAIL.
     }
 
     private static void handleConfigReload(WorkbenchCompanionClient.WorkbenchEvent event) {
@@ -98,27 +102,31 @@ public class WorkbenchEventHandler {
         LOGGER.info("[WorkbenchEventHandler] Reloading configs from: {}", path);
 
         sendCommand("kubejs reload");
-        sendToast("Configs reloaded from " + path);
+        // No success toast: unverifiable from the companion (see
+        // handleQuestReload) — the app's evidence loop owns the report.
     }
 
     private static void handleKubeJSReload(WorkbenchCompanionClient.WorkbenchEvent event) {
         LOGGER.info("[WorkbenchEventHandler] Reloading KubeJS scripts");
 
         sendCommand("kubejs reload");
-        sendToast("KubeJS scripts reloaded");
+        // No success toast: unverifiable from the companion (see
+        // handleQuestReload) — the app's evidence loop owns the report.
     }
 
     private static void handleCraftTweakerReload(WorkbenchCompanionClient.WorkbenchEvent event) {
         LOGGER.info("[WorkbenchEventHandler] Reloading CraftTweaker scripts");
 
         sendCommand("ct reload");
-        sendToast("CraftTweaker scripts reloaded");
+        // No success toast: unverifiable from the companion (see
+        // handleQuestReload) — the app's evidence loop owns the report.
     }
 
     private static void handleProgressionReload(WorkbenchCompanionClient.WorkbenchEvent event) {
         String path = event.path != null ? event.path : "Unknown path";
         LOGGER.info("[WorkbenchEventHandler] Reloading progression from: {}", path);
-        sendToast("Progression reloaded from " + path);
+        // No command and no toast: progression has no in-game reload path yet —
+        // toasting success here would be a claim with no mechanism behind it.
     }
 
     private static void handleReloadAll(WorkbenchCompanionClient.WorkbenchEvent event) {
@@ -127,20 +135,14 @@ public class WorkbenchEventHandler {
         handleConfigReload(event);
         handleKubeJSReload(event);
         handleProgressionReload(event);
-        sendToast("All resources reloaded");
+        // No blanket success toast — individual handlers are verified by the
+        // app's evidence loop as each reload type is un-frozen.
     }
 
     private static void sendCommand(String command) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null && mc.player.connection != null) {
             mc.player.connection.sendCommand(command);
-        }
-    }
-
-    private static void sendToast(String message) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a[ModCanvas] §r" + message), true);
         }
     }
 }

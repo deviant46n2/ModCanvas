@@ -1,10 +1,13 @@
 // Hotswap freeze (see todo.md Phase 3).
 //
-// The in-game hot-reload path (`RELOAD_QUESTS`, `RELOAD_KUBEJS_SCRIPTS`,
-// `SyncPipeline.broadcastReload`) is FROZEN: saves still export to disk and
-// persist, but no reload command is pushed to a running game. The WS server,
-// engine-render capture, and runtime texture extraction stay live.
+// RELOAD_QUESTS is UN-FROZEN (s42) behind the reload-evidence gate
+// (P2-HOTSWAP): the quest Save button now pins the game log position,
+// broadcasts the reload, and reports PASS only when FTB's own "Loading
+// quests from" line lands after the pin (services/hotswap.ts +
+// src-tauri commands/hotswap.rs). A reload without evidence is reported
+// FAIL, never claimed. The companion no longer toasts unverifiable success.
 //
-// The send-sites keep their code (dormant, importable) so the path can be
-// re-enabled later; set this flag to `false` to un-freeze.
-export const HOTSWAP_FROZEN = true
+// RELOAD_KUBEJS_SCRIPTS / RELOAD_CONFIG / RELOAD_CRAFTTWEAKER stay frozen —
+// their log signatures have NOT been probed (each has its own evidence
+// shape; do not assume it matches quests).
+export const HOTSWAP_FROZEN = false

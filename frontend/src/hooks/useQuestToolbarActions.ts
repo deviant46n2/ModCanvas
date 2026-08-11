@@ -5,7 +5,6 @@ import {
   importFtbQuestsFromDir,
   exportFtbQuestsToDir,
   saveQuestGraph,
-  wsIpcSendEvent,
   wsIpcGetStatus,
   wsIpcRestart,
   listPrismInstances,
@@ -15,6 +14,7 @@ import { defaultQuestNodeData } from '../components/quest/quest-helpers'
 import { stripMcFormatting } from '../core/theme/font-formatter'
 import { pickDir } from '../components/quest/pick-dir'
 import { HOTSWAP_FROZEN } from '../core/sync/config'
+import { reloadQuestsInGame } from '../services/hotswap'
 
 export interface QuestToolbarActions {
   saveMessage: { text: string; ok: boolean } | null
@@ -73,7 +73,7 @@ export function useQuestToolbarActions({
     setSaveMessage({ text: 'Saving...', ok: true })
     await saveGraphRef.current?.()
     // Hotswap frozen (todo.md Phase 3): the save/export above is all we push;
-    // the RELOAD_QUESTS send below stays dormant behind the flag.
+    // the evidence-gated reload flow below stays dormant behind the flag.
     if (HOTSWAP_FROZEN) {
       const texCount = Object.keys(textureIndex).length
       setSaveMessage({ text: `Saved (${texCount} textures)`, ok: true })
@@ -81,14 +81,32 @@ export function useQuestToolbarActions({
     }
     if (!wsStatus.connected) await handleReconnect()
     try {
-      await wsIpcSendEvent('RELOAD_QUESTS')
+      const outcome = await reloadQuestsInGame(projectId)
       const texCount = Object.keys(textureIndex).length
-      setSaveMessage(m => m?.ok ? { text: `Saved (${texCount} textures)`, ok: true } : m!)
+      const base = `Saved (${texCount} textures)`
+      switch (outcome.status) {
+        case 'passed':
+          // Evidence: FTB's "Loading quests from" line landed after the send.
+          setSaveMessage({ text: `${base} · reload verified in-game ✓`, ok: true })
+          break
+        case 'no-companion':
+          setSaveMessage({ text: `${base} · game not connected — saved to disk only`, ok: true })
+          break
+        case 'rotated':
+          setSaveMessage({ text: `${base} · reload unverified (game log rotated) — saved to disk`, ok: true })
+          break
+        case 'failed':
+          setSaveMessage({
+            text: `${base} · reload FAILED — is the game running with FTB Quests commands + edit mode enabled?`,
+            ok: false,
+          })
+          break
+      }
     } catch (e) {
       setSaveMessage({ text: `Hot-reload failed: ${e}`, ok: false })
       console.error('Hot-reload failed:', e)
     }
-  }, [graph, wsStatus.connected, handleReconnect, textureIndex])
+  }, [graph, wsStatus.connected, handleReconnect, textureIndex, projectId])
 
   autoSaveRef.current = async () => {
     if (!graph) return
