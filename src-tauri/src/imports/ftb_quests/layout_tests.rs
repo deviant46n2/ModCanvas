@@ -175,6 +175,58 @@ fn test_flat_chapters_layout() {
 }
 
 #[test]
+fn layout_for_version_maps_1_21_to_flat_chapters() {
+    use crate::imports::ftb_quests::FtBQuestsLayout;
+    // Verified against the shipped 1.21.1 jar (2101.1.30): the ONLY loadable
+    // layout is chapters/ (path template "chapters/%s.snbt").
+    assert_eq!(layout_for_version("1.21.1"), Some(FtBQuestsLayout::FlatChapters));
+    assert_eq!(layout_for_version("1.21.4"), Some(FtBQuestsLayout::FlatChapters));
+    // Unverified versions keep the pre-existing behavior.
+    assert_eq!(layout_for_version("1.20.1"), None);
+    assert_eq!(layout_for_version(""), None);
+}
+
+#[test]
+fn export_override_forces_flat_chapters_for_subdirs_graph() {
+    use crate::imports::ftb_quests::FtBQuestsLayout;
+    // A graph whose layout says "Subdirs" records what the pack directory
+    // contained — not what FTB 1.21.x can load. The version-aware override
+    // must migrate it to chapters/*.snbt (the s42 bug: Monster's subdirs
+    // export loaded 0 chapters in-game).
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let ch_dir = quests_dir.join("chapter_1");
+    std::fs::create_dir_all(&ch_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+    std::fs::write(ch_dir.join("chapter.snbt"), r#"{
+    id = "ch1"
+    filename = "chapter_1"
+    title = "Early Game"
+    quests = [
+        { id = "q1", x = 0.0d, y = 0.0d, title = "Start", tasks = [{ id = "t1", type = "checkmark", title = "Begin" }] }
+    ]
+}"#).unwrap();
+
+    let result = import_ftb_quests(tmp.path()).unwrap();
+    assert_eq!(result.layout, "Subdirs");
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt_for_layout(&result.graph, export_dir.path(), &result.sidecar, Some(FtBQuestsLayout::FlatChapters)).unwrap();
+
+    let out_quests = export_dir.path().join("config").join("ftbquests").join("quests");
+    let flat_files: Vec<_> = std::fs::read_dir(out_quests.join("chapters"))
+        .map(|e| e.flatten().filter(|p| p.path().extension().map_or(false, |x| x == "snbt")).collect())
+        .unwrap_or_default();
+    assert_eq!(flat_files.len(), 1, "expected exactly one chapter file in chapters/");
+    assert!(!out_quests.join("chapter_1").join("chapter.snbt").exists(), "subdirs copy must be gone");
+
+    // The flat output re-imports as FlatChapters (the layout FTB 1.21 loads).
+    let result2 = import_ftb_quests(export_dir.path()).unwrap();
+    assert_eq!(result2.layout, "FlatChapters");
+    assert!(result2.chapter_count >= 1, "chapter survived the migration");
+}
+
+#[test]
 fn test_checkmark_quest_uses_accept_icon() {
     let tmp = tempfile::tempdir().unwrap();
     let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");

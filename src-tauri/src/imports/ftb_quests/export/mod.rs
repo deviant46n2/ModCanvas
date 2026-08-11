@@ -1,4 +1,5 @@
 use crate::imports::snbt::{SnbtValue, compound_to_snbt};
+use crate::imports::ftb_quests::FtBQuestsLayout;
 use super::snbt_sidecar;
 use crate::quest::*;
 use anyhow::Result;
@@ -18,15 +19,43 @@ use helpers::{chapter_images_to_snbt, sanitize_filename};
 use quest::quest_to_snbt;
 use book::{write_book_snbt, write_reward_tables_snbt};
 
-/// Export a QuestGraph as FTB Quests SNBT files to a directory — in the ONE
-/// layout the pack already uses (Subdirs or FlatChapters; stale copies of the
-/// other layout are cleaned up, so a pack can never accumulate two copies of
-/// the same book — that doubled dependency edges on re-import).
+/// The chapter layout a given Minecraft version's FTB Quests actually READS.
+/// Returns `None` when the version is unverified and the pre-existing
+/// (graph/detected) behavior should stand.
 ///
-/// `sidecar` is the raw-SNBT map returned from `import_ftb_quests`.  When
-/// non-empty, the exporter re-parses the original SNBT to recover user comments
-/// and merges them into the output for unchanged fields.
+/// Verified for 1.21.x against the shipped jar (ftb-quests-neoforge
+/// 2101.1.30, BaseQuestFile bytecode): `readDataFull` resolves `chapters`
+/// and `Files.list`s it, and the chapter path template is the constant
+/// `"chapters/%s.snbt"` — chapters live at `quests/chapters/*.snbt` ONLY.
+/// The Subdirs layout (`quests/<name>/chapter.snbt`) is invisible to 1.21.x:
+/// a pack exported in it loads 0 chapters in-game (s42: Monster never
+/// showed quests; ATM10SKY, a working 1.21.1 pack, uses `chapters/`).
+pub fn layout_for_version(mc_version: &str) -> Option<FtBQuestsLayout> {
+    if mc_version.starts_with("1.21") {
+        Some(FtBQuestsLayout::FlatChapters)
+    } else {
+        None
+    }
+}
+
+/// Export in the layout the graph came from (or the target dir's detected
+/// layout for a fresh graph). See [`export_ftb_quests_snbt_for_layout`] for
+/// the version-aware override used by production paths.
 pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &snbt_sidecar::SnbtSidecar) -> Result<()> {
+    export_ftb_quests_snbt_for_layout(graph, output_dir, sidecar, None)
+}
+
+/// Export with an explicit layout override. Production paths resolve the
+/// override from the project's Minecraft version (see `layout_for_version`):
+/// for 1.21.x a graph whose layout says "Subdirs" must STILL export
+/// FlatChapters — the graph's layout records what the pack's directory
+/// contained, not what the target FTB version can load.
+pub fn export_ftb_quests_snbt_for_layout(
+    graph: &QuestGraph,
+    output_dir: &Path,
+    sidecar: &snbt_sidecar::SnbtSidecar,
+    layout_override: Option<FtBQuestsLayout>,
+) -> Result<()> {
     let quests_dir = output_dir.join("config").join("ftbquests").join("quests");
 
     // Live export paths (export_ftb_quests_to_dir, write_quest_graph_to_instance)
@@ -67,18 +96,28 @@ pub fn export_ftb_quests_snbt(graph: &QuestGraph, output_dir: &Path, sidecar: &s
         }
     }
 
-    // Write ONE layout — the one the pack already uses. Writing both used to
-    // create a second, stale copy of the book on every save; the game can
-    // load both, and re-importing the doubled dirs doubled dependency edges
-    // (retitled chapter folders + the other layout's files accumulated until
-    // the pack had two copies of the same quests).
+    // Write ONE layout — the one the pack already uses (or the version-aware
+    // override). Writing both used to create a second, stale copy of the book
+    // on every save; the game can load both, and re-importing the doubled
+    // dirs doubled dependency edges (retitled chapter folders + the other
+    // layout's files accumulated until the pack had two copies of the same
+    // quests).
     // The layout travels with the graph (set by the import); a fresh graph
-    // falls back to what the target dir already has.
-    let layout_is_subdirs = if graph.layout.is_empty() {
-        crate::imports::ftb_quests::detect_layout(&quests_dir)
-            == crate::imports::ftb_quests::FtBQuestsLayout::Subdirs
-    } else {
-        graph.layout == "Subdirs"
+    // falls back to what the target dir already has. The override (1.21.x →
+    // FlatChapters) wins over both: the graph/detected layout records what
+    // the directory contains, not what the target FTB version can load.
+    let layout_is_subdirs = match layout_override {
+        Some(crate::imports::ftb_quests::FtBQuestsLayout::Subdirs) => true,
+        Some(crate::imports::ftb_quests::FtBQuestsLayout::FlatChapters)
+        | Some(crate::imports::ftb_quests::FtBQuestsLayout::Flat) => false,
+        None => {
+            if graph.layout.is_empty() {
+                crate::imports::ftb_quests::detect_layout(&quests_dir)
+                    == crate::imports::ftb_quests::FtBQuestsLayout::Subdirs
+            } else {
+                graph.layout == "Subdirs"
+            }
+        }
     };
 
     if layout_is_subdirs {

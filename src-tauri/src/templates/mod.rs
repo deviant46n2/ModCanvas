@@ -4,10 +4,11 @@
 //! Template content lives in `src-tauri/templates/` — deliberately OUTSIDE
 //! `src/`, so the integrity line-limit scan treats it as data, not code — and
 //! is embedded at compile time via `include_str!`. Content mirrors the app's
-//! own export output (subdirs layout: `config/ftbquests/quests/`), so a
-//! scaffolded pack imports, re-exports, and loads in-game exactly like a real
-//! pack. Everything is self-authored plain text: the no-bundling rule
-//! (AGENTS.md) is untouched.
+//! own export output (FlatChapters layout: `config/ftbquests/quests/chapters/
+//! *.snbt` — the ONLY layout FTB Quests 1.21.x reads, verified in the
+//! 2101.1.30 jar), so a scaffolded pack imports, re-exports, and loads
+//! in-game exactly like a real pack. Everything is self-authored plain text:
+//! the no-bundling rule (AGENTS.md) is untouched.
 //!
 //! The seam: `scaffold_template` is pure (path in, files out, no Tauri
 //! state), so `create_project` stays a thin command wrapper and the scaffold
@@ -37,12 +38,12 @@ const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
             include_str!("../../templates/exploration/data.snbt"),
         ),
         (
-            "Exploration_Starter/chapter.snbt",
-            include_str!("../../templates/exploration/Exploration_Starter/chapter.snbt"),
+            "chapters/Exploration_Starter.snbt",
+            include_str!("../../templates/exploration/chapters/Exploration_Starter.snbt"),
         ),
         (
-            "Shape_Your_Pack/chapter.snbt",
-            include_str!("../../templates/exploration/Shape_Your_Pack/chapter.snbt"),
+            "chapters/Shape_Your_Pack.snbt",
+            include_str!("../../templates/exploration/chapters/Shape_Your_Pack.snbt"),
         ),
     ],
 }];
@@ -81,9 +82,9 @@ pub fn scaffold_template(project_root: &Path, template_id: &str) -> Result<(), S
     }
 
     for (rel, contents) in tpl.files {
-        // Same layout the app's own exporter produces, so the load pipeline
-        // (`apiImportFtbQuests`) picks the scaffolded pack up like any real
-        // pack on the first open.
+        // Same layout the app's own exporter produces (FlatChapters on
+        // 1.21.x), so the load pipeline (`apiImportFtbQuests`) picks the
+        // scaffolded pack up like any real pack on the first open.
         let rel = format!("ftbquests/quests/{rel}");
         let target = crate::path_safety::validate_project_write(root, &rel)?;
         if let Some(parent) = target.parent() {

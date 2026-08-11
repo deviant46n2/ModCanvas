@@ -119,7 +119,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Domain | State | Evidence |
 |---|---|---|
-| Quest editor (FTB Quests) | **Implemented, deep** — near-full parity per `featureparity.md` | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + flat/subdirs export (`imports/ftb_quests/`) |
+| Quest editor (FTB Quests) | **Implemented, deep** — near-full parity per `featureparity.md`; **export layout fixed s42** (1.21.x exports ONLY FlatChapters `quests/chapters/*.snbt` — verified against the shipped 2101.1.30 jar, which loads no other layout; the older Subdirs export loaded 0 chapters in-game) | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + version-aware export (`imports/ftb_quests/`) |
 | Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:433`; `scriptgen/`; `recipe_disable.rs:29` |
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
 | Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `search_merge.rs` (s33) |
@@ -266,7 +266,7 @@ Every item here exists and works. The roadmap's relationship to each is
 | 8 | Pack Health Tier 1 | `core/pack-health/*` | Works | **Harden** (trust-scope gaps) + **Expand** to Tier 2 (§10) |
 | 9 | History/undo w/ journal | `core/history/*`, `history-provider.tsx` | Works | **Keep**; mini-wizards must route through it |
 | 10 | Pack import (mrpack/CF/packwiz/instance) + FTB import | `imports/*` | Works (entry points partially dead) | **Integrate** into wizard's instance-pick; wire or prune dead variants |
-| 11 | Pack export (mrpack, CF zip, FTB flat+subdirs) | `imports/mod.rs:294`, `imports/curseforge.rs:293`, `export/mod.rs:26` | Works; **CF export drops Modrinth mods** (bug) | **Harden** — fix the bug (P1-HYGIENE-2) |
+| 11 | Pack export (mrpack, CF zip, FTB layout-aware export) | `imports/mod.rs:294`, `imports/curseforge.rs:293`, `export/mod.rs:26` | Works; **CF export drops Modrinth mods** (bug); quest export layout version-aware since s42 (1.21.x → FlatChapters only) | **Harden** — fix the bug (P1-HYGIENE-2) |
 | 12 | Launcher attach + Test launch | `launcher.rs`, `minecraft/launch.rs` | Works | **Keep**; the wizard's final Launch button |
 | 13 | Companion rendering/texture extraction | companion Java, `engine-renders.md` | Works | **Harden** for wizard-driven first launch (P0-LAUNCH) |
 | 14 | Texture pipeline (index, lazy materialization, animations, tags) | `instance_textures/`, `texture-loader.ts` | Works | **Keep**; Pack Index item/tag spine (P1-PACKINDEX) |

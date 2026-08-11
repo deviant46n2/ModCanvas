@@ -16,15 +16,18 @@ fn scaffolded_root() -> (tempfile::TempDir, std::path::PathBuf) {
 }
 
 #[test]
-fn scaffold_writes_subdirs_layout() {
+fn scaffold_writes_flat_chapters_layout() {
     let (_tmp, root) = scaffolded_root();
     let quests = root.join("config").join("ftbquests").join("quests");
 
     assert!(quests.join("data.snbt").exists(), "book data file missing");
-    let play = quests.join("Exploration_Starter").join("chapter.snbt");
-    assert!(play.exists(), "play chapter missing in subdirs layout");
-    let shape = quests.join("Shape_Your_Pack").join("chapter.snbt");
-    assert!(shape.exists(), "shape chapter missing in subdirs layout");
+    // FlatChapters — the ONLY layout FTB Quests 1.21.x reads (verified in the
+    // 2101.1.30 jar: "chapters/%s.snbt"). Subdirs would load 0 chapters.
+    let play = quests.join("chapters").join("Exploration_Starter.snbt");
+    assert!(play.exists(), "play chapter missing in chapters/ layout");
+    let shape = quests.join("chapters").join("Shape_Your_Pack.snbt");
+    assert!(shape.exists(), "shape chapter missing in chapters/ layout");
+    assert!(!quests.join("Exploration_Starter").exists(), "no subdirs chapter folders");
 
     let play_content = std::fs::read_to_string(&play).unwrap();
     assert!(play_content.contains(r#"id = "A000000000000001""#), "play chapter id missing");

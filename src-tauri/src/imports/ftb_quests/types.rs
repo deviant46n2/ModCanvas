@@ -37,9 +37,14 @@ pub enum FtBQuestsFormat {
 /// Detected FTB Quests directory layout
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FtBQuestsLayout {
-    /// New layout: quests_dir/<chapter_dir>/chapter.snbt (subdirectories)
+    /// quests_dir/<chapter_dir>/chapter.snbt — what the app's older exports
+    /// wrote. NOT read by FTB Quests 1.21.x (verified in the 2101.1.30 jar:
+    /// only quests/chapters/*.snbt is scanned); kept for older-version/legacy
+    /// pack import fidelity.
     Subdirs,
-    /// Old layout: quests_dir/chapters/*.snbt (flat files in chapters/ dir)
+    /// quests_dir/chapters/*.snbt — the ONLY layout FTB Quests 1.21.x loads
+    /// (chapter path template "chapters/%s.snbt"). ATM10SKY (working 1.21.1
+    /// pack) uses this.
     FlatChapters,
     /// Very old: quests_dir/*.snbt (flat files directly in quests dir)
     Flat,
