@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use crate::launcher::LauncherDriver;
 use crate::models::{InstanceStatus, MinecraftInstance};
 
 use super::instances::InstanceManager;
+use super::liveness::InstanceLiveness;
 use super::progress::{LaunchProgress, ProgressEmitter};
 
 impl InstanceManager {
@@ -45,6 +47,15 @@ _username: &str,
                 .to_string()
         };
 
+        // Liveness scans the instance ROOT (the java cmdline carries the root
+        // via -Djava.library.path=.../natives, never the /minecraft subdir).
+        let game_dir_str = game_dir.to_string_lossy();
+        let instance_root = game_dir_str
+            .strip_suffix("/minecraft")
+            .unwrap_or(&game_dir_str)
+            .to_string();
+        let liveness = self.liveness.clone();
+
         let id_owned = id.to_string();
         drop(instances);
 
@@ -72,6 +83,8 @@ _username: &str,
                 &prism_folder_name,
                 &min_mem,
                 &max_mem,
+                liveness.as_ref(),
+                &instance_root,
             )
             .await;
 
@@ -97,7 +110,16 @@ _username: &str,
     }
 }
 
-async fn do_launch(
+/// Grace window for the Prism-refusal check: a stale Prism process (workaround
+/// #8) swallows the single-instance IPC and the wrapper exits 0 immediately
+/// with no game process starting. Real launches reach the game well within
+/// this window; a slow first launch just keeps the wrapper alive.
+const LAUNCH_GRACE: Duration = Duration::from_secs(20);
+const LIVENESS_POLL: Duration = Duration::from_millis(250);
+
+/// `pub(super)`: the sibling `launch_tests` module drives the refusal
+/// detection against fake drivers/liveness (s44).
+pub(super) async fn do_launch(
     emitter: &dyn ProgressEmitter,
     driver: &dyn LauncherDriver,
     instances: &Arc<Mutex<Vec<MinecraftInstance>>>,
@@ -105,6 +127,8 @@ async fn do_launch(
     prism_folder_name: &str,
     min_mem: &str,
     max_mem: &str,
+    liveness: &dyn InstanceLiveness,
+    instance_root: &str,
 ) -> Result<(), String> {
     eprintln!(
         "[ModCanvas] Launching '{}' via Prism Launcher",
@@ -150,6 +174,51 @@ async fn do_launch(
         bytes: None,
         total: None,
     });
+
+    // Prism-refusal detection (s44, workaround #8): a stale Prism process
+    // holds the single-instance lock, the spawn forwards to it and the
+    // wrapper exits 0 IMMEDIATELY — no game process ever starts. Distinguish
+    // that from a normal launch by liveness: a real launch has a live game
+    // process carrying the instance root in its cmdline. Liveness wins over
+    // the exit code, because a normal hand-off can also see the wrapper exit
+    // 0 while the game keeps running (liveness.rs). Never report "Game
+    // exited (code 0)" as a success when the game never started.
+    let deadline = Instant::now() + LAUNCH_GRACE;
+    loop {
+        if liveness.is_running(instance_root) {
+            break; // game is up — normal path, wait for the wrapper below.
+        }
+        match child.try_wait().map_err(|e| format!("Process error: {e}"))? {
+            Some(status) if status.code() == Some(0) => {
+                return Err(format!(
+                    "Prism exited immediately (code 0) and no game process started. \
+                     A stale Prism process may be holding the instance — close Prism \
+                     completely and try again."
+                ));
+            }
+            Some(status) => {
+                // Non-zero exit within the grace window — a real failure, not
+                // a refusal; report it as the launch result.
+                let msg = match status.code() {
+                    Some(code) => format!("Game exited (code {})", code),
+                    None => "Game exited".into(),
+                };
+                emitter.emit_progress(LaunchProgress {
+                    phase: "done".into(),
+                    message: msg.clone(),
+                    bytes: None,
+                    total: None,
+                });
+                return Err(msg);
+            }
+            None => {
+                if Instant::now() >= deadline {
+                    break; // wrapper still alive after grace — normal slow start.
+                }
+                tokio::time::sleep(LIVENESS_POLL).await;
+            }
+        }
+    }
 
     // Wait for the child process to exit (non-blocking)
     let exit_status = child.wait().await.map_err(|e| format!("Process error: {e}"))?;

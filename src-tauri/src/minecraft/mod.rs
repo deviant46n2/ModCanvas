@@ -21,3 +21,5 @@ pub use progress::{LaunchProgress, NullProgressEmitter, ProgressEmitter};
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod launch_tests;

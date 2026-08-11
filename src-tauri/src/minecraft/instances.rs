@@ -33,7 +33,9 @@ pub struct InstanceManager {
     /// read time. The launch flow's stored status tracks the Prism wrapper,
     /// which can exit while the game keeps running — deriving from the
     /// process table fixes every consumer (pill, restart pre-check) at once.
-    liveness: Arc<dyn InstanceLiveness>,
+    /// `pub(super)`: the sibling `launch` module reads it for the Prism-
+    /// refusal check (s44); nothing outside `minecraft` touches it.
+    pub(super) liveness: Arc<dyn InstanceLiveness>,
 }
 
 impl InstanceManager {
