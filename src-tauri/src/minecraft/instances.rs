@@ -218,4 +218,45 @@ impl InstanceManager {
             Ok("No logs yet. Launch the instance first.".to_string())
         }
     }
+
+    /// Byte length of `logs/latest.log` — the position pin for hotswap reload
+    /// evidence. FTB's "Loading quests from" line fires on EVERY world load,
+    /// so an unpinned whole-log grep false-passes (s42 probe); the pin makes
+    /// the check "line landed AFTER I sent", not "line exists somewhere".
+    pub fn log_pin(&self, id: &str) -> Result<u64, String> {
+        let instances = self.instances.lock().unwrap();
+        let instance = instances.iter().find(|i| i.id == id)
+            .ok_or_else(|| "Instance not found".to_string())?;
+        let log_file = PathBuf::from(&instance.game_dir).join("logs").join("latest.log");
+        match std::fs::metadata(&log_file) {
+            Ok(m) => Ok(m.len()),
+            Err(_) => Ok(0),
+        }
+    }
+
+    /// Read the log tail from a pinned offset. `rotated=true` when the file
+    /// shrank or vanished since the pin (midnight rotation/truncation) — the
+    /// check is then inconclusive and must be retried, never claimed as FAIL
+    /// or PASS.
+    pub fn read_log_since(&self, id: &str, offset: u64) -> Result<(String, bool), String> {
+        let instances = self.instances.lock().unwrap();
+        let instance = instances.iter().find(|i| i.id == id)
+            .ok_or_else(|| "Instance not found".to_string())?;
+        let log_file = PathBuf::from(&instance.game_dir).join("logs").join("latest.log");
+
+        if !log_file.exists() {
+            return Ok((String::new(), false));
+        }
+        let len = std::fs::metadata(&log_file).map_err(|e| e.to_string())?.len();
+        if len < offset {
+            return Ok((String::new(), true));
+        }
+
+        use std::io::{Read, Seek, SeekFrom};
+        let mut f = std::fs::File::open(&log_file).map_err(|e| e.to_string())?;
+        f.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+        let mut tail = String::new();
+        f.read_to_string(&mut tail).map_err(|e| e.to_string())?;
+        Ok((tail, false))
+    }
 }

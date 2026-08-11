@@ -152,6 +152,8 @@ pub fn run() {
             commands::write_config_file,
             commands::parse_config_file,
             commands::save_structured_config,
+            commands::pin_reload_log,
+            commands::verify_reload_log,
             commands::read_history_journal,
             commands::write_history_journal,
             // Runtime family (create/launch/stop/remove/get_logs/resolve) is

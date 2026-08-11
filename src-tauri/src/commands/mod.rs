@@ -1,5 +1,6 @@
 pub mod config;
 pub mod history;
+pub mod hotswap;
 pub mod mod_intel;
 pub mod modpack;
 pub mod project;
@@ -8,6 +9,7 @@ pub mod runtime;
 
 pub use config::*;
 pub use history::*;
+pub use hotswap::*;
 pub use mod_intel::*;
 pub use modpack::*;
 pub use quest_graph::*;
