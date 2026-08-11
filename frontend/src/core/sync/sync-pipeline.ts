@@ -71,8 +71,9 @@ export class SyncPipeline {
 
     try {
       await fn();
-      // Hotswap is frozen (todo.md Phase 3): the reload broadcast after a save
-      // is suppressed. broadcastReload() stays defined/dormant for re-enable.
+      // Dormant path (roadmap §14.3): the live quest-reload flow is
+      // services/hotswap.ts (evidence-gated); this broadcast is kept for the
+      // re-enable path and follows the quest hotswap gate (config.ts).
       if (!this.config.hotswapFrozen) {
         await this.broadcastReload();
       }

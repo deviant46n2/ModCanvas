@@ -14,8 +14,9 @@ import type { QuestGraphData, PrismInstance } from '../services/api'
 import { defaultQuestNodeData } from '../components/quest/quest-helpers'
 import { stripMcFormatting } from '../core/theme/font-formatter'
 import { pickDir } from '../components/quest/pick-dir'
-import { HOTSWAP_FROZEN } from '../core/sync/config'
+import { QUEST_HOTSWAP_ENABLED } from '../core/sync/config'
 import { reloadQuestsInGame } from '../services/hotswap'
+import { companionState, onCompanionStatus } from '../services/companion-socket'
 
 export interface QuestToolbarActions {
   saveMessage: { text: string; ok: boolean } | null
@@ -59,6 +60,17 @@ export function useQuestToolbarActions({
     } catch {}
   }, [])
 
+  // Keep wsStatus live from the hub's status pushes, not a mount-time
+  // snapshot. The app may mount before the game boots a companion (s43):
+  // a stale `connected: false` then drives saveAndHotReload into a
+  // destructive hub restart.
+  useEffect(() => {
+    const unsub = onCompanionStatus((status) => {
+      setWsStatus({ connected: status.connected, clientCount: status.clientCount })
+    })
+    return unsub
+  }, [])
+
   const handleReconnect = useCallback(async () => {
     try {
       await wsIpcRestart()
@@ -73,14 +85,21 @@ export function useQuestToolbarActions({
     if (!graph) return
     setSaveMessage({ text: 'Saving...', ok: true })
     await saveGraphRef.current?.()
-    // Hotswap frozen (todo.md Phase 3): the save/export above is all we push;
-    // the evidence-gated reload flow below stays dormant behind the flag.
-    if (HOTSWAP_FROZEN) {
+    // Quest hotswap is evidence-gated (s42): when disabled the save/export
+    // above is all we push and the reload flow stays dormant.
+    if (!QUEST_HOTSWAP_ENABLED) {
       const texCount = Object.keys(textureIndex).length
       setSaveMessage({ text: `Saved (${texCount} textures)`, ok: true })
       return
     }
-    if (!wsStatus.connected) await handleReconnect()
+    // Restart the hub only when the hub itself is unreachable (frontend's
+    // own socket is down). Never restart on the companion flag: wsIpcRestart
+    // stops the hub and clears ALL clients (ws_ipc.rs), which would drop a
+    // healthy companion and guarantee "game not connected" on the next save
+    // (s43 — the mount-snapshot bug). If the hub is up but no companion is
+    // attached, broadcast anyway: reloadQuestsInGame honestly reports
+    // no-companion.
+    if (!companionState.serverUp) await handleReconnect()
     try {
       const outcome = await reloadQuestsInGame(projectId)
       const texCount = Object.keys(textureIndex).length
@@ -97,8 +116,12 @@ export function useQuestToolbarActions({
           setSaveMessage({ text: `${base} · reload unverified (game log rotated) — saved to disk`, ok: true })
           break
         case 'failed':
+          // No evidence line landed after the pin. Since s43 the companion
+          // dispatches through the server's own command source (op 4), so the
+          // old "enable commands + edit mode" hint no longer applies — the
+          // failure is: no reload happened in the running game.
           setSaveMessage({
-            text: `${base} · reload FAILED — is the game running with FTB Quests commands + edit mode enabled?`,
+            text: `${base} · reload FAILED — no reload evidence in the game log (is the game running the current companion jar?)`,
             ok: false,
           })
           break
@@ -107,7 +130,7 @@ export function useQuestToolbarActions({
       setSaveMessage({ text: `Hot-reload failed: ${e}`, ok: false })
       console.error('Hot-reload failed:', e)
     }
-  }, [graph, wsStatus.connected, handleReconnect, textureIndex, projectId])
+  }, [graph, handleReconnect, textureIndex, projectId])
 
   autoSaveRef.current = async () => {
     if (!graph) return
