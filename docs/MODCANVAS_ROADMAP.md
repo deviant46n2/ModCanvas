@@ -642,7 +642,11 @@ Thin, task-scoped guides over the existing editors. First three:
    now; kill/reach/XP are future additions to the same component.
 2. **"Add a recipe"** — the wizard reads the item picker, fills the grid, validates via
    `core/recipe/validation.ts:94`, saves through the normal authored-only path.
-   **Pending.**
+   **Implemented (s41):** `GuidedRecipeWizard.tsx` — pick the output → set the count +
+   pick ingredients (up to 9, each with a count) → review + create. Builds a shapeless
+   recipe through the editor's own `addRecipe` store path (undoable, saves via
+   `useRecipeSave`); live validation via `validateRecipe` blocks create on errors.
+   A "✨ Add a recipe" button sits in the recipe editor header.
 3. **"Add a config tweak"** — search a setting by plain words, present it as a typed form,
    save through `save_structured_config`. **Pending.**
 

@@ -7,6 +7,8 @@ interface RecipeEditorHeaderProps {
   reloadMsg: string;
   onReload: () => void;
   onImport: () => void;
+  /** Open the guided "Add a recipe" wizard (P0-MINIWIZ). */
+  onAddGuided?: () => void;
 }
 
 export function RecipeEditorHeader({
@@ -18,11 +20,17 @@ export function RecipeEditorHeader({
   reloadMsg,
   onReload,
   onImport,
+  onAddGuided,
 }: RecipeEditorHeaderProps) {
   return (
     <header className="recipe-editor-header">
       <h2>Recipe Editor <span className="recipe-adapter-badge">{mcVersion}/{loader}</span></h2>
       <div className="header-actions">
+        {onAddGuided && (
+          <button type="button" className="btn-secondary" onClick={onAddGuided} title="Guided recipe — pick an output and ingredients, the wizard writes it">
+            ✨ Add a recipe
+          </button>
+        )}
         <button
           type="button"
           className={`script-toggle ${showScriptPreview ? 'active' : ''}`}

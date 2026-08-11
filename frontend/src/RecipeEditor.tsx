@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRecipeStore } from './core/recipe/recipe-store';
+import { useGuidedRecipe } from './hooks/useGuidedRecipe';
 import { RecipeEditorHeader } from './components/recipe/RecipeEditorHeader';
+import { GuidedRecipeWizard } from './components/recipe/GuidedRecipeWizard';
 import { RecipeEditorBody } from './components/recipe/RecipeEditorBody';
 import { RecipeEditorModals } from './components/recipe/RecipeEditorModals';
 import type { IngredientRef } from './core/recipe/bulk-replace';
 import type { ImportedRecipe } from './core/recipe/json-import';
 import { useInstanceTextures } from './hooks/useInstanceTextures';
 import { useRecipeSave } from './hooks/useRecipeSave';
+import { useRecipeReload } from './hooks/useRecipeReload';
 import { useRecipeDisable, manifestRecipesFrom } from './hooks/useRecipeDisable';
 import { usePackHealthStore } from './core/pack-health/pack-health-store';
 import type { ItemRegistryEntry, ItemTagInfo } from './services/api';
@@ -30,7 +33,6 @@ import {
   applyBulkReplace,
   createToggleDisableHandler,
   createRecipesUsingHandler,
-  reloadPackRecipes,
   scanItemRegistry,
 } from './components/recipe/recipe-editor-utils';
 import './recipe-editor-styles';
@@ -83,8 +85,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const registryUrlById = useMemo(() => buildRegistryUrlMap(itemRegistry), [itemRegistry]);
   const [, setTextureTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
-  const [reloading, setReloading] = useState(false);
-  const [reloadMsg, setReloadMsg] = useState('');
+  const { reloading, reloadMsg, reloadRecipes } = useRecipeReload(projectPath, loadRecipesFromPack);
   // The raw generated-script preview is opt-in for veterans — hidden by default
   // so beginners never hit code. Sticky across sessions via localStorage.
   const [showScriptPreview, setShowScriptPreview] = useState(readScriptPreviewPref);
@@ -111,21 +112,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       disposed = true;
     };
   }, [projectPath, kubejsNamespace, setItemRegistry]);
-
-  // Reload recipes from the pack (recipes are auto-loaded when the pack opens;
-  // this re-scans in case files changed since). Idempotent — existing recipes
-  // are kept, new/changed ones are merged in.
-  const reloadRecipes = useCallback(async () => {
-    setReloading(true);
-    setReloadMsg('');
-    try {
-      setReloadMsg(await reloadPackRecipes(projectPath, loadRecipesFromPack));
-    } catch (e) {
-      setReloadMsg(`Reload failed: ${String(e)}`);
-    } finally {
-      setReloading(false);
-    }
-  }, [projectPath, loadRecipesFromPack]);
 
   const selectedRecipe = getSelectedRecipe();
   const recipeIssues = selectedRecipe ? validateRecipe(selectedRecipe) : [];
@@ -180,6 +166,10 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
     selectRecipe(id);
   };
 
+  // Guided recipe create (P0-MINIWIZ): hook owns modal state + the store path
+  // (same addRecipe/selectRecipe as "New Recipe" — undoable, saves normally).
+  const guided = useGuidedRecipe();
+
   const handleImport = (imported: ImportedRecipe[]) => {
     let lastId: string | null = null;
     for (const entry of imported) {
@@ -230,6 +220,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         reloadMsg={reloadMsg}
         onReload={reloadRecipes}
         onImport={() => setShowImport(true)}
+        onAddGuided={guided.openWizard}
       />
 
       <RecipeEditorBody
@@ -286,6 +277,15 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         getTextureUrl={getTextureUrl}
         onCloseBulk={() => setBulkReplaceIds(null)}
         onApplyBulk={handleBulkReplace}
+      />
+
+      <GuidedRecipeWizard
+        open={guided.open}
+        items={itemRegistry}
+        tags={tagCatalog}
+        getTextureUrl={getRegistryTextureUrl}
+        onClose={guided.closeWizard}
+        onCreate={guided.handleCreate}
       />
 
       {showSaveDialog && (
