@@ -12,6 +12,7 @@
 import type { Recipe } from '../recipe/recipe-store'
 import type { ItemRegistryEntry, QuestGraphData } from '../../services/quest-types'
 import { checkQuestStructure, checkQuestItemRefs, questItemCoverage } from './checks/quests'
+import { computeTopology } from './checks/topology'
 import { checkRecipes } from './checks/recipes'
 import { checkPack, type PackCoverageMeta } from './checks/pack'
 import type { HealthItem, HealthSection, HealthSectionKey, PackHealthReport } from './types'
@@ -73,15 +74,61 @@ function degradedRegistryDiagnostic(knownIds: Set<string>, coverage: { total: nu
   }
 }
 
+/** Topology measurements (P1-HEALTH-2) as recommended findings. Measurements,
+ *  never opinions (Trust Rule): each names what was measured and the value.
+ *  Empty graphs and graphs with no findings produce nothing. */
+function topologyFindings(graph: QuestGraphData): HealthItem[] {
+  const t = computeTopology(graph)
+  const items: HealthItem[] = []
+  const labelById = new Map(graph.nodes.map((n) => [n.id, n.label]))
+  const label = (id: string) => labelById.get(id) || id
+
+  for (const id of t.bottlenecks) {
+    items.push({
+      id: `quest.topology.bottleneck.${id}`,
+      severity: 'recommended',
+      message: `"${label(id)}" gates more than half of the quest graph (${t.maxChainLength > 0 ? 'measurement' : 'topology'}).`,
+      detail: 'Removing it disconnects a majority of quests — a structural pinch point.',
+      copyText: `Pack topology: "${label(id)}" is a bottleneck (gates >50% of quests).`,
+      target: { section: 'quests', nodeId: id },
+    })
+  }
+
+  for (const id of t.walls) {
+    items.push({
+      id: `quest.topology.wall.${id}`,
+      severity: 'recommended',
+      message: `"${label(id)}" is a single path — no alternative route reaches what follows it.`,
+      detail: 'If this quest is skipped or blocked, the quests after it are unreachable.',
+      copyText: `Pack topology: "${label(id)}" is a wall (single path to downstream quests).`,
+      target: { section: 'quests', nodeId: id },
+    })
+  }
+
+  if (t.maxChainLength >= 6) {
+    const chain = t.longestChains[0].map(label).join(' → ')
+    items.push({
+      id: 'quest.topology.longest-chain',
+      severity: 'recommended',
+      message: `Longest quest chain is ${t.maxChainLength} quests (pacing measurement).`,
+      detail: chain,
+      copyText: `Pack topology: longest chain ${t.maxChainLength} quests: ${chain}`,
+      target: { section: 'quests' },
+    })
+  }
+
+  return items
+}
+
 /** Compute the full pack-health report from materialized state. */
-export function analyzePackHealth(input: PackHealthInput): PackHealthReport {
-  const knownIds = new Set((input.itemRegistry ?? []).map((i) => i.id))
+export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  const knownIds = new Set((input.itemRegistry ?? []).map((i) => i.id))
   const quests: HealthItem[] = []
   let registryNote: HealthItem | null = null
   let coverage: { total: number; found: number } = { total: 0, found: 0 }
 
   if (input.questGraph) {
     quests.push(...checkQuestStructure(input.questGraph))
+    quests.push(...topologyFindings(input.questGraph))
     coverage = questItemCoverage(input.questGraph, knownIds)
     if (!registryDegraded(knownIds, coverage)) {
       quests.push(...checkQuestItemRefs(input.questGraph, knownIds))
