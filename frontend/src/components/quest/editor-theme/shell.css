@@ -29,6 +29,12 @@
   border-right: 2px solid var(--ftb-border);
   overflow-y: auto;
   overflow-x: hidden;
+  /* The aside becomes the flex container so ChapterTree's root stretches
+     (align-items: stretch) instead of using height:100% — the WebKitGTK
+     percentage-height collapse (s38/s42: ChapterTree.tsx had a residual
+     height:'100%' link that resurfaced on window resize). */
+  display: flex;
+  flex-direction: column;
 }
 
 .quest-editor-canvas {

@@ -201,7 +201,7 @@ function ChapterTreeInner({
   );
 
   return (
-    <div style={{ width: 250, height: '100%', background: 'var(--ftb-surface)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: 250, background: 'var(--ftb-surface)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
         className="ch-tree-header"
         style={{
@@ -221,7 +221,7 @@ function ChapterTreeInner({
       >
         Chapters ({chapters.length})
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

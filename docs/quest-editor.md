@@ -772,6 +772,12 @@ frequent operations:
   WebKitGTK, collapsing the editor to content height (visible with few
   chapters; tall packs mask it by accident). When touching quest layout CSS,
   keep the flex-fill chain — never reintroduce a `height: 100%` link.
+  (s42: `ChapterTree.tsx` carried a residual inline `height: '100%'` the s38
+  pass missed — it resurfaced as a clipped chapters list on window RESIZE
+  (game launch squishing the app window). The aside is now the flex
+  container and the tree root stretches via `align-items: stretch`; the
+  scroller got `min-height: 0`. Grep for `height: '100%'` in
+  `components/quest/` before touching quest layout.)
 - **Tasks/rewards use in-game style icon strips** (`quest-slot-icon.tsx`):
   one tile per entry, click to select, the selected entry's full card below.
   Type-derived icons render real textures when the type has a fixed in-game
