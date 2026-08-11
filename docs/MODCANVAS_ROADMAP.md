@@ -1087,6 +1087,25 @@ Conventions:
   boot-to-test tax make this high-value but easy to get wrong.
 - **Completion criteria:** a reload cycle is verified in-game with observable log evidence;
   the UI never claims reload happened when it didn't.
+- **Status (s43):** the companion's reload dispatch moved from the player's command pipe to the
+  integrated server's own command source (`server.getCommands().performPrefixedCommand(...)`,
+  console op level) — bytecode-verified to bypass FTB's `hasEditorPermission` gate (workaround #9
+  no longer applies to the app's path). The evidence loop (pin → broadcast → verify log line) is
+  unchanged and still the truth source.
+- **Status (s43b):** end-to-end reload verified in-game — three save→reload cycles with the full
+  evidence chain observed in the game log (companion `Dispatched server-side` → FTB
+  `Loading quests from`, pin-correlated). The reload-vs-restart honesty decision is made: per-type
+  gates in `core/sync/config.ts` (`QUEST_HOTSWAP_ENABLED`, `KUBEJS_HOTSWAP_ENABLED` — the KubeJS
+  reload stays disabled until its evidence shape is probed) and save messages surface the decision
+  (quests: reload-verified; recipes: "restart the game to apply"). Companion closes an open quest
+  book before the reload and reopens it once the reload sync lands — FTB does not refresh an open
+  QuestScreen (red X on every chapter until reopened). Reopen runs on the CLIENT (`openGui`, the
+  keybind's path) ~600ms after the server reload completes so the sync is applied, and overrides
+  the vanilla pause menu (auto-opens on window focus loss while saving from the app) but never a
+  screen the user opened themselves. Three FTB behaviors drove the design: FTB Library wraps all
+  GUIs in a `ScreenWrapper` (the book is never the vanilla `Screen`); the client's reload sync
+  arrives AFTER the server reload completes; `pauseOnLostFocus` opens the pause menu the moment
+  the book closes.
 
 ### P3 — Loot, worldgen, distribution depth
 

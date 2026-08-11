@@ -598,6 +598,20 @@ SVG labels, no emoji:
   exports to FTB Quests, and hot-reloads into the game via WebSocket when
   connected; the label reads `Save (Offline)` when no game is connected.
   Texture count appears as an inline SVG icon + number in the right cluster.
+  The reload is evidence-gated (P2-HOTSWAP, `services/hotswap.ts`): the save
+  pins the game log, broadcasts `RELOAD_QUESTS`, and reports PASS only when
+  FTB's own "Loading quests from" line lands after the pin — a reload without
+  evidence is reported FAIL, never claimed. The companion (s43) dispatches the
+  reload through the integrated server's own command source (bypasses FTB's
+  editor-permission gate) and, when the quest book is open in-game, closes it
+  before the reload and reopens it after the reload sync lands — an open book
+  otherwise holds stale chapter refs (red X on every chapter) until manually
+  reopened. Reopen uses FTB's own `openGui` (the keybind's path) via
+  reflection, delayed ~600ms after the server reload completes so the CLIENT
+  has applied the reload sync (reopening earlier renders the book's locked
+  not-ready state), and it reopens over the vanilla pause menu (which
+  auto-opens on window focus loss while the user saves from the app) but never
+  over a screen the user opened themselves.
 
 WebSocket server state lives in the app workspace status bar
 (`statusbar.tsx`, bottom of `ProjectWorkspace`) as a status pill + **Restart**
