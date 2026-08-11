@@ -46,10 +46,10 @@ fn scaffolded_pack_imports_cleanly() {
         .iter()
         .filter(|n| matches!(n.node_type, QuestNodeType::Quest))
         .count();
-    assert_eq!(quest_count, 18, "7 play quests + 11 tour quests must import");
+    assert_eq!(quest_count, 23, "7 play quests + 16 tour quests must import");
 
-    // Task variety survives: one kill task, one crafting task, twelve
-    // checkmark (app-action) tasks — eleven tour quests plus the play
+    // Task variety survives: one kill task, one crafting task, seventeen
+    // checkmark (app-action) tasks — sixteen tour quests plus the play
     // chapter's own milestone. All must import as checkmarks so players
     // can complete them by hand.
     let kill = result
@@ -72,17 +72,20 @@ fn scaffolded_pack_imports_cleanly() {
         .iter()
         .filter(|n| n.objectives.iter().any(|o| matches!(o.objective_type, ObjectiveType::Checkmark)))
         .count();
-    assert_eq!(checkmarks, 12, "eleven tour quests + the play milestone");
+    assert_eq!(checkmarks, 17, "sixteen tour quests + the play milestone");
 
     // The play chapter's linear chain produces 6 prerequisite edges; the
-    // tour chapter is deliberately dependency-free (self-paced).
+    // tour's teaching spine + side branches add 18 more: 6 along the spine,
+    // 4 converging on Health (spine + the three content quests), and 8 side
+    // branches (undo, chapter, book settings, recipe, config, mods + the
+    // spine links they hang off).
     let prereqs = result
         .graph
         .edges
         .iter()
         .filter(|e| e.edge_type == EdgeType::Prerequisite)
         .count();
-    assert_eq!(prereqs, 6, "six prerequisite edges for the seven-quest chain");
+    assert_eq!(prereqs, 24, "6 play-chain edges + 18 tour edges");
 }
 
 #[test]

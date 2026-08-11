@@ -9,7 +9,7 @@
             x = 0.0d
             y = 0.0d
             title = "Meet Your Workbench"
-            description = ["ModCanvas is your pack workbench. The tabs at the top switch between the parts of your pack.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Mods — find and install mods. Health — checks your pack for problems.", "Check me off once you've clicked through every tab."]
+            description = ["This is your pack workbench — the tabs at the top switch between its parts.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Mods — find and install mods. Health — checks your pack for problems.", "Click through every tab, then check me off."]
             icon = "minecraft:chest"
             tasks = [
                 { id = "B000000000000201", type = "checkmark", title = "Visit every tab" }
@@ -23,8 +23,9 @@
             x = 4.0d
             y = 0.0d
             title = "Save Your Work"
-            description = ["Every editor saves straight into your pack: the quest editor's Save button writes your quests to config/ftbquests, recipes write kubejs scripts, configs write config files.", "Your changes are written to the pack — you'll see them the next time you launch the game.", "Save something, then check me off."]
+            description = ["Every editor saves straight into your pack: the quest editor writes to config/ftbquests, recipes write kubejs scripts, configs write config files.", "Your changes appear in-game the next time you launch.", "Hit the Save button once, then check me off."]
             icon = "minecraft:book"
+            dependencies = ["A000000000000201"]
             tasks = [
                 { id = "B000000000000202", type = "checkmark", title = "Save once" }
             ]
@@ -36,25 +37,27 @@
             id = "A000000000000203"
             x = 8.0d
             y = 0.0d
-            title = "Add a Quest"
-            description = ["Quests are the heart of a pack — you just completed a few.", "In the Quests tab, click + Add Quest on the canvas (or right-click the canvas and choose Add Quest). A new quest appears.", "Give it a title, add an objective, and press Save. Check me off when your own quest is on the board."]
-            icon = "minecraft:paper"
+            title = "Refresh"
+            description = ["ModCanvas reads your pack into memory when it opens. When you change things outside the app — or add files by hand — it won't notice until you Refresh.", "The top bar's Refresh button re-scans quests, mods, configs, and textures.", "Press Refresh, then check me off."]
+            icon = "minecraft:clock"
+            dependencies = ["A000000000000202"]
             tasks = [
-                { id = "B000000000000203", type = "checkmark", title = "Add a quest" }
+                { id = "B000000000000203", type = "checkmark", title = "Press Refresh" }
             ]
             rewards = [
-                { id = "C000000000000203", type = "xp", xp = 150 }
+                { id = "C000000000000203", type = "xp", xp = 100 }
             ]
         }
         {
             id = "A000000000000204"
             x = 12.0d
             y = 0.0d
-            title = "Connect Quests"
-            description = ["Quest chains tell players what comes next.", "In the quest canvas toolbar, click the connect button, then drag from one quest's port to another. That's a dependency: the second quest unlocks after the first.", "Connect two of your quests, then check me off."]
-            icon = "minecraft:chain"
+            title = "Add a Quest"
+            description = ["Quests are the heart of a pack — you just completed a few.", "In the Quests tab, click + Add Quest on the canvas (or right-click the canvas and choose Add Quest).", "Give it a title and press Save. Check me off when your own quest is on the board."]
+            icon = "minecraft:paper"
+            dependencies = ["A000000000000203"]
             tasks = [
-                { id = "B000000000000204", type = "checkmark", title = "Draw a connection" }
+                { id = "B000000000000204", type = "checkmark", title = "Add a quest" }
             ]
             rewards = [
                 { id = "C000000000000204", type = "xp", xp = 150 }
@@ -64,11 +67,12 @@
             id = "A000000000000205"
             x = 16.0d
             y = 0.0d
-            title = "Add a Chapter"
-            description = ["Chapters group quests into a book.", "In the chapter tree on the left of the canvas, click + Add Chapter and give it a name. Then move one of your quests into it.", "Check me off when your new chapter has a quest in it."]
-            icon = "minecraft:bookshelf"
+            title = "Give It a Task & a Reward"
+            description = ["A quest isn't a quest without a task to complete and a reward for doing it.", "Click your quest to open its editor, then use the + buttons to add a Task (what the player must do) and a Reward (what they get).", "Add both, press Save, then check me off."]
+            icon = "minecraft:emerald"
+            dependencies = ["A000000000000204"]
             tasks = [
-                { id = "B000000000000205", type = "checkmark", title = "Create a chapter" }
+                { id = "B000000000000205", type = "checkmark", title = "Add a task and a reward" }
             ]
             rewards = [
                 { id = "C000000000000205", type = "xp", xp = 150 }
@@ -78,11 +82,12 @@
             id = "A000000000000206"
             x = 20.0d
             y = 0.0d
-            title = "Craft a Recipe"
-            description = ["Your pack can change what's craftable.", "Open the Recipes tab and click + New Recipe. A shaped crafting recipe appears — set an output and a pattern.", "Press Save and the recipe is written as a kubejs script the pack reads at launch.", "Add one recipe, then check me off."]
-            icon = "minecraft:crafting_table"
+            title = "Connect Quests"
+            description = ["Quest chains tell players what comes next.", "In the canvas toolbar, click Connect, then drag from one quest's port to another — the second quest unlocks after the first.", "Connect your new quest into the chain, then check me off."]
+            icon = "minecraft:chain"
+            dependencies = ["A000000000000205"]
             tasks = [
-                { id = "B000000000000206", type = "checkmark", title = "Add a recipe" }
+                { id = "B000000000000206", type = "checkmark", title = "Draw a connection" }
             ]
             rewards = [
                 { id = "C000000000000206", type = "xp", xp = 150 }
@@ -92,11 +97,12 @@
             id = "A000000000000207"
             x = 24.0d
             y = 0.0d
-            title = "Tweak a Config"
-            description = ["Config files are fragile — ModCanvas edits them safely, keeping your comments and formatting intact.", "Open the Configs tab, pick a file, and edit a value in the structured view. Save it.", "Config changes apply the next time the game starts. Check me off when you've saved one."]
-            icon = "minecraft:comparator"
+            title = "Simulate Your Pack"
+            description = ["Before a player ever sees your pack, walk it yourself.", "Click Simulate in the canvas toolbar: preview locked quests, mark them complete, or reset — without touching the real save.", "Complete your quest chain in Simulate, then check me off."]
+            icon = "minecraft:daylight_detector"
+            dependencies = ["A000000000000206"]
             tasks = [
-                { id = "B000000000000207", type = "checkmark", title = "Edit a config value" }
+                { id = "B000000000000207", type = "checkmark", title = "Complete the chain in Simulate" }
             ]
             rewards = [
                 { id = "C000000000000207", type = "xp", xp = 150 }
@@ -106,25 +112,27 @@
             id = "A000000000000208"
             x = 28.0d
             y = 0.0d
-            title = "Find a Mod"
-            description = ["Mods change everything. ModCanvas searches Modrinth and CurseForge without leaving the app.", "Open the Mods tab, search for something you like, and install it.", "Installed mods land in your pack's mods folder and load on the next launch. Check me off when one is installed."]
-            icon = "minecraft:spyglass"
+            title = "Watch Your Health"
+            description = ["A pack with a missing mod or a broken quest will frustrate players.", "You've shaped quests and added content — open the Health tab and read your verdict.", "It's a go/no-go, not a grade: fix what's blocking, ignore the rest. Check me off when you've read it."]
+            icon = "minecraft:golden_apple"
+            dependencies = ["A000000000000207", "A000000000000212", "A000000000000213", "A000000000000214"]
             tasks = [
-                { id = "B000000000000208", type = "checkmark", title = "Install a mod" }
+                { id = "B000000000000208", type = "checkmark", title = "Read the health verdict" }
             ]
             rewards = [
-                { id = "C000000000000208", type = "xp", xp = 150 }
+                { id = "C000000000000208", type = "xp", xp = 200 }
             ]
         }
         {
             id = "A000000000000209"
             x = 32.0d
             y = 0.0d
-            title = "Watch Your Health"
-            description = ["A pack with a missing mod or a broken quest will frustrate players.", "Open the Health tab — ModCanvas checks your quests, recipes, and items and tells you what's blocking.", "It's a go/no-go, not a grade: fix what's blocking and ignore the rest. Check me off when you've read your verdict."]
-            icon = "minecraft:golden_apple"
+            title = "Run the Game"
+            description = ["The Test button launches your pack with the companion mod attached.", "Watch the status bar: Instance Connected means the app and the game are talking.", "While the game runs, 3D item icons are captured into your editor automatically — the more you run, the more your pack looks alive.", "Launch once, then check me off."]
+            icon = "minecraft:lever"
+            dependencies = ["A000000000000208"]
             tasks = [
-                { id = "B000000000000209", type = "checkmark", title = "Read the health verdict" }
+                { id = "B000000000000209", type = "checkmark", title = "Launch the pack" }
             ]
             rewards = [
                 { id = "C000000000000209", type = "xp", xp = 200 }
@@ -134,29 +142,106 @@
             id = "A000000000000210"
             x = 36.0d
             y = 0.0d
-            title = "Run the Game"
-            description = ["The Test button launches your pack with the companion mod attached.", "Watch the status bar: Instance Connected means the app and the game are talking.", "While the game runs, 3D item icons are captured into your editor automatically — the more you run, the more your pack looks alive.", "Launch once, then check me off."]
-            icon = "minecraft:lever"
-            tasks = [
-                { id = "B000000000000210", type = "checkmark", title = "Launch the pack" }
-            ]
-            rewards = [
-                { id = "C000000000000210", type = "xp", xp = 200 }
-            ]
-        }
-        {
-            id = "A000000000000211"
-            x = 40.0d
-            y = 0.0d
             title = "Share Your Pack"
             description = ["Packs are meant to be shared.", "Open the Project menu in the top right and choose Export Modpack. ModCanvas exports .mrpack (Modrinth) or a CurseForge zip.", "Export once, then check me off — and welcome to your first pack."]
             icon = "minecraft:ender_chest"
             shape = "rsquare"
+            dependencies = ["A000000000000209"]
             tasks = [
-                { id = "B000000000000211", type = "checkmark", title = "Export the pack" }
+                { id = "B000000000000210", type = "checkmark", title = "Export the pack" }
             ]
             rewards = [
-                { id = "C000000000000211", type = "xp", xp = 500 }
+                { id = "C000000000000210", type = "xp", xp = 500 }
+            ]
+        }
+        {
+            id = "A000000000000211"
+            x = 4.0d
+            y = -4.0d
+            title = "Undo & Redo"
+            description = ["Mistakes happen — ModCanvas remembers everything you do.", "The Undo and Redo buttons in the canvas toolbar step your changes back and forward; the history drawer in the top bar shows the full timeline.", "Undo something, redo it, then check me off."]
+            icon = "minecraft:paper"
+            dependencies = ["A000000000000202"]
+            tasks = [
+                { id = "B000000000000211", type = "checkmark", title = "Undo and redo once" }
+            ]
+            rewards = [
+                { id = "C000000000000211", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "A000000000000212"
+            x = 12.0d
+            y = 4.0d
+            title = "Craft a Recipe"
+            description = ["Your pack can change what's craftable.", "Open the Recipes tab and click + New Recipe. A shaped crafting recipe appears — set an output and a pattern.", "Press Save and the recipe is written as a kubejs script the pack reads at launch.", "Add one recipe, then check me off."]
+            icon = "minecraft:crafting_table"
+            dependencies = ["A000000000000203"]
+            tasks = [
+                { id = "B000000000000212", type = "checkmark", title = "Add a recipe" }
+            ]
+            rewards = [
+                { id = "C000000000000212", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "A000000000000213"
+            x = 16.0d
+            y = 4.0d
+            title = "Tweak a Config"
+            description = ["Config files are fragile — ModCanvas edits them safely, keeping your comments and formatting intact.", "Open the Configs tab, pick a file, and edit a value in the structured view. Save it.", "Config changes apply the next time the game starts. Check me off when you've saved one."]
+            icon = "minecraft:comparator"
+            dependencies = ["A000000000000203"]
+            tasks = [
+                { id = "B000000000000213", type = "checkmark", title = "Edit a config value" }
+            ]
+            rewards = [
+                { id = "C000000000000213", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "A000000000000214"
+            x = 20.0d
+            y = 4.0d
+            title = "Find a Mod"
+            description = ["Mods change everything. ModCanvas searches Modrinth and CurseForge without leaving the app.", "Open the Mods tab, search for something you like, and install it.", "Installed mods land in your pack's mods folder and load on the next launch. Check me off when one is installed."]
+            icon = "minecraft:spyglass"
+            dependencies = ["A000000000000203"]
+            tasks = [
+                { id = "B000000000000214", type = "checkmark", title = "Install a mod" }
+            ]
+            rewards = [
+                { id = "C000000000000214", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "A000000000000215"
+            x = 12.0d
+            y = -4.0d
+            title = "Add a Chapter"
+            description = ["Chapters group quests into a book.", "In the chapter tree on the left of the canvas, click + Add Chapter and give it a name. Then move one of your quests into it.", "Check me off when your new chapter has a quest in it."]
+            icon = "minecraft:bookshelf"
+            dependencies = ["A000000000000204"]
+            tasks = [
+                { id = "B000000000000215", type = "checkmark", title = "Create a chapter" }
+            ]
+            rewards = [
+                { id = "C000000000000215", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "A000000000000216"
+            x = 16.0d
+            y = -4.0d
+            title = "Book Settings"
+            description = ["Every quest book has rules: how progress works, how rewards are claimed, what players see.", "Open Book Settings from the quest editor toolbar and look around — try switching the progression mode.", "Save your change, then check me off."]
+            icon = "minecraft:written_book"
+            dependencies = ["A000000000000204"]
+            tasks = [
+                { id = "B000000000000216", type = "checkmark", title = "Change a book setting" }
+            ]
+            rewards = [
+                { id = "C000000000000216", type = "xp", xp = 150 }
             ]
         }
     ]

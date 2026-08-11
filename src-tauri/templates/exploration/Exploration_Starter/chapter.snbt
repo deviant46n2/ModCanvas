@@ -51,7 +51,7 @@
         {
             id = "A000000000000104"
             x = 12.0d
-            y = 0.0d
+            y = -4.0d
             title = "Light Your Way"
             description = ["Coal keeps you safe above ground and below.", "Gather enough to craft a stack of torches."]
             icon = "minecraft:coal"
@@ -66,7 +66,7 @@
         {
             id = "A000000000000105"
             x = 16.0d
-            y = 0.0d
+            y = -4.0d
             title = "Night Defenders"
             description = ["Mobs come out at night. Prove you can hold your own.", "Zombies are slow — use that."]
             icon = "minecraft:zombie_spawn_egg"
@@ -81,7 +81,7 @@
         {
             id = "A000000000000106"
             x = 20.0d
-            y = 0.0d
+            y = -4.0d
             title = "Mining Adventure"
             description = ["Iron is the first metal worth your time.", "Find it below y=16 and bring it home."]
             icon = "minecraft:raw_iron"
@@ -96,7 +96,7 @@
         {
             id = "A000000000000107"
             x = 24.0d
-            y = 0.0d
+            y = -8.0d
             title = "On Your Way"
             description = ["Logs, stone, torches, iron — you have the loop.", "Follow the quest book as your pack grows."]
             icon = "minecraft:compass"

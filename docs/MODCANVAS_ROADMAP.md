@@ -139,7 +139,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3).** `WizardStepper.tsx`: instance pick or start-from-scratch → template pick → review → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). `create_project` scaffolds template packages. Step 5 (guided first quest) lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
-| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: a 2-chapter book — a 7-quest survival intro plus an 11-quest ModCanvas tour). Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
+| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: a 2-chapter book — a 7-quest survival intro plus a 16-quest ModCanvas tour). Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
 | Progression editor / campaign surface | `workspace-actions.md:15` (stale tab), §3.1 of this doc | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
@@ -549,10 +549,14 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    from scratch"; a **"Create a new instance"** card builds a fresh Prism instance for the
    pack —    one combo (MC 1.21.1 · NeoForge), loader version auto-resolved from **Prism's own
    index** (`meta.prismlauncher.org/v1/net.neoforged/` — the set Prism can actually
-   serve; the raw Maven list contains retracted builds Prism never indexes, and
-   Maven-latest races Prism's index into "could not download metadata" launch
-   failures; `commands/modpack/loader_version.rs`; the mmc-pack generator's "0.0.0"
-   fallback is never reached — unresolved = loud failure), instance created at the commit
+    serve; the raw Maven list contains retracted builds Prism never indexes, and
+    Maven-latest races Prism's index into "could not download metadata" launch
+    failures; `commands/modpack/loader_version.rs`; the mmc-pack generator's "0.0.0"
+    fallback is never reached — unresolved = loud failure). The resolver skips
+    versions inside a 24h settling window and verifies the chosen component serves,
+    so the wizard never pins a just-released loader whose files are still
+    propagating through Prism's CDN/caches (21.1.248 failed this way an hour after
+    release, 2026-08-10). Instance created at the commit
    point, game downloads on Prism's first launch (auto-install; verify in the journey
    test). More combos unlock by extending the resolver + the card — never before. The
    adapter lie is already fixed (`servedMatrix`). Browse-for-folder
@@ -571,7 +575,7 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    template packages are embedded in the Rust binary (`src-tauri/templates/`, format in
    `docs/templates.md`), and the first package ships with fidelity tests: a 2-chapter
    book titled "First Steps — Play & Shape Your Pack" (a 7-quest vanilla survival chain
-   plus an 11-quest ModCanvas tour — add quests/chapters/connections, recipes, configs,
+   plus a 16-quest ModCanvas tour — a 10-quest teaching spine (tabs, save, refresh, add/task/connect/simulate quests, health, launch, export) with six side branches (undo, chapters, book settings, recipes, configs, mods),
    mods, health, launch, export). The `WizardStepper` UI (chunk 2) lets a user pick it.
  4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
     pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
