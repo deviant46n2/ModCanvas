@@ -93,4 +93,119 @@ describe('GuidedConfigWizard', () => {
     fireEvent.click(screen.getByText('server.toml'))
     expect(screen.getByText(/Open a config file first/)).toBeTruthy()
   })
+
+  it('survives being opened and closed on a live component (hooks regression)', () => {
+    // The wizard is always mounted; toggling `open` must not change the hook
+    // count. Regression for the s42 crash: a useState declared after the
+    // `if (!open) return null` threw "Rendered more hooks than during the
+    // previous render" on every open/close — the ErrorBoundary turned that
+    // into a full-panel "Something went wrong".
+    const { rerender } = render(
+      <GuidedConfigWizard
+        open={false}
+        configFiles={files}
+        openFilePath={null}
+        openRoot={null}
+        onOpenFile={vi.fn()}
+        onApply={vi.fn()}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.queryByText('server.toml')).toBeNull()
+    expect(() =>
+      rerender(
+        <GuidedConfigWizard
+          open
+          configFiles={files}
+          openFilePath={'config/server.toml'}
+          openRoot={root}
+          onOpenFile={vi.fn()}
+          onApply={vi.fn()}
+          onClose={() => {}}
+        />,
+      ),
+    ).not.toThrow()
+    expect(screen.getByText('server.toml')).toBeTruthy()
+    // And closing again must not throw either.
+    expect(() =>
+      rerender(
+        <GuidedConfigWizard
+          open={false}
+          configFiles={files}
+          openFilePath={null}
+          openRoot={null}
+          onOpenFile={vi.fn()}
+          onApply={vi.fn()}
+          onClose={() => {}}
+        />,
+      ),
+    ).not.toThrow()
+  })
+
+  it('explains raw-only packs instead of dead-ending (the Monster pack case: quest .snbt + kubejs .js + .zs)', () => {
+    const rawOnlyFiles: ConfigFileInfo[] = [
+      { path: 'config/ftbquests/quests/data.snbt', name: 'data.snbt', format: 'Unknown', size: 10 },
+      { path: 'config/kubejs/server_scripts/modcanvas_recipes.js', name: 'modcanvas_recipes.js', format: 'Unknown', size: 10 },
+      { path: 'config/scripts/modcanvas_crafttweaker.zs', name: 'modcanvas_crafttweaker.zs', format: 'Unknown', size: 10 },
+    ]
+    render(
+      <GuidedConfigWizard
+        open
+        configFiles={rawOnlyFiles}
+        openFilePath={null}
+        openRoot={null}
+        onOpenFile={vi.fn()}
+        onApply={vi.fn()}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByText(/No config files here have searchable settings/)).toBeTruthy()
+    // The raw-only files are named in the explanation, never offered as
+    // searchable buttons that dead-end with "No settings match".
+    expect(screen.getByText(/data\.snbt/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /data\.snbt/ })).toBeNull()
+  })
+
+  it('lists only searchable files as pickable and counts the raw-only remainder', () => {
+    const mixed: ConfigFileInfo[] = [
+      { path: 'config/server.toml', name: 'server.toml', format: 'TOML', size: 100 },
+      { path: 'config/ftbquests/quests/data.snbt', name: 'data.snbt', format: 'Unknown', size: 10 },
+      { path: 'config/scripts/modcanvas_crafttweaker.zs', name: 'modcanvas_crafttweaker.zs', format: 'Unknown', size: 10 },
+    ]
+    render(
+      <GuidedConfigWizard
+        open
+        configFiles={mixed}
+        openFilePath={null}
+        openRoot={null}
+        onOpenFile={vi.fn()}
+        onApply={vi.fn()}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /server\.toml/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /data\.snbt/ })).toBeNull()
+    expect(screen.getByText(/2 other files/)).toBeTruthy()
+  })
+
+  it('tells the user why an open file has no searchable settings instead of a dead "No settings match"', () => {
+    const onOpenFile = vi.fn()
+    render(
+      <GuidedConfigWizard
+        open
+        configFiles={files}
+        openFilePath={'config/server.toml'}
+        openRoot={null}
+        onOpenFile={onOpenFile}
+        onApply={vi.fn()}
+        onClose={() => {}}
+      />,
+    )
+    // Step 1: pick the file (it advances to step 2).
+    fireEvent.click(screen.getByRole('button', { name: /server\.toml/ }))
+    // Step 2 with an open file that failed to parse (raw mode): no search box,
+    // a direct explanation instead.
+    expect(screen.getByText(/has no searchable settings/)).toBeTruthy()
+    expect(screen.queryByPlaceholderText(/keep inventory/)).toBeNull()
+  })
 })

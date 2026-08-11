@@ -31,8 +31,11 @@ artifacts produced by the import pipeline.
     parents) stays inside the config directory.
   - `atomic_write` / `atomic_write_str` — write to a `.tmp` then atomic rename,
     with a Windows `EBUSY`/lock retry loop.
-- `src-tauri/src/config_parser.rs` — pure typed parsers/serializers (TOML/JSON/
-  Properties/YAML/HOCON) with no system I/O.
+- `src-tauri/src/config_parser/` — pure typed parsers/serializers (TOML/JSON/
+  Properties/YAML) with no system I/O. HOCON, Forge `.cfg`, quest `.snbt`,
+  KubeJS `.js` and any other extension fall back to a single raw-string value —
+  the structured editor then defaults to Raw mode (a leaf-string root has no
+  fields to structure).
 
 ### Commands
 

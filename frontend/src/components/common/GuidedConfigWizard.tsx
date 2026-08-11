@@ -21,6 +21,15 @@ export interface GuidedConfigTarget {
   value: ConfigValue
 }
 
+// The parser only produces a searchable tree for these extensions; anything
+// else (quest .snbt, kubejs .js, crafttweaker .zs, Forge .cfg, …) parses to a
+// single raw string and can never match a setting. Step 1 filters on the
+// extension (the parse truth) — never on the displayed format label, which
+// calls .cfg "Properties" while the parser treats it as raw.
+const SEARCHABLE_EXTS = new Set(['toml', 'json', 'yaml', 'yml', 'properties'])
+const extOf = (f: ConfigFileInfo) => f.path.split('.').pop()?.toLowerCase() ?? ''
+const isSearchable = (f: ConfigFileInfo) => SEARCHABLE_EXTS.has(extOf(f))
+
 interface GuidedConfigWizardProps {
   open: boolean
   configFiles: ConfigFileInfo[]
@@ -40,14 +49,19 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
   const [fileQuery, setFileQuery] = useState('')
   const [settingQuery, setSettingQuery] = useState('')
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null)
+  const [draftValue, setDraftValue] = useState<ConfigValue | null>(null)
 
   const filteredFiles = useMemo(() => {
     const q = fileQuery.trim().toLowerCase()
-    if (!q) return configFiles
-    return configFiles.filter(
+    const searchable = configFiles.filter(isSearchable)
+    if (!q) return searchable
+    return searchable.filter(
       (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q),
     )
   }, [configFiles, fileQuery])
+
+  const rawOnlyFiles = useMemo(() => configFiles.filter((f) => !isSearchable(f)), [configFiles])
+  const rawOnlyCount = rawOnlyFiles.length
 
   const matches = useMemo(() => {
     if (!openRoot || !settingQuery.trim()) return []
@@ -57,6 +71,7 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
   }, [openRoot, settingQuery])
 
   const selectedValue = selectedPath && openRoot ? getAt(openRoot, selectedPath) : null
+  const displayValue = draftValue ?? selectedValue
 
   if (!open) return null
 
@@ -77,9 +92,6 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
     // Keep the in-wizard value in sync; Apply persists via the editor path.
     setDraftValue(value)
   }
-
-  const [draftValue, setDraftValue] = useState<ConfigValue | null>(null)
-  const displayValue = draftValue ?? selectedValue
 
   const handleApply = () => {
     if (!openFilePath || !selectedPath || !displayValue) return
@@ -117,48 +129,74 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
         {step === 1 && (
           <div className="guided-config-step">
             <p className="guided-config-hint">Which config file has the setting you want to change?</p>
-            <input
-              type="text"
-              className="guided-config-search"
-              placeholder="Search config files…"
-              value={fileQuery}
-              onChange={(e) => setFileQuery(e.target.value)}
-            />
-            <div className="guided-config-files">
-              {filteredFiles.length === 0 && <p className="guided-config-hint">No config files match.</p>}
-              {filteredFiles.map((f) => (
-                <button key={f.path} className="guided-config-file" onClick={() => handlePickFile(f)}>
-                  <span>{f.name}</span>
-                  <em>{f.format}</em>
-                </button>
-              ))}
-            </div>
+            {filteredFiles.length === 0 ? (
+              rawOnlyCount === configFiles.length ? (
+                <p className="guided-config-hint">
+                  No config files here have searchable settings — quest data, scripts and custom formats are raw text.
+                  {' '}Raw-only files (open them in the configs tab and edit in Raw mode): {configFiles.slice(0, 8).map((f) => f.name).join(', ')}{configFiles.length > 8 ? ` and ${configFiles.length - 8} more.` : '.'}
+                </p>
+              ) : (
+                <p className="guided-config-hint">No searchable config files match.</p>
+              )
+            ) : (
+              <>
+                <input
+                  type="text"
+                  className="guided-config-search"
+                  placeholder="Search config files…"
+                  value={fileQuery}
+                  onChange={(e) => setFileQuery(e.target.value)}
+                />
+                <div className="guided-config-files">
+                  {filteredFiles.map((f) => (
+                    <button key={f.path} className="guided-config-file" onClick={() => handlePickFile(f)}>
+                      <span>{f.name}</span>
+                      <em>{f.format}</em>
+                    </button>
+                  ))}
+                </div>
+                {rawOnlyCount > 0 && (
+                  <p className="guided-config-hint guided-config-rawonly">
+                    {rawOnlyCount} other file{rawOnlyCount === 1 ? '' : 's'} ({rawOnlyFiles.slice(0, 8).map((f) => f.name).join(', ')}{rawOnlyCount > 8 ? ' …' : ''}) have no searchable settings — raw text only.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 
         {step === 2 && (
           <div className="guided-config-step">
-            <p className="guided-config-hint">
-              {openFile ? <><strong>{openFile.name}</strong> — search a setting by plain words.</> : 'Open a config file first.'}
-            </p>
-            <input
-              type="text"
-              className="guided-config-search"
-              placeholder="e.g. keep inventory, difficulty, tps…"
-              value={settingQuery}
-              onChange={(e) => setSettingQuery(e.target.value)}
-              autoFocus
-            />
-            <div className="guided-config-matches">
-              {settingQuery.trim() && matches.length === 0 && (
-                <p className="guided-config-hint">No settings match “{settingQuery}”.</p>
-              )}
-              {matches.map((path) => (
-                <button key={path.join('.')} className="guided-config-match" onClick={() => handlePickSetting(path)}>
-                  {path.join(' › ')}
-                </button>
-              ))}
-            </div>
+            {openFile && !openRoot ? (
+              <p className="guided-config-hint">
+                <strong>{openFile.name}</strong> has no searchable settings — it opened in Raw mode (unparseable as
+                structured config). Close the wizard and edit it in the configs tab's Raw mode instead.
+              </p>
+            ) : (
+              <>
+                <p className="guided-config-hint">
+                  {openFile ? <><strong>{openFile.name}</strong> — search a setting by plain words.</> : 'Open a config file first.'}
+                </p>
+                <input
+                  type="text"
+                  className="guided-config-search"
+                  placeholder="e.g. keep inventory, difficulty, tps…"
+                  value={settingQuery}
+                  onChange={(e) => setSettingQuery(e.target.value)}
+                  autoFocus
+                />
+                <div className="guided-config-matches">
+                  {settingQuery.trim() && matches.length === 0 && (
+                    <p className="guided-config-hint">No settings match “{settingQuery}”.</p>
+                  )}
+                  {matches.map((path) => (
+                    <button key={path.join('.')} className="guided-config-match" onClick={() => handlePickSetting(path)}>
+                      {path.join(' › ')}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 

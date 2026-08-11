@@ -103,6 +103,17 @@ export function useConfigState(selectedProject: Project | null) {
     return window.confirm('You have unsaved changes. Discard them?')
   }, [configDirty])
 
+  // A leaf-string root means the parser's catch-all swallowed the whole file
+  // (unknown formats: quest .snbt, kubejs .js, .cfg, …) — there are no fields
+  // to structure, so raw mode is the honest default; the structured toggle
+  // stays available for the curious.
+  const settleParsed = (content: string, parsed: ParsedConfig) => {
+    setParsedConfig(parsed)
+    const structured = parsed.root.type === 'object' || parsed.root.type === 'group' || parsed.root.type === 'array'
+    setConfigMode(structured ? 'structured' : 'raw')
+    lastSavedRef.current = structured ? JSON.stringify(parsed.root) : content
+  }
+
   async function openConfigFile(file: ConfigFileInfo) {
     if (!selectedProject) return
     if (!maybeDiscard()) return
@@ -110,13 +121,11 @@ export function useConfigState(selectedProject: Project | null) {
       const content = await readConfigFile(selectedProject.id, file.path)
       setSelectedConfig(file)
       setConfigContent(content)
-      setConfigMode('structured')
       setConfigSearch('')
 
       try {
         const parsed = await parseConfigFile(selectedProject.id, file.path)
-        setParsedConfig(parsed)
-        lastSavedRef.current = JSON.stringify(parsed.root)
+        settleParsed(content, parsed)
       } catch {
         setParsedConfig(null)
         setConfigMode('raw')
@@ -132,11 +141,9 @@ export function useConfigState(selectedProject: Project | null) {
     try {
       const content = await readConfigFile(selectedProject.id, selectedConfig.path)
       setConfigContent(content)
-      setConfigMode('structured')
       try {
         const parsed = await parseConfigFile(selectedProject.id, selectedConfig.path)
-        setParsedConfig(parsed)
-        lastSavedRef.current = JSON.stringify(parsed.root)
+        settleParsed(content, parsed)
       } catch {
         setParsedConfig(null)
         setConfigMode('raw')

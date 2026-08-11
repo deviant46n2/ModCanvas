@@ -655,6 +655,15 @@ Thin, task-scoped guides over the existing editors. First three:
    `updateConfigValue` + `saveConfigFile` (history + `save_structured_config`). The wizard
    never parses files itself — it searches the already-open parsed tree. A "✨ Add a tweak"
    button sits in the configs tab sidebar.
+   **Honesty surfaces (s42):** step 1 only lists files the parser can actually structure
+   (extension-derived: toml/json/yaml/properties) — quest .snbt, kubejs .js, crafttweaker
+   .zs and Forge .cfg parse to a single raw string and are named as raw-only instead of
+   dead-ending with "No settings match". A file that fails to parse (opens in Raw mode)
+   gets the same explanation on step 2. Opening such a file in the configs tab now defaults
+   to Raw mode — a leaf-string root has no fields to structure. Fixed alongside: a React
+   hooks violation (useState after the `if (!open) return null`) crashed the whole configs
+   panel on every wizard open/close ("Rendered more hooks than during the previous
+   render" → ErrorBoundary).
 
 Each is a modal/side-panel that **operates the same editor state and routes through the
 global HistoryStore** — so the user can undo the wizard and see exactly what it made

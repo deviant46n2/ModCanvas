@@ -41,7 +41,10 @@ fn list_files_under(root: &PathBuf) -> Vec<ConfigFileInfo> {
             let format = match path.extension().and_then(|e| e.to_str()) {
                 Some("toml") => "TOML".to_string(),
                 Some("json") => "JSON".to_string(),
-                Some("cfg") | Some("properties") => "Properties".to_string(),
+                // Forge .cfg files are NOT Java properties (they use `section {
+                // S:Key <…> }` blocks): the parser treats them as raw text, so
+                // the label must not claim a structure the parse won't give.
+                Some("properties") => "Properties".to_string(),
                 Some("yaml") | Some("yml") => "YAML".to_string(),
                 Some("hocon") => "HOCON".to_string(),
                 _ => "Unknown".to_string(),
@@ -162,4 +165,27 @@ pub fn save_structured_config(
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     path_safety::atomic_write_str(&safe_path, &content).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_files_under_labels_cfg_as_unknown_not_properties() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("mod.toml"), "key = 1").unwrap();
+        std::fs::write(tmp.path().join("forge.cfg"), "general {\n  B:enabled = true\n}").unwrap();
+        std::fs::write(tmp.path().join("app.properties"), "a = b").unwrap();
+
+        let files = list_files_under(&tmp.path().to_path_buf());
+        let by_name: std::collections::HashMap<&str, &str> = files
+            .iter()
+            .map(|f| (f.name.as_str(), f.format.as_str()))
+            .collect();
+        assert_eq!(by_name.get("mod.toml"), Some(&"TOML"));
+        // The parser cannot structure Forge .cfg — the label must not claim it can.
+        assert_eq!(by_name.get("forge.cfg"), Some(&"Unknown"));
+        assert_eq!(by_name.get("app.properties"), Some(&"Properties"));
+    }
 }
