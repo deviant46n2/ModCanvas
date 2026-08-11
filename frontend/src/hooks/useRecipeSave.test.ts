@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useRecipeSave } from './useRecipeSave'
-import { generateRecipeScripts, writeScriptFiles, wsIpcSendEvent } from '../services/api'
+import { generateRecipeScripts, writeScriptFiles } from '../services/api'
 
 vi.mock('../services/api', () => ({
   generateRecipeScripts: vi.fn().mockResolvedValue({ kubejs: 'x', crafttweaker: 'y' }),
@@ -9,15 +9,23 @@ vi.mock('../services/api', () => ({
   wsIpcSendEvent: vi.fn().mockResolvedValue(1),
 }))
 
-// The hotswap gate is a build-time flag (core/sync/config.ts): the recipe save
-// must NOT fire an unverified RELOAD_KUBEJS_SCRIPTS while the KubeJS reload
-// evidence shape is unprobed (P2-HOTSWAP silent-divergence rule).
+// The hotswap gate is ENABLED (s44): the recipe save goes through the
+// evidence-gated loop (reloadKubeJSInGame) and reports PASS/FAIL honestly —
+// never an unverified claim. The gate was disabled until the KubeJS reload
+// evidence shape was probed (two-line, verified against the 2101.7.2 jar).
 vi.mock('../core/sync/config', () => ({
-  KUBEJS_HOTSWAP_ENABLED: false,
+  KUBEJS_HOTSWAP_ENABLED: true,
+}))
+
+vi.mock('../services/hotswap', () => ({
+  reloadKubeJSInGame: vi.fn(),
 }))
 
 import { useRecipeStore } from '../core/recipe/recipe-store'
+import { reloadKubeJSInGame } from '../services/hotswap'
 import type { Recipe } from '../core/recipe/recipe-store'
+
+const reloadMock = reloadKubeJSInGame as unknown as ReturnType<typeof vi.fn>
 
 function makeRecipe(over: Partial<Recipe> = {}): Recipe {
   return {
@@ -35,13 +43,14 @@ function makeRecipe(over: Partial<Recipe> = {}): Recipe {
   }
 }
 
-describe('useRecipeSave — hotswap gate (P2-HOTSWAP)', () => {
+describe('useRecipeSave — hotswap evidence loop (P2-HOTSWAP)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    reloadMock.mockResolvedValue({ status: 'passed' })
   })
 
-  it('does NOT broadcast RELOAD_KUBEJS_SCRIPTS while KubeJS hotswap is disabled (silent-divergence guard)', async () => {
-    const { result } = renderHook(() => useRecipeSave('p1', '/x/kubejs/server_scripts/recipes.js'))
+  it('broadcasts the reload through the evidence loop and reports verified PASS', async () => {
+    const { result } = renderHook(() => useRecipeSave('p1'))
     const recipes = [makeRecipe()]
 
     await act(async () => {
@@ -49,13 +58,39 @@ describe('useRecipeSave — hotswap gate (P2-HOTSWAP)', () => {
     })
 
     expect(writeScriptFiles).toHaveBeenCalledTimes(1)
-    expect(wsIpcSendEvent).not.toHaveBeenCalled()
-    // The message must surface the reload-vs-restart decision, not claim a reload.
+    expect(reloadMock).toHaveBeenCalledWith('p1')
+    expect(result.current.saveMessage).toContain('evidence verified')
+  })
+
+  it('never claims a reload when the evidence loop reports FAIL', async () => {
+    reloadMock.mockResolvedValue({ status: 'failed' })
+    const { result } = renderHook(() => useRecipeSave('p1'))
+    const recipes = [makeRecipe()]
+
+    await act(async () => {
+      await result.current.save(recipes, () => {})
+    })
+
+    expect(result.current.saveMessage).toContain('NOT verified')
     expect(result.current.saveMessage).toContain('restart the game to apply')
   })
 
-  it('writes the generated scripts regardless of the gate', async () => {
-    const { result } = renderHook(() => useRecipeSave('p1', '/x/kubejs/server_scripts/recipes.js'))
+  it('surfaces no-companion honestly instead of claiming a reload', async () => {
+    reloadMock.mockResolvedValue({ status: 'no-companion' })
+    const { result } = renderHook(() => useRecipeSave('p1'))
+    const recipes = [makeRecipe()]
+
+    await act(async () => {
+      await result.current.save(recipes, () => {})
+    })
+
+    expect(result.current.saveMessage).toContain('game not connected')
+    expect(result.current.saveMessage).toContain('restart the game to apply')
+  })
+
+  it('writes the generated scripts regardless of the evidence outcome', async () => {
+    reloadMock.mockResolvedValue({ status: 'passed' })
+    const { result } = renderHook(() => useRecipeSave('p1'))
     const recipes = [makeRecipe()]
 
     await act(async () => {

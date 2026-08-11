@@ -81,6 +81,22 @@ persist — use **Edit a copy** first (the intended beginner flow). Saves write 
 dedicated `kubejs/server_scripts/modcanvas_recipes.js` and
 `scripts/modcanvas_crafttweaker.zs`, never clobbering a pack-author's files.
 
+### Hotswap on save (s44, P2-HOTSWAP)
+
+After writing the scripts, the save fires the KubeJS reload through the same
+**evidence-gated loop** quests use (`services/hotswap.ts` `reloadKubeJSInGame`):
+pin the game log → broadcast `RELOAD_KUBEJS_SCRIPTS` → verify both evidence
+lines landed after the pin. The companion runs a **two-command sequence**
+(`kubejs reload server-scripts` then vanilla `/reload`) — bare `kubejs reload`
+has NO executor on 1.21.1, and the script reload alone does not apply recipes
+(verified against the shipped KubeJS 2101.7.2 jar, s44). The evidence shape is
+per-type in `commands/hotswap.rs` (`ReloadKind`): quests = one line, kubejs =
+**both** "KubeJS server scripts in" (script reload) and "Server resource
+reload complete!" (datapack apply). The save message reports honestly: verified
+PASS, or one of no-companion / rotated / unverified — each says restart the
+game to apply. A reload is never claimed without its evidence (the s43b
+silent-divergence rule).
+
 ### JEI-grammar search (`core/recipe/filter.ts`, pure)
 
 Whitespace-separated tokens, AND-combined:

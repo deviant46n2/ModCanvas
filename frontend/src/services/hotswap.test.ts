@@ -1,10 +1,12 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { reloadQuestsInGame } from './hotswap'
+import { reloadQuestsInGame, reloadKubeJSInGame } from './hotswap'
 import * as ipc from './ipc'
 
 // The orchestration is the honesty gate of P2-HOTSWAP: pin BEFORE broadcast,
 // evidence line must land AFTER the pin, and a reload is never claimed
-// without it. These tests lock the four outcomes against mocked I/O.
+// without it. These tests lock the four outcomes against mocked I/O, plus
+// the per-type kind routing (s44): quests verifies kind 'quests', kubejs
+// verifies kind 'kubejs' (the two-line evidence shape).
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('./ipc', () => ({ wsIpcSendEvent: vi.fn() }))
@@ -15,6 +17,7 @@ const invokeMock = invoke as unknown as ReturnType<typeof vi.fn>
 const sendMock = ipc.wsIpcSendEvent as unknown as ReturnType<typeof vi.fn>
 
 const EVIDENCE_LINE = '[11Aug2026 12:14:44.590] [Server thread/INFO] [FTB Quests/]: Loading quests from /config/ftbquests/quests'
+const KUBEJS_LINE = '[11Aug2026 16:15:37.539] [Render thread/INFO] [KubeJS Server/]: Loaded 1/1 KubeJS server scripts in 0.008 s with 0 errors and 0 warnings'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -36,8 +39,8 @@ it('pins the log BEFORE broadcasting — the evidence must land after the pin', 
   expect(calls[0]).toBe('pin_reload_log')
   expect(sendMock).toHaveBeenCalledTimes(1)
   expect(sendMock.mock.calls[0][0]).toBe('RELOAD_QUESTS')
-  // Verify reads from the pinned offset — never a whole-log read.
-  expect(invokeMock).toHaveBeenCalledWith('verify_reload_log', { projectId: 'proj-1', offset: 100 })
+  // Verify reads from the pinned offset with the quest evidence kind.
+  expect(invokeMock).toHaveBeenCalledWith('verify_reload_log', { projectId: 'proj-1', offset: 100, kind: 'quests' })
 })
 
 it('reports FAIL when no evidence lands in the poll window', async () => {
@@ -76,4 +79,31 @@ it('reports no-companion and skips verification when zero peers received the bro
   const outcome = await reloadQuestsInGame('proj-1', { pollMs: 5, tries: 3 })
   expect(outcome.status).toBe('no-companion')
   expect(invokeMock).toHaveBeenCalledTimes(1) // pin only — no verify without a send
+})
+
+it('kubejs reload broadcasts RELOAD_KUBEJS_SCRIPTS and verifies with the kubejs kind', async () => {
+  invokeMock.mockImplementation((cmd: string) => {
+    if (cmd === 'pin_reload_log') return Promise.resolve(100)
+    if (cmd === 'verify_reload_log') return Promise.resolve({ passed: true, evidence: KUBEJS_LINE, rotated: false })
+    return Promise.resolve(undefined)
+  })
+  sendMock.mockResolvedValue(1)
+
+  const outcome = await reloadKubeJSInGame('proj-1', { pollMs: 5, tries: 2 })
+
+  expect(outcome.status).toBe('passed')
+  expect(sendMock.mock.calls[0][0]).toBe('RELOAD_KUBEJS_SCRIPTS')
+  expect(invokeMock).toHaveBeenCalledWith('verify_reload_log', { projectId: 'proj-1', offset: 100, kind: 'kubejs' })
+})
+
+it('kubejs reload reports FAIL when either evidence line is missing', async () => {
+  invokeMock.mockImplementation((cmd: string) => {
+    if (cmd === 'pin_reload_log') return Promise.resolve(100)
+    if (cmd === 'verify_reload_log') return Promise.resolve({ passed: false, evidence: null, rotated: false })
+    return Promise.resolve(undefined)
+  })
+  sendMock.mockResolvedValue(1)
+
+  const outcome = await reloadKubeJSInGame('proj-1', { pollMs: 5, tries: 2 })
+  expect(outcome.status).toBe('failed')
 })

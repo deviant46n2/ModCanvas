@@ -209,7 +209,14 @@ public class WorkbenchEventHandler {
         String path = event.path != null ? event.path : "Unknown path";
         LOGGER.info("[WorkbenchEventHandler] Reloading configs from: {}", path);
 
-        sendCommand("kubejs reload");
+        // `kubejs reload config` — NOT bare `kubejs reload`: on 1.21.1 the
+        // command tree is `reload config|startup-scripts|server-scripts`, and
+        // a bare `reload` has no executor (s44, verified against the shipped
+        // 2101.7.2 jar). This gate is currently frozen app-side
+        // (core/sync/config.ts: RELOAD_CONFIG disabled until its evidence
+        // shape is probed) — this fix makes the dispatch correct so the gate
+        // can unfreeze without a latent dead command.
+        sendCommand("kubejs reload config");
         // No success toast: unverifiable from the companion (see
         // handleQuestReload) — the app's evidence loop owns the report.
     }
@@ -217,7 +224,16 @@ public class WorkbenchEventHandler {
     private static void handleKubeJSReload(WorkbenchCompanionClient.WorkbenchEvent event) {
         LOGGER.info("[WorkbenchEventHandler] Reloading KubeJS scripts");
 
-        sendCommand("kubejs reload");
+        // Two-command sequence (verified against the shipped KubeJS jar,
+        // 2101.7.2-build.368): `kubejs reload` alone has NO executor on 1.21.1 —
+        // the tree is `reload config|startup-scripts|server-scripts`. The
+        // server-scripts reload re-runs the script files and regenerates
+        // KubeJS's virtual data packs, but KubeJS's own command message says
+        // recipes/tags/loot tables need the vanilla `/reload` to apply — so we
+        // chain it. Both run on the server thread via server.execute(...) FIFO,
+        // the same ordering guarantee the quest reopen relies on.
+        sendCommand("kubejs reload server-scripts");
+        sendCommand("reload");
         // No success toast: unverifiable from the companion (see
         // handleQuestReload) — the app's evidence loop owns the report.
     }

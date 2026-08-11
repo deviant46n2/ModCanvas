@@ -10,12 +10,21 @@
 // unverifiable success, and (s43) dispatches through the integrated server's
 // own command source so FTB's editor-permission gate is bypassed.
 //
-// RELOAD_KUBEJS_SCRIPTS / RELOAD_CONFIG / RELOAD_CRAFTTWEAKER are DISABLED —
-// their log signatures have NOT been probed (each has its own evidence
-// shape; do not assume it matches quests). The recipe save must not fire
-// RELOAD_KUBEJS_SCRIPTS while unverified: that was silent divergence.
+// RELOAD_KUBEJS_SCRIPTS is ENABLED (s44) behind a two-line evidence gate.
+// The KubeJS reload is a two-command sequence (kubejs reload server-scripts
+// + vanilla /reload — verified against the shipped 2101.7.2 jar: bare
+// `kubejs reload` has NO executor, and the script reload alone does not
+// apply recipes). The evidence matcher requires BOTH lines after the pin:
+// "KubeJS server scripts in" (script reload) and "Server resource reload
+// complete!" (datapack apply). The recipe save broadcasts and reports
+// PASS/FAIL like quests.
+//
+// RELOAD_CONFIG / RELOAD_CRAFTTWEAKER are DISABLED — their log signatures
+// have NOT been probed (each has its own evidence shape; do not assume it
+// matches quests or kubejs). Their save paths must not fire unverified
+// reloads: that was silent divergence.
 export const QUEST_HOTSWAP_ENABLED = true
-export const KUBEJS_HOTSWAP_ENABLED = false
+export const KUBEJS_HOTSWAP_ENABLED = true
 
 // sync-pipeline compat: the dormant quest-reload path follows the quest gate.
 export const HOTSWAP_FROZEN = !QUEST_HOTSWAP_ENABLED

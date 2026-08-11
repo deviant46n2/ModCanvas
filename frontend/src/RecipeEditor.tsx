@@ -63,7 +63,6 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   // Resolve the adapter for this pack's version + loader so item/tag search and
   // the hotswap reload path are correct instead of hardcoded neoforge/1.21.1.
   const adapter = getAdapter(minecraftVersion, normalizeLoader(modLoader));
-  const recipeScriptPath = `${adapter.getRecipeScriptPath(projectPath)}/modcanvas_recipes.js`;
   const kubejsNamespace = adapter.getKubejsDefaultNamespace();
 
   // Explorer owns recipe search (lifted here so "recipes using this" can drive
@@ -71,7 +70,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const [explorerQuery, setExplorerQuery] = useState('');
 
   const { textureIndex, animations, loading: indexLoading } = useInstanceTextures(projectPath);
-  const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId, recipeScriptPath);
+  const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId);
   const { toggleDisable } = useRecipeDisable(projectId);
   const manifestRecipes = useMemo(() => manifestRecipesFrom(disabledScripts), [disabledScripts]);
 
