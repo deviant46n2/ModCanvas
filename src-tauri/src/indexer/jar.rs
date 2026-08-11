@@ -17,6 +17,32 @@ pub(super) fn is_fake_item_key(rest: &str) -> bool {
     MARKERS.iter().any(|m| rest.contains(m))
 }
 
+/// UI pseudo-namespaces that use the `item.<ns>.<path>` shape but are NOT
+/// registry namespaces (verified against the vanilla 1.21.1 client jar,
+/// s44): `item.modifiers.*` are attribute-component keys, `item.canUse.*`
+/// and the no-third-segment labels (`item.color`, `item.disabled`, ...) are
+/// tooltip labels. Treating `item.canUse.unknown` as an item flooded the
+/// registry with `canUse:unknown` (mod_id "canUse") — the s44 probe caught
+/// it in the pack index's item set. A real item key is `item.<ns>.<path>`
+/// where `ns` is a registry namespace; these are not.
+const UI_PSEUDO_NAMESPACES: [&str; 2] = ["canUse", "modifiers"];
+
+/// A lang key is a REAL item registration when, after `item.`, it has the
+/// shape `ns.path` with a non-empty path and a non-UI namespace. Tooltip/
+/// desc markers are rejected by `is_fake_item_key` first.
+pub(super) fn is_real_item_key(rest: &str) -> bool {
+    if is_fake_item_key(rest) {
+        return false;
+    }
+    let Some((ns, path)) = rest.split_once('.') else {
+        return false; // `item.color` — UI label, no path
+    };
+    if ns.is_empty() || path.is_empty() {
+        return false;
+    }
+    !UI_PSEUDO_NAMESPACES.contains(&ns)
+}
+
 pub(super) fn parse_lang_for_items(lang_json: &str) -> Vec<(String, String, String)> {
     let mut items = Vec::new();
     let map: HashMap<String, String> = match serde_json::from_str(lang_json) {
@@ -25,7 +51,7 @@ pub(super) fn parse_lang_for_items(lang_json: &str) -> Vec<(String, String, Stri
     };
     for (key, value) in &map {
         if let Some(rest) = key.strip_prefix("item.") {
-            if is_fake_item_key(rest) {
+            if !is_real_item_key(rest) {
                 continue;
             }
             if let Some(dot) = rest.find('.') {
@@ -34,7 +60,7 @@ pub(super) fn parse_lang_for_items(lang_json: &str) -> Vec<(String, String, Stri
                 items.push((format!("{}:{}", namespace, path), value.clone(), namespace.to_string()));
             }
         } else if let Some(rest) = key.strip_prefix("block.") {
-            if is_fake_item_key(rest) {
+            if !is_real_item_key(rest) {
                 continue;
             }
             if let Some(dot) = rest.find('.') {

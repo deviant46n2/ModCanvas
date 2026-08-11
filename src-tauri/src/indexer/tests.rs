@@ -60,6 +60,34 @@ fn test_parse_lang_for_items() {
 }
 
 #[test]
+fn test_parse_lang_filters_ui_pseudo_namespace_keys() {
+    // The s44 probe caught `canUse:unknown` in the pack index's item set —
+    // vanilla UI labels masquerading as items. These exact keys exist in the
+    // vanilla 1.21.1 client jar's en_us.json (client-...-extra.jar).
+    let json = r#"{
+        "item.minecraft.diamond": "Diamond",
+        "item.canUse.unknown": "Unknown",
+        "item.canBreak": "Can break:",
+        "item.modifiers.any": "Any",
+        "item.color": "Color: %s"
+    }"#;
+    let items = parse_lang_for_items(json);
+    assert_eq!(items.len(), 1, "only the real item survives, got {items:?}");
+    assert_eq!(items[0].0, "minecraft:diamond");
+}
+
+#[test]
+fn test_is_real_item_key_rejects_ui_labels() {
+    use super::jar::is_real_item_key;
+    assert!(is_real_item_key("minecraft.diamond"));
+    assert!(is_real_item_key("some_mod.custom_item"));
+    assert!(!is_real_item_key("canUse.unknown"));
+    assert!(!is_real_item_key("modifiers.any"));
+    assert!(!is_real_item_key("color")); // no ns.path shape
+    assert!(!is_real_item_key("mod.thing.tooltip.extended")); // marker guard
+}
+
+#[test]
 fn test_parse_lang_filters_non_item_keys() {
     let json = r#"{
         "item.minecraft.diamond": "Diamond",

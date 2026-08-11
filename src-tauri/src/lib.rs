@@ -12,6 +12,8 @@ pub mod instance_textures;
 pub mod key_store;
 pub mod ftb_theme;
 pub mod launcher;
+pub mod loot;
+pub mod pack_index;
 pub mod models;
 pub mod mod_intelligence;
 pub mod minecraft;
@@ -199,6 +201,8 @@ pub fn run() {
             commands::generate_recipe_scripts,
             commands::write_script_files,
             crate::recipes::scan_pack_recipes_cmd,
+            crate::loot::scan_loot_tables_cmd,
+            crate::pack_index::get_pack_index,
             crate::recipe_disable::comment_out_recipe_call,
             crate::recipe_disable::uncomment_recipe_call,
             crate::indexer::scan_instance_items_cmd,

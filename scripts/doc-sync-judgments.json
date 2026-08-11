@@ -75,6 +75,18 @@
     {
       "commit": "c208bfb",
       "reason": "CF export fix made the code match the function's existing doc comment (jars in overrides/mods was already documented intent); NewProjectModal options now derived from the adapter matrix — behavior aligned with existing docs, no doc change needed, s34"
+    },
+    {
+      "commit": "a4b3857",
+      "reason": "per-type hotswap gates + hub-restart + honest save messages — docs landed same-pass in e4b2bbb: roadmap §13 P2-HOTSWAP Status (s43b) names QUEST_HOTSWAP_ENABLED/KUBEJS_HOTSWAP_ENABLED + the save-message honesty decision; quest-editor.md Save flow + workarounds #9 updated in the same commit"
+    },
+    {
+      "commit": "7262374",
+      "reason": "pure test split (ids.rs 230 lines moved to export_ids_tests.rs, zero behavior change, 4 files, line-limit fix) — doc-less by judgment, s43"
+    },
+    {
+      "commit": "1828b09",
+      "reason": "import-on-open cache gate (s42 race) — behavior documented via component inline docs: useQuestToolbarActions.ts:40-47 explains the race, the gate, and why a non-empty cache is authoritative (AGENTS.md doc-sync rule counts component inline docs). quest-editor.md does NOT cover the load path — inline comment is the doc; revisit on next quest-load touch"
     }
   ]
 }
