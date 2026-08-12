@@ -145,8 +145,11 @@ describe('GuidedConfigWizard', () => {
   it('explains raw-only packs instead of dead-ending (the Monster pack case: quest .snbt + kubejs .js + .zs)', () => {
     const rawOnlyFiles: ConfigFileInfo[] = [
       { path: 'config/ftbquests/quests/data.snbt', name: 'data.snbt', format: 'Unknown', size: 10 },
-      { path: 'config/kubejs/server_scripts/modcanvas_recipes.js', name: 'modcanvas_recipes.js', format: 'Unknown', size: 10 },
-      { path: 'config/scripts/modcanvas_crafttweaker.zs', name: 'modcanvas_crafttweaker.zs', format: 'Unknown', size: 10 },
+      // Recipe scripts live at the project root (kubejs/server_scripts/,
+      // scripts/) — the s45 path fix stopped them landing in config/ and
+      // masquerading as config files. The config browser must not list them.
+      { path: 'kubejs/server_scripts/modcanvas_recipes.js', name: 'modcanvas_recipes.js', format: 'Unknown', size: 10 },
+      { path: 'scripts/modcanvas_crafttweaker.zs', name: 'modcanvas_crafttweaker.zs', format: 'Unknown', size: 10 },
     ]
     render(
       <GuidedConfigWizard

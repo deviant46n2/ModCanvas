@@ -138,16 +138,20 @@ PlayerEvents.loggedIn(event => {
   the IR save still succeeds (partial authoring is legal), but the UI shows
   exactly which behaviors did not ship and why. The game never silently runs
   a stale or broken partial script.
-- **PATH FINDING (s45):** the script goes to `<project>/kubejs/server_scripts/`
+- **PATH FINDING (s45, FIXED):** the script goes to `<project>/kubejs/server_scripts/`
   — the project ROOT, NOT `<project>/config/`. KubeJS reads server scripts
   from the game dir's `kubejs/server_scripts/` (verified: the instance's own
   `main.js` example lives there; the shipped KubeJS README says so). The
-  recipe writer (`commands/mod.rs` write_script_files) resolves through the
-  config-scoped `validate_project_write`, landing recipe scripts in
-  `<root>/config/kubejs/...` — a directory KubeJS never reads. **That is a
-  separate latent bug in the recipe flow** (flagged s45, not fixed in the
-  behavior arc); behavior emission uses `validate_under_root` and does NOT
-  copy the mistake.
+  recipe writer (`commands/mod.rs` write_script_files) used to resolve through
+  the config-scoped `validate_project_write`, landing recipe scripts (and
+  CraftTweaker `.zs`) in `<root>/config/kubejs/...` — directories neither mod
+  ever reads, silently never applying, and masquerading as config files in the
+  config browser. **Fixed s45** (chunk 6): `write_script_files` now uses
+  `validate_under_root` for both KubeJS and CraftTweaker; regression lock
+  `test_under_root_resolves_to_project_root_not_config`. Behavior emission had
+  already diverged correctly and documented the recipe bug as the reason;
+  now the divergence is gone. Remaining: in-game verify that recipe scripts
+  actually apply.
 
 ## Pack Index validation (chunk 5) — Pack Health integration
 
@@ -182,5 +186,6 @@ PlayerEvents.loggedIn(event => {
 - **In-game API verification** — now reachable: the emitted script lands in
   the right directory, so a game run + `kubejs reload` proves the `give`
   count form (the flagged runtime surprise, roadmap §21 risk #3).
-- **Recipe-writer path bug** (flagged, separate): write_script_files lands
-  recipes in `config/kubejs/` — needs its own fix + in-game verify.
+- **Recipe-writer path fix in-game verify** (fixed in code, s45 chunk 6):
+  recipe scripts now land in `kubejs/server_scripts/` — confirm a real
+  recipe applies in-game.

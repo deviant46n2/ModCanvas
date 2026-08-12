@@ -218,4 +218,32 @@ mod tests {
         let validated = validate_project_write(&root, "sub/dir/nested.toml").unwrap();
         assert_eq!(validated, project_config_root(&root).join("sub").join("dir").join("nested.toml"));
     }
+
+    #[test]
+    fn test_under_root_resolves_to_project_root_not_config() {
+        // s45 regression lock (KUBEJS-SCRIPTS-DIR-IS-PROJECT-ROOT-NOT-CONFIG):
+        // KubeJS reads server scripts from `<root>/kubejs/server_scripts/` and
+        // CraftTweaker from `<root>/scripts/` — the PROJECT root, not config/.
+        // The recipe writer must resolve these through validate_under_root
+        // (root-scoped), never validate_project_write (config-scoped).
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        std::fs::create_dir_all(root.join("kubejs").join("server_scripts")).unwrap();
+
+        let kubejs = validate_under_root(root, "kubejs/server_scripts/modcanvas_recipes.js").unwrap();
+        assert_eq!(kubejs, root.join("kubejs").join("server_scripts").join("modcanvas_recipes.js"));
+        assert!(
+            kubejs.starts_with(root),
+            "script must resolve inside the project root, not config/: {kubejs:?}"
+        );
+
+        let ct = validate_under_root(root, "scripts/modcanvas_crafttweaker.zs").unwrap();
+        assert_eq!(ct, root.join("scripts").join("modcanvas_crafttweaker.zs"));
+        assert!(ct.starts_with(root));
+
+        // The config-scoped validator is the WRONG tool for scripts — it
+        // silently redirects them under config/.
+        let wrong = validate_project_write(root.to_str().unwrap(), "kubejs/server_scripts/modcanvas_recipes.js").unwrap();
+        assert!(wrong.starts_with(root.join("config")), "config-scoped validator must not be used for scripts");
+    }
 }
