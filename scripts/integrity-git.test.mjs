@@ -98,6 +98,29 @@ test('adapter-matrix: adding a NEW adapter is clean; allowlisted edit is parked'
   assert.equal(violations.length, 0)
 })
 
+test('adapter-matrix: accepted allowlisted edit is a decision, not debt (s47)', () => {
+  const root = gitFixture()
+  mkdirSync(join(root, 'frontend/src/adapters/v1_20_1'), { recursive: true })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export {}')
+  git(root, 'add', '.')
+  commit(root, 'init')
+
+  // Interface evolution: kind "accepted" lands in accepted, never violations
+  // nor parked — an intentional decision with a cited reason, not debt.
+  const rules = structuredClone(RULES_V2)
+  rules.allowlists['adapter-matrix'].push({
+    path: 'frontend/src/adapters/v1_20_1/neoforge.ts',
+    reason: 'interface evolution (s47) — method added, behavior locked by matrix test, cited in docs/loot-editor.md',
+    kind: 'accepted',
+  })
+  writeFileSync(join(root, 'frontend/src/adapters/v1_20_1/neoforge.ts'), 'export const x = 1')
+  const { violations, parked, accepted } = checkAdapterMatrix(rules, root)
+  assert.equal(violations.length, 0)
+  assert.equal(parked.length, 0)
+  assert.equal(accepted.length, 1)
+  assert.match(accepted[0].path, /v1_20_1\/neoforge\.ts/)
+})
+
 test('doc-sync: code-only commit is a candidate; code+docs commit is not', () => {
   const root = gitFixture()
   mkdirSync(join(root, 'src'), { recursive: true })

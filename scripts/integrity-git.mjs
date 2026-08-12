@@ -25,9 +25,16 @@ export function checkDiffHygiene(rules, root) {
 // silently). Modified (M), deleted (D), or renamed (R) existing adapters are
 // all violations — a deletion removes functionality for that version, a
 // rename breaks the factory's imports; only an ADD (A) of a new file is fine.
+//
+// Exception (s47): INTERFACE evolution — adding a method to
+// `IMinecraftVersionAdapter` requires touching every adapter and the base
+// class in one pass. That is a deliberate, tested decision (the matrix test
+// locks each version's behavior), never silent breakage — allowlisted as
+// `kind: "accepted"` with a reason citing the doc, mirroring line-limit.
 export function checkAdapterMatrix(rules, root) {
   const violations = []
   const parked = []
+  const accepted = []
   let status
   try {
     status = execFileSync('git', ['diff', '--name-status', 'HEAD'], { cwd: root, encoding: 'utf8' })
@@ -44,10 +51,11 @@ export function checkAdapterMatrix(rules, root) {
     if (!isAdapter) continue
     const entry = rules.allowlists['adapter-matrix'].find((a) => a.path === path)
     const label = code.startsWith('D') ? 'deleted' : code.startsWith('R') ? 'renamed' : 'modified'
-    if (entry) parked.push({ path, reason: entry.reason })
+    if (entry && entry.kind === 'accepted') accepted.push({ path, reason: entry.reason })
+    else if (entry) parked.push({ path, reason: entry.reason })
     else violations.push({ path: `${label} adapter: ${path}` })
   }
-  return { violations, parked }
+  return { violations, parked, accepted }
 }
 
 // Doc-sync: a commit that changes code but no doc is a drift CANDIDATE (the

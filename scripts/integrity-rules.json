@@ -26,7 +26,44 @@
         "kind": "accepted"
       }
     ],
-    "adapter-matrix": [],
+    "adapter-matrix": [
+      {
+        "path": "frontend/src/adapters/types.ts",
+        "reason": "interface evolution (s47): added getLootDirName() to IMinecraftVersionAdapter — every adapter + base implemented in the same pass, behavior locked by matrix.test.ts, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      },
+      {
+        "path": "frontend/src/adapters/base/defaults.ts",
+        "reason": "interface evolution (s47): base default returns loot_table; v1_20_1 adapters override to loot_tables — behavior locked by matrix.test.ts, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      },
+      {
+        "path": "frontend/src/adapters/v1_20_1/forge.ts",
+        "reason": "interface evolution (s47): pre-1.21 loot dir override (loot_tables) — same-pass implementation + matrix test lock, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      },
+      {
+        "path": "frontend/src/adapters/v1_20_1/neoforge.ts",
+        "reason": "interface evolution (s47): pre-1.21 loot dir override (loot_tables) — same-pass implementation + matrix test lock, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      },
+      {
+        "path": "frontend/src/adapters/v1_20_1/fabric.ts",
+        "reason": "interface evolution (s47): pre-1.21 loot dir override (loot_tables) — same-pass implementation + matrix test lock, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      },
+      {
+        "path": "frontend/src/adapters/matrix.test.ts",
+        "reason": "interface evolution (s47): matrix test extended with getLootDirName locks — the test suite grows with the interface, documented in docs/loot-editor.md",
+        "since": "2026-08-12T02:00:00",
+        "kind": "accepted"
+      }
+    ],
     "stale-binary": []
   },
   "docSync": {
