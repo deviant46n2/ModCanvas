@@ -1,8 +1,9 @@
 # Behaviors — no-code Trigger → Conditions → Actions (P2-BEHAVIOR)
 
-Status: **chunk 2 (s45)** — persistence + commands landed on the chunk-1 spine
-(IR + KubeJS compiler, one pair). See `docs/MODCANVAS_ROADMAP.md` §11 for the full
-proposal and §13 P2-BEHAVIOR for status. The roadmap's model is binding: **a constrained
+Status: **chunk 3 (s45)** — frontend surface landed on the persistence layer:
+a Behaviors tab with list + card editor + live compile preview. See
+`docs/MODCANVAS_ROADMAP.md` §11 for the full proposal and §13 P2-BEHAVIOR for
+status. The roadmap's model is binding: **a constrained
 Trigger → Conditions → Actions rule with a small curated action library, NOT a
 generic visual programming language** (§11.1). Anything outside the vocabulary
 is a "raw command" escape hatch, visibly labeled — the veteran's release
@@ -95,11 +96,37 @@ PlayerEvents.loggedIn(event => {
   never writes. The compile result is `CompileOutput::{Ok{script,
   warnings}|Err{reason}}`, serialized for the frontend.
 
-## Not in chunk 2 (queued)
+## Frontend surface (chunk 3)
 
-- The frontend surface (behavior list + editor cards; the three commands
-  above are the contract it binds to).
-- Conditions compile path; remaining §11.1 triggers/actions.
+- **Tab:** Behaviors added to the workspace (`AppTab` union + `ProjectWorkspace`
+  tabpanel + `styles/app-behaviors.css`, dark-only, flex-fill invariant from the
+  s43 lesson honored — the panel inherits the tabpanel rule, no height link).
+- **Contract:** `services/behavior.ts` — the ONLY place the IR shape is known on
+  the frontend (types mirror the Rust IR; components never see raw invoke args).
+  The three commands from chunk 2 are its full surface.
+- **Hook:** `hooks/useBehaviors.ts` — loading/error/loaded + dirty tracking
+  (divergence from last saved list), save returns ok/error honestly (never a
+  silent success claim). 5 tests.
+- **Editor:** `components/behavior/BehaviorTab.tsx` — list + per-card editor for
+  the CURRENT vocabulary: trigger select (one option today), action select
+  (give-item), item id + count inputs, and a **live compile preview** — every
+  edit (debounced 250ms) runs `compile_behavior` and shows the real emitted
+  KubeJS or the real compiler error. This is the P2-BEHAVIOR completion
+  criterion made visible: an authored behavior emits real KubeJS.
+- **Deliberately NOT a generic VPL:** no loops, no variables, no condition
+  wiring UI. The vocabulary grows server-side (IR variants land with compile
+  paths); this surface renders what the IR declares. When Condition gains
+  variants, the editor gains condition cards — not a visual programming
+  language.
+- **Scope cut (honest):** the GiveItem item id is a text input with live
+  compile validation, not the full ItemBrowser picker — wiring ItemBrowser
+  needs the texture/registry/engine pipeline (the quest editor's
+  `useQuestAssetPipeline`); that integration is queued, not skipped silently.
+
+## Not in chunk 3 (queued)
+
+- Conditions compile path + editor cards; remaining §11.1 triggers/actions.
+- ItemBrowser integration for GiveItem (needs the asset pipeline).
 - Datapack backend (advancement triggers / loot conditions).
 - Pack Index reference validation wiring (Blocking health finding).
 - 3 example behaviors in wizard templates.

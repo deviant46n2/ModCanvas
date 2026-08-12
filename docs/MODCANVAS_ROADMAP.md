@@ -1086,6 +1086,16 @@ Conventions:
   `save_behaviors` / `compile_behavior` (compile-for-preview, never writes) registered
   in the handler. 374 Rust green. The frontend surface is the next node (the three
   commands are its contract). Details: `docs/behaviors.md`.
+- **Status (s45 chunk 3):** frontend surface landed. Behaviors workspace tab
+  (`BehaviorTab.tsx` + `useBehaviors` hook + `services/behavior.ts` contract, 5 hook
+  tests): list + card editor (trigger select, give-item action, item id/count) with a
+  LIVE compile preview — every edit runs `compile_behavior` and shows the real emitted
+  KubeJS or the real compiler error. The completion criterion "an authored behavior
+  emits real KubeJS" is now visible in the app. 672 frontend green (667 → 672).
+  Scope cut recorded: GiveItem uses a text input with compile validation, not the
+  ItemBrowser picker (that needs the quest asset pipeline — queued). Still queued:
+  conditions + remaining vocabulary, datapack backend, Pack Index validation, wizard
+  templates, in-game API verification. Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 

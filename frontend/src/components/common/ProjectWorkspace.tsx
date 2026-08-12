@@ -8,6 +8,7 @@ import { ConfigsTab, type ConfigsTabProps } from './ConfigsTab'
 import QuestBookEditor from '../../QuestBookEditor'
 import RecipeEditor from '../../RecipeEditor'
 import { LootTab } from '../loot/LootTab'
+import { BehaviorTab } from '../behavior/BehaviorTab'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
@@ -29,8 +30,8 @@ export interface ProjectWorkspaceProps {
     updated_at: string
     path: string
   }
-  activeTab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'health'
-  onTabChange: (tab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'health') => void
+  activeTab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'behaviors' | 'health'
+  onTabChange: (tab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'behaviors' | 'health') => void
   /** Guided "Add a quest" handoff (P0-MINIWIZ, wizard step 5). */
   showGuidedQuest?: boolean
   onGuidedQuestClose?: () => void
@@ -122,7 +123,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onOpenSettings={props.onOpenSettings}
       />
 
-            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot'] as const).map((tab) => (
+            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot', 'behaviors'] as const).map((tab) => (
           <button
             key={tab}
             id={`tab-${tab}`}
@@ -187,6 +188,11 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           <div id="tabpanel-loot" role="tabpanel" aria-labelledby="tab-loot" className={activeTab === 'loot' ? '' : 'tab-hidden'}>
             <ErrorBoundary>
               <LootTab projectId={project.id} projectPath={project.path} />
+            </ErrorBoundary>
+          </div>
+          <div id="tabpanel-behaviors" role="tabpanel" aria-labelledby="tab-behaviors" className={activeTab === 'behaviors' ? '' : 'tab-hidden'}>
+            <ErrorBoundary>
+              <BehaviorTab projectId={project.id} />
             </ErrorBoundary>
           </div>
         </div>

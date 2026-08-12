@@ -12,7 +12,7 @@ import type { Recipe } from '../core/recipe/recipe-store'
 import type { Project, ImportResult, LoadPackProgress, DiscoveredRecipe } from '../services/types'
 import type { IngestResult } from '../services/quest-types'
 
-export type AppTab = 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'health'
+export type AppTab = 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'behaviors' | 'health'
 
 export function errorMessage(e: any): string {
   return typeof e === 'string' ? e : e?.message || String(e)
