@@ -80,6 +80,11 @@ export function BehaviorTab({ projectId, projectPath }: { projectId: string; pro
         ok: false,
         text: `Saved, but ${result.emitFailures.length} behavior(s) did not reach the instance: ${result.emitFailures.join('; ')}`,
       })
+    } else if (result.warnings.length > 0) {
+      setSaveMsg({
+        ok: true,
+        text: `Saved — all behaviors reached the instance. Notes (shipped, not errors): ${result.warnings.join('; ')}`,
+      })
     } else {
       setSaveMsg({ ok: true, text: 'Saved — behaviors written to the instance' })
     }

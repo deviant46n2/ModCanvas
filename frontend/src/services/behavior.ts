@@ -62,9 +62,13 @@ export function listBehaviors(projectId: string): Promise<Behavior[]> {
 
 /** Result of a behavior save: the IR persisted, and the emission step either
  *  shipped every behavior or reports which ones did not compile (with
- *  reasons). Empty `emitFailures` = all behaviors reached the instance. */
+ *  reasons). Empty `emitFailures` = all behaviors reached the instance.
+ *  `warnings` = behaviors that shipped WITH deterministic notes (e.g. the
+ *  datapack coarseness warning) — those are NOT failures; the UI must not
+ *  claim they "did not reach the instance". */
 export interface SaveBehaviorsOutcome {
   emit_failures: string[]
+  warnings: string[]
 }
 
 /** Replace the entire behavior list for a project (full-list semantics) and

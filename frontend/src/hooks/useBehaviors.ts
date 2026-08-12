@@ -20,6 +20,10 @@ interface SaveResult {
   error: string | null
   /** Behaviors that did NOT ship to the instance (`id: reason`). Empty = all. */
   emitFailures: string[]
+  /** Behaviors that shipped WITH deterministic notes (`id: note`). These
+   *  reached the instance — NOT failures; the UI must say so, not claim
+   *  "did not reach the instance" (s46 warning-vs-failure fix). */
+  warnings: string[]
 }
 
 /**
@@ -81,9 +85,10 @@ export function useBehaviors(projectId: string) {
         ok: true,
         error: null,
         emitFailures: outcome.emit_failures ?? [],
+        warnings: outcome.warnings ?? [],
       }
     } catch (e) {
-      return { ok: false, error: String(e), emitFailures: [] }
+      return { ok: false, error: String(e), emitFailures: [], warnings: [] }
     }
   }, [projectId, state.behaviors])
 

@@ -41,15 +41,21 @@ pub const DATAPACK_DATA_REL: &str = "kubejs/data/modcanvas";
 /// `kubejs/data/modcanvas/advancement|function/` — the namespace is cleared
 /// then re-emitted, so the on-disk datapack is ALWAYS exactly the saved IR.
 ///
-/// Returns the warnings/errors for behaviors that did NOT emit (as `id:
-/// reason` strings), so the caller can surface them honestly. Empty vec =
-/// every behavior compiled and shipped.
+/// Returns (failures, warnings):
+/// - `failures`: behaviors that did NOT emit, as `id: reason` — the honest
+///   failure contract. Empty = everything shipped.
+/// - `warnings`: behaviors that EMITTED FINE but carry deterministic notes
+///   (e.g. the datapack coarseness warnings). A warning is NOT a failure —
+///   shipping with a note is not failing to ship. The s46 bug: warnings were
+///   merged into failures, so a datapack behavior with a by-design coarseness
+///   note was falsely reported as "did not reach the instance".
 pub fn emit_behavior_scripts(
     project_path: &str,
     behaviors: &[Behavior],
-) -> Result<Vec<String>, String> {
+) -> Result<(Vec<String>, Vec<String>), String> {
     let mut body: Vec<String> = Vec::new();
     let mut failures: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
 
     body.push("// ModCanvas Generated Behaviors — do not edit by hand.".to_string());
     body.push("// Re-exported on every behavior save from the IR in .modcanvas/behaviors.json".to_string());
@@ -70,15 +76,15 @@ pub fn emit_behavior_scripts(
             }),
         };
         match result {
-            Ok((script, warnings)) => {
+            Ok((script, warnings_list)) => {
                 if b.backend == Backend::Datapack {
                     emit_datapack_files(root, b)?;
                 } else {
                     body.push(script);
                     body.push("".to_string());
                 }
-                for w in warnings {
-                    failures.push(format!("{}: {}", b.id, w.0));
+                for w in warnings_list {
+                    warnings.push(format!("{}: {}", b.id, w.0));
                 }
             }
             Err(e) => failures.push(format!("{}: {}", b.id, e.0)),
@@ -99,7 +105,7 @@ pub fn emit_behavior_scripts(
     }
     atomic_write_str(&target, &body.join("\n"))?;
 
-    Ok(failures)
+    Ok((failures, warnings))
 }
 
 /// Write one datapack behavior's advancement + reward function into the
@@ -155,8 +161,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().to_string_lossy().to_string();
 
-        let failures = emit_behavior_scripts(&root, &[kit()]).unwrap();
+        let (failures, warnings) = emit_behavior_scripts(&root, &[kit()]).unwrap();
         assert!(failures.is_empty());
+        assert!(warnings.is_empty());
 
         let path = tmp.path().join(BEHAVIORS_SCRIPT_REL);
         assert!(path.exists(), "script must be written into the instance");
@@ -180,10 +187,11 @@ mod tests {
             ..kit()
         };
 
-        let failures = emit_behavior_scripts(&root, &[kit(), bad]).unwrap();
+        let (failures, warnings) = emit_behavior_scripts(&root, &[kit(), bad]).unwrap();
         assert_eq!(failures.len(), 1);
         assert!(failures[0].contains("bad:item"));
         assert!(failures[0].contains("namespaced"));
+        assert!(warnings.is_empty(), "a compile error is not a warning");
 
         // The good behavior still shipped.
         let content =
@@ -197,12 +205,57 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().to_string_lossy().to_string();
 
-        let failures = emit_behavior_scripts(&root, &[]).unwrap();
+        let (failures, warnings) = emit_behavior_scripts(&root, &[]).unwrap();
         assert!(failures.is_empty());
+        assert!(warnings.is_empty());
         let content =
             std::fs::read_to_string(tmp.path().join(BEHAVIORS_SCRIPT_REL)).unwrap();
         assert!(content.starts_with("// ModCanvas Generated Behaviors"));
         assert!(!content.contains("PlayerEvents"));
+    }
+
+    /// The s46 regression: a datapack behavior that ships WITH a by-design
+    /// coarseness warning (crafted → inventory_changed) is NOT a failure —
+    /// it emitted fine. Warnings must land in the warnings vec, never in
+    /// failures, or the UI falsely reports "did not reach the instance".
+    #[test]
+    fn datapack_warning_is_not_an_emit_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_string_lossy().to_string();
+
+        let craft = Behavior {
+            id: "suite:chain2".to_string(),
+            name: "datapack crafted".to_string(),
+            backend: Backend::Datapack,
+            trigger: crate::behavior::Trigger::ItemCrafted {
+                item: Some("minecraft:crafting_table".to_string()),
+            },
+            conditions: vec![],
+            actions: vec![Action::GiveItem {
+                item: "minecraft:apple".to_string(),
+                count: 1,
+            }],
+        };
+
+        let (failures, warnings) = emit_behavior_scripts(&root, &[craft]).unwrap();
+        assert!(
+            failures.is_empty(),
+            "a warned datapack behavior reached the instance — it is not a failure: {:?}",
+            failures
+        );
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("suite:chain2"));
+        assert!(warnings[0].contains("inventory_changed"));
+
+        // And the datapack artifacts DID land.
+        assert!(
+            tmp.path().join("kubejs/data/modcanvas/advancement/behavior_suite_chain2.json").exists(),
+            "advancement must exist for a warned-but-emitted behavior"
+        );
+        assert!(
+            tmp.path().join("kubejs/data/modcanvas/function/behavior_suite_chain2.mcfunction").exists(),
+            "function must exist for a warned-but-emitted behavior"
+        );
     }
 
     #[test]

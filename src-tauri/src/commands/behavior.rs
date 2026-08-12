@@ -28,11 +28,16 @@ pub fn list_behaviors(
 /// What a behavior save produced: the IR was persisted, and the emission
 /// step either shipped every behavior or reports which ones did not compile
 /// (with reasons). The UI must surface `emit_failures` honestly — a saved
-/// behavior that never reached the game is a silent failure otherwise.
+/// behavior that never reached the game is a silent failure otherwise. A
+/// behavior that shipped WITH a deterministic note (e.g. a datapack
+/// coarseness warning) is reported separately in `warnings` — it is NOT a
+/// failure, and the UI must not claim it "did not reach the instance".
 #[derive(serde::Serialize)]
 pub struct SaveBehaviorsOutcome {
     /// Behaviors that did NOT emit (`id: reason`). Empty = all shipped.
     pub emit_failures: Vec<String>,
+    /// Behaviors that emitted fine but carry deterministic notes (`id: note`).
+    pub warnings: Vec<String>,
 }
 
 /// Replace the entire behavior list for a project, then compile + write the
@@ -49,8 +54,8 @@ pub fn save_behaviors(
 ) -> Result<SaveBehaviorsOutcome, String> {
     let path = project_path_for(&db, &project_id)?;
     store::save_behaviors(&path, &behaviors)?;
-    let emit_failures = crate::behavior::emit::emit_behavior_scripts(&path, &behaviors)?;
-    Ok(SaveBehaviorsOutcome { emit_failures })
+    let (emit_failures, warnings) = crate::behavior::emit::emit_behavior_scripts(&path, &behaviors)?;
+    Ok(SaveBehaviorsOutcome { emit_failures, warnings })
 }
 
 /// Compile one behavior to KubeJS for preview — never saves. The UI calls
