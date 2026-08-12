@@ -206,6 +206,8 @@ pub fn run() {
             commands::write_script_files,
             crate::recipes::scan_pack_recipes_cmd,
             crate::loot::scan_loot_tables_cmd,
+            crate::loot::editor::read_loot_table_cmd,
+            crate::loot::editor::save_loot_table_cmd,
             crate::pack_index::get_pack_index,
             crate::recipe_disable::comment_out_recipe_call,
             crate::recipe_disable::uncomment_recipe_call,

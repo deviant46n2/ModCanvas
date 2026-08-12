@@ -1223,13 +1223,17 @@ Conventions:
 
 - **P3-LOOT** — loot-table editor (scan `data/*/loot_table(s)/*.json`; weighted pools,
   conditions; emits real JSON; Pack Index validated). Class: New. Complexity: Medium–High.
-  **Read-only scan MVP landed (s44):** `src-tauri/src/loot/` walks pack `data/` + mod jars
-  for both historical dir names (`loot_table` 1.21+ / `loot_tables` pre-1.21), parses each
-  into a typed summary via the pure `parse.rs`, dedups by resource id with full-path keys
-  (`minecraft:chests/simple_dungeon` — the game's key form, NOT the bare filename; the first
-  scan silently collapsed nested tables under one wrong id until the live-instance probe
-  caught it). Frontend: `LootTab.tsx` lists + details tables read-only. The editor (pools,
-  conditions, JSON emission) is the remaining build.
+  **COMPLETE (s47).** Read-only scan MVP (s44): `src-tauri/src/loot/` walks pack `data/` +
+  mod jars for both historical dir names (`loot_table` 1.21+ / `loot_tables` pre-1.21),
+  parses each into a typed summary via the pure `parse.rs`, dedups by resource id with
+  full-path keys (`minecraft:chests/simple_dungeon` — the game's key form, NOT the bare
+  filename). Editor (s47): full-depth model with preserve-unknown (`loot/model.rs` + the
+  frontend mirror `core/loot/model.ts`), verbatim atomic save (`loot/editor.rs`, root-scoped
+  path gate), Pool-Index-style item validation as warnings never gates
+  (`core/loot/validation.ts`), and the editor surface (pools, rolls, entry weights via the
+  shared ItemBrowser, opaque condition add/remove). Reference: `docs/loot-editor.md`.
+  **Follow-ups parked with written reasons:** new-table creation (version-derived dir) and
+  typed condition editors — see `docs/loot-editor.md`.
 - **P3-WORLDGEN** — worldgen authoring: features/ores first (datapack-JSON-scoped), biomes
   later, dimensions last. Class: New. Complexity: **Very High** — the lowest no-code
   ROI-per-effort; scope tightly or cut. **Recommendation: keep as a "scoped features/ores

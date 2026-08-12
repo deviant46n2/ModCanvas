@@ -9,6 +9,8 @@
 // emission) is the remaining P3-LOOT build; this module is the "a scan,
 // like recipes" half the roadmap calls out (§7.4.2).
 
+pub mod editor;
+pub mod model;
 pub mod parse;
 pub mod pack_scan;
 
