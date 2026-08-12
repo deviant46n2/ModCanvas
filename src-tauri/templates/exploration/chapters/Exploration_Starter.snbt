@@ -12,7 +12,7 @@
             description = ["Chop down a few trees to get started.", "Wood is the foundation of everything you will build."]
             icon = "minecraft:oak_log"
             tasks = [
-                { id = "2000000000000101", type = "item", title = "Collect Oak Logs", item = "minecraft:oak_log", count = 8L }
+                { id = "2000000000000101", type = "item", title = "Collect Oak Logs", item = { id = "minecraft:oak_log", count = 8 } }
             ]
             rewards = [
                 { id = "3000000000000101", type = "xp", xp = 100 }
@@ -27,7 +27,7 @@
             icon = "minecraft:crafting_table"
             dependencies = ["1000000000000101"]
             tasks = [
-                { id = "2000000000000102", type = "item_crafting", title = "Craft a Crafting Table", item = "minecraft:crafting_table" }
+                { id = "2000000000000102", type = "item_crafting", title = "Craft a Crafting Table", item = { id = "minecraft:crafting_table" } }
             ]
             rewards = [
                 { id = "3000000000000102", type = "xp", xp = 150 }
@@ -42,10 +42,10 @@
             icon = "minecraft:cobblestone"
             dependencies = ["1000000000000102"]
             tasks = [
-                { id = "2000000000000103", type = "item", title = "Collect Cobblestone", item = "minecraft:cobblestone", count = 16L }
+                { id = "2000000000000103", type = "item", title = "Collect Cobblestone", item = { id = "minecraft:cobblestone", count = 16 } }
             ]
             rewards = [
-                { id = "3000000000000103", type = "item", item = "minecraft:stone_pickaxe" }
+                { id = "3000000000000103", type = "item", item = { id = "minecraft:stone_pickaxe" } }
             ]
         }
         {
@@ -57,7 +57,7 @@
             icon = "minecraft:coal"
             dependencies = ["1000000000000103"]
             tasks = [
-                { id = "2000000000000104", type = "item", title = "Collect Coal", item = "minecraft:coal", count = 8L }
+                { id = "2000000000000104", type = "item", title = "Collect Coal", item = { id = "minecraft:coal", count = 8 } }
             ]
             rewards = [
                 { id = "3000000000000104", type = "item", item = { id = "minecraft:torch", count = 8 } }
@@ -87,7 +87,7 @@
             icon = "minecraft:raw_iron"
             dependencies = ["1000000000000105"]
             tasks = [
-                { id = "2000000000000106", type = "item", title = "Collect Raw Iron", item = "minecraft:raw_iron", count = 4L }
+                { id = "2000000000000106", type = "item", title = "Collect Raw Iron", item = { id = "minecraft:raw_iron", count = 4 } }
             ]
             rewards = [
                 { id = "3000000000000106", type = "item", item = { id = "minecraft:iron_ingot", count = 2 } }

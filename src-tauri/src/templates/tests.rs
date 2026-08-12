@@ -94,6 +94,41 @@ fn scaffolded_pack_imports_cleanly() {
     assert_eq!(prereqs, 24, "6 play-chain edges + 18 tour edges");
 }
 
+/// s45 regression lock (TEMPLATE-ITEM-TASK-BARE-STRING-NPE): every `item`
+/// field in the exploration template must use the 1.21 Data Components
+/// compound form (`item = { id = ..., count = ... }`), NEVER a bare string
+/// (`item = "minecraft:oak_log"`). Bare strings are the pre-1.20.5 format:
+/// FTB Quests 2101.1.30's ItemTask.readData -> itemOrMissingFromNBT chokes on
+/// them, createTask returns null, readQuestsFromNBT NPEs in
+/// handleLegacyTaskNBT, the whole book fails to load, and the game re-saves a
+/// stripped 2-quest chapter. The template must stay in the SAME form the
+/// exporter emits (helpers.rs item_compound) so template and exporter can
+/// never drift. The 23-quest import above proves the compound form still
+/// imports identically.
+#[test]
+fn template_item_fields_are_never_bare_strings() {
+    for (rel, contents) in TEMPLATES
+        .iter()
+        .find(|t| t.id == "exploration")
+        .expect("exploration template exists")
+        .files
+    {
+        if !rel.ends_with(".snbt") {
+            continue;
+        }
+        // A bare `item = "..."` — the pre-1.20.5 form. The compound form
+        // `item = { ... }` must survive this check untouched.
+        let bare = contents.lines().filter(|l| l.trim().starts_with("item = \""));
+        let bare_lines: Vec<String> = bare.map(|l| l.trim().to_string()).collect();
+        assert!(
+            bare_lines.is_empty(),
+            "template {} has bare-string item fields (pre-1.20.5 format, NPEs FTB 2101.1.30): {:?}",
+            rel,
+            bare_lines
+        );
+    }
+}
+
 #[test]
 fn scaffolded_pack_survives_edit_and_reexport() {
     let (_tmp, root) = scaffolded_root();
