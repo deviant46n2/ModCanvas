@@ -1070,6 +1070,15 @@ Conventions:
 - **Completion criteria:** an authored behavior emits real KubeJS/datapack that a test pack
   loads without syntax errors; a behavior referencing a missing item is a Blocking health
   finding; golden-output tests lock the compiler.
+- **Status (s45 chunk 1):** the IR + KubeJS compiler spine landed
+  (`src-tauri/src/behavior/` — typed `Behavior`/`Trigger`/`Action`/`Condition`, pure
+  `compile_to_kubejs`, 5 golden-output tests, 366 Rust green). First pair implemented
+  end-to-end: `PlayerJoinsGame` → `GiveItem` (starter-kit; `Item.of(id, count)` for
+  stacks > 1). Golden tests already caught a real emitter bug (missing `(` before
+  `event`). Deliberately NOT yet: datapack backend, conditions compile path, persistence
+  (`.modcanvas/behaviors.json`), the Tauri command, UI cards, Pack Index wiring, and
+  in-game API verification (the `give` count form is the flagged runtime surprise —
+  roadmap §21 risk #3). Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 

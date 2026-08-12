@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod behavior;
 pub mod config_parser;
 pub mod db;
 pub mod engine_renders;
