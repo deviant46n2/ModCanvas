@@ -29,7 +29,11 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_conditions_actions;
+#[cfg(test)]
 mod tests_datapack;
+#[cfg(test)]
+mod tests_vocabulary;
 
 pub use compile::{CompileError, CompileOutput, CompileWarning};
 
