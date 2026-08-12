@@ -581,8 +581,11 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    template packages are embedded in the Rust binary (`src-tauri/templates/`, format in
    `docs/templates.md`), and the first package ships with fidelity tests: a 2-chapter
    book titled "First Steps — Play & Shape Your Pack" (a 7-quest vanilla survival chain
-   plus a 16-quest ModCanvas tour — a 10-quest teaching spine (tabs, save, refresh, add/task/connect/simulate quests, health, launch, export) with six side branches (undo, chapters, book settings, recipes, configs, mods),
-   mods, health, launch, export). The `WizardStepper` UI (chunk 2) lets a user pick it.
+    plus a 20-quest ModCanvas tour — a 10-quest teaching spine (tabs, save, refresh,
+    add/task/connect/simulate quests, health, launch, export) with ten side branches
+    (undo, beginner mode, chapters, book settings, recipes, configs, mods, behaviors,
+    loot, config tweaks); the health quest converges all content branches (s48),
+    mods, health, launch, export). The `WizardStepper` UI (chunk 2) lets a user pick it.
  4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
     pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
     **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation

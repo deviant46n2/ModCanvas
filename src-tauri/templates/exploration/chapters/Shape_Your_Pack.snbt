@@ -9,7 +9,7 @@
             x = 0.0d
             y = 0.0d
             title = "Meet Your Workbench"
-            description = ["This is your pack workbench — the tabs at the top switch between its parts.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Mods — find and install mods. Health — checks your pack for problems.", "Click through every tab, then check me off."]
+            description = ["This is your pack workbench — the tabs at the top switch between its parts.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Behaviors — automate things while playing. Loot — control what chests and mobs drop. Mods — find and install mods. Health — checks your pack for problems.", "Click through every tab, then check me off."]
             icon = "minecraft:chest"
             tasks = [
                 { id = "2000000000000201", type = "checkmark", title = "Visit every tab" }
@@ -113,9 +113,9 @@
             x = 28.0d
             y = 0.0d
             title = "Watch Your Health"
-            description = ["A pack with a missing mod or a broken quest will frustrate players.", "You've shaped quests and added content — open the Health tab and read your verdict.", "It's a go/no-go, not a grade: fix what's blocking, ignore the rest. Check me off when you've read it."]
+            description = ["A pack with a missing mod or a broken quest will frustrate players.", "You've shaped quests, recipes, behaviors, loot, and configs — open the Health tab and read your verdict.", "It's a go/no-go, not a grade: fix what's blocking, ignore the rest. Health also maps your pack's flow — bottlenecks, walls, and the longest quest chains — the shape a player will walk.", "Check me off when you've read it."]
             icon = "minecraft:golden_apple"
-            dependencies = ["1000000000000207", "1000000000000212", "1000000000000213", "1000000000000214"]
+            dependencies = ["1000000000000207", "1000000000000212", "1000000000000213", "1000000000000214", "1000000000000217", "1000000000000218", "1000000000000220"]
             tasks = [
                 { id = "2000000000000208", type = "checkmark", title = "Read the health verdict" }
             ]
@@ -242,6 +242,66 @@
             ]
             rewards = [
                 { id = "3000000000000216", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "1000000000000217"
+            x = 24.0d
+            y = 4.0d
+            title = "Automate With Behaviors"
+            description = ["Behaviors are small automations that run while your pack is played — give a starter item on world join, run a command on a kill, message a player when a block is placed.", "Open the Behaviors tab and click Add behavior. Give it a trigger (like Player joins the game), an optional condition, and an action (like Give item).", "Save it — ModCanvas compiles the behavior into a datapack or kubejs script the pack reads at launch. Check me off when your first behavior is saved."]
+            icon = "minecraft:command_block"
+            dependencies = ["1000000000000203"]
+            tasks = [
+                { id = "2000000000000217", type = "checkmark", title = "Save a behavior" }
+            ]
+            rewards = [
+                { id = "3000000000000217", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "1000000000000218"
+            x = 28.0d
+            y = 4.0d
+            title = "Write a Loot Table"
+            description = ["Loot tables decide what chests and mobs drop. ModCanvas edits the pack's real loot tables without touching JSON by hand.", "Open the Loot tab. Pick a table, or create your own with + New table, then adjust its pools: what drops, how many rolls, under what conditions.", "Save it — the table lands in the pack's data folder and applies on the next launch. Check me off when a table is saved."]
+            icon = "minecraft:barrel"
+            dependencies = ["1000000000000203"]
+            tasks = [
+                { id = "2000000000000218", type = "checkmark", title = "Edit a loot table" }
+            ]
+            rewards = [
+                { id = "3000000000000218", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "1000000000000219"
+            x = 20.0d
+            y = -4.0d
+            title = "Beginner Mode"
+            description = ["You're in Beginner Mode right now — the top bar toggle reads Beginner mode: on.", "Beginner Mode hides the code-shaped surfaces: the raw config textarea and the generated script preview, so a first-timer never trips on code.", "Flip the toggle off to see the full IDE, then back on. Check me off when you know where the switch lives."]
+            icon = "minecraft:compass"
+            dependencies = ["1000000000000202"]
+            tasks = [
+                { id = "2000000000000219", type = "checkmark", title = "Toggle Beginner Mode" }
+            ]
+            rewards = [
+                { id = "3000000000000219", type = "xp", xp = 100 }
+            ]
+        }
+        {
+            id = "1000000000000220"
+            x = 32.0d
+            y = 4.0d
+            title = "Add a Config Tweak"
+            description = ["Not sure which config file a setting lives in? ModCanvas knows common tweaks by their plain-language names.", "In the Configs tab, click ✨ Add a tweak and search for something like 'keep inventory'. Pick a recommendation — ModCanvas opens the right file and pre-fills the typed form.", "Apply it — the change routes through the normal editor, so Undo works. Check me off when one tweak is applied."]
+            icon = "minecraft:repeater"
+            dependencies = ["1000000000000203"]
+            tasks = [
+                { id = "2000000000000220", type = "checkmark", title = "Apply a config recommendation" }
+            ]
+            rewards = [
+                { id = "3000000000000220", type = "xp", xp = 150 }
             ]
         }
     ]

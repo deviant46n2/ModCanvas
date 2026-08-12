@@ -35,7 +35,7 @@ pub struct TemplateMeta {
 const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
     id: "exploration",
     name: "First Steps — Play & Shape Your Pack",
-    description: "A survival intro that doubles as a ModCanvas tour: quests, recipes, configs, health, launch, export.",
+    description: "A survival intro that doubles as a ModCanvas tour: quests, recipes, configs, behaviors, loot, mods, health, launch, export.",
     files: &[
         (
             "data.snbt",

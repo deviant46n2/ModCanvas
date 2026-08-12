@@ -52,10 +52,10 @@ fn scaffolded_pack_imports_cleanly() {
         .iter()
         .filter(|n| matches!(n.node_type, QuestNodeType::Quest))
         .count();
-    assert_eq!(quest_count, 23, "7 play quests + 16 tour quests must import");
+    assert_eq!(quest_count, 27, "7 play quests + 20 tour quests must import");
 
-    // Task variety survives: one kill task, one crafting task, seventeen
-    // checkmark (app-action) tasks — sixteen tour quests plus the play
+    // Task variety survives: one kill task, one crafting task, twenty-one
+    // checkmark (app-action) tasks — twenty tour quests plus the play
     // chapter's own milestone. All must import as checkmarks so players
     // can complete them by hand.
     let kill = result
@@ -78,20 +78,21 @@ fn scaffolded_pack_imports_cleanly() {
         .iter()
         .filter(|n| n.objectives.iter().any(|o| matches!(o.objective_type, ObjectiveType::Checkmark)))
         .count();
-    assert_eq!(checkmarks, 17, "sixteen tour quests + the play milestone");
+    assert_eq!(checkmarks, 21, "twenty tour quests + the play milestone");
 
     // The play chapter's linear chain produces 6 prerequisite edges; the
-    // tour's teaching spine + side branches add 18 more: 6 along the spine,
-    // 4 converging on Health (spine + the three content quests), and 8 side
-    // branches (undo, chapter, book settings, recipe, config, mods + the
-    // spine links they hang off).
+    // tour's teaching spine + side branches add 25 more: 6 along the spine,
+    // 7 converging on Health (spine + the six content quests), 2 along the
+    // Run/Share tail, and 10 side branches (undo, beginner mode, chapter,
+    // book settings, recipe, config, mods, behaviors, loot, config tweaks +
+    // the spine links they hang off).
     let prereqs = result
         .graph
         .edges
         .iter()
         .filter(|e| e.edge_type == EdgeType::Prerequisite)
         .count();
-    assert_eq!(prereqs, 24, "6 play-chain edges + 18 tour edges");
+    assert_eq!(prereqs, 31, "6 play-chain edges + 25 tour edges");
 }
 
 /// s45 regression lock (TEMPLATE-ITEM-TASK-BARE-STRING-NPE): every `item`
@@ -103,7 +104,7 @@ fn scaffolded_pack_imports_cleanly() {
 /// handleLegacyTaskNBT, the whole book fails to load, and the game re-saves a
 /// stripped 2-quest chapter. The template must stay in the SAME form the
 /// exporter emits (helpers.rs item_compound) so template and exporter can
-/// never drift. The 23-quest import above proves the compound form still
+/// never drift. The 27-quest import above proves the compound form still
 /// imports identically.
 #[test]
 fn template_item_fields_are_never_bare_strings() {
