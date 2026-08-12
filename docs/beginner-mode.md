@@ -15,6 +15,20 @@ full tool back. Beginner Mode is that switch.
 **prominent in the topbar** — never a buried setting — so the mode can't
 become a trap.
 
+## First-boot routing (s48)
+
+A brand-new install (no projects, `first_boot_seen` unset) gets the First-Pack
+wizard **auto-opened** instead of a passive "No projects yet" launcher — the
+wizard is the entry point that scaffolds the tutorial pack and turns Beginner
+Mode on at Done. Guardrails in `useFirstBootRouting.ts`:
+
+- waits for a **successful** project-list load — a failed load never opens the
+  wizard (an empty list is ambiguous until the load succeeds);
+- fires **exactly once** (ref guard): the flag is written when the wizard
+  opens, so a crash, restart, or closing-without-creating never re-triggers;
+- returning users (any projects) are skipped permanently.
+- key: `first_boot_seen` in the same settings table as `beginner_mode`.
+
 ## What it hides
 
 | Surface | Beginner mode | Where |
@@ -32,6 +46,7 @@ no-code-shaped and stays as-is.
 | I/O | `src-tauri/src/commands/settings.rs` | `get_app_setting` / `set_app_setting` — thin IPC over the key/value `settings` table |
 | I/O | `frontend/src/services/settings.ts` | IPC wrappers + `BEGINNER_MODE_KEY` |
 | State | `frontend/src/hooks/useBeginnerMode.ts` | Reads the flag on mount (null until resolved), persisted toggle with honest-state revert |
+| State | `frontend/src/hooks/useFirstBootRouting.ts` | One-shot auto-open of the First-Pack wizard for a fresh install (`first_boot_seen`) |
 | State | `useAppState.ts` | Composes the hook; threads `beginnerMode`/`setBeginnerMode` to the workspace |
 | Show | `topbar.tsx` | The prominent toggle (`Beginner mode: on/off`, `aria-pressed`) |
 | Show + glue | `ProjectWorkspace.tsx` | Threads the flag to `ConfigsTab` + `RecipeEditor` |

@@ -29,6 +29,12 @@ export function useProjectState() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [confirmCloseProject, setConfirmCloseProject] = useState(false)
+  // True once listProjects() has SUCCEEDED (success path only). The launcher
+  // boots with an empty list, so `projects.length === 0` is ambiguous until
+  // this flips — first-boot routing waits on it and must not fire on a
+  // failed load (which would wrongly open the wizard for a user whose
+  // projects just failed to list).
+  const [projectsLoaded, setProjectsLoaded] = useState(false)
 
   function persistSelection(id: string | null) {
     try {
@@ -71,6 +77,7 @@ export function useProjectState() {
     try {
       const result = await listProjects()
       setProjects(result)
+      setProjectsLoaded(true)
       return result
     } catch (e) {
       console.error('Failed to load projects:', e)
@@ -146,6 +153,7 @@ export function useProjectState() {
     closePack,
     showWizard, setShowWizard,
     confirmCloseProject, setConfirmCloseProject,
+    projectsLoaded,
     loadProjects,
     getLastProjectId,
     handleCreateProject,

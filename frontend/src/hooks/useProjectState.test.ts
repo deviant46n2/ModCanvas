@@ -64,6 +64,28 @@ describe('useProjectState', () => {
     expect(result.current.getLastProjectId()).toBe('p1')
   })
 
+  it('projectsLoaded flips true only after a successful list', async () => {
+    const { result } = renderHook(() => useProjectState())
+    expect(result.current.projectsLoaded).toBe(false)
+
+    await act(async () => {
+      await result.current.loadProjects()
+    })
+    expect(result.current.projectsLoaded).toBe(true)
+    expect(result.current.projects).toHaveLength(1)
+  })
+
+  it('projectsLoaded stays false when the list fails', async () => {
+    vi.mocked(listProjects).mockRejectedValueOnce(new Error('boom'))
+    const { result } = renderHook(() => useProjectState())
+
+    await act(async () => {
+      await result.current.loadProjects()
+    })
+    expect(result.current.projectsLoaded).toBe(false)
+    expect(result.current.projects).toHaveLength(0)
+  })
+
   it('handleCreateProject creates with the given input and selects the new project', async () => {
     const created = project({ id: 'p9', name: 'New Pack' })
     vi.mocked(createProject).mockResolvedValue(created)

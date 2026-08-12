@@ -5,6 +5,7 @@ import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
 import { useBeginnerMode } from './useBeginnerMode'
+import { useFirstBootRouting } from './useFirstBootRouting'
 import type { LoadPackProgress, CreateProjectInput } from '../services/types'
 import { usePackIo } from './use-pack-io'
 import {
@@ -194,6 +195,16 @@ export function useAppState() {
     openPack(target)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectState.projects])
+
+  // First-boot routing: a brand-new install (no projects, first_boot_seen
+  // unset) gets the First-Pack wizard auto-opened instead of a passive
+  // "No projects yet" launcher. Guarded in useFirstBootRouting (one-shot,
+  // waits for a successful load, never re-triggers).
+  useFirstBootRouting(
+    projectState.projectsLoaded,
+    projectState.projects.length,
+    () => setShowWizard(true),
+  )
 
   // Drag-and-drop pack import: the native dialog can hang on some Wayland
   // setups, so dropping a pack file onto the window is a reliable alternative.

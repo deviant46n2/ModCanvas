@@ -12,3 +12,8 @@ export function setAppSetting(key: string, value: string): Promise<void> {
 
 /** The settings-table key for Beginner Mode. */
 export const BEGINNER_MODE_KEY = 'beginner_mode'
+
+/** The settings-table key for the first-boot routing: set once the First-Pack
+ *  wizard has been auto-opened for a brand-new install, so a crash or restart
+ *  never re-triggers the intro. Absent/null = never shown. */
+export const FIRST_BOOT_KEY = 'first_boot_seen'
