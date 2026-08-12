@@ -34,8 +34,8 @@ export function CuratedModRow({
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
         border: blocked
-          ? '1px dashed var(--color-border)'
-          : ticked ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+          ? '1px dashed var(--color-border-default)'
+          : ticked ? '1px solid var(--color-accent)' : '1px solid var(--color-border-default)',
         borderRadius: 8, marginBottom: 6,
         cursor: blocked ? 'not-allowed' : 'pointer',
         opacity: blocked ? 0.6 : 1,

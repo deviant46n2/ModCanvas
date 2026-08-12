@@ -68,7 +68,7 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
         <span
           style={{
             padding: '4px 12px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-            background: report.go ? 'var(--color-success)' : 'var(--color-danger)',
+            background: report.go ? 'var(--color-success)' : 'var(--color-error)',
             color: '#fff',
           }}
         >

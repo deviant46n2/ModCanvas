@@ -25,7 +25,7 @@
 }
 
 .recipe-status-error {
-  background: var(--color-danger);
+  background: var(--color-error);
 }
 
 .recipe-rename-input {

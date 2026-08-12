@@ -165,7 +165,7 @@
 }
 
 .recipe-slot-menu button.danger {
-  color: var(--color-danger);
+  color: var(--color-error);
 }
 
 /* Inline count editor overlay (shapeless only). */

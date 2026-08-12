@@ -28,8 +28,8 @@
 }
 
 .recipe-disable-toggle.on {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
+  border-color: var(--color-error);
+  background: var(--color-error);
 }
 
 .recipe-disable-toggle.on::after {

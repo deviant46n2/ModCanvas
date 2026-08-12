@@ -187,6 +187,14 @@ directly — never the legacy literals. One token source, one palette.
 - Label above input; error text below input (inline, `--color-error`).
 - Inputs: `--color-bg-sunken` fill, `--color-border-default` border, focus =
   accent border/ring.
+- Selects: `appearance: none` with the chevron data-URL
+  (`app-config-editor.css:79-85` pattern) — never native white popups.
+  The chevron rule must come last so its `background-image` beats earlier
+  `background` shorthands; hover states must use `background-color`, not
+  `background`.
+- Code wells (compile previews, script previews): `--color-bg-sunken` fill,
+  borderless, mono (`--font-mono`), `line-height: 1.6` — the
+  `.preview-code` / `.behavior-preview` pattern.
 
 ### 4.3 Modals / Dialogs
 

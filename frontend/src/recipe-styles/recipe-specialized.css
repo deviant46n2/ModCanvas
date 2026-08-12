@@ -104,7 +104,7 @@
 }
 
 .ingredient-slot-clear:hover {
-  color: var(--color-danger);
+  color: var(--color-error);
 }
 
 .ingredient-slot-input {

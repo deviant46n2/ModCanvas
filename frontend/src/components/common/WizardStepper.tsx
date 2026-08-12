@@ -164,7 +164,7 @@ export function WizardStepper({
 
   const card = (active: boolean) => ({
     padding: '12px',
-    border: active ? '2px solid var(--color-accent)' : '1px solid var(--color-border)',
+    border: active ? '2px solid var(--color-accent)' : '1px solid var(--color-border-default)',
     borderRadius: '8px',
     cursor: 'pointer',
     background: 'var(--color-bg-surface-1)',
