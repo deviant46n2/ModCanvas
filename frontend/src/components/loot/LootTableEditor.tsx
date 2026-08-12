@@ -6,6 +6,7 @@ import type { LootEntryModel, LootPoolModel, LootTableModel } from '../../core/l
 import { findLootItemFindings } from '../../core/loot/validation'
 import type { LootEditorStatus } from '../../hooks/useLootEditor'
 import { LootEntryRow, RollsInput } from './loot-entry-row'
+import { LootConditionList } from './LootConditionList'
 
 interface LootTableEditorProps {
   table: LootTableModel
@@ -99,18 +100,6 @@ export function LootTableEditor({
     setPickerFor(null)
   }
 
-  const addSurvivesExplosion = (poolIdx: number) => {
-    setPool(poolIdx, {
-      conditions: [...table.pools[poolIdx].conditions, { condition: 'minecraft:survives_explosion' }],
-    })
-  }
-
-  const removeCondition = (poolIdx: number, condIdx: number) => {
-    setPool(poolIdx, {
-      conditions: table.pools[poolIdx].conditions.filter((_, i) => i !== condIdx),
-    })
-  }
-
   return (
     <div className="loot-editor" data-testid="loot-editor">
       <div className="loot-editor-header">
@@ -192,22 +181,7 @@ export function LootTableEditor({
               ))}
             </div>
 
-            {pool.conditions.length > 0 && (
-              <div className="loot-conditions">
-                <span className="loot-conditions-title">Conditions</span>
-                {pool.conditions.map((c, i) => (
-                  <div className="loot-condition" key={i}>
-                    <code>{String((c as Record<string, unknown>).condition ?? c)}</code>
-                    <button className="loot-btn loot-btn-ghost loot-btn-small" onClick={() => removeCondition(poolIdx, i)}>
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button className="loot-btn loot-btn-ghost loot-btn-small" onClick={() => addSurvivesExplosion(poolIdx)}>
-              + survives_explosion condition
-            </button>
+            <LootConditionList pool={pool} onPool={(patch) => setPool(poolIdx, patch)} />
           </div>
         ))}
         <button className="loot-btn loot-btn-ghost" onClick={addPool}>

@@ -130,6 +130,20 @@ describe('Adapter Matrix — Version-Specific Differences', () => {
     }
   });
 
+  it('1.21.1 adapters should use the singular loot_table dir', () => {
+    for (const loader of ['neoforge', 'forge', 'fabric', 'quilt'] as const) {
+      const adapter = getAdapter('1.21.1', loader);
+      expect(adapter.getLootDirName()).toBe('loot_table');
+    }
+  });
+
+  it('1.20.1 adapters should use the plural loot_tables dir', () => {
+    for (const loader of ['forge', 'neoforge', 'fabric'] as const) {
+      const adapter = getAdapter('1.20.1', loader);
+      expect(adapter.getLootDirName()).toBe('loot_tables');
+    }
+  });
+
   it('1.21.1 neoforge should use KubeJS 7 with startup scripts', () => {
     const adapter = getAdapter('1.21.1', 'neoforge');
     const fmt = adapter.getRecipeScriptFormat();

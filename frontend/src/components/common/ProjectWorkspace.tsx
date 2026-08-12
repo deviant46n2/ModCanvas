@@ -187,7 +187,12 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </div>
           <div id="tabpanel-loot" role="tabpanel" aria-labelledby="tab-loot" className={activeTab === 'loot' ? '' : 'tab-hidden'}>
             <ErrorBoundary>
-              <LootTab projectId={project.id} projectPath={project.path} />
+              <LootTab
+                projectId={project.id}
+                projectPath={project.path}
+                minecraftVersion={project.minecraft_version}
+                modLoader={project.mod_loader}
+              />
             </ErrorBoundary>
           </div>
           <div id="tabpanel-behaviors" role="tabpanel" aria-labelledby="tab-behaviors" className={activeTab === 'behaviors' ? '' : 'tab-hidden'}>

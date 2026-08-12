@@ -8,14 +8,16 @@
 
 Loot tables are the "what drops" surface: chests, blocks, entities, and
 advancement rewards are driven by `data/<ns>/loot_table(s)/*.json`. The editor
-lets a pack author adjust weighted pools without hand-writing datapack JSON.
+lets a pack author adjust weighted pools without hand-writing datapack JSON —
+and create new tables in the pack's own `data/`.
 
 Roadmap completion criteria (§13 P3-LOOT):
 
 - [x] Weighted pools (rolls — count, uniform range, or opaque exotic provider)
-- [x] Conditions (opaque add/remove — scoping decision, see below)
+- [x] Conditions (typed forms for the common five, opaque raw-JSON for the rest)
 - [x] Emits real JSON (verbatim save, structurally validated)
 - [x] Pack Index validated (item references graded against the item universe)
+- [x] New-table creation (version-derived dir via the adapter matrix)
 
 ## Architecture (3-layer rule)
 
@@ -24,10 +26,12 @@ Roadmap completion criteria (§13 P3-LOOT):
 | Thinking (pure) | `src-tauri/src/loot/model.rs` | `LootTable`/`LootPool`/`LootEntry`/`LootRolls` — typed model with preserve-unknown |
 | Thinking (pure) | `frontend/src/core/loot/model.ts` | Frontend mirror of the Rust model: parse/serialize + `extra` maps |
 | Thinking (pure) | `frontend/src/core/loot/validation.ts` | Item-reference grading against the item universe |
+| Thinking (pure) | `frontend/src/core/loot/conditions.ts` | Typed condition views (5 typed forms, opaque fallback) |
 | Hands (I/O) | `src-tauri/src/loot/editor.rs` | `read_loot_table_cmd` + `save_loot_table_cmd` (path-safe, atomic) |
-| Hands (I/O) | `frontend/src/services/loot.ts` | IPC wrappers for scan/read/save |
+| Hands (I/O) | `src-tauri/src/loot/create.rs` | `create_loot_table_cmd` — dir whitelist, ns/name validation, no-clobber |
+| Hands (I/O) | `frontend/src/services/loot.ts` | IPC wrappers for scan/read/save/create + starter-table JSON |
 | State | `frontend/src/hooks/useLootEditor.ts` | Load → edit → save state machine, honest statuses |
-| Show | `frontend/src/components/loot/LootTableEditor.tsx` + `loot-entry-row.tsx` | The editor surface; LootTab hosts it for editable tables |
+| Show | `frontend/src/components/loot/LootTableEditor.tsx` + `loot-entry-row.tsx` + `LootConditionList.tsx` | The editor surface; LootTab hosts it for editable tables |
 
 The Rust model is the contract; the frontend mirror must stay in lockstep
 (doc-sync: a model change lands in both files, same pass).
@@ -79,8 +83,14 @@ same reason. The `loot_table` vs `loot_tables` directory name is preserved by
 construction — the scanned `source` path carries it.
 
 **Version boundary:** reading scans both dir names. Writing edits in place, so
-the dir name is preserved. Creating a *new* table is NOT in the MVP (needs a
-version-derived dir choice — flagged as follow-up, not silently skipped).
+the dir name is preserved. **Creating a new table** uses the adapter matrix:
+`IMinecraftVersionAdapter.getLootDirName()` returns `loot_table` (1.21+) or
+`loot_tables` (pre-1.21), locked per-version in `adapters/matrix.test.ts`. The
+frontend passes the adapter-derived dir to `create_loot_table_cmd`; Rust
+re-validates it against the whitelist (`LOOT_DIR_NAMES`) so a frontend bug can
+never write an unvalidated path component. Create validates namespace/name as
+a safe resource path (traversal refused, name must be the extension-less
+resource path), refuses to clobber an existing table, and writes atomically.
 
 ## Item validation (Pack Index)
 
@@ -100,15 +110,21 @@ the Pack Index's reference universe, without a full index build per save.
 ## Editor surface
 
 `LootTab` lists tables; selecting an **editable** (pack `data/`) table opens
-the editor. Jar tables stay read-only — a jar cannot be edited in place. The
-editor offers:
+the editor. A **+ New table** button opens the create form (namespace +
+resource path; the adapter-derived dir is shown live); creating selects the
+new table immediately. Jar tables stay read-only — a jar cannot be edited in
+place. The editor offers:
 
 - Pools: add/remove, rolls (count / min–max / opaque), bonus rolls.
 - Entries: item entries pick through the shared `ItemBrowser` (via
   `RecipeItemPicker`); weight/quality fields; type select (item, tag, loot
   table, empty, group, alternatives, dynamic); remove.
-- Conditions: opaque add/remove. One template ships (`survives_explosion`);
-  existing condition blocks are shown and removable, never edited inside.
+- Conditions: typed forms for `survives_explosion`, `killed_by_player`,
+  `random_chance`, `random_chance_with_looting`, `weather_check` (typed in
+  `core/loot/conditions.ts` — adding a condition type = one entry + a test);
+  everything else shows as an opaque read-only row (removable) and can be
+  added via a raw-JSON textarea. Typed edits write only the typed key, so
+  unknown condition internals survive (fidelity contract untouched).
 - Save: honest states only (idle/loading/ready/saving/saved/error) — never a
   fake success. Unsaved-changes indicator.
 
@@ -122,11 +138,10 @@ editor offers:
   (like `QuestBookEditor` derives it from `minecraftVersion`/`modLoader`),
   touching a shared hook used by two tabs — one-pass fix, not loot-arc scope.
   Tripwire: next time the Behaviors tab or loot tab touches picker wiring.
-- New-table creation (version-derived `loot_table` vs `loot_tables` dir):
-  follow-up, needs the version boundary wired through (Rust-side
-  VersionProfile or the project's `minecraft_version` from the DB).
-- Typed condition editors (per-condition forms): deliberately out of MVP
-  scope; the opaque add/remove meets the roadmap's "conditions" bar.
+- Typed editors for the full condition registry: deliberately bounded to the
+  five common conditions. Every other condition stays opaque (read-only,
+  removable, raw-JSON addable) — the fidelity contract holds either way.
+  Adding a typed condition = one entry in `core/loot/conditions.ts` + a test.
 
 ## Verification
 

@@ -30,4 +30,9 @@ export interface IMinecraftVersionAdapter {
   /** Default namespace for bare KubeJS-registered item ids (KubeJS uses
    *  `kubejs` unless a modpack overrides it in `kubejs.properties`). */
   getKubejsDefaultNamespace(): string;
+
+  /** Datapack loot-table directory name: singular `loot_table` on 1.21+,
+   *  plural `loot_tables` before 1.21. Version boundary — the adapter owns
+   *  the name; writers never hardcode it (AGENTS.md adapter-matrix rule). */
+  getLootDirName(): 'loot_table' | 'loot_tables';
 }

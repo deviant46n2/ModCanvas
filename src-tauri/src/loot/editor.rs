@@ -11,7 +11,6 @@
 // (root-scoped), NEVER `validate_project_write` (config-scoped) — the s45
 // regression lock (validation.rs) documents the same trap for KubeJS scripts
 // and the behavior datapack emitter (`behavior/emit.rs`).
-
 use crate::loot::model::LootTable;
 use crate::path_safety::{atomic_write_str, validate_under_root};
 use serde_json::Value;

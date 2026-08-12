@@ -1230,10 +1230,10 @@ Conventions:
   filename). Editor (s47): full-depth model with preserve-unknown (`loot/model.rs` + the
   frontend mirror `core/loot/model.ts`), verbatim atomic save (`loot/editor.rs`, root-scoped
   path gate), Pool-Index-style item validation as warnings never gates
-  (`core/loot/validation.ts`), and the editor surface (pools, rolls, entry weights via the
-  shared ItemBrowser, opaque condition add/remove). Reference: `docs/loot-editor.md`.
-  **Follow-ups parked with written reasons:** new-table creation (version-derived dir) and
-  typed condition editors — see `docs/loot-editor.md`.
+  (`core/loot/validation.ts`), typed condition editors for the common five
+  (`core/loot/conditions.ts`), and new-table creation with the version-derived dir via the
+  adapter matrix (`IMinecraftVersionAdapter.getLootDirName()`, locked in matrix.test.ts;
+  `loot/create.rs`). Reference: `docs/loot-editor.md`.
 - **P3-WORLDGEN** — worldgen authoring: features/ores first (datapack-JSON-scoped), biomes
   later, dimensions last. Class: New. Complexity: **Very High** — the lowest no-code
   ROI-per-effort; scope tightly or cut. **Recommendation: keep as a "scoped features/ores

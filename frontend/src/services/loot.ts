@@ -32,3 +32,42 @@ export async function saveLootTable(
 ): Promise<void> {
   return invoke<void>('save_loot_table_cmd', { projectPath, source, content })
 }
+
+/** Create a NEW loot table in the pack's own `data/` (loot/editor.rs).
+ *  `dirName` is the adapter-derived dir (`loot_table` 1.21+ / `loot_tables`
+ *  pre-1.21) — the version boundary lives in the adapter, never here. Returns
+ *  the created row for immediate selection. */
+export async function createLootTable(
+  projectPath: string,
+  namespace: string,
+  name: string,
+  dirName: 'loot_table' | 'loot_tables',
+  content: string,
+): Promise<DiscoveredLootTable> {
+  return invoke<DiscoveredLootTable>('create_loot_table_cmd', {
+    projectPath,
+    namespace,
+    name,
+    dirName,
+    content,
+  })
+}
+
+/** A fresh starter table JSON for the New Table form: chest type, one pool,
+ *  one item entry — the author fills it in the editor. */
+export function starterLootTableContent(namespace: string): string {
+  return JSON.stringify(
+    {
+      type: 'minecraft:chest',
+      pools: [
+        {
+          rolls: 1,
+          bonus_rolls: 0,
+          entries: [{ type: 'minecraft:item', name: `${namespace}:placeholder`, weight: 1 }],
+        },
+      ],
+    },
+    null,
+    2,
+  )
+}

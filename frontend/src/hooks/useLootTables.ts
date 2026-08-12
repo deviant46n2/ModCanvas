@@ -8,6 +8,7 @@ export function useLootTables(projectPath: string) {
   const [scanning, setScanning] = useState(true)
   const [error, setError] = useState('')
   const [tables, setTables] = useState<DiscoveredLootTable[]>([])
+  const [scanVersion, setScanVersion] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -18,7 +19,9 @@ export function useLootTables(projectPath: string) {
       .catch((e) => { if (!cancelled) setError(String(e)) })
       .finally(() => { if (!cancelled) setScanning(false) })
     return () => { cancelled = true }
-  }, [projectPath])
+  }, [projectPath, scanVersion])
 
-  return { scanning, error, tables }
+  const refresh = () => setScanVersion((v) => v + 1)
+
+  return { scanning, error, tables, refresh }
 }

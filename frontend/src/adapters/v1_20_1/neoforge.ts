@@ -22,4 +22,8 @@ export class Minecraft121NeoForgeAdapter extends BaseMinecraftAdapter {
       extension: '.js',
     };
   }
+
+  getLootDirName(): 'loot_table' | 'loot_tables' {
+    return 'loot_tables';
+  }
 }

@@ -24,6 +24,12 @@ export abstract class BaseMinecraftAdapter implements IMinecraftVersionAdapter {
     return 'kubejs';
   }
 
+  /** Modern datapack dir name (1.21+); pre-1.21 adapters override to
+   *  `loot_tables`. Version boundary, owned by the adapter. */
+  getLootDirName(): 'loot_table' | 'loot_tables' {
+    return 'loot_table';
+  }
+
   abstract getSNBTSpec(): SNBTSpecification;
   abstract getRecipeScriptFormat(): RecipeScriptFormat;
 }
