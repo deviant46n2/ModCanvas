@@ -13,7 +13,7 @@ impl ModIntelligence {
     pub async fn get_mod_metadata(&self, mod_id: &str) -> anyhow::Result<Option<ModMetadata>> {
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
         let resp = self.client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
         if resp.status() == 404 {
@@ -39,7 +39,7 @@ impl ModIntelligence {
 
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
         let resp = self.client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
 
@@ -55,7 +55,7 @@ impl ModIntelligence {
             MODRINTH_API, mod_id, loader_str, mc_version
         );
         let versions_resp = self.client.get(&versions_url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
 
@@ -169,7 +169,7 @@ impl ModIntelligence {
 
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
         let resp = client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
 
@@ -185,7 +185,7 @@ impl ModIntelligence {
             MODRINTH_API, mod_id, loader_str, mc_version
         );
         let versions_resp = client.get(&versions_url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
 
@@ -207,7 +207,7 @@ impl ModIntelligence {
     pub(crate) async fn fetch_project_basic_static(client: &Client, mod_id: &str) -> anyhow::Result<ModMetadata> {
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
         let resp = client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
         if !resp.status().is_success() {
@@ -221,7 +221,7 @@ impl ModIntelligence {
     pub async fn fetch_project_basic(&self, mod_id: &str) -> anyhow::Result<ModMetadata> {
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
         let resp = self.client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
         if !resp.status().is_success() {

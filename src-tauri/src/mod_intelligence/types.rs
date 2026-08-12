@@ -9,6 +9,18 @@ pub(crate) const CURSEFORGE_CDN: &str = "https://mediafilez.forgecdn.net/files";
 /// omit `gameId`, so every search must pass it.
 pub(crate) const CURSEFORGE_MINECRAFT_GAME_ID: u32 = 432;
 
+/// The User-Agent ModCanvas sends to every registry API and CDN request.
+/// Both Modrinth (API terms require a real, contactable UA — they block
+/// offenders) and CurseForge use it for policy and download attribution, so
+/// a placeholder UA means authors may not get counted. The prototype
+/// placeholder ("MMM/0.1.0 (contact@example.com)") was a real attribution
+/// and policy bug (s48).
+pub(crate) const MODCANVAS_USER_AGENT: &str = concat!(
+    "ModCanvas/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/deviant46n2/ModCanvas)",
+);
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct ModrinthSearchResult {
     pub(crate) hits: Vec<ModrinthHit>,

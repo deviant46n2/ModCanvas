@@ -30,7 +30,7 @@ pub async fn search_modrinth(query: &str, loader: &ModLoader, mc_version: &str) 
 
     let resp = client
         .get(&url)
-        .header("User-Agent", "MMM/0.1.0")
+        .header("User-Agent", MODCANVAS_USER_AGENT)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -74,7 +74,7 @@ impl ModIntelligence {
         let url = search_url(MODRINTH_API, &urlencoding::encode(query), &urlencoding::encode(&facets));
         
         let resp = self.client.get(&url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
         let result: ModrinthSearchResult = resp.json().await?;

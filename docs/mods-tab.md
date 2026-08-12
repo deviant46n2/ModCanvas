@@ -94,8 +94,9 @@ into a category search would make the filter look broken.
    - **CurseForge** — `resolve_curseforge_file` queries
      `GET /v1/mods/{id}/files` (game version + `modLoaderType` filter), skips
      early-access/unavailable files, and downloads the best match via
-     `download_curseforge_mod_for_version`. Requires an API key (Settings →
-     gear icon), or the `CURSEFORGE_API_KEY` env var / baked key.
+      `download_curseforge_mod_for_version`. Requires an API key (Settings →
+      gear icon) or the `CURSEFORGE_API_KEY` env var (dev override; the
+      compile-time baked key was removed 2026-08-10).
 2. The downloaded jar is written atomically (`.tmp` + rename) with the filename
    sanitized so a URL can't escape the `mods/` dir (`sanitize_filename`).
 3. The jar is re-inspected with `extract_mod_info_from_jar` so the DB row
@@ -104,6 +105,16 @@ into a category search would make the filter look broken.
 4. The `ModEntry` is upserted into the DB and returned; the frontend reloads
    the project's mod list and shows a success/error toast. Per-row buttons
    switch to a disabled "Installing..." state while the download runs.
+
+**Author attribution (s48):** every download must count toward the author's
+stats. Modrinth downloads route through the counted endpoint
+(`GET /v2/version/{id}/download` — `modrinth_download_url`), never the raw CDN
+`file.url`, and every registry/CDN request carries the real User-Agent
+(`MODCANVAS_USER_AGENT` in `mod_intelligence/types.rs` — `ModCanvas/<version>`
+with the repo as contact). The prototype placeholder UA ("MMM/0.1.0
+(contact@example.com)") was removed — a placeholder UA both violates Modrinth's
+API terms and can strip attribution. CurseForge downloads use the API-returned
+`downloadUrl` (the counted path); the raw-CDN fallback stays a last resort.
 
 Notes: after installing, the jar is visible to Prism and the game immediately
 (next launch). Quest-editor textures/items for the new jar appear after the

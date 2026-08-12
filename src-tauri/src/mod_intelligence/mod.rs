@@ -2,6 +2,8 @@ use std::path::Path;
 
 use reqwest::Client;
 
+use types::MODCANVAS_USER_AGENT;
+
 mod types;
 mod modrinth;
 mod curseforge;
@@ -24,7 +26,7 @@ impl ModIntelligence {
 
     pub(crate) async fn download_file(&self, url: &str, dest_dir: &Path) -> anyhow::Result<String> {
         let resp = self.client.get(url)
-            .header("User-Agent", "MMM/0.1.0 (contact@example.com)")
+            .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
             .await?;
 
@@ -32,11 +34,15 @@ impl ModIntelligence {
             anyhow::bail!("Failed to download {}: HTTP {}", url, resp.status());
         }
 
+        // Capture the FINAL url (after redirects) before consuming the body:
+        // the Modrinth counted-download endpoint (`/version/{id}/download`)
+        // redirects to the CDN, so the request URL ends in "download" while
+        // the final URL carries the real file name. Direct CDN urls
+        // (CurseForge downloadUrl) don't redirect, so final == original.
+        let final_url = resp.url().clone();
         let bytes = resp.bytes().await?;
 
-        // Extract filename from URL path, sanitized so a malicious URL can't
-        // escape the destination directory via `..` or path separators.
-        let url_path = url.split('?').next().unwrap_or(url);
+        let url_path = final_url.as_str().split('?').next().unwrap_or(final_url.as_str());
         let raw_filename = url_path.rsplit('/').next()
             .filter(|s| !s.is_empty())
             .unwrap_or("mod.jar");
