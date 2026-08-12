@@ -32,9 +32,9 @@ const project = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listCuratedMods).mockResolvedValue([
-    { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null },
-    { source: 'modrinth', mod_id: 'jei', slug: 'jei', name: 'Just Enough Items', description: 'See recipes.', ticked: true, core: false, blocked_reason: null },
-    { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null },
+    { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
+    { source: 'modrinth', mod_id: 'jei', slug: 'jei', name: 'Just Enough Items', description: 'See recipes.', ticked: true, core: false, blocked_reason: null, page_url: null },
+    { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null, page_url: null },
   ])
   vi.mocked(installModFromSearch).mockResolvedValue({ name: 'installed' })
   vi.mocked(checkCompatibility).mockResolvedValue({ compatible: false, issues: [], warnings: [] })
@@ -75,6 +75,7 @@ describe('CuratedModsStep', () => {
         source: 'curseforge', mod_id: '', slug: '', name: 'FTB Quests',
         description: 'The quest book.', ticked: false, core: true,
         blocked_reason: 'needs a CurseForge API key — add one in Settings (gear icon)',
+        page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests',
       },
     ])
     renderStep()
@@ -85,6 +86,8 @@ describe('CuratedModsStep', () => {
     expect(screen.getAllByText(/needs a CurseForge API key/).length).toBeGreaterThan(0)
     expect(screen.getByPlaceholderText('CurseForge API key')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Install FTB Quests' })).toBeDisabled()
+    // The blocked box also offers the manual-download page (s48).
+    expect(screen.getByRole('link', { name: /curseforge.com\/minecraft\/mc-mods\/ftb-quests/ })).toBeInTheDocument()
   })
 
   it('saving a key offers a re-check that refetches the list', async () => {
@@ -93,9 +96,10 @@ describe('CuratedModsStep', () => {
         source: 'curseforge', mod_id: '', slug: '', name: 'FTB Quests',
         description: 'The quest book.', ticked: false, core: true,
         blocked_reason: 'needs a CurseForge API key',
+        page_url: null,
       },
     ])
-    vi.mocked(setCurseforgeApiKey).mockResolvedValue('keychain')
+    vi.mocked(setCurseforgeApiKey).mockResolvedValue('kernel keyring')
     renderStep()
     await screen.findAllByText('FTB Quests')
     fireEvent.change(screen.getByPlaceholderText('CurseForge API key'), { target: { value: 'cf-secret' } })
@@ -152,7 +156,7 @@ describe('CuratedModsStep', () => {
   it('failed installs offer a per-mod Retry that re-runs the install', async () => {
     // One ticked mod, so the failure is unambiguous.
     vi.mocked(listCuratedMods).mockResolvedValue([
-      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null },
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: null },
     ])
     vi.mocked(installModFromSearch)
       .mockRejectedValueOnce('Invalid CurseForge project id: curseforge:289412')

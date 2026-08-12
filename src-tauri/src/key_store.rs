@@ -1,6 +1,13 @@
-//! CurseForge API key storage: the OS keychain (Secret Service on Linux)
-//! with the app database as an explicit, reported fallback for headless
-//! sessions with no keychain daemon.
+//! CurseForge API key storage: the Linux **kernel keyring** (keyutils — the
+//! `keyring` crate's `linux-native` feature; no daemon, per-user kernel keys,
+//! no prompts) with the app database as an explicit, reported fallback when
+//! the kernel keyring is unavailable (no session keyring / restricted
+//! keyring permissions).
+//!
+//! NOTE (s48): this module previously claimed "OS keychain (Secret Service)"
+//! — wrong. `linux-native` maps to keyutils, NOT gnome-keyring. Diagnostic
+//! consequence: `keyctl show` sees the stored key; `secret-tool` (Secret
+//! Service) never will — a `secret-tool`-based probe reads the wrong store.
 //!
 //! Hard rules:
 //! - The key NEVER ships in the binary. The compile-time baked-key path
@@ -24,7 +31,7 @@ pub enum KeyStore {
 impl std::fmt::Display for KeyStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KeyStore::Keychain => write!(f, "keychain"),
+            KeyStore::Keychain => write!(f, "kernel keyring"),
             KeyStore::Database => write!(f, "database"),
         }
     }

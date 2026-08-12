@@ -180,6 +180,9 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
 
   const coreMods = mods?.filter((m) => m.core) ?? []
   const funMods = mods?.filter((m) => !m.core) ?? []
+  // The blocked box offers the first blocked pick's manual-download page, so
+  // a user without a working CurseForge key can still get the jar by hand.
+  const blockedManualUrl = mods?.find((m) => m.blocked_reason && m.page_url)?.page_url ?? null
 
   return (
     <div>
@@ -213,6 +216,15 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
               <button className="btn-primary btn-sm" onClick={handleRecheck}>Re-check</button>
             )}
           </div>
+          {blockedManualUrl && (
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6 }}>
+              No key handy? Grab it manually from its project page:{' '}
+              <a href={blockedManualUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>
+                {blockedManualUrl.replace('https://www.', '')}
+              </a>{' '}
+              — drop the jar into your pack's mods folder and it works the same.
+            </div>
+          )}
           {failure._key && <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>{failure._key}</div>}
         </div>
       )}

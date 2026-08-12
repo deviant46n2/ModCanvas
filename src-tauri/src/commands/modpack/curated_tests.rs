@@ -2,7 +2,7 @@
 //! list is content. These lock the trust rule (empty support lists = unknown,
 //! not incompatible) so a registry hiccup never silently starves the wizard.
 
-use super::{filter_curated, CuratedMod};
+use super::{blocked, cf_block_reason, filter_curated, CURATED, CuratedMod};
 use crate::models::{ModLoader, ModMetadata};
 
 fn meta(slug: &str, loaders: Vec<ModLoader>, versions: Vec<String>) -> ModMetadata {
@@ -114,4 +114,31 @@ fn blocked_reason_is_added_by_the_command_not_the_filter() {
     let metadata = vec![meta("kubejs", vec![ModLoader::NeoForge], vec!["1.21.1".into()])];
     let out = filter_curated(&metadata, &ModLoader::NeoForge, "1.21.1");
     assert!(out.iter().all(|m| m.blocked_reason.is_none()));
+}
+
+#[test]
+fn cf_block_reason_maps_403_to_the_key_message() {
+    // A 403 means the stored key was rejected — the reason must say so in
+    // beginner words, not echo the raw HTTP status (s48 walkthrough finding).
+    let reason = cf_block_reason("CurseForge API returned 403 Forbidden");
+    assert!(reason.contains("rejected your API key"), "403 maps to the key message: {reason}");
+    assert!(reason.contains("Settings"), "points at the fix: {reason}");
+
+    let other = cf_block_reason("CurseForge API returned 500 Internal Server Error");
+    assert!(other.contains("metadata fetch failed"), "non-403 keeps the generic message: {other}");
+}
+
+#[test]
+fn blocked_picks_carry_the_manual_download_page() {
+    // The FTB Quests pick declares its project page so the blocked box can
+    // link it — a user with a dead key can still grab the jar by hand (s48).
+    let pick = CURATED.iter().find(|c| c.key == "curseforge:289412").unwrap();
+    let blocked_row = blocked(pick, "needs a CurseForge API key");
+    assert_eq!(
+        blocked_row.page_url.as_deref(),
+        Some("https://www.curseforge.com/minecraft/mc-mods/ftb-quests")
+    );
+    // Modrinth picks don't declare a page — their installs don't block.
+    let modrinth_pick = CURATED.iter().find(|c| c.key == "kubejs").unwrap();
+    assert_eq!(blocked(modrinth_pick, "x").page_url, None);
 }

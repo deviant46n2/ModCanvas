@@ -17,9 +17,11 @@ interface SettingsModalProps {
 }
 
 function storeLabel(store: string): string | null {
-  if (store === 'keychain') return 'Stored in your system keychain.'
+  if (store === 'kernel keyring') {
+    return 'Stored in your system keyring (Linux kernel keyring).'
+  }
   if (store === 'database') {
-    return 'Stored in the app database (fallback — no system keychain detected). Still protected: the file is owner-only.'
+    return 'Stored in the app database (fallback — kernel keyring unavailable). Still protected: the file is owner-only.'
   }
   return null
 }
@@ -109,7 +111,7 @@ export function SettingsModal({ show, onClose }: SettingsModalProps) {
           Only CurseForge needs a key — Modrinth works without one. FTB Quests
           is CurseForge-only, so the wizard's core picks need it. Get a free
           key at <strong>console.curseforge.com</strong> → API Keys. Your key
-          stays on this machine, in your system keychain.
+          stays on this machine, in your system keyring (Linux kernel keyring).
         </div>
         {message && <div style={{ fontSize: 13, marginBottom: 8 }}>{message}</div>}
         <div className="modal-actions">

@@ -30,6 +30,8 @@ pub struct CuratedMod {
     /// CurseForge pick without an API key). A core pick is never silently
     /// absent — an actionable reason beats a mysterious gap.
     pub blocked_reason: Option<String>,
+    /// Project page for manual download (the blocked box links it).
+    pub page_url: Option<String>,
 }
 
 struct CuratedPick {
@@ -39,6 +41,10 @@ struct CuratedPick {
     description: &'static str,
     ticked: bool,
     core: bool,
+    /// Project page for manual download — shown in the blocked box so a user
+    /// whose CurseForge key is dead can still grab the jar by hand (s48).
+    /// Empty = no manual-download link offered.
+    page_url: &'static str,
 }
 
 /// Core picks first: ModCanvas's own editors write to FTB Quests (quests)
@@ -48,16 +54,16 @@ struct CuratedPick {
 /// The rest are "goes great" picks. Loader/version filtering happens per
 /// pack at request time; a pick that doesn't support the pack never shows.
 const CURATED: &[CuratedPick] = &[
-    CuratedPick { key: "curseforge:289412", name: "FTB Quests", description: "The quest book — ModCanvas's quest editor writes to it.", ticked: true, core: true },
-    CuratedPick { key: "kubejs", name: "KubeJS", description: "Lets ModCanvas write recipes your pack loads at launch.", ticked: true, core: true },
-    CuratedPick { key: "jei", name: "Just Enough Items", description: "See every item and recipe.", ticked: true, core: false },
-    CuratedPick { key: "jade", name: "Jade", description: "Block names and info at a glance.", ticked: true, core: false },
-    CuratedPick { key: "journeymap", name: "JourneyMap", description: "A live map of the world you've explored.", ticked: true, core: false },
-    CuratedPick { key: "appleskin", name: "AppleSkin", description: "Hunger and saturation in the HUD.", ticked: true, core: false },
-    CuratedPick { key: "mouse-tweaks", name: "Mouse Tweaks", description: "Drag items across inventories faster.", ticked: true, core: false },
-    CuratedPick { key: "sodium", name: "Sodium", description: "A big frame-rate boost (Fabric/Quilt).", ticked: true, core: false },
-    CuratedPick { key: "modmenu", name: "Mod Menu", description: "A mod list screen (Fabric/Quilt).", ticked: true, core: false },
-    CuratedPick { key: "controllable", name: "Controllable", description: "Play with a game controller.", ticked: false, core: false },
+    CuratedPick { key: "curseforge:289412", name: "FTB Quests", description: "The quest book — ModCanvas's quest editor writes to it.", ticked: true, core: true, page_url: "https://www.curseforge.com/minecraft/mc-mods/ftb-quests" },
+    CuratedPick { key: "kubejs", name: "KubeJS", description: "Lets ModCanvas write recipes your pack loads at launch.", ticked: true, core: true, page_url: "" },
+    CuratedPick { key: "jei", name: "Just Enough Items", description: "See every item and recipe.", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "jade", name: "Jade", description: "Block names and info at a glance.", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "journeymap", name: "JourneyMap", description: "A live map of the world you've explored.", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "appleskin", name: "AppleSkin", description: "Hunger and saturation in the HUD.", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "mouse-tweaks", name: "Mouse Tweaks", description: "Drag items across inventories faster.", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "sodium", name: "Sodium", description: "A big frame-rate boost (Fabric/Quilt).", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "modmenu", name: "Mod Menu", description: "A mod list screen (Fabric/Quilt).", ticked: true, core: false, page_url: "" },
+    CuratedPick { key: "controllable", name: "Controllable", description: "Play with a game controller.", ticked: false, core: false, page_url: "" },
 ];
 
 /// Keep a pick only when the resolved metadata proves it compatible. Empty
@@ -113,9 +119,22 @@ fn filter_curated(
             ticked: pick.ticked,
             core: pick.core,
             blocked_reason: None,
+            page_url: None,
         });
     }
     out
+}
+
+/// Map a CurseForge metadata-fetch failure to a beginner-actionable blocked
+/// reason: a 403 means the stored key was rejected (not that the registry is
+/// down). The raw error carries the status ("CurseForge API returned 403
+/// Forbidden").
+fn cf_block_reason(err: &str) -> String {
+    if err.contains("403") {
+        "CurseForge rejected your API key (403) — check it in Settings (gear icon)".to_string()
+    } else {
+        format!("CurseForge metadata fetch failed: {err}")
+    }
 }
 
 #[tauri::command]
@@ -173,6 +192,7 @@ fn blocked(pick: &CuratedPick, reason: &str) -> CuratedMod {
         ticked: false,
         core: pick.core,
         blocked_reason: Some(reason.to_string()),
+        page_url: if pick.page_url.is_empty() { None } else { Some(pick.page_url.to_string()) },
     }
 }
 
@@ -210,9 +230,10 @@ async fn resolve_cf_pick(
                 ticked: pick.ticked,
                 core: pick.core,
                 blocked_reason: None,
+                page_url: None,
             }
         }
-        Err(e) => blocked(pick, &format!("CurseForge metadata fetch failed: {e}")),
+        Err(e) => blocked(pick, &cf_block_reason(&e.to_string())),
     }
 }
 

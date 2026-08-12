@@ -100,6 +100,8 @@ export interface CuratedMod {
   ticked: boolean
   core: boolean
   blocked_reason: string | null
+  /** Project page for manual download, offered in the blocked box (s48). */
+  page_url: string | null
 }
 
 export interface ConfigFileInfo {
