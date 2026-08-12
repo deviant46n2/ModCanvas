@@ -33,6 +33,8 @@ mod tests_conditions_actions;
 #[cfg(test)]
 mod tests_datapack;
 #[cfg(test)]
+mod tests_smoke_suite;
+#[cfg(test)]
 mod tests_vocabulary;
 
 pub use compile::{CompileError, CompileOutput, CompileWarning};

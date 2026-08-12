@@ -1,0 +1,160 @@
+[
+  {
+    "id": "suite:kit",
+    "name": "SMOKE-1 join kit",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_joins_game" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:bread", "count": 8 },
+      { "kind": "message", "text": "[SMOKE-1] join trigger + give(count>1) + message OK" }
+    ]
+  },
+  {
+    "id": "suite:bye",
+    "name": "SMOKE-2 leave",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_leaves_game" },
+    "conditions": [],
+    "actions": [
+      { "kind": "remove_item", "item": "minecraft:bread" },
+      { "kind": "run_command", "command": "say [SMOKE-2] leaves trigger + remove_item + run_command OK" }
+    ]
+  },
+  {
+    "id": "suite:ouch",
+    "name": "SMOKE-3 damage-heal",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_takes_damage" },
+    "conditions": [ { "kind": "health_below", "health": 18 } ],
+    "actions": [
+      { "kind": "heal", "amount": 4 },
+      { "kind": "message", "text": "[SMOKE-3] damage trigger + health_below + heal OK" }
+    ]
+  },
+  {
+    "id": "suite:hunter",
+    "name": "SMOKE-4 kill-dimension",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_kills_entity", "entity": "minecraft:zombie" },
+    "conditions": [ { "kind": "dimension", "dimension": "minecraft:overworld" } ],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:diamond", "count": 1 },
+      { "kind": "set_stage", "stage": "smoke_zombie_hunter" },
+      { "kind": "message", "text": "[SMOKE-4] kills trigger + dimension cond + give(1) + set_stage OK" }
+    ]
+  },
+  {
+    "id": "suite:skull",
+    "name": "SMOKE-5 entity-type",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_kills_entity" },
+    "conditions": [ { "kind": "entity_type", "entity": "minecraft:zombie" } ],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-5] entity_type cond TRUE OK (zombie killed)" }
+    ]
+  },
+  {
+    "id": "suite:craft",
+    "name": "SMOKE-6 crafted",
+    "backend": "kubejs",
+    "trigger": { "kind": "item_crafted", "item": "minecraft:crafting_table" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:stick", "count": 1 },
+      { "kind": "message", "text": "[SMOKE-6] crafted trigger + filter + give OK" }
+    ]
+  },
+  {
+    "id": "suite:pickup",
+    "name": "SMOKE-7 pickup-inventory",
+    "backend": "kubejs",
+    "trigger": { "kind": "item_picked_up", "item": "minecraft:diamond" },
+    "conditions": [ { "kind": "item_in_inventory", "item": "minecraft:diamond", "min_count": 1 } ],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-7] pickup trigger + item_in_inventory cond TRUE OK" }
+    ]
+  },
+  {
+    "id": "suite:pickup_neg",
+    "name": "SMOKE-8 pickup negative control",
+    "backend": "kubejs",
+    "trigger": { "kind": "item_picked_up", "item": "minecraft:diamond" },
+    "conditions": [ { "kind": "item_in_inventory", "item": "minecraft:bread", "min_count": 64 } ],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-8] FAIL — negative control fired (item_in_inventory guard broken)" }
+    ]
+  },
+  {
+    "id": "suite:build",
+    "name": "SMOKE-9 placed",
+    "backend": "kubejs",
+    "trigger": { "kind": "block_placed", "block": "minecraft:stone" },
+    "conditions": [],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-9] placed trigger + placer guard OK" }
+    ]
+  },
+  {
+    "id": "suite:break",
+    "name": "SMOKE-10 broken",
+    "backend": "kubejs",
+    "trigger": { "kind": "block_broken", "block": "minecraft:stone" },
+    "conditions": [],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-10] broken trigger + guard OK" }
+    ]
+  },
+  {
+    "id": "suite:story",
+    "name": "SMOKE-11 advancement-teleport-spawn",
+    "backend": "kubejs",
+    "trigger": { "kind": "advancement_completed", "advancement": "minecraft:story/root" },
+    "conditions": [],
+    "actions": [
+      { "kind": "teleport", "x": 0.0, "y": 80.0, "z": 0.0, "yaw": 0.0, "pitch": 0.0 },
+      { "kind": "spawn_entity", "entity": "minecraft:chicken" },
+      { "kind": "message", "text": "[SMOKE-11] advancement trigger + teleport + spawn OK" }
+    ]
+  },
+  {
+    "id": "suite:chain",
+    "name": "SMOKE-12 datapack chain",
+    "backend": "datapack",
+    "trigger": { "kind": "advancement_completed", "advancement": "minecraft:story/root" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:apple", "count": 1 }
+    ]
+  },
+  {
+    "id": "suite:chain2",
+    "name": "SMOKE-13 datapack crafted",
+    "backend": "datapack",
+    "trigger": { "kind": "item_crafted", "item": "minecraft:crafting_table" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:apple", "count": 1 }
+    ]
+  },
+  {
+    "id": "suite:hold",
+    "name": "SMOKE-14 item-held",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_kills_entity" },
+    "conditions": [ { "kind": "item_held", "item": "minecraft:diamond" } ],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-14] item_held cond TRUE OK (killed while holding diamond)" }
+    ]
+  },
+  {
+    "id": "suite:lotto",
+    "name": "SMOKE-15 timed-random",
+    "backend": "kubejs",
+    "trigger": { "kind": "timed_every", "ticks": 100 },
+    "conditions": [ { "kind": "random_chance", "chance": 0.5 } ],
+    "actions": [
+      { "kind": "message", "text": "[SMOKE-15] timed trigger + random_chance fired" }
+    ]
+  }
+]
