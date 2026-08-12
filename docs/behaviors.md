@@ -183,9 +183,12 @@ PlayerEvents.loggedIn(event => {
 - ItemBrowser integration for GiveItem (needs the asset pipeline).
 - Datapack backend (advancement triggers / loot conditions).
 - 3 example behaviors in wizard templates.
-- **In-game API verification** — now reachable: the emitted script lands in
-  the right directory, so a game run + `kubejs reload` proves the `give`
-  count form (the flagged runtime surprise, roadmap §21 risk #3).
-- **Recipe-writer path fix in-game verify** (fixed in code, s45 chunk 6):
-  recipe scripts now land in `kubejs/server_scripts/` — confirm a real
-  recipe applies in-game.
+- **In-game API verification — DONE (s45, monster):** the `give` count form
+  (`Item.of(id, count)` for stacks > 1) was proven in a real game — a behavior
+  giving `minecraft:diamond` count 10 fired on join. The flagged runtime
+  surprise (roadmap §21 risk #3) is closed for the behavior path.
+- **Recipe-writer path fix in-game verify — DONE (s45, monster):** a saved
+  recipe hot-reloaded with evidence-verified PASS and was confirmed working
+  in-game; `modcanvas_recipes.js` confirmed in `kubejs/server_scripts/`
+  (project root, no `config/kubejs`). The s44 evidence gate's blind spot is
+  closed.

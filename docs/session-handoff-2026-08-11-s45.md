@@ -95,11 +95,18 @@ except the parked release-binary, health 90.
 
 ## UNVERIFIED CLAIMS
 
-- The `give` count form (`Item.of(id, count)` for stacks > 1) — golden tests
-  lock the string, but no live KubeJS run has executed it. In-game node owed.
-- Recipes applying in-game — the s44 evidence gate verified reload evidence,
+- ~~The `give` count form (`Item.of(id, count)` for stacks > 1) — golden tests
+  lock the string, but no live KubeJS run has executed it.~~ **VERIFIED in-game
+  (s45, monster):** a behavior giving `minecraft:diamond` count 10 fired on
+  join; the `Item.of` form works. Golden tests locked the string, the run
+  proved the API.
+- ~~Recipes applying in-game — the s44 evidence gate verified reload evidence,
   NOT that recipe scripts land where KubeJS reads them (the path bug above
-  makes this genuinely unverified).
+  makes this genuinely unverified).~~ **VERIFIED in-game (s45, monster):** a
+  saved recipe hot-reloaded with evidence-verified PASS and was confirmed
+  working in-game; `modcanvas_recipes.js` confirmed in
+  `kubejs/server_scripts/` (project root — the path fix works, no
+  `config/kubejs` dir).
 
 ## DECISIONS (memory pointers)
 

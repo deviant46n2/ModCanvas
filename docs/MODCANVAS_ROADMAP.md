@@ -1099,8 +1099,8 @@ Conventions:
   emits real KubeJS" is now visible in the app. 672 frontend green (667 → 672).
   Scope cut recorded: GiveItem uses a text input with compile validation, not the
   ItemBrowser picker (that needs the quest asset pipeline — queued). Still queued:
-  conditions + remaining vocabulary, datapack backend, Pack Index validation, wizard
-  templates, in-game API verification. Details: `docs/behaviors.md`.
+  conditions + remaining vocabulary, datapack backend, wizard templates. Details:
+  `docs/behaviors.md`.
 - **Status (s45 chunk 4):** the emission step landed — saving behaviors now compiles
   + writes `kubejs/server_scripts/modcanvas_behaviors.js` in the instance
   (`behavior/emit.rs`, dedicated file, `validate_under_root` project-root scoping,
@@ -1120,6 +1120,16 @@ Conventions:
   false-GO-block a released pack) — recorded in §11.2/§13. New
   `core/behavior/behavior-store.ts` (zustand, not persisted — the Rust command persists;
   the tab mirrors into it, health reads it). 683 frontend green (673 → 683, +10).
+  Details: `docs/behaviors.md`.
+- **Status (s45 chunk 6 + in-game verify):** recipe-writer path bug FIXED —
+  `write_script_files` now uses `validate_under_root` (project-root scoped) for both
+  KubeJS and CraftTweaker paths (the config-scoped validator silently redirected them
+  under `config/`, which neither mod reads). Regression lock
+  `test_under_root_resolves_to_project_root_not_config`. **IN-GAME VERIFIED (monster,
+  s45):** the behavior `give` count form (`Item.of(id, count)`, count 10) fired on
+  join — the flagged runtime surprise (§21 risk #3) is closed for behaviors — and a
+  saved recipe hot-reloaded with evidence-verified PASS and was confirmed working
+  in-game. Both handoff UNVERIFIED items are now VERIFIED. 379 Rust green.
   Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
