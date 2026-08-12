@@ -87,6 +87,22 @@
     {
       "commit": "1828b09",
       "reason": "import-on-open cache gate (s42 race) — behavior documented via component inline docs: useQuestToolbarActions.ts:40-47 explains the race, the gate, and why a non-empty cache is authoritative (AGENTS.md doc-sync rule counts component inline docs). quest-editor.md does NOT cover the load path — inline comment is the doc; revisit on next quest-load touch"
+    },
+    {
+      "commit": "5c51fa3",
+      "reason": "Prism-refusal launch detection — behavior documented same-pass in d4e2e5c (roadmap §13 P2-HOTSWAP Status s44): the liveness-based refusal detection (wrapper exits 0 but no game process appears = stale-Prism signature) and the 'close Prism and retry' failure message instead of 'Game exited (code 0)'. Also docs/workarounds.md #8 context, s44"
+    },
+    {
+      "commit": "e38611b",
+      "reason": "loot read-only scan MVP — behavior documented same-pass in d4e2e5c (roadmap §13 P3-LOOT Status s44): scan walks pack data/ + mod jars for both historical dir names (loot_table 1.21+ / loot_tables pre-1.21), full-path resource ids, read-only list + detail; editor not built. Also roadmap §7.4.2, s44"
+    },
+    {
+      "commit": "b91a0cc",
+      "reason": "Pack Index derived spine + item-registry UI-label fix — behavior documented same-pass in d4e2e5c (roadmap §13 P1-PACKINDEX Status s44 + §7): derived read-mostly spine (never authoritative, never write-through), is_real_item_key requires non-UI namespaced item keys (item.canUse.*/item.modifiers.* are UI labels). Commit also carries the 3 doc-sync judgment rows for a4b3857/7262374/1828b09, s44"
+    },
+    {
+      "commit": "33e207d",
+      "reason": "Pack Health Tier 2 topology — behavior documented same-pass in d4e2e5c (roadmap §13 P1-HEALTH-2 Status s44): bottlenecks/walls/longest-chains as recommended measurements (never blocks, Trust Rule) via checks/topology.ts; quest→item→recipe availability half parked with written reason. Also docs/pack-health.md, s44"
     }
   ]
 }

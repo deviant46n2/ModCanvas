@@ -6,6 +6,15 @@ returned usage-guide errors and stored nothing; the close entry was deleted), so
 doc + `.tutor/profile.md` + the commits are the durable record. All 7 lost entries
 re-written at s45 open with code-verified pointers, `pnpm memory-check` green.
 
+> **ERRATA (s45):** the s44 close battery reported "integrity clean", but a re-run
+> at s45 open surfaced 4 doc-sync CANDIDATES from s44 itself (5c51fa3, e38611b,
+> b91a0cc, 33e207d) — code-only commits inside the lookback window without judgment
+> rows. Their docs DID land same-pass in `d4e2e5c`; the checker is per-commit strict
+> so the candidates stood. Paid at s45 open: 4 judgment rows in
+> `scripts/doc-sync-judgments.json` citing `d4e2e5c`; integrity now shows only the
+> parked release-binary violation. Lesson: read the close battery's verdicts from the
+> gate output at close time, never assert from memory.
+
 ## WHAT WE BUILT (one line)
 
 s44 shipped the first three nodes of the worldgen chain — an evidence-gated KubeJS
