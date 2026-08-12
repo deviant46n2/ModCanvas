@@ -137,11 +137,15 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
 - Companion changes that alter renderer semantics (e.g. per-face light constants) are coupled to the app's `engine_renders.rs` `CACHE_VERSION`: bump it in the SAME pass, and **restart the app too** (the new binary enforces the cache invalidation; an old app process keeps serving the stale cache).
 - The s14 trap: the fix was committed, the jar was re-copied, but the jar was the OLD build (identical md5) and the app never restarted — the "dirt block not fixed" observation was invalid because neither artifact ran the new code. Verification loop = rebuild → deploy → restart BOTH app and game → then observe.
 
-### Branch convention (s48)
-- `master` is the **mainline**: all work lands here (feature branches merge into master, then are deleted). The public repo's truth.
-- `nightly` **tracks master's tip** — the bleeding edge, advanced to master whenever master is green (manual `git branch -f nightly master` at boundaries until CI automates it). The future nightly-build source.
-- `stable` is the **release line**: fast-forward/tag (vX.Y.Z) at release-worthy states; bugfix-only after a tag (cherry-picked from master). Never a work branch.
-- **Push at boundaries** — a commit that isn't pushed exists in exactly one place (the s48 lesson: a week of single-copy work). Push IS backup.
+### Branch convention (s48, revised — solo mainline)
+- `master` is the **single mainline**: all work lands here. Solo project, no
+  release lines yet — no `stable`/`nightly` branches until CI or users exist
+  (they're recreatable in seconds when they do; the three-branch shape was
+  tried and deliberately collapsed for being ceremony without a consumer).
+- **Known-good states get tags, not branches** (`git tag v0.1.0`): a tag is
+  immutable and drift-free. Release-worthy master tip → tag.
+- **Push at boundaries** — a commit that isn't pushed exists in exactly one place
+  (the s48 lesson: a week of single-copy work). Push IS backup.
 
 ### Testing & Verification
 - **Run Unit Tests:** `pnpm test` (in `frontend/` — includes frontend parser tests like smart-filter DSL)
