@@ -687,6 +687,16 @@ Each is a modal/side-panel that **operates the same editor state and routes thro
 global HistoryStore** — so the user can undo the wizard and see exactly what it made
 (Bible §10.4: "the mini-wizard is a teacher; the editor is the classroom").
 
+**PARKED (s48, written reason) — the guided-tour driver.** The tutorial quests are
+inert: they teach surfaces *by name*, but selecting a tutorial quest doesn't open its
+tab or launch its mini-wizard. A driver (quest-id → destination map + a hint strip in
+Beginner Mode + tab-switch wiring) was scoped and deliberately parked: Chunk 1 (content
+coverage — the 20-quest tour now spans every feature) and Chunk 2 (first-boot routing)
+shipped first, and the remaining plumbing (switching the workspace tab from inside the
+quest editor) is the rat's-nest risk. **Tripwire:** revisit when a fresh-eyes user test
+shows quests-by-name aren't enough, or when the dogfood item (authoring template content
+*using* the mini-wizards) gets scheduled.
+
 ---
 
 ## 10. Pack Health strategy
