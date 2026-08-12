@@ -133,6 +133,8 @@ function AppRoot() {
           onOpenSettings={() => s.setShowSettings(true)}
           onRefresh={() => s.refreshPack(false)}
           onForceReindex={() => s.refreshPack(true)}
+          beginnerMode={s.beginnerMode}
+          onBeginnerModeChange={s.setBeginnerMode}
           modsTab={{
             projectMods: s.projectMods,
             filteredMods: s.filteredMods,
@@ -190,6 +192,7 @@ function AppRoot() {
             configDirty: s.configDirty,
             canUndoConfig: s.canUndoConfig,
             onUndoConfig: s.undoConfigChange,
+            beginnerMode: s.beginnerMode === true,
           }}
           ingestResult={s.ingestResult}
           ingesting={s.ingesting}
@@ -217,7 +220,13 @@ function AppRoot() {
         onCreate={s.handleCreateProject}
         onRefresh={() => s.refreshPack(false)}
         packLoaded={s.packLoaded}
-        onDone={() => s.setShowWizard(false)}
+        onDone={() => {
+          // P0-BEGINNER: onboarding completes → first-timers land in
+          // Beginner mode (raw/code surfaces hidden). They can switch to
+          // the full IDE from the prominent topbar toggle.
+          s.setBeginnerMode(true)
+          s.setShowWizard(false)
+        }}
         onGuidedQuest={s.handleGuidedQuest}
       />
 

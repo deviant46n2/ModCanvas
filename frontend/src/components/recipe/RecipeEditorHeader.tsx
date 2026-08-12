@@ -3,6 +3,8 @@ interface RecipeEditorHeaderProps {
   loader: string;
   showScriptPreview: boolean;
   onToggleScriptPreview: () => void;
+  /** P0-BEGINNER: omit the Script toggle entirely. */
+  hideScriptToggle?: boolean;
   reloading: boolean;
   reloadMsg: string;
   onReload: () => void;
@@ -16,6 +18,7 @@ export function RecipeEditorHeader({
   loader,
   showScriptPreview,
   onToggleScriptPreview,
+  hideScriptToggle = false,
   reloading,
   reloadMsg,
   onReload,
@@ -31,14 +34,16 @@ export function RecipeEditorHeader({
             ✨ Add a recipe
           </button>
         )}
-        <button
-          type="button"
-          className={`script-toggle ${showScriptPreview ? 'active' : ''}`}
-          onClick={onToggleScriptPreview}
-          title="Show the raw generated KubeJS/CraftTweaker script (opt-in)"
-        >
-          Script
-        </button>
+        {!hideScriptToggle && (
+          <button
+            type="button"
+            className={`script-toggle ${showScriptPreview ? 'active' : ''}`}
+            onClick={onToggleScriptPreview}
+            title="Show the raw generated KubeJS/CraftTweaker script (opt-in)"
+          >
+            Script
+          </button>
+        )}
         <button className="btn-secondary" onClick={onReload} disabled={reloading} title="Re-scan the pack for recipes (cache-aware)">
           {reloading ? 'Reloading…' : 'Reload Recipes'}
         </button>

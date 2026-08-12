@@ -901,6 +901,12 @@ Conventions:
 - **Completion criteria:** a fresh-eyes tester never sees a code file, raw textarea, or
   script drawer in default mode; the toggle is reachable from the topbar; mode persists
   across restarts.
+- **Status (s47): COMPLETE — the P0 gate is closed.** `beginner_mode` flag in the
+  app-scoped settings table (`get_app_setting`/`set_app_setting` commands, `db/settings.rs`);
+  `useBeginnerMode` hook (null until read, persisted toggle with honest-state revert);
+  prominent topbar toggle; Raw config mode + script preview hidden (forced structured /
+  toggle not offered); onboarding (wizard Done) turns it ON for first-timers, OFF default
+  for returning users. Reference: `docs/beginner-mode.md`.
 - **PARKED (s42, written reason):** deferred until after P2-HOTSWAP. The hotswap mini-wizard
   IS a beginner surface (one-click "apply my tweaks without restarting"), so beginner mode
   ships better once it exists; the surfaces it hides (raw textarea, script drawer, KubeJS)

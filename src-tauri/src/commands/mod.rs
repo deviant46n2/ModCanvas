@@ -4,9 +4,11 @@ pub mod history;
 pub mod hotswap;
 pub mod mod_intel;
 pub mod modpack;
+pub mod progress_emitter;
 pub mod project;
 pub mod quest_graph;
 pub mod runtime;
+pub mod settings;
 
 pub use config::*;
 pub use behavior::*;
@@ -14,9 +16,11 @@ pub use history::*;
 pub use hotswap::*;
 pub use mod_intel::*;
 pub use modpack::*;
+pub(crate) use progress_emitter::TauriProgressEmitter;
 pub use quest_graph::*;
 pub use project::*;
 pub use runtime::*;
+pub use settings::*;
 
 use crate::db::Database;
 use crate::models::{Recipe, ModLoader, ModSource, ModEntry};
@@ -26,19 +30,6 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 use tauri::State;
 use uuid::Uuid;
-
-/// Tauri-specific adapter bridging ProgressEmitter to Tauri's event system.
-/// Lives here so both runtime.rs and project.rs can use it.
-pub(crate) struct TauriProgressEmitter(pub tauri::AppHandle);
-
-impl crate::minecraft::ProgressEmitter for TauriProgressEmitter {
-    fn emit_progress(&self, progress: crate::minecraft::LaunchProgress) {
-        use tauri::Emitter;
-        let _ = self.0.emit("mc-launch-progress", progress);
-    }
-}
-
-// ... rest of the file
 
 /// Resolve the CurseForge API key: runtime env var (dev override) > OS
 /// keychain > database fallback (key_store.rs). The compile-time baked key

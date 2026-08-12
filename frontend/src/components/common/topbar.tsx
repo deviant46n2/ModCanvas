@@ -22,6 +22,8 @@ interface TopBarProps {
   onRefresh: () => void
   onForceReindex: () => void
   onClosePack: () => void
+  beginnerMode: boolean | null
+  onBeginnerModeChange: (next: boolean) => void
 }
 
 export function TopBar({
@@ -41,6 +43,8 @@ export function TopBar({
   onRefresh,
   onForceReindex,
   onClosePack,
+  beginnerMode,
+  onBeginnerModeChange,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -70,6 +74,20 @@ export function TopBar({
         </span>
       </div>
       <div className="workspace-actions">
+        {beginnerMode !== null && (
+          <button
+            className={`beginner-toggle ${beginnerMode ? 'active' : ''}`}
+            onClick={() => onBeginnerModeChange(!beginnerMode)}
+            title={
+              beginnerMode
+                ? 'Beginner mode is on — raw/code surfaces are hidden. Click to switch to the full IDE.'
+                : 'Beginner mode hides raw/code surfaces — a simplified view for first-timers.'
+            }
+            aria-pressed={beginnerMode}
+          >
+            {beginnerMode ? 'Beginner mode: on' : 'Beginner mode: off'}
+          </button>
+        )}
         <button className="btn-secondary" onClick={onSave} title="Save project metadata">
           Save
         </button>

@@ -11,7 +11,13 @@
     "frontend/src/assets"
   ],
   "allowlists": {
-    "line-limit": [],
+    "line-limit": [
+      {
+        "path": "frontend/src/RecipeEditor.tsx",
+        "reason": "P0-BEGINNER (s47): beginnerMode additions pushed the file to 305 lines. Parked by student decision 2026-08-12 (pay-later debt-triage) — TRIPWIRE: the next touching edit to RecipeEditor.tsx MUST split it (extract the script-preview-pref seam) or update this entry",
+        "since": "2026-08-12T08:30:00"
+      }
+    ],
     "asset-bundle": [
       {
         "path": "frontend/src/assets/hero.png",

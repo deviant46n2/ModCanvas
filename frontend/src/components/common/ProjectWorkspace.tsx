@@ -51,6 +51,8 @@ export interface ProjectWorkspaceProps {
   onOpenSettings: () => void
   onRefresh: () => void
   onForceReindex: () => void
+  beginnerMode: boolean | null
+  onBeginnerModeChange: (next: boolean) => void
 
   modsTab: ModsTabProps
   configsTab: ConfigsTabProps
@@ -121,6 +123,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onForceReindex={props.onForceReindex}
         onClosePack={props.onBackToProjects}
         onOpenSettings={props.onOpenSettings}
+        beginnerMode={props.beginnerMode}
+        onBeginnerModeChange={props.onBeginnerModeChange}
       />
 
             <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot', 'behaviors'] as const).map((tab) => (
@@ -182,6 +186,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                 projectPath={project.path}
                 minecraftVersion={project.minecraft_version}
                 modLoader={project.mod_loader}
+                beginnerMode={props.beginnerMode === true}
               />
             </ErrorBoundary>
           </div>

@@ -204,6 +204,8 @@ pub fn run() {
             commands::list_prism_instances,
             commands::generate_recipe_scripts,
             commands::write_script_files,
+            commands::get_app_setting,
+            commands::set_app_setting,
             crate::recipes::scan_pack_recipes_cmd,
             crate::loot::scan_loot_tables_cmd,
             crate::loot::editor::read_loot_table_cmd,

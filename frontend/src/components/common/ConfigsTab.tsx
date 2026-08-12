@@ -28,12 +28,18 @@ export interface ConfigsTabProps {
   configDirty: boolean
   canUndoConfig: boolean
   onUndoConfig: () => void
+  beginnerMode: boolean
 }
 
 export function ConfigsTab(props: ConfigsTabProps) {
   const [editorSearch, setEditorSearch] = useState('')
   const [collapsedAll, setCollapsedAll] = useState(false)
   const [showGuidedConfig, setShowGuidedConfig] = useState(false)
+
+  // Beginner mode hides the Raw toggle and the raw textarea: a first-timer
+  // should never see a code-shaped surface (P0-BEGINNER). The effective mode
+  // is forced to structured; unparseable files get a plain explanation.
+  const effectiveMode: 'structured' | 'raw' = props.beginnerMode ? 'structured' : props.configMode
 
   const filteredFiles = useMemo(() => {
     const q = props.configSearch.trim().toLowerCase()
@@ -44,7 +50,7 @@ export function ConfigsTab(props: ConfigsTabProps) {
   }, [props.configFiles, props.configSearch])
 
   const showDirtyHint =
-    props.configMode === 'structured'
+    effectiveMode === 'structured'
       ? props.configDirty && !!props.parsedConfig
       : props.configDirty
 
@@ -101,16 +107,16 @@ export function ConfigsTab(props: ConfigsTabProps) {
                   {showDirtyHint && <span className="config-dirty-dot" title="Unsaved changes" />}
                 </span>
                 <div className="config-editor-actions">
-                  {props.parsedConfig && (
+                  {props.parsedConfig && !props.beginnerMode && (
                     <div className="config-mode-toggle">
                       <button
-                        className={`btn-mode ${props.configMode === 'structured' ? 'active' : ''}`}
+                        className={`btn-mode ${effectiveMode === 'structured' ? 'active' : ''}`}
                         onClick={() => props.onConfigModeChange('structured')}
                       >
                         Structured
                       </button>
                       <button
-                        className={`btn-mode ${props.configMode === 'raw' ? 'active' : ''}`}
+                        className={`btn-mode ${effectiveMode === 'raw' ? 'active' : ''}`}
                         onClick={() => props.onConfigModeChange('raw')}
                       >
                         Raw
@@ -147,56 +153,61 @@ export function ConfigsTab(props: ConfigsTabProps) {
                   </button>
                 </div>
               </div>
-              {props.configMode === 'structured' && props.parsedConfig ? (
-                <>
-                  <input
-                    type="text"
-                    className="config-search config-editor-search"
-                    placeholder="Search keys and values..."
-                    value={editorSearch}
-                    onChange={(e) => setEditorSearch(e.target.value)}
-                  />
-                  <div className="config-structured-editor" key={collapsedAll ? 'collapsed' : 'expanded'}>
-                    {props.parsedConfig.root.type === 'object' || props.parsedConfig.root.type === 'group' ? (
-                      Object.entries(props.parsedConfig.root.fields || {}).map(([key, val]) => (
-                        <ConfigValueEditor
-                          key={key}
-                          value={val}
-                          path={[key]}
-                          onChange={props.onUpdateConfigValue}
-                          query={editorSearch}
-                          collapsed={collapsedAll}
-                          onAddArrayItem={props.onAddConfigArrayItem}
-                          onAddField={props.onAddConfigField}
-                          onRemoveAt={props.onRemoveConfigAt}
-                          onMoveArrayItem={props.onMoveConfigArrayItem}
-                          onDuplicateAt={props.onDuplicateConfigAt}
-                        />
-                      ))
-                    ) : (
-                      <ConfigValueEditor
-                        value={props.parsedConfig.root}
-                        path={['root']}
-                        onChange={props.onUpdateConfigValue}
-                        query={editorSearch}
-                        collapsed={collapsedAll}
-                        onAddArrayItem={props.onAddConfigArrayItem}
-                        onAddField={props.onAddConfigField}
-                        onRemoveAt={props.onRemoveConfigAt}
-                        onMoveArrayItem={props.onMoveConfigArrayItem}
-                        onDuplicateAt={props.onDuplicateConfigAt}
+                  {effectiveMode === 'structured' && props.parsedConfig ? (
+                    <>
+                      <input
+                        type="text"
+                        className="config-search config-editor-search"
+                        placeholder="Search keys and values..."
+                        value={editorSearch}
+                        onChange={(e) => setEditorSearch(e.target.value)}
                       />
-                    )}
-                  </div>
-                </>
-              ) : (
-                <textarea
-                  className="config-editor-textarea"
-                  value={props.configContent}
-                  onChange={(e) => props.onConfigContentChange(e.target.value)}
-                  spellCheck={false}
-                />
-              )}
+                      <div className="config-structured-editor" key={collapsedAll ? 'collapsed' : 'expanded'}>
+                        {props.parsedConfig.root.type === 'object' || props.parsedConfig.root.type === 'group' ? (
+                          Object.entries(props.parsedConfig.root.fields || {}).map(([key, val]) => (
+                            <ConfigValueEditor
+                              key={key}
+                              value={val}
+                              path={[key]}
+                              onChange={props.onUpdateConfigValue}
+                              query={editorSearch}
+                              collapsed={collapsedAll}
+                              onAddArrayItem={props.onAddConfigArrayItem}
+                              onAddField={props.onAddConfigField}
+                              onRemoveAt={props.onRemoveConfigAt}
+                              onMoveArrayItem={props.onMoveConfigArrayItem}
+                              onDuplicateAt={props.onDuplicateConfigAt}
+                            />
+                          ))
+                        ) : (
+                          <ConfigValueEditor
+                            value={props.parsedConfig.root}
+                            path={['root']}
+                            onChange={props.onUpdateConfigValue}
+                            query={editorSearch}
+                            collapsed={collapsedAll}
+                            onAddArrayItem={props.onAddConfigArrayItem}
+                            onAddField={props.onAddConfigField}
+                            onRemoveAt={props.onRemoveConfigAt}
+                            onMoveArrayItem={props.onMoveConfigArrayItem}
+                            onDuplicateAt={props.onDuplicateConfigAt}
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : props.beginnerMode && !props.parsedConfig ? (
+                    <div className="empty-state">
+                      This file can't be shown as a simple form — it uses a raw format.{' '}
+                      Switch to the full IDE (Beginner mode toggle in the top bar) to edit it as text.
+                    </div>
+                  ) : (
+                    <textarea
+                      className="config-editor-textarea"
+                      value={props.configContent}
+                      onChange={(e) => props.onConfigContentChange(e.target.value)}
+                      spellCheck={false}
+                    />
+                  )}
             </>
           ) : (
             <div className="empty-state">Select a config file to edit.</div>

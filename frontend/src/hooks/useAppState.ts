@@ -4,6 +4,7 @@ import { useProjectState, type Project } from './useProjectState'
 import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
+import { useBeginnerMode } from './useBeginnerMode'
 import type { LoadPackProgress, CreateProjectInput } from '../services/types'
 import { usePackIo } from './use-pack-io'
 import {
@@ -24,6 +25,7 @@ export function useAppState() {
   const modState = useModState(openProject)
   const configState = useConfigState(openProject)
   const launchState = useLaunchState(openProject)
+  const { beginnerMode, setBeginnerMode } = useBeginnerMode()
   const packIo = usePackIo(projectState)
   const { setIngestResult, setIngestError, setImportError, setImportResult, ...packIoRest } = packIo
 
@@ -248,6 +250,7 @@ export function useAppState() {
     ...launchState,
     ...packIoRest,
     activeTab,
+    beginnerMode, setBeginnerMode,
     handleTabChange,
     handleConfirmDelete,
     openPrismLauncher,

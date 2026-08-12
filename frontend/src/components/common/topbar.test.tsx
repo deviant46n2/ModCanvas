@@ -19,6 +19,8 @@ const base = {
   onRefresh: vi.fn(),
   onForceReindex: vi.fn(),
   onClosePack: vi.fn(),
+  beginnerMode: false,
+  onBeginnerModeChange: vi.fn(),
 }
 
 describe('TopBar', () => {
@@ -85,5 +87,24 @@ describe('TopBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Project' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /delete project/i }))
     expect(base.onDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the beginner toggle and fires the change handler (P0-BEGINNER)', () => {
+    const onChange = vi.fn()
+    render(
+      <HistoryProvider><TopBar {...base} packLoaded={true} beginnerMode={false} onBeginnerModeChange={onChange} /></HistoryProvider>,
+    )
+    const toggle = screen.getByRole('button', { name: /beginner mode: off/i })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(toggle)
+    expect(onChange).toHaveBeenCalledWith(true)
+  })
+
+  it('marks the beginner toggle active when mode is on', () => {
+    render(
+      <HistoryProvider><TopBar {...base} packLoaded={true} beginnerMode={true} onBeginnerModeChange={vi.fn()} /></HistoryProvider>,
+    )
+    const toggle = screen.getByRole('button', { name: /beginner mode: on/i })
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
   })
 })

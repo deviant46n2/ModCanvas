@@ -184,3 +184,16 @@ use uuid::Uuid;
         assert_eq!(db.get_curseforge_api_key().unwrap(), None, "delete clears the key");
         let _ = std::fs::remove_file(&path);
     }
+
+    #[test]
+    fn generic_setting_round_trips_and_overwrites() {
+        // P0-BEGINNER: app preferences (beginner_mode) live in the same
+        // settings table — lock the generic get/set the commands expose.
+        let (db, path) = temp_db();
+        assert_eq!(db.get_setting("beginner_mode").unwrap(), None, "unset by default");
+        db.set_setting("beginner_mode", "1").unwrap();
+        assert_eq!(db.get_setting("beginner_mode").unwrap(), Some("1".to_string()));
+        db.set_setting("beginner_mode", "0").unwrap(); // INSERT OR REPLACE
+        assert_eq!(db.get_setting("beginner_mode").unwrap(), Some("0".to_string()));
+        let _ = std::fs::remove_file(&path);
+    }

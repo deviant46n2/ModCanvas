@@ -36,3 +36,32 @@
   display: block;
 }
 
+
+/* ================================================================
+   BEGINNER MODE TOGGLE (P0-BEGINNER) — prominent, in the topbar
+   ================================================================ */
+
+.beginner-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.beginner-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.beginner-toggle.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}

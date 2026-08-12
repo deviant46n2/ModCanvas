@@ -42,9 +42,12 @@ interface RecipeEditorProps {
   projectPath: string;
   minecraftVersion?: string;
   modLoader?: string;
+  /** P0-BEGINNER: when true, the raw script preview is hidden and the
+   *  toggle is not offered — a first-timer never sees generated code. */
+  beginnerMode?: boolean;
 }
 
-export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.1', modLoader }: RecipeEditorProps) {
+export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.1', modLoader, beginnerMode = false }: RecipeEditorProps) {
   const {
     recipes,
     selectedRecipeId,
@@ -88,6 +91,9 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   // The raw generated-script preview is opt-in for veterans — hidden by default
   // so beginners never hit code. Sticky across sessions via localStorage.
   const [showScriptPreview, setShowScriptPreview] = useState(readScriptPreviewPref);
+  // Beginner mode forces the preview off regardless of the saved pref —
+  // the toggle is not even offered (hideScriptToggle).
+  const effectiveShowScriptPreview = beginnerMode ? false : showScriptPreview;
   const toggleScriptPreview = () => {
     setShowScriptPreview((prev) => {
       const next = !prev;
@@ -213,7 +219,8 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       <RecipeEditorHeader
         mcVersion={adapter.mcVersion}
         loader={adapter.loader}
-        showScriptPreview={showScriptPreview}
+        showScriptPreview={effectiveShowScriptPreview}
+        hideScriptToggle={beginnerMode}
         onToggleScriptPreview={toggleScriptPreview}
         reloading={reloading}
         reloadMsg={reloadMsg}
@@ -254,7 +261,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         dirty={dirty}
         issues={issues}
         hasBlockingErrors={hasBlockingErrors}
-        showScriptPreview={showScriptPreview}
+        showScriptPreview={effectiveShowScriptPreview}
         projectId={projectId}
         loader={adapter.loader}
         tagCatalog={tagCatalog}
