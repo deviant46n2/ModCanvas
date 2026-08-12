@@ -7,6 +7,7 @@
     "conditions": [],
     "actions": [
       { "kind": "give_item", "item": "minecraft:bread", "count": 8 },
+      { "kind": "give_item", "item": "minecraft:diamond", "count": 1 },
       { "kind": "message", "text": "[SMOKE-1] join trigger + give(count>1) + message OK" }
     ]
   },
@@ -39,7 +40,7 @@
     "trigger": { "kind": "player_kills_entity", "entity": "minecraft:zombie" },
     "conditions": [ { "kind": "dimension", "dimension": "minecraft:overworld" } ],
     "actions": [
-      { "kind": "give_item", "item": "minecraft:diamond", "count": 1 },
+      { "kind": "give_item", "item": "minecraft:emerald", "count": 1 },
       { "kind": "set_stage", "stage": "smoke_zombie_hunter" },
       { "kind": "message", "text": "[SMOKE-4] kills trigger + dimension cond + give(1) + set_stage OK" }
     ]
@@ -69,10 +70,10 @@
     "id": "suite:pickup",
     "name": "SMOKE-7 pickup-inventory",
     "backend": "kubejs",
-    "trigger": { "kind": "item_picked_up", "item": "minecraft:diamond" },
-    "conditions": [ { "kind": "item_in_inventory", "item": "minecraft:diamond", "min_count": 1 } ],
+    "trigger": { "kind": "item_picked_up" },
+    "conditions": [ { "kind": "item_in_inventory", "item": "minecraft:cobblestone", "min_count": 1 } ],
     "actions": [
-      { "kind": "message", "text": "[SMOKE-7] pickup trigger + item_in_inventory cond TRUE OK" }
+      { "kind": "message", "text": "[SMOKE-7] pickup trigger (any) + item_in_inventory cond TRUE OK" }
     ]
   },
   {
@@ -89,7 +90,7 @@
     "id": "suite:build",
     "name": "SMOKE-9 placed",
     "backend": "kubejs",
-    "trigger": { "kind": "block_placed", "block": "minecraft:stone" },
+    "trigger": { "kind": "block_placed", "block": "minecraft:cobblestone" },
     "conditions": [],
     "actions": [
       { "kind": "message", "text": "[SMOKE-9] placed trigger + placer guard OK" }
@@ -99,7 +100,7 @@
     "id": "suite:break",
     "name": "SMOKE-10 broken",
     "backend": "kubejs",
-    "trigger": { "kind": "block_broken", "block": "minecraft:stone" },
+    "trigger": { "kind": "block_broken", "block": "minecraft:cobblestone" },
     "conditions": [],
     "actions": [
       { "kind": "message", "text": "[SMOKE-10] broken trigger + guard OK" }
