@@ -1,14 +1,15 @@
 # Behaviors — no-code Trigger → Conditions → Actions (P2-BEHAVIOR)
 
-Status: **chunk 5 (s45)** — Pack Health integration landed: behaviors
-referencing missing items surface as recommended findings in a new Behaviors
-health section (Trust-Rule-consistent severity, degraded-registry guard,
-shared coverage). See `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal
-and §13 P2-BEHAVIOR for status. The roadmap's model is binding: **a constrained
-Trigger → Conditions → Actions rule with a small curated action library, NOT a
-generic visual programming language** (§11.1). Anything outside the vocabulary
-is a "raw command" escape hatch, visibly labeled — the veteran's release
-valve, not the beginner's trap.
+Status: **s46** — the §11.1 MVP vocabulary is implemented end-to-end: 10
+triggers, 6 conditions, 8 actions, two backends (KubeJS + datapack), the
+full editor with a live compile preview and ItemBrowser picking, Pack Health
+integration, and 3 example behaviors in the wizard template. See
+`docs/MODCANVAS_ROADMAP.md` §11 for the full proposal and §13 P2-BEHAVIOR for
+status. The roadmap's model is binding: **a constrained Trigger → Conditions
+→ Actions rule with a small curated action library, NOT a generic visual
+programming language** (§11.1). Anything outside the vocabulary is a
+"raw command" escape hatch (`run_command`), visibly labeled — the veteran's
+release valve, not the beginner's trap.
 
 ## The IR (`src-tauri/src/behavior/mod.rs`)
 
@@ -20,175 +21,222 @@ remain valid ecosystem files). Versioned via serde as the vocabulary grows.
 pub struct Behavior {
     pub id: String,              // stable id, ns:name (e.g. starter:kit)
     pub name: String,
+    pub backend: Backend,        // kubejs (default) | datapack
     pub trigger: Trigger,
     pub conditions: Vec<Condition>,  // empty = unconditional
     pub actions: Vec<Action>,        // run in order
 }
-
-pub enum Trigger { PlayerJoinsGame }                  // §11.1 list grows variant-by-variant
-pub enum Action  { GiveItem { item: String, count: u32 } }
-pub enum Condition {}                                 // reserved shape, zero variants today
 ```
 
-Deliberately NOT modeled up front: the full §11.1 vocabulary. The enum shapes
-leave room; each variant lands with its compile path and golden tests. The
-empty `Condition` enum means a behavior with conditions is **unconstructible**
-today — and the compiler refuses rather than silently dropping conditions the
-moment variants appear.
+**One backend per behavior.** The game can only run the artifact once —
+emitting both would double-fire every rule. `Backend` defaults to kubejs via
+serde, so behaviors authored before the datapack backend keep loading
+unchanged.
 
-## The compiler (`src-tauri/src/behavior/compile.rs`)
+### Triggers (10)
 
-Pure function: typed IR in, script string out, no I/O.
+Each maps to a KubeJS event handler VERIFIED against the shipped KubeJS
+2101.7.2-build.368 jar (s46): event class bytecode for the handler name, the
+targeted-event "any" semantics (`EventHandlerContainer` — no/blank target
+listens for all), and the per-event subject. Optional target fields map to
+KubeJS targeted handlers: `None` = any, `Some` = that registry id.
+
+| Variant | KubeJS event | Subject |
+|---|---|---|
+| `player_joins_game` | `PlayerEvents.loggedIn` | `event.player` |
+| `player_leaves_game` | `PlayerEvents.loggedOut` | `event.player` |
+| `player_takes_damage` | `EntityEvents.afterHurt('minecraft:player', …)` | `event.player` |
+| `player_kills_entity { entity? }` | `EntityEvents.death(<entity>, …)` | `event.source.player` (guarded) |
+| `item_crafted { item? }` | `ItemEvents.crafted(<item>, …)` | `event.player` |
+| `item_picked_up { item? }` | `ItemEvents.pickedUp(<item>, …)` | `event.player` |
+| `block_placed { block? }` | `BlockEvents.placed(<block>, …)` | `event.player` (guarded — placer may be a piston) |
+| `block_broken { block? }` | `BlockEvents.broken(<block>, …)` | `event.player` (guarded) |
+| `advancement_completed { advancement }` | `PlayerEvents.advancement(<id>, …)` | `event.player` |
+| `timed_every { ticks }` | `ServerEvents.loaded` + `scheduleRepeatingInTicks` + `players.forEach` | every online player |
+
+### Conditions (6)
+
+All compile to `return` guards: if any condition fails, the actions never
+run. Accessors verified in the jar: `mainHandItem.id` (LivingEntityKJS +
+ItemStackKJS), `inventory.count(id)` (InventoryKJS), `event.entity.type`
+(EntityKJS), `level.dimension` (LevelKJS), `Math.random()`, `health` (vanilla
+wrapper).
+
+| Variant | Guard |
+|---|---|
+| `item_held { item }` | `player.mainHandItem.id == item` |
+| `item_in_inventory { item, min_count }` | `player.inventory.count(item) >= min_count` |
+| `entity_type { entity }` | `event.entity.type == entity` — **only legal on entity-scoped triggers** (kills, damage, crafted, picked up, placed, broken); elsewhere it is a CompileError, never silently dropped |
+| `dimension { dimension }` | `player.level.dimension == dimension` |
+| `random_chance { chance }` | `Math.random() < chance` (0.0..1.0 enforced) |
+| `health_below { health }` | `player.health < health` |
+
+### Actions (8)
+
+Calls verified in the jar (PlayerKJS, ServerPlayerKJS, EntityKJS,
+InventoryKJS, MinecraftServerKJS, LevelKJS, Stages).
+
+| Variant | Emits |
+|---|---|
+| `give_item { item, count }` | `player.give(item)` / `player.give(Item.of(item, count))` for stacks > 1 |
+| `remove_item { item }` | `player.inventory.clear(item)` — removes ALL of that item |
+| `run_command { command }` | `event.server.runCommandSilent(command)` — the raw escape hatch; a leading `/` is a warning, not an error |
+| `message { text }` | `player.tell(text)` |
+| `heal { amount }` | `player.heal(amount)` |
+| `teleport { x, y, z, yaw, pitch }` | `player.setPositionAndRotation(x, y, z, yaw, pitch)` |
+| `spawn_entity { entity }` | `player.level.spawnEntity(entity, e => {})` |
+| `set_stage { stage }` | `player.stages.add(stage)` |
+
+## SUBJECT BINDING (the s46 compiler architecture)
+
+Actions run against a subject, but the subject expression differs per
+trigger. `compile.rs` emits a per-trigger binding:
+
+- **Always-player triggers** (joins, crafted, picked up, advancement,
+  damage): subject is `event.player` directly — safe, no guard.
+- **Nullable triggers** (block placed/broken): `const player = event.player;
+  if (!player) return;` — the placer may be a piston or other non-player
+  entity.
+- **Kills**: `const player = event.source.player; if (!player) return;` —
+  the dying entity's killer (verified via `DamageSourceMixin.kjs$getPlayer`);
+  the guard IS the "player kills" semantic.
+- **Timed**: `event.server.players.forEach(player => …)` — no single event
+  player; every online player is the subject each interval.
+
+Conditions and actions both address this subject variable. This is why the
+kills trigger's `event.source.player` guard and the placed trigger's placer
+guard are structurally different — they guard different nullability
+realities.
+
+## The compilers
+
+### KubeJS (`compile.rs` + `compile_conditions.rs` + `compile_actions.rs`)
 
 ```rust
 pub fn compile_to_kubejs(b: &Behavior) -> Result<(String, Vec<CompileWarning>), CompileError>
 ```
 
-- `CompileError` — structurally invalid IR (e.g. an unnamespaced item id), or
-  a not-yet-implemented construct (conditions, when they exist).
-- `CompileWarning` — deterministic, non-fatal notes. Empty today; the seed of
-  the Pack Index validation story (§11.2: a behavior referencing a missing
-  item is a Blocking health finding).
+Pure: typed IR in, script string out, no I/O. `CompileError` = structurally
+invalid IR (unnamespaced id, `entity_type` condition on a join trigger,
+`random_chance` out of range, zero tick interval). `CompileWarning` =
+deterministic non-fatal notes (leading `/` on a command). The emitted script
+rides the same evidence loop as the hotswap gate (`kubejs reload
+server-scripts` picks it up).
 
-### What chunk 1 emits
+### Datapack (`compile_datapack.rs`)
 
-`PlayerJoinsGame` → `GiveItem { item, count }` compiles to:
-
-```js
-// ModCanvas Generated Behavior
-// starter:kit — Starter Kit
-
-PlayerEvents.loggedIn(event => {
-  event.player.give('minecraft:diamond')
-})
+```rust
+pub fn compile_to_datapack(b: &Behavior) -> Result<(DatapackOutput, Vec<CompileWarning>), CompileError>
 ```
 
-- `count == 1`: bare string argument (`give('minecraft:diamond')`).
-- `count > 1`: `Item.of(id, count)` factory (`give(Item.of('minecraft:diamond', 4))`).
+Advancement JSON + `.mcfunction` reward function. **Faithful subset only** —
+the honest boundary is a hard CompileError naming the construct, never a
+silent drop or coarsening:
 
-## Verification story (the honest boundary)
+- Triggers: `player_kills_entity` → `minecraft:player_killed_entity`
+  (EntityType condition folds into the entity predicate — the one faithful
+  fold); `item_crafted` → `minecraft:inventory_changed` (with a coarseness
+  warning — datapack cannot tell crafting from pickup); `block_placed` →
+  `minecraft:placed_block`; `advancement_completed` → a hidden child
+  advancement with an `impossible` criterion whose `parent` is the referenced
+  advancement (completes exactly when the parent does). Joins, leaves,
+  damage, and timed have no datapack criterion → CompileError.
+- Conditions: only `entity_type` (folds into the kills predicate); everything
+  else → CompileError.
+- Actions → function commands: `give`, `clear`, raw command, `tellraw`,
+  `effect give … instant_health` (2-half-heart granularity warning), `tp`,
+  `summon`. `set_stage` has no command form → CompileError.
 
-- **Golden-output tests** (`behavior/tests.rs`, 7 tests) lock every emitted
-  string byte-for-byte. They already caught a real emitter bug (missing `(`
-  before `event` — `loggedInevent => {`).
-- **What golden tests do NOT prove:** KubeJS method signatures at runtime.
-  `PlayerEvents.loggedIn` and `give(ItemStack)` are verified to exist in the
-  shipped KubeJS 2101.7.2 jar (`KubeJSPlayerEventHandler.loggedIn`,
-  `PlayerKJS.kjs$give`), but the two-arg/count forms and script-loading
-  behavior are exactly the "file-level sound, runtime-only surprises remain"
-  class (§21 risk #3). In-game verification against a real instance is a
-  later node of this arc.
+Every name is verified against the shipped jars at s46: trigger ids from
+`CriteriaTriggers` bytecode, advancement JSON keys from `Advancement.class`,
+the rewards `function` field, the 1.21 singular `advancement/` datapack
+folder (`Registries.elementsDirPath`), and `kubejs/data/` as KubeJS's
+virtual datapack (`KubeJSPaths` + `ServerScriptManager`).
 
-## Persistence & commands (chunk 2)
+## Emission (`emit.rs`)
 
-- **File:** `.modcanvas/behaviors.json` per project, resolved through the
-  single canonical scoping function `path_safety::state_file_path`
-  (`quest_graph_path` is now a thin delegate — one escape guard for all
-  `.modcanvas/` state, not one per feature).
-- **Store (`behavior/store.rs`):** `load_behaviors` (missing file = empty
-  list, never an error) and `save_behaviors` (full-list atomic write, tmp +
-  rename with EBUSY retry — a crash never leaves a zero-byte file).
-- **Deliberately dumb:** no validation on save. A partially-authored behavior
-  MUST be saveable — validation is the compiler's and (later) the Pack
-  Index's job, surfaced to the user, never a save blocker.
-- **Commands (`commands/behavior.rs`):** `list_behaviors(project_id)`,
-  `save_behaviors(project_id, behaviors)` (full-list semantics, matching the
-  quest-graph store), `compile_behavior(behavior)` — compile-for-preview,
-  never writes. The compile result is `CompileOutput::{Ok{script,
-  warnings}|Err{reason}}`, serialized for the frontend.
+`emit_behavior_scripts` writes the real artifacts on every save:
 
-## Frontend surface (chunk 3)
+- **KubeJS behaviors** → `kubejs/server_scripts/modcanvas_behaviors.js` (the
+  dedicated file — a save never clobbers a pack-author's own scripts).
+- **Datapack behaviors** → `kubejs/data/modcanvas/advancement/*.json` +
+  `kubejs/data/modcanvas/function/*.mcfunction`. The whole `modcanvas`
+  namespace is **cleared and re-emitted** on every save, so the on-disk
+  datapack always mirrors the IR exactly — a deleted behavior cannot leave a
+  stale advancement firing in-game.
 
-- **Tab:** Behaviors added to the workspace (`AppTab` union + `ProjectWorkspace`
-  tabpanel + `styles/app-behaviors.css`, dark-only, flex-fill invariant from the
-  s43 lesson honored — the panel inherits the tabpanel rule, no height link).
-- **Contract:** `services/behavior.ts` — the ONLY place the IR shape is known on
-  the frontend (types mirror the Rust IR; components never see raw invoke args).
-  The three commands from chunk 2 are its full surface.
-- **Hook:** `hooks/useBehaviors.ts` — loading/error/loaded + dirty tracking
-  (divergence from last saved list), save returns ok/error honestly (never a
-  silent success claim). 5 tests.
-- **Editor:** `components/behavior/BehaviorTab.tsx` — list + per-card editor for
-  the CURRENT vocabulary: trigger select (one option today), action select
-  (give-item), item id + count inputs, and a **live compile preview** — every
-  edit (debounced 250ms) runs `compile_behavior` and shows the real emitted
-  KubeJS or the real compiler error. This is the P2-BEHAVIOR completion
-  criterion made visible: an authored behavior emits real KubeJS.
-- **Deliberately NOT a generic VPL:** no loops, no variables, no condition
-  wiring UI. The vocabulary grows server-side (IR variants land with compile
-  paths); this surface renders what the IR declares. When Condition gains
-  variants, the editor gains condition cards — not a visual programming
-  language.
-- **Scope cut (honest):** the GiveItem item id is a text input with live
-  compile validation, not the full ItemBrowser picker — wiring ItemBrowser
-  needs the texture/registry/engine pipeline (the quest editor's
-  `useQuestAssetPipeline`); that integration is queued, not skipped silently.
+Honest failure contract (unchanged from chunk 4): a behavior that fails to
+compile is SKIPPED and reported as `SaveBehaviorsOutcome.emit_failures` —
+the IR save still succeeds (partial authoring is legal), but the UI shows
+exactly which behaviors did not ship and why.
 
-## Emission (chunk 4) — the missing link
+## Persistence & commands (chunk 2, unchanged)
 
-- **The bug it fixes:** before chunk 4, save wrote only the IR to
-  `.modcanvas/behaviors.json`. The game never received a script — the
-  behavior "didn't go off" because the emitter didn't exist. (Found by
-  in-game test, s45.)
-- **`behavior/emit.rs`:** compiles every behavior and atomic-writes
-  `kubejs/server_scripts/modcanvas_behaviors.js` — a DEDICATED file so a save
-  never clobbers a pack-author's own scripts (the recipe writer's rule).
-- **Honest failure contract:** a behavior that fails to compile is SKIPPED in
-  the emitted file and reported as `SaveBehaviorsOutcome.emit_failures` —
-  the IR save still succeeds (partial authoring is legal), but the UI shows
-  exactly which behaviors did not ship and why. The game never silently runs
-  a stale or broken partial script.
-- **PATH FINDING (s45, FIXED):** the script goes to `<project>/kubejs/server_scripts/`
-  — the project ROOT, NOT `<project>/config/`. KubeJS reads server scripts
-  from the game dir's `kubejs/server_scripts/` (verified: the instance's own
-  `main.js` example lives there; the shipped KubeJS README says so). The
-  recipe writer (`commands/mod.rs` write_script_files) used to resolve through
-  the config-scoped `validate_project_write`, landing recipe scripts (and
-  CraftTweaker `.zs`) in `<root>/config/kubejs/...` — directories neither mod
-  ever reads, silently never applying, and masquerading as config files in the
-  config browser. **Fixed s45** (chunk 6): `write_script_files` now uses
-  `validate_under_root` for both KubeJS and CraftTweaker; regression lock
-  `test_under_root_resolves_to_project_root_not_config`. Behavior emission had
-  already diverged correctly and documented the recipe bug as the reason;
-  now the divergence is gone. Remaining: in-game verify that recipe scripts
-  actually apply.
+- **File:** `.modcanvas/behaviors.json` per project, resolved through
+  `path_safety::state_file_path`.
+- **Store (`behavior/store.rs`):** full-list load/save, atomic write, missing
+  file = empty. No validation on save — partial authoring must always be
+  saveable; validation is the compiler's job.
+- **Commands (`commands/behavior.rs`):** `list_behaviors`,
+  `save_behaviors` (full-list + emit), `compile_behavior` (compiles on the
+  behavior's declared backend, never writes).
 
-## Pack Index validation (chunk 5) — Pack Health integration
+## Frontend surface
 
-- **The check:** `pack-health/checks/behaviors.ts` — every `give_item` target is
-  normalized (namespaced-only, tags/unnamespaced skipped — the quest rule) and
-  checked against the item registry. Missing items surface in the Behaviors
-  health section.
-- **SEVERITY DECISION (s45, your call):** RECOMMENDED, never blocking. The
-  roadmap's "Blocking health finding" line (§11.2) predates the Trust Rule's
-  registry-incompleteness analysis (Project Bible §4; see the quest check).
-  The scanned registry cannot prove an item is absent — a behavior referencing
-  `kubejs:custom_item` is "missing" from the registry but valid at runtime;
-  blocking it would false-GO-block a released pack. Recorded as a written
-  deviation in the roadmap §11.2/§13.
-- **Guardrails:** behaviors share the quest degraded-registry guard — item
-  findings only fire when the registry is trusted (≥100 items, ≥50% coverage,
-  ≥20-reference sample); otherwise one `pack.item-registry-degraded`
-  diagnostic. Behavior references fold into the shared coverage metric.
-- **Wiring:** the Behaviors tab mirrors its working list into a new
-  `core/behavior/behavior-store.ts` (zustand, NOT persisted — the Rust
-  command is persistence; the store is the live truth both the tab and health
-  read, avoiding the recipe store's private-undo anti-pattern, roadmap §14.4).
-  `PackHealthProvider` + `HealthLaunchStep` pass it to the analyzer; the
-  Behaviors section renders via the existing generic section UI.
+- **Editor:** `components/behavior/` — `BehaviorTab` (list + save), per-card
+  `BehaviorCard`, `TriggerEditor` / `ConditionEditor` / `ActionEditor` (per
+  §11.1 kind, with defaults via `blank*` in `services/behavior.ts`). The
+  "when / if / then" rows render exactly what the IR declares; growing the
+  vocabulary is a Rust-side change + a contract update, never an editor
+  rewrite. Deliberately NOT a generic VPL — no loops, no variables, no
+  condition wiring UI.
+- **Backend selector:** per-card select (KubeJS / datapack) with a tooltip
+  explaining the trade-off. The live compile preview labels which artifact
+  it shows and renders warnings inline.
+- **Live compile preview:** every edit (debounced 250ms) runs
+  `compile_behavior` and shows the real emitted script/JSON or the real
+  compiler error — the P2-BEHAVIOR completion criterion made visible.
+- **ItemBrowser picking (s46):** GiveItem/RemoveItem item fields have a
+  browse button opening the shared JEI-style `ItemBrowser` (the recipe
+  editor's `RecipeItemPicker` shell), fed by `useBehaviorItemPicker` — the
+  pack-health item registry (shared scan, never duplicated), tag catalog,
+  and instance texture index. Picked ids land in the same IR the compiler
+  reads. UI-layer only (3-layer rule).
+- **Contract:** `services/behavior.ts` — the only place the IR's shape is
+  known on the frontend; components never see raw invoke args.
 
-## Not in chunk 5 (queued)
+## Pack Health integration (chunk 5, extended s46)
 
-- Conditions compile path + editor cards; remaining §11.1 triggers/actions.
-- ItemBrowser integration for GiveItem (needs the asset pipeline).
-- Datapack backend (advancement triggers / loot conditions).
-- 3 example behaviors in wizard templates.
-- **In-game API verification — DONE (s45, monster):** the `give` count form
-  (`Item.of(id, count)` for stacks > 1) was proven in a real game — a behavior
-  giving `minecraft:diamond` count 10 fired on join. The flagged runtime
-  surprise (roadmap §21 risk #3) is closed for the behavior path.
-- **Recipe-writer path fix in-game verify — DONE (s45, monster):** a saved
-  recipe hot-reloaded with evidence-verified PASS and was confirmed working
-  in-game; `modcanvas_recipes.js` confirmed in `kubejs/server_scripts/`
-  (project root, no `config/kubejs`). The s44 evidence gate's blind spot is
-  closed.
+`pack-health/checks/behaviors.ts` — `give_item` and `remove_item` targets
+are normalized and checked against the item registry. Missing items surface
+as RECOMMENDED findings (never blocking — Trust Rule, s45 deviation).
+`spawn_entity` is deliberately NOT checked: it references the ENTITY
+registry, which Pack Health has no set for — checking it against the item
+registry would false-flag every valid entity id (documented, not silently
+skipped). Shared degraded-registry guard + coverage metric.
+
+## Template examples (s46)
+
+The exploration template ships 3 example behaviors in
+`.modcanvas/behaviors.json` (scaffolded as project-root private state via
+`TemplateMeta.state_files`, never under `config/`): a join-time starter kit
+(KubeJS), a zombie-kill reward with a random-chance condition + stage
+(KubeJS), and an advancement-chain reward (datapack) — demonstrating both
+backends per roadmap §11.3. Fidelity tests lock that they parse as valid IR
+and compile on their declared backends.
+
+## Verification story
+
+- **Golden-output tests** (4 files, 50 tests): KubeJS emission
+  (`tests.rs`, `tests_vocabulary.rs`, `tests_conditions_actions.rs`) and
+  datapack emission + error paths (`tests_datapack.rs`) lock every emitted
+  string byte-for-byte.
+- **Jar verification (s46):** every event name, method, and accessor emitted
+  was verified against the shipped KubeJS 2101.7.2-build.368 jar and the
+  Minecraft 1.21.1 jar (trigger ids, advancement schema, datapack folders)
+  via javap/strings — the §21 risk #3 discipline ("file-level sound,
+  runtime-only surprises remain").
+- **In-game verification:** the `give` count form (`Item.of(id, count)`)
+  was proven in a real game at s45. The s46 vocabulary's runtime behavior
+  (new triggers, conditions, actions, and the datapack advancement chain) is
+  the arc's final verification node.

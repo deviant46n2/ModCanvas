@@ -1131,6 +1131,28 @@ Conventions:
   saved recipe hot-reloaded with evidence-verified PASS and was confirmed working
   in-game. Both handoff UNVERIFIED items are now VERIFIED. 379 Rust green.
   Details: `docs/behaviors.md`.
+- **Status (s46 chunk 7 — the §11.1 vocabulary + datapack backend):** the full MVP
+  vocabulary landed end-to-end. **IR:** 10 triggers, 6 conditions, 8 actions — every
+  variant mapped to an API bytecode-verified against the shipped KubeJS
+  2101.7.2-build.368 jar (the §21 risk #3 discipline: golden tests lock strings, javap
+  locks APIs, in-game smoke remains the runtime lock). **Compiler architecture —
+  subject binding:** actions run against a per-trigger subject (`event.player` /
+  guarded `player` for nullable placer triggers / `event.source.player` for kills /
+  all-online-players loop for timed). **Datapack backend** (`compile_datapack.rs`):
+  advancement JSON + `.mcfunction` reward functions under `kubejs/data/modcanvas/`
+  (KubeJS's virtual datapack, jar-verified). Faithful subset only — unexpressible
+  triggers/conditions/actions are hard CompileErrors, never silently dropped or
+  coarsened (two coarsenings that ship — crafted→`inventory_changed`,
+  heal→`instant_health` — carry deterministic warnings). **One backend per behavior**
+  (`Backend` field, defaults kubejs — stored behaviors keep loading). **Editor:**
+  per-kind cards for the whole vocabulary, backend selector, live compile preview
+  labeled by backend, and **ItemBrowser picking** for give/remove (the chunk-3 scope
+  cut, paid — shared registry scan, never duplicated). **Templates:** 3 example
+  behaviors shipped via `TemplateMeta.state_files` (project-root `.modcanvas/`, both
+  backends, roadmap §11.3). **Health:** give_item + remove_item checked;
+  spawn_entity deliberately not (entity registry ≠ item registry, documented). 425
+  Rust + 685 frontend green. REMAINING: in-game verification of the new vocabulary on
+  a real instance (the arc's final node). Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 
