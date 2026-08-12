@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useBehaviors } from '../../hooks/useBehaviors'
 import { useBehaviorStore } from '../../core/behavior/behavior-store'
+import { useBehaviorItemPicker } from '../../hooks/useBehaviorItemPicker'
+import { RecipeItemPicker } from '../recipe/RecipeItemPicker'
+import type { RecipePickValue } from '../recipe/ItemBrowser'
 import {
   makeStarterBehavior,
   type Behavior,
@@ -19,14 +22,20 @@ import { BehaviorCard } from './BehaviorCard'
  * UI-layer only (3-layer rule): all data flows through useBehaviors → the
  * three Rust commands. The live compile preview is the completion criterion
  * made visible — an authored behavior emits real KubeJS, warnings and errors
- * from the actual compiler shown as you edit.
+ * from the actual compiler shown as you edit. Item references (give/remove)
+ * can be picked from the shared ItemBrowser — the picker is UI-layer only
+ * too: it resolves against the pack-health registry + texture index, and the
+ * picked id lands in the same IR the compiler reads.
  */
-export function BehaviorTab({ projectId }: { projectId: string }) {
+export function BehaviorTab({ projectId, projectPath }: { projectId: string; projectPath: string }) {
   const { loading, error, behaviors, dirty, setBehaviors, save, compile } =
     useBehaviors(projectId)
   const mirrorToStore = useBehaviorStore((s) => s.setBehaviors)
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [compiled, setCompiled] = useState<Map<string, CompileOutput>>(new Map())
+  // ItemBrowser pick target: which behavior + action index to write into.
+  const [pickTarget, setPickTarget] = useState<{ behaviorId: string; actionIndex: number } | null>(null)
+  const { items, tags, getTextureUrl } = useBehaviorItemPicker(projectPath)
 
   // Mirror the working list into the shared store so Pack Health reads the
   // same in-memory truth. Health recomputes on every edit.
@@ -48,6 +57,18 @@ export function BehaviorTab({ projectId }: { projectId: string }) {
   const updateBehavior = (id: string, patch: (b: Behavior) => Behavior) => {
     setBehaviors(behaviors.map((b) => (b.id === id ? patch(b) : b)))
     setSaveMsg(null)
+  }
+
+  const onPickItem = (value: RecipePickValue) => {
+    if (pickTarget && !value.tag) {
+      updateBehavior(pickTarget.behaviorId, (b) => ({
+        ...b,
+        actions: b.actions.map((a, i) =>
+          i === pickTarget.actionIndex && 'item' in a ? { ...a, item: value.item } : a,
+        ),
+      }))
+    }
+    setPickTarget(null)
   }
 
   const onSave = async () => {
@@ -98,6 +119,9 @@ export function BehaviorTab({ projectId }: { projectId: string }) {
               }
               onRemove={() => removeBehavior(b.id)}
               compile={compile}
+              onBrowseItem={(actionIndex) =>
+                setPickTarget({ behaviorId: b.id, actionIndex })
+              }
             />
           ))}
         </div>
@@ -107,6 +131,17 @@ export function BehaviorTab({ projectId }: { projectId: string }) {
         <p className={`behavior-save-msg ${saveMsg.ok ? '' : 'behavior-error'}`}>
           {saveMsg.text}
         </p>
+      )}
+
+      {pickTarget && (
+        <RecipeItemPicker
+          items={items}
+          tags={tags}
+          getTextureUrl={getTextureUrl}
+          allowTags={false}
+          onSelect={onPickItem}
+          onClose={() => setPickTarget(null)}
+        />
       )}
     </div>
   )

@@ -8,6 +8,8 @@ import {
 interface ActionEditorProps {
   actions: Action[]
   onChange: (actions: Action[]) => void
+  /** Request the shared item picker for a give/remove action's item field. */
+  onBrowseItem: (actionIndex: number) => void
 }
 
 /**
@@ -16,7 +18,7 @@ interface ActionEditorProps {
  * tests lock it). `run_command` is the labeled escape hatch — anything
  * outside the vocabulary, visibly marked "(raw)" in the select.
  */
-export function ActionEditor({ actions, onChange }: ActionEditorProps) {
+export function ActionEditor({ actions, onChange, onBrowseItem }: ActionEditorProps) {
   const addAction = (kind: Action['kind']) => {
     onChange([...actions, blankAction(kind)])
   }
@@ -40,7 +42,7 @@ export function ActionEditor({ actions, onChange }: ActionEditorProps) {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <ActionFields action={a} onChange={(next) => updateAction(i, next)} />
+          <ActionFields action={a} onChange={(next) => updateAction(i, next)} onBrowse={() => onBrowseItem(i)} />
           <button
             type="button"
             className="behavior-remove"
@@ -71,9 +73,11 @@ export function ActionEditor({ actions, onChange }: ActionEditorProps) {
 function ActionFields({
   action,
   onChange,
+  onBrowse,
 }: {
   action: Action
   onChange: (a: Action) => void
+  onBrowse: () => void
 }) {
   switch (action.kind) {
     case 'give_item':
@@ -94,16 +98,20 @@ function ActionFields({
               onChange({ ...action, count: Math.max(1, num(e.target.value, 1)) })
             }
           />
+          <button type="button" className="behavior-browse" aria-label="Browse items" onClick={onBrowse}>…</button>
         </>
       )
     case 'remove_item':
       return (
-        <input
-          value={action.item}
-          aria-label="Item id"
-          placeholder="minecraft:stone"
-          onChange={(e) => onChange({ ...action, item: e.target.value })}
-        />
+        <>
+          <input
+            value={action.item}
+            aria-label="Item id"
+            placeholder="minecraft:stone"
+            onChange={(e) => onChange({ ...action, item: e.target.value })}
+          />
+          <button type="button" className="behavior-browse" aria-label="Browse items" onClick={onBrowse}>…</button>
+        </>
       )
     case 'run_command':
       return (

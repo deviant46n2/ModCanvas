@@ -186,3 +186,50 @@ fn list_templates_exposes_metadata() {
         "every template carries display metadata"
     );
 }
+
+// --- template behaviors (s46): the template ships 3 example behaviors so a
+// new pack demonstrates the Behaviors tab on first open. The load-bearing
+// guarantee: the scaffolded `.modcanvas/behaviors.json` must (a) be valid IR
+// the app's own store reads, and (b) compile on its declared backend — a
+// template behavior that errors on open would teach the wrong lesson.
+
+#[test]
+fn scaffold_writes_example_behaviors_state() {
+    let (_tmp, root) = scaffolded_root();
+    let behaviors_file = root.join(".modcanvas").join("behaviors.json");
+    assert!(behaviors_file.exists(), "template behaviors state missing");
+
+    let contents = std::fs::read_to_string(&behaviors_file).unwrap();
+    let behaviors: Vec<crate::behavior::Behavior> =
+        serde_json::from_str(&contents).expect("template behaviors must be valid IR");
+    assert_eq!(behaviors.len(), 3, "template ships exactly 3 example behaviors");
+
+    // Every example behavior compiles on its declared backend — a broken
+    // template behavior would fail in the editor's live preview on first open.
+    for b in &behaviors {
+        let out = crate::behavior::CompileOutput::from_behavior(b);
+        assert!(
+            matches!(out, crate::behavior::CompileOutput::Ok { .. }),
+            "template behavior '{}' ({:?}) must compile: {:?}",
+            b.name,
+            b.backend,
+            out
+        );
+    }
+    // The template demonstrates both backends (roadmap §11.2: KubeJS first,
+    // datapack second).
+    let backends: std::collections::HashSet<_> =
+        behaviors.iter().map(|b| b.backend).collect();
+    assert_eq!(backends.len(), 2, "template examples cover kubejs + datapack");
+}
+
+#[test]
+fn example_behaviors_scaffold_through_state_path() {
+    let (_tmp, root) = scaffolded_root();
+    // The scaffold must NOT place behaviors under config/ (the s45 recipe-writer
+    // bug class) — they are project-root private state.
+    assert!(!root.join("config").join(".modcanvas").exists());
+    assert!(
+        !root.join("config").join("ftbquests").join("quests").join(".modcanvas").exists()
+    );
+}

@@ -11,6 +11,8 @@ interface BehaviorCardProps {
   onCompiled: (out: CompileOutput) => void
   onRemove: () => void
   compile: (b: Behavior) => Promise<CompileOutput>
+  /** Request the shared item picker for an action index (give/remove). */
+  onBrowseItem: (actionIndex: number) => void
 }
 
 /**
@@ -25,6 +27,7 @@ export function BehaviorCard({
   onCompiled,
   onRemove,
   compile,
+  onBrowseItem,
 }: BehaviorCardProps) {
   // Compile on every edit, debounced — the preview follows the draft.
   const compileRef = useRef(compile)
@@ -92,6 +95,7 @@ export function BehaviorCard({
           <ActionEditor
             actions={behavior.actions}
             onChange={(actions) => onChange((b) => ({ ...b, actions }))}
+            onBrowseItem={onBrowseItem}
           />
         </div>
       </div>

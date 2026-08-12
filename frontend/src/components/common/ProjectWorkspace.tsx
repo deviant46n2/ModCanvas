@@ -192,7 +192,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
           </div>
           <div id="tabpanel-behaviors" role="tabpanel" aria-labelledby="tab-behaviors" className={activeTab === 'behaviors' ? '' : 'tab-hidden'}>
             <ErrorBoundary>
-              <BehaviorTab projectId={project.id} />
+              <BehaviorTab projectId={project.id} projectPath={project.path} />
             </ErrorBoundary>
           </div>
         </div>

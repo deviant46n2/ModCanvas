@@ -58,7 +58,7 @@ pub struct Behavior {
 /// can only run the artifact once; emitting both would double-fire every
 /// rule. The KubeJS backend is the full vocabulary; the datapack backend is
 /// the faithful vanilla subset (see `compile_datapack.rs`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Backend {
     /// KubeJS server script — every trigger/condition/action compiles.

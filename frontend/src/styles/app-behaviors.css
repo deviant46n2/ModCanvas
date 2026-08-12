@@ -254,6 +254,22 @@
   color: var(--color-text-primary);
 }
 
+.behavior-browse {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.behavior-browse:hover {
+  background: var(--color-bg-surface-2);
+}
+
 .behavior-give {
   display: inline-flex;
   align-items: center;

@@ -18,7 +18,9 @@ use serde::Serialize;
 use std::path::Path;
 
 /// One template package. `files` maps a relative path (resolved under
-/// `<project>/config/ftbquests/quests/`) to its embedded contents.
+/// `<project>/config/ftbquests/quests/`) to its embedded contents;
+/// `state_files` maps a relative path (resolved under the PROJECT ROOT —
+/// `.modcanvas/` private state) to its embedded contents.
 #[derive(Clone, Serialize)]
 pub struct TemplateMeta {
     pub id: &'static str,
@@ -26,6 +28,8 @@ pub struct TemplateMeta {
     pub description: &'static str,
     #[serde(skip)]
     files: &'static [(&'static str, &'static str)],
+    #[serde(skip)]
+    state_files: &'static [(&'static str, &'static str)],
 }
 
 const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
@@ -46,6 +50,15 @@ const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
             include_str!("../../templates/exploration/chapters/Shape_Your_Pack.snbt"),
         ),
     ],
+    // Example behaviors ship with the template so a new pack demonstrates
+    // the Behaviors tab (roadmap §11.3: "Loot-on-kill / advancement gating
+    // examples shipped in templates"). They are scaffolded as PRIVATE state
+    // (`.modcanvas/`), same as the app writes on save — the Behaviors tab
+    // lists them on first open, and Save re-emits the artifacts.
+    state_files: &[(
+        ".modcanvas/behaviors.json",
+        include_str!("../../templates/exploration/behaviors.json"),
+    )],
 }];
 
 /// List the templates the wizard can offer. Ids here are the only ids the
@@ -90,6 +103,20 @@ pub fn scaffold_template(project_root: &Path, template_id: &str) -> Result<(), S
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create template directory {:?}: {e}", parent))?;
+        }
+        crate::path_safety::atomic_write_str(&target, contents)?;
+    }
+
+    // Private state files land at the PROJECT ROOT (`.modcanvas/...`) — the
+    // same paths the app's own stores write, so the Behaviors tab reads a
+    // scaffolded pack like one it created itself. The config-scoped
+    // validate_project_write is wrong for these (they are not config); the
+    // project-root scoping is validate_under_root.
+    for (rel, contents) in tpl.state_files {
+        let target = crate::path_safety::validate_under_root(project_root, rel)?;
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create template state dir {:?}: {e}", parent))?;
         }
         crate::path_safety::atomic_write_str(&target, contents)?;
     }

@@ -1,0 +1,36 @@
+[
+  {
+    "id": "modcanvas:starter_kit",
+    "name": "Starter Kit — welcome gift",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_joins_game" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:bread", "count": 8 },
+      { "kind": "message", "text": "Welcome! Your starter kit has arrived." }
+    ]
+  },
+  {
+    "id": "modcanvas:zombie_hunter",
+    "name": "Zombie Hunter — kill reward",
+    "backend": "kubejs",
+    "trigger": { "kind": "player_kills_entity", "entity": "minecraft:zombie" },
+    "conditions": [
+      { "kind": "random_chance", "chance": 0.5 }
+    ],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:diamond", "count": 1 },
+      { "kind": "set_stage", "stage": "zombie_hunter" }
+    ]
+  },
+  {
+    "id": "modcanvas:story_reward",
+    "name": "Story Reward — datapack chain",
+    "backend": "datapack",
+    "trigger": { "kind": "advancement_completed", "advancement": "minecraft:story/root" },
+    "conditions": [],
+    "actions": [
+      { "kind": "give_item", "item": "minecraft:apple", "count": 1 }
+    ]
+  }
+]
