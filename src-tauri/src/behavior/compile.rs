@@ -9,15 +9,42 @@
 //! "file-level sound, runtime-only surprises remain").
 
 use crate::behavior::{Action, Behavior, Trigger};
+use serde::Serialize;
 
 /// Compile-time validation failure — the behavior IR cannot be emitted.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompileError(pub String);
 
 /// A non-fatal note about the compiled script (e.g. a suspicious item id).
 /// Deterministic — same IR always yields the same warnings.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompileWarning(pub String);
+
+/// The result of a compile attempt, shaped for the frontend: a behavior
+/// either compiles to a script (with deterministic warnings) or fails with a
+/// reason. The UI shows this without ever touching the compiler's Rust
+/// internals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompileOutput {
+    Ok {
+        script: String,
+        warnings: Vec<CompileWarning>,
+    },
+    Err {
+        reason: String,
+    },
+}
+
+impl CompileOutput {
+    /// Compile a behavior into the UI-facing shape.
+    pub fn from_behavior(b: &Behavior) -> Self {
+        match compile_to_kubejs(b) {
+            Ok((script, warnings)) => CompileOutput::Ok { script, warnings },
+            Err(e) => CompileOutput::Err { reason: e.0 },
+        }
+    }
+}
 
 /// Compile a behavior to a KubeJS server-script file body (no trailing
 /// newline). Errors are reserved for structurally invalid IR; suspicious but

@@ -3,6 +3,7 @@
 //! script string)"). Every emitted string is locked byte-for-byte here.
 
 use super::compile::*;
+use super::store::load_behaviors;
 use super::{Action, Behavior, Trigger};
 
 fn starter_kit() -> Behavior {
@@ -98,4 +99,32 @@ fn empty_actions_emit_empty_event_body() {
          PlayerEvents.loggedIn(event => {\n\
          })"
     );
+}
+
+#[test]
+fn compile_output_ok_shape_for_ui() {
+    let out = CompileOutput::from_behavior(&starter_kit());
+    match out {
+        CompileOutput::Ok { script, warnings } => {
+            assert!(script.contains("PlayerEvents.loggedIn"));
+            assert!(warnings.is_empty());
+        }
+        CompileOutput::Err { .. } => panic!("valid behavior must compile to Ok"),
+    }
+}
+
+#[test]
+fn compile_output_err_shape_for_ui() {
+    let bad = Behavior {
+        actions: vec![Action::GiveItem {
+            item: "diamond".to_string(),
+            count: 1,
+        }],
+        ..starter_kit()
+    };
+    let out = CompileOutput::from_behavior(&bad);
+    match out {
+        CompileOutput::Err { reason } => assert!(reason.contains("namespaced")),
+        CompileOutput::Ok { .. } => panic!("unnamespaced item must not compile"),
+    }
 }

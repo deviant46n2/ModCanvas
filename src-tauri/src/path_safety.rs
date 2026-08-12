@@ -111,6 +111,16 @@ pub fn expand_home(path: &str) -> PathBuf {
 /// created on demand; the returned path is validated to resolve inside the
 /// project root (defense against traversal/symlink escapes).
 pub fn quest_graph_path(project_path: &str) -> Result<PathBuf, String> {
+    state_file_path(project_path, "quests.json")
+}
+
+/// Resolve any `.modcanvas/` state file for a project workspace. The single
+/// canonical scoping answer: the state dir is created on demand, the result
+/// is validated to resolve inside the project root (defense against
+/// traversal/symlink escapes). All editor private state (quest graph today,
+/// behavior IR tomorrow) resolves through this one function so the escape
+/// guard is not re-implemented per feature.
+pub fn state_file_path(project_path: &str, file_name: &str) -> Result<PathBuf, String> {
     let root = PathBuf::from(project_path);
     if !root.exists() {
         return Err(format!(
@@ -133,7 +143,7 @@ pub fn quest_graph_path(project_path: &str) -> Result<PathBuf, String> {
         return Err("Access denied: ModCanvas state dir escapes the project root".to_string());
     }
 
-    Ok(state_canonical.join("quests.json"))
+    Ok(state_canonical.join(file_name))
 }
 
 /// Sanitize a user-supplied project name for use in directory paths.
@@ -209,5 +219,19 @@ mod tests {
         atomic_write_str(&path, "{\"nodes\":[]}").unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"nodes\":[]}");
         assert!(path.starts_with(tmp.path()));
+    }
+
+    #[test]
+    fn test_state_file_path_is_scoped_and_named() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().to_string_lossy().to_string();
+
+        let path = state_file_path(&root, "behaviors.json").unwrap();
+        assert!(path.ends_with(".modcanvas/behaviors.json"));
+        assert!(path.parent().unwrap().is_dir(), "state dir should be created");
+        assert!(path.starts_with(tmp.path()));
+
+        // Two calls return the same path — deterministic.
+        assert_eq!(state_file_path(&root, "behaviors.json").unwrap(), path);
     }
 }

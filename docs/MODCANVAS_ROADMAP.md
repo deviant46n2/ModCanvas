@@ -1079,6 +1079,13 @@ Conventions:
   (`.modcanvas/behaviors.json`), the Tauri command, UI cards, Pack Index wiring, and
   in-game API verification (the `give` count form is the flagged runtime surprise —
   roadmap §21 risk #3). Details: `docs/behaviors.md`.
+- **Status (s45 chunk 2):** persistence + commands landed. `.modcanvas/behaviors.json`
+  via the new single canonical `path_safety::state_file_path` (quest path is now a thin
+  delegate); `behavior/store.rs` (load = missing-file→empty, save = full-list atomic
+  write, deliberately no validation on save); commands `list_behaviors` /
+  `save_behaviors` / `compile_behavior` (compile-for-preview, never writes) registered
+  in the handler. 374 Rust green. The frontend surface is the next node (the three
+  commands are its contract). Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 

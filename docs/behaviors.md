@@ -1,8 +1,8 @@
 # Behaviors — no-code Trigger → Conditions → Actions (P2-BEHAVIOR)
 
-Status: **chunk 1 (s45)** — IR + KubeJS compiler spine, one pair implemented.
-See `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal and §13 P2-BEHAVIOR
-for status. The roadmap's model is binding: **a constrained
+Status: **chunk 2 (s45)** — persistence + commands landed on the chunk-1 spine
+(IR + KubeJS compiler, one pair). See `docs/MODCANVAS_ROADMAP.md` §11 for the full
+proposal and §13 P2-BEHAVIOR for status. The roadmap's model is binding: **a constrained
 Trigger → Conditions → Actions rule with a small curated action library, NOT a
 generic visual programming language** (§11.1). Anything outside the vocabulary
 is a "raw command" escape hatch, visibly labeled — the veteran's release
@@ -66,7 +66,7 @@ PlayerEvents.loggedIn(event => {
 
 ## Verification story (the honest boundary)
 
-- **Golden-output tests** (`behavior/tests.rs`, 5 tests) lock every emitted
+- **Golden-output tests** (`behavior/tests.rs`, 7 tests) lock every emitted
   string byte-for-byte. They already caught a real emitter bug (missing `(`
   before `event` — `loggedInevent => {`).
 - **What golden tests do NOT prove:** KubeJS method signatures at runtime.
@@ -77,12 +77,31 @@ PlayerEvents.loggedIn(event => {
   class (§21 risk #3). In-game verification against a real instance is a
   later node of this arc.
 
-## Not in chunk 1 (queued)
+## Persistence & commands (chunk 2)
 
-- Persistence: `.modcanvas/behaviors.json`, following the `quest_graph_path`
-  private-state pattern (`src-tauri/src/path_safety.rs:108-125`).
-- The Tauri command + frontend surface.
+- **File:** `.modcanvas/behaviors.json` per project, resolved through the
+  single canonical scoping function `path_safety::state_file_path`
+  (`quest_graph_path` is now a thin delegate — one escape guard for all
+  `.modcanvas/` state, not one per feature).
+- **Store (`behavior/store.rs`):** `load_behaviors` (missing file = empty
+  list, never an error) and `save_behaviors` (full-list atomic write, tmp +
+  rename with EBUSY retry — a crash never leaves a zero-byte file).
+- **Deliberately dumb:** no validation on save. A partially-authored behavior
+  MUST be saveable — validation is the compiler's and (later) the Pack
+  Index's job, surfaced to the user, never a save blocker.
+- **Commands (`commands/behavior.rs`):** `list_behaviors(project_id)`,
+  `save_behaviors(project_id, behaviors)` (full-list semantics, matching the
+  quest-graph store), `compile_behavior(behavior)` — compile-for-preview,
+  never writes. The compile result is `CompileOutput::{Ok{script,
+  warnings}|Err{reason}}`, serialized for the frontend.
+
+## Not in chunk 2 (queued)
+
+- The frontend surface (behavior list + editor cards; the three commands
+  above are the contract it binds to).
 - Conditions compile path; remaining §11.1 triggers/actions.
 - Datapack backend (advancement triggers / loot conditions).
 - Pack Index reference validation wiring (Blocking health finding).
 - 3 example behaviors in wizard templates.
+- In-game API verification (the `give` count form is the flagged runtime
+  surprise — roadmap §21 risk #3).

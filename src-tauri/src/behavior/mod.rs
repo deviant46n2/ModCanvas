@@ -19,8 +19,11 @@
 //! a real KubeJS run proves the API — the roadmap's own risk framing).
 
 pub mod compile;
+pub mod store;
 #[cfg(test)]
 mod tests;
+
+pub use compile::{CompileError, CompileOutput, CompileWarning};
 
 use serde::{Deserialize, Serialize};
 
