@@ -1,7 +1,13 @@
 // Behavior item-reference checks (P2-BEHAVIOR, roadmap §11.2 / §13): which
-// `give_item` targets the registry cannot resolve. Pure, deterministic,
+// item references the registry cannot resolve. Pure, deterministic,
 // unit-testable — consumes the already-materialized behaviors list + the
 // item registry, no I/O, no IPC (the Pack Health purity rule).
+//
+// s46 scope: `give_item` and `remove_item` reference the ITEM registry and
+// are checked. `spawn_entity` references the ENTITY registry, which Pack
+// Health has no set for — checking it against the item registry would
+// false-flag every valid entity id, so it is deliberately NOT checked (and
+// documented, not silently skipped).
 //
 // SEVERITY DECISION (s45, Trust Rule): these findings are RECOMMENDED, never
 // blocking — the roadmap's "Blocking health finding" line (§11.2) was written
@@ -14,14 +20,23 @@
 // therefore follow the quest rule exactly. The roadmap's "Blocking" line is
 // superseded by this decision — recorded as a written deviation.
 
-import type { Behavior } from '../../behavior/behavior-store'
+import type { Action, Behavior } from '../../behavior/behavior-store'
 import type { HealthItem } from '../types'
 import { normalizeItemReference } from './quests/shared'
 
+/** The action kinds whose targets are item registry references. */
+const ITEM_ACTIONS = new Set(['give_item', 'remove_item'])
+
+/** Type predicate: narrows a behavior action to the item-referencing kinds,
+ *  so TS knows `.item` exists after the check. */
+function isItemAction(a: Action): a is Extract<Action, { item: string }> {
+  return ITEM_ACTIONS.has(a.kind)
+}
+
 /** Count how many behavior item references the registry resolves, as a
- * fraction. `{ total: 0, found: 0 }` when there is nothing checkable. The
- * analyzer folds this into the shared coverage metric so the degraded-
- * registry guard has signal even when only behaviors reference items. */
+ *  fraction. `{ total: 0, found: 0 }` when there is nothing checkable. The
+ *  analyzer folds this into the shared coverage metric so the degraded-
+ *  registry guard has signal even when only behaviors reference items. */
 export function behaviorItemCoverage(
   behaviors: Behavior[],
   knownIds: Set<string>,
@@ -31,7 +46,7 @@ export function behaviorItemCoverage(
   const seen = new Set<string>()
   for (const behavior of behaviors) {
     for (const action of behavior.actions) {
-      if (action.kind !== 'give_item') continue
+      if (!isItemAction(action)) continue
       const id = normalizeItemReference(action.item)
       if (!id || seen.has(id)) continue
       seen.add(id)
@@ -51,20 +66,21 @@ export function checkBehaviors(
   const seen = new Set<string>()
   for (const behavior of behaviors) {
     for (const action of behavior.actions) {
-      if (action.kind !== 'give_item') continue
+      if (!isItemAction(action)) continue
       const id = normalizeItemReference(action.item)
       if (!id || knownIds.has(id)) continue
       const dedupeKey = `${behavior.id}|${id}`
       if (seen.has(dedupeKey)) continue
       seen.add(dedupeKey)
+      const verb = action.kind === 'give_item' ? 'gives' : 'removes'
       items.push({
         id: `behaviors.missing-item.${behavior.id}.${id}`,
         // Recommended, never blocking — same Trust Rule reasoning as quests
         // (checks/quests/items.ts): the registry cannot prove absence.
         severity: 'recommended',
-        message: `Behavior "${behavior.name}" gives "${id}" which is not in the pack's item registry.`,
+        message: `Behavior "${behavior.name}" ${verb} "${id}" which is not in the pack's item registry.`,
         detail: 'Could be a custom/KubeJS/datapack item outside the jar scan — verify it exists.',
-        copyText: `Behavior "${behavior.name}" (${behavior.id}) gives "${id}", which is not in the pack's scanned item registry.`,
+        copyText: `Behavior "${behavior.name}" (${behavior.id}) ${verb} "${id}", which is not in the pack's scanned item registry.`,
         target: { section: 'behaviors' },
       })
     }

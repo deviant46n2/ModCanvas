@@ -42,12 +42,13 @@ pub fn save_behaviors(project_path: &str, behaviors: &[Behavior]) -> Result<(), 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::behavior::{Action, Trigger};
+    use crate::behavior::{Action, Backend, Trigger};
 
     fn kit() -> Behavior {
         Behavior {
             id: "starter:kit".to_string(),
             name: "Starter Kit".to_string(),
+            backend: Backend::Kubejs,
             trigger: Trigger::PlayerJoinsGame,
             conditions: vec![],
             actions: vec![Action::GiveItem {

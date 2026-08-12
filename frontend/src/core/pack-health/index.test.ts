@@ -47,6 +47,7 @@ describe('analyzePackHealth', () => {
       {
         id: 'starter:kit',
         name: 'Starter Kit',
+        backend: 'kubejs',
         trigger: { kind: 'player_joins_game' },
         conditions: [],
         actions: [{ kind: 'give_item', item: 'minecraft:ghost_item', count: 1 }],
@@ -66,6 +67,7 @@ describe('analyzePackHealth', () => {
       {
         id: 'starter:kit',
         name: 'Starter Kit',
+        backend: 'kubejs',
         trigger: { kind: 'player_joins_game' },
         conditions: [],
         actions: [{ kind: 'give_item', item: 'minecraft:item_0', count: 1 }],

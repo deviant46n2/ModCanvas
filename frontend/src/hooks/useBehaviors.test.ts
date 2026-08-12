@@ -18,6 +18,7 @@ function kit(over: Partial<Behavior> = {}): Behavior {
   return {
     id: 'starter:kit',
     name: 'Starter Kit',
+    backend: 'kubejs',
     trigger: { kind: 'player_joins_game' },
     conditions: [],
     actions: [{ kind: 'give_item', item: 'minecraft:diamond', count: 1 }],

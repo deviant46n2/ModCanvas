@@ -6,6 +6,7 @@ function behavior(over: Partial<Behavior> = {}): Behavior {
   return {
     id: 'starter:kit',
     name: 'Starter Kit',
+    backend: 'kubejs',
     trigger: { kind: 'player_joins_game' },
     conditions: [],
     actions: [{ kind: 'give_item', item: 'minecraft:diamond', count: 1 }],
@@ -57,6 +58,24 @@ describe('checkBehaviors', () => {
     // Only the namespaced, non-tag ghost ref is checkable.
     expect(items).toHaveLength(1)
     expect(items[0].message).toContain('minecraft:ghost')
+  })
+
+  it('flags a remove_item target missing from the registry (s46 vocabulary)', () => {
+    const items = checkBehaviors(
+      [behavior({ actions: [{ kind: 'remove_item', item: 'minecraft:ghost' }] })],
+      known,
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0].id).toBe('behaviors.missing-item.starter:kit.minecraft:ghost')
+    expect(items[0].message).toContain('removes')
+  })
+
+  it('does not check spawn_entity against the item registry (entity ids are not items)', () => {
+    const items = checkBehaviors(
+      [behavior({ actions: [{ kind: 'spawn_entity', entity: 'minecraft:creeper' }] })],
+      known,
+    )
+    expect(items).toEqual([])
   })
 
   it('dedupes repeated references to the same item', () => {

@@ -127,6 +127,28 @@
   background: var(--color-bg-surface-0);
 }
 
+.behavior-backend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.behavior-backend select {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .behavior-remove {
   border: none;
   background: transparent;
@@ -157,7 +179,9 @@
 }
 
 .behavior-rule select,
-.behavior-give input {
+.behavior-give input,
+.behavior-stack select,
+.behavior-stack input {
   border: 1px solid var(--color-border);
   background: var(--color-bg-surface-0);
   color: var(--color-text-primary);
@@ -165,6 +189,69 @@
   font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
+}
+
+.behavior-rule select[aria-label="Trigger"],
+.behavior-stack select[aria-label="Condition"],
+.behavior-stack select[aria-label="Action"] {
+  min-width: 16ch;
+}
+
+.behavior-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.behavior-inline input {
+  width: 7ch;
+}
+
+.behavior-inline input[aria-label="Chance percent"] {
+  width: 16ch;
+}
+
+.behavior-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 0;
+}
+
+.behavior-stack-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.behavior-if,
+.behavior-then {
+  align-items: flex-start;
+}
+
+.behavior-row-editors {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.behavior-add {
+  align-self: flex-start;
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.behavior-add:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
 .behavior-give {

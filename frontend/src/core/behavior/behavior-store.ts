@@ -7,7 +7,7 @@
 import { create } from 'zustand'
 import type { Action, Behavior, Trigger } from '../../services/behavior'
 
-export type { Behavior }
+export type { Action, Behavior, Trigger }
 
 export interface BehaviorState {
   behaviors: Behavior[]
@@ -29,6 +29,7 @@ export const useBehaviorStore = create<BehaviorState>()((set) => ({
     const behavior: Behavior = {
       id: `behavior:${Date.now().toString(36)}`,
       name,
+      backend: 'kubejs',
       trigger,
       conditions: [],
       actions: [action],
