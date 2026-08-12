@@ -1096,6 +1096,17 @@ Conventions:
   ItemBrowser picker (that needs the quest asset pipeline — queued). Still queued:
   conditions + remaining vocabulary, datapack backend, Pack Index validation, wizard
   templates, in-game API verification. Details: `docs/behaviors.md`.
+- **Status (s45 chunk 4):** the emission step landed — saving behaviors now compiles
+  + writes `kubejs/server_scripts/modcanvas_behaviors.js` in the instance
+  (`behavior/emit.rs`, dedicated file, `validate_under_root` project-root scoping,
+  atomic write). Before this the game never received a script (found by in-game test).
+  Honest failure contract: uncompilable behaviors are skipped in the file and reported
+  as `emit_failures` on save. PATH FINDING: the recipe writer (`write_script_files`)
+  resolves through config-scoped `validate_project_write` and lands recipes in
+  `<root>/config/kubejs/` — a directory KubeJS never reads (its README + the
+  instance's own `main.js` prove scripts load from `<root>/kubejs/server_scripts/`).
+  That is a flagged latent bug in the recipe flow, not fixed in this arc. 378 Rust
+  green (+4 emitter tests), 673 frontend green. Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 

@@ -18,6 +18,8 @@ interface BehaviorsState {
 interface SaveResult {
   ok: boolean
   error: string | null
+  /** Behaviors that did NOT ship to the instance (`id: reason`). Empty = all. */
+  emitFailures: string[]
 }
 
 /**
@@ -66,16 +68,22 @@ export function useBehaviors(projectId: string) {
     }))
   }, [])
 
-  /** Save the working list. Returns ok/error so the UI can show the result
-   *  honestly — never a silent claim of success. */
+  /** Save the working list + write the compiled script into the instance.
+   *  Returns ok/error plus the behaviors that failed to emit — the UI shows
+   *  those honestly: a saved behavior that never reached the game is a
+   *  silent failure otherwise. */
   const save = useCallback(async (): Promise<SaveResult> => {
     try {
-      await saveBehaviors(projectId, state.behaviors)
+      const outcome = await saveBehaviors(projectId, state.behaviors)
       savedRef.current = state.behaviors
       setState((s) => ({ ...s, dirty: false }))
-      return { ok: true, error: null }
+      return {
+        ok: true,
+        error: null,
+        emitFailures: outcome.emit_failures ?? [],
+      }
     } catch (e) {
-      return { ok: false, error: String(e) }
+      return { ok: false, error: String(e), emitFailures: [] }
     }
   }, [projectId, state.behaviors])
 

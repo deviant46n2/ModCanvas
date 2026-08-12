@@ -1,9 +1,10 @@
 # Behaviors — no-code Trigger → Conditions → Actions (P2-BEHAVIOR)
 
-Status: **chunk 3 (s45)** — frontend surface landed on the persistence layer:
-a Behaviors tab with list + card editor + live compile preview. See
-`docs/MODCANVAS_ROADMAP.md` §11 for the full proposal and §13 P2-BEHAVIOR for
-status. The roadmap's model is binding: **a constrained
+Status: **chunk 4 (s45)** — the emission step landed: saving behaviors now
+writes the compiled `.js` into the instance's KubeJS scripts dir, closing the
+arc's completion criterion ("an authored behavior emits real KubeJS that a
+test pack loads"). See `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal
+and §13 P2-BEHAVIOR for status. The roadmap's model is binding: **a constrained
 Trigger → Conditions → Actions rule with a small curated action library, NOT a
 generic visual programming language** (§11.1). Anything outside the vocabulary
 is a "raw command" escape hatch, visibly labeled — the veteran's release
@@ -123,12 +124,40 @@ PlayerEvents.loggedIn(event => {
   needs the texture/registry/engine pipeline (the quest editor's
   `useQuestAssetPipeline`); that integration is queued, not skipped silently.
 
-## Not in chunk 3 (queued)
+## Emission (chunk 4) — the missing link
+
+- **The bug it fixes:** before chunk 4, save wrote only the IR to
+  `.modcanvas/behaviors.json`. The game never received a script — the
+  behavior "didn't go off" because the emitter didn't exist. (Found by
+  in-game test, s45.)
+- **`behavior/emit.rs`:** compiles every behavior and atomic-writes
+  `kubejs/server_scripts/modcanvas_behaviors.js` — a DEDICATED file so a save
+  never clobbers a pack-author's own scripts (the recipe writer's rule).
+- **Honest failure contract:** a behavior that fails to compile is SKIPPED in
+  the emitted file and reported as `SaveBehaviorsOutcome.emit_failures` —
+  the IR save still succeeds (partial authoring is legal), but the UI shows
+  exactly which behaviors did not ship and why. The game never silently runs
+  a stale or broken partial script.
+- **PATH FINDING (s45):** the script goes to `<project>/kubejs/server_scripts/`
+  — the project ROOT, NOT `<project>/config/`. KubeJS reads server scripts
+  from the game dir's `kubejs/server_scripts/` (verified: the instance's own
+  `main.js` example lives there; the shipped KubeJS README says so). The
+  recipe writer (`commands/mod.rs` write_script_files) resolves through the
+  config-scoped `validate_project_write`, landing recipe scripts in
+  `<root>/config/kubejs/...` — a directory KubeJS never reads. **That is a
+  separate latent bug in the recipe flow** (flagged s45, not fixed in the
+  behavior arc); behavior emission uses `validate_under_root` and does NOT
+  copy the mistake.
+
+## Not in chunk 4 (queued)
 
 - Conditions compile path + editor cards; remaining §11.1 triggers/actions.
 - ItemBrowser integration for GiveItem (needs the asset pipeline).
 - Datapack backend (advancement triggers / loot conditions).
 - Pack Index reference validation wiring (Blocking health finding).
 - 3 example behaviors in wizard templates.
-- In-game API verification (the `give` count form is the flagged runtime
-  surprise — roadmap §21 risk #3).
+- **In-game API verification** — now reachable: the emitted script lands in
+  the right directory, so a game run + `kubejs reload` proves the `give`
+  count form (the flagged runtime surprise, roadmap §21 risk #3).
+- **Recipe-writer path bug** (flagged, separate): write_script_files lands
+  recipes in `config/kubejs/` — needs its own fix + in-game verify.

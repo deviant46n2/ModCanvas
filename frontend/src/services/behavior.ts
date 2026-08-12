@@ -28,12 +28,20 @@ export function listBehaviors(projectId: string): Promise<Behavior[]> {
   return invoke<Behavior[]>('list_behaviors', { projectId })
 }
 
-/** Replace the entire behavior list for a project (full-list semantics). */
+/** Result of a behavior save: the IR persisted, and the emission step either
+ *  shipped every behavior or reports which ones did not compile (with
+ *  reasons). Empty `emitFailures` = all behaviors reached the instance. */
+export interface SaveBehaviorsOutcome {
+  emit_failures: string[]
+}
+
+/** Replace the entire behavior list for a project (full-list semantics) and
+ *  write the compiled script into the instance's KubeJS scripts dir. */
 export function saveBehaviors(
   projectId: string,
   behaviors: Behavior[],
-): Promise<void> {
-  return invoke('save_behaviors', { projectId, behaviors })
+): Promise<SaveBehaviorsOutcome> {
+  return invoke<SaveBehaviorsOutcome>('save_behaviors', { projectId, behaviors })
 }
 
 /** Compile one behavior for preview — never writes. */

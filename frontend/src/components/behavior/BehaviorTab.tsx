@@ -43,11 +43,16 @@ export function BehaviorTab({ projectId }: { projectId: string }) {
 
   const onSave = async () => {
     const result = await save()
-    setSaveMsg(
-      result.ok
-        ? { ok: true, text: 'Saved' }
-        : { ok: false, text: `Save failed: ${result.error}` },
-    )
+    if (!result.ok) {
+      setSaveMsg({ ok: false, text: `Save failed: ${result.error}` })
+    } else if (result.emitFailures.length > 0) {
+      setSaveMsg({
+        ok: false,
+        text: `Saved, but ${result.emitFailures.length} behavior(s) did not reach the instance: ${result.emitFailures.join('; ')}`,
+      })
+    } else {
+      setSaveMsg({ ok: true, text: 'Saved — behaviors written to the instance' })
+    }
   }
 
   return (

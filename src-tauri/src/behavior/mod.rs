@@ -19,6 +19,7 @@
 //! a real KubeJS run proves the API — the roadmap's own risk framing).
 
 pub mod compile;
+pub mod emit;
 pub mod store;
 #[cfg(test)]
 mod tests;

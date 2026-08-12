@@ -29,7 +29,7 @@ describe('useBehaviors', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     listMock.mockResolvedValue([])
-    saveMock.mockResolvedValue(undefined)
+    saveMock.mockResolvedValue({ emit_failures: [] })
     compileMock.mockResolvedValue({ ok: { script: 'x', warnings: [] } })
   })
 
@@ -73,13 +73,29 @@ describe('useBehaviors', () => {
     act(() => result.current.setBehaviors([kit({ name: 'Edited' })]))
     expect(result.current.dirty).toBe(true)
 
-    let res: { ok: boolean; error: string | null } | null = null
+    let res: { ok: boolean; error: string | null; emitFailures: string[] } | null = null
     await act(async () => {
       res = await result.current.save()
     })
-    expect(res).toEqual({ ok: true, error: null })
+    expect(res).toEqual({ ok: true, error: null, emitFailures: [] })
     expect(result.current.dirty).toBe(false)
     expect(saveMock).toHaveBeenCalledWith('proj-1', [kit({ name: 'Edited' })])
+  })
+
+  it('save surfaces emit failures without claiming full success', async () => {
+    listMock.mockResolvedValue([kit()])
+    saveMock.mockResolvedValue({ emit_failures: ['bad:item: item ids must be namespaced'] })
+    const { result } = renderHook(() => useBehaviors('proj-1'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => result.current.setBehaviors([kit({ name: 'Edited' })]))
+    let res: { ok: boolean; error: string | null; emitFailures: string[] } | null = null
+    await act(async () => {
+      res = await result.current.save()
+    })
+    expect(res!.ok).toBe(true)
+    expect(res!.emitFailures).toHaveLength(1)
+    expect(res!.emitFailures[0]).toContain('bad:item')
   })
 
   it('save reports failure without clearing dirty', async () => {
@@ -89,11 +105,11 @@ describe('useBehaviors', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     act(() => result.current.setBehaviors([kit({ name: 'Edited' })]))
-    let res: { ok: boolean; error: string | null } | null = null
+    let res: { ok: boolean; error: string | null; emitFailures: string[] } | null = null
     await act(async () => {
       res = await result.current.save()
     })
-    expect(res).toEqual({ ok: false, error: 'disk full' })
+    expect(res).toEqual({ ok: false, error: 'disk full', emitFailures: [] })
     expect(result.current.dirty).toBe(true)
   })
 })
