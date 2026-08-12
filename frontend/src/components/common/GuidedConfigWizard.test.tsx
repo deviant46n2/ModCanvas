@@ -41,12 +41,71 @@ function renderWizard(onApply: (t: GuidedConfigTarget) => void, openRoot: Config
   return { onOpenFile }
 }
 
+/** Step 0 (recommendation search) → the manual file-search fallback, so the
+ *  classic file→setting→value flow is reachable in tests. */
+function goToFileSearch() {
+  fireEvent.click(screen.getByText('search config files'))
+}
+
 describe('GuidedConfigWizard', () => {
+  it('recommends tweaks by plain language, opens the file, and applies through onApply (P2-CONFIG)', () => {
+    const onApply = vi.fn()
+    const onOpenFile = vi.fn()
+    const propsFiles: ConfigFileInfo[] = [
+      { path: 'config/server.properties', name: 'server.properties', format: 'properties', size: 100 },
+    ]
+    const propsRoot: ConfigValue = {
+      type: 'object',
+      fields: {
+        keepInventory: { type: 'boolean', value: false },
+      },
+    }
+    const { rerender } = render(
+      <GuidedConfigWizard
+        open
+        configFiles={propsFiles}
+        openFilePath={null}
+        openRoot={null}
+        onOpenFile={onOpenFile}
+        onApply={onApply}
+        onClose={() => {}}
+      />,
+    )
+
+    // Step 0: plain-language search surfaces the recommendation card.
+    const search = screen.getByPlaceholderText(/keep inventory/) as HTMLInputElement
+    fireEvent.change(search, { target: { value: 'keep inventory' } })
+    fireEvent.click(screen.getByRole('button', { name: /keep inventory/i }))
+    expect(onOpenFile).toHaveBeenCalledWith(propsFiles[0])
+
+    // Opening is async: the wizard waits for the parsed tree, then jumps to
+    // the setting step with the recommendation's path + value pre-filled.
+    rerender(
+      <GuidedConfigWizard
+        open
+        configFiles={propsFiles}
+        openFilePath={'config/server.properties'}
+        openRoot={propsRoot}
+        onOpenFile={onOpenFile}
+        onApply={onApply}
+        onClose={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByText('Apply tweak'))
+
+    expect(onApply).toHaveBeenCalledTimes(1)
+    const target = onApply.mock.calls[0][0]
+    expect(target.filePath).toBe('config/server.properties')
+    expect(target.path).toEqual(['keepInventory'])
+    expect(target.value.value).toBe(true)
+  })
+
   it('searches settings by plain words and applies an edit through onApply', () => {
     const onApply = vi.fn()
     renderWizard(onApply)
 
     // Step 1: pick the config file.
+    goToFileSearch()
     fireEvent.click(screen.getByText('server.toml'))
     // Step 2: search a setting by plain words.
     const search = screen.getByPlaceholderText(/keep inventory/) as HTMLInputElement
@@ -67,6 +126,7 @@ describe('GuidedConfigWizard', () => {
     const onApply = vi.fn()
     renderWizard(onApply)
 
+    goToFileSearch()
     fireEvent.click(screen.getByText('server.toml'))
     const search = screen.getByPlaceholderText(/keep inventory/) as HTMLInputElement
     fireEvent.change(search, { target: { value: 'hard' } })
@@ -80,6 +140,7 @@ describe('GuidedConfigWizard', () => {
 
   it('reports no matches for a miss', () => {
     renderWizard(vi.fn())
+    goToFileSearch()
     fireEvent.click(screen.getByText('server.toml'))
     const search = screen.getByPlaceholderText(/keep inventory/) as HTMLInputElement
     fireEvent.change(search, { target: { value: 'zzz' } })
@@ -90,6 +151,7 @@ describe('GuidedConfigWizard', () => {
     const onApply = vi.fn()
     renderWizard(onApply, null, null)
     // No parsed root: step 1 still lets you pick the file (which opens it).
+    goToFileSearch()
     fireEvent.click(screen.getByText('server.toml'))
     expect(screen.getByText(/Open a config file first/)).toBeTruthy()
   })
@@ -125,7 +187,9 @@ describe('GuidedConfigWizard', () => {
         />,
       ),
     ).not.toThrow()
-    expect(screen.getByText('server.toml')).toBeTruthy()
+    // Step 0 (recommendation search) renders — the point is the hook count
+    // survives open/close, not which step is visible.
+    expect(screen.getByText(/What do you want to change/)).toBeTruthy()
     // And closing again must not throw either.
     expect(() =>
       rerender(
@@ -162,6 +226,7 @@ describe('GuidedConfigWizard', () => {
         onClose={() => {}}
       />,
     )
+    goToFileSearch()
     expect(screen.getByText(/No config files here have searchable settings/)).toBeTruthy()
     // The raw-only files are named in the explanation, never offered as
     // searchable buttons that dead-end with "No settings match".
@@ -189,6 +254,7 @@ describe('GuidedConfigWizard', () => {
         onClose={() => {}}
       />,
     )
+    goToFileSearch()
     expect(screen.getByRole('button', { name: /server\.toml/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /data\.snbt/ })).toBeNull()
     expect(screen.getByText(/2 other files/)).toBeTruthy()
@@ -207,6 +273,7 @@ describe('GuidedConfigWizard', () => {
         onClose={() => {}}
       />,
     )
+    goToFileSearch()
     // Step 1: pick the file (it advances to step 2).
     fireEvent.click(screen.getByRole('button', { name: /server\.toml/ }))
     // Step 2 with an open file that failed to parse (raw mode): no search box,

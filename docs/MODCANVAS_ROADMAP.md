@@ -1163,6 +1163,15 @@ Conventions:
 - **Complexity:** Medium. **Risk:** recommendation-file maintenance burden — keep it tiny
   and community-extensible.
 - **No-code impact:** closes the "config torture" gap for the most-requested tweaks.
+- **Status (s47): COMPLETE.** `core/config/recommendations.ts` ships a curated
+  plain-language list (`CONFIG_RECOMMENDATIONS` — 6 vanilla `server.properties` tweaks,
+  tiny by design, one entry + a test to extend); the "Add a config tweak" wizard opens on a
+  recommendation search (step 0) that maps intent → file + key path + typed value, gated on
+  the target file being present in the pack (no dead ends). Apply routes through the
+  editor's existing history+save path — undoable by the existing Undo button. Reference:
+  `docs/config-recommendations.md`. Follow-up parked with a written reason: mod-specific
+  recommendations need in-pack verification (paths vary too much to ship blind) — the
+  structure is the contract, the list is data.
 
 #### P2-PROGRESSION — Campaign-level progression surface
 

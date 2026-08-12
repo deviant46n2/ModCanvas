@@ -5,11 +5,13 @@
 // step routes through the editor's own updateConfigValue + saveConfigFile
 // (history + save_structured_config) — the wizard operates the same editor
 // state, no parallel generation.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ConfigFileInfo } from '../../core/config/types'
 import { findMatchingPaths, getAt } from '../../core/config/tree'
 import type { ConfigValue } from '../../core/config/types'
+import type { ConfigRecommendation } from '../../core/config/recommendations'
 import { ConfigStringField, ConfigNumberField, ConfigBooleanField, ConfigEnumField, ConfigColorField } from './config-editor/fields'
+import { ConfigRecommendationSearch } from './config-recommendation-search'
 import './guided-config-wizard.css'
 
 export interface GuidedConfigTarget {
@@ -45,11 +47,35 @@ interface GuidedConfigWizardProps {
 }
 
 export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, onOpenFile, onApply, onClose }: GuidedConfigWizardProps) {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [fileQuery, setFileQuery] = useState('')
   const [settingQuery, setSettingQuery] = useState('')
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null)
   const [draftValue, setDraftValue] = useState<ConfigValue | null>(null)
+  const [pendingRec, setPendingRec] = useState<ConfigRecommendation | null>(null)
+
+  // Recommendation flow: a pick opens the target file; once the editor has
+  // parsed it (openRoot arrives for that file), jump to the setting step
+  // with the recommendation's path pre-selected and its value pre-filled.
+  // The user still reviews and hits Apply — the edit-then-apply contract
+  // and the undo path are unchanged.
+  useEffect(() => {
+    if (!pendingRec || !openRoot) return
+    if (!openFilePath?.toLowerCase().includes(pendingRec.file.toLowerCase())) return
+    setSelectedPath(pendingRec.path)
+    setDraftValue(pendingRec.value)
+    setPendingRec(null)
+    setSettingQuery('')
+    setStep(3) // straight to the value form — path + value are known
+  }, [pendingRec, openRoot, openFilePath])
+
+  const handlePickRecommendation = (rec: ConfigRecommendation) => {
+    const file = configFiles.find((f) => f.path.toLowerCase().includes(rec.file.toLowerCase()))
+    if (!file) return
+    setPendingRec(rec)
+    setStep(1) // "opening…" state until openRoot lands
+    onOpenFile(file)
+  }
 
   const filteredFiles = useMemo(() => {
     const q = fileQuery.trim().toLowerCase()
@@ -105,11 +131,12 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
   }
 
   const reset = () => {
-    setStep(1)
+    setStep(0)
     setFileQuery('')
     setSettingQuery('')
     setSelectedPath(null)
     setDraftValue(null)
+    setPendingRec(null)
   }
 
   const handleClose = () => {
@@ -122,11 +149,28 @@ export function GuidedConfigWizard({ open, configFiles, openFilePath, openRoot, 
       <div className="guided-config" onClick={(e) => e.stopPropagation()}>
         <div className="guided-config-header">
           <strong>Add a config tweak</strong>
-          <span>Step {step} of 3</span>
+          <span>{step === 0 ? 'Search' : `Step ${step} of 3`}</span>
           <button className="guided-config-close" onClick={handleClose} aria-label="Close">×</button>
         </div>
 
-        {step === 1 && (
+        {step === 0 && (
+          <ConfigRecommendationSearch
+            configFiles={configFiles}
+            onPick={handlePickRecommendation}
+            onSearchFiles={() => setStep(1)}
+          />
+        )}
+
+        {step === 1 && pendingRec && (
+          <div className="guided-config-step">
+            <p className="guided-config-hint">
+              Opening <strong>{pendingRec.file}</strong>… once it loads, the setting
+              will be pre-filled for review.
+            </p>
+          </div>
+        )}
+
+        {step === 1 && !pendingRec && (
           <div className="guided-config-step">
             <p className="guided-config-hint">Which config file has the setting you want to change?</p>
             {filteredFiles.length === 0 ? (
