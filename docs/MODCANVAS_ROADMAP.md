@@ -905,13 +905,8 @@ Conventions:
   app-scoped settings table (`get_app_setting`/`set_app_setting` commands, `db/settings.rs`);
   `useBeginnerMode` hook (null until read, persisted toggle with honest-state revert);
   prominent topbar toggle; Raw config mode + script preview hidden (forced structured /
-  toggle not offered); onboarding (wizard Done) turns it ON for first-timers, OFF default
+  toggle not offered);   onboarding (wizard Done) turns it ON for first-timers, OFF default
   for returning users. Reference: `docs/beginner-mode.md`.
-- **PARKED (s42, written reason):** deferred until after P2-HOTSWAP. The hotswap mini-wizard
-  IS a beginner surface (one-click "apply my tweaks without restarting"), so beginner mode
-  ships better once it exists; the surfaces it hides (raw textarea, script drawer, KubeJS)
-  are stable and small today. **Tripwire:** revisit in the P2 landing review — beginner mode
-  is the remaining P0 UX feature and the P0 gate is not closed without it.
 
 #### P0-MINIWIZ — Mini-wizards (first three)
 
@@ -926,6 +921,15 @@ Conventions:
 - **No-code impact:** the "teacher" layer that makes the editors approachable.
 - **Completion criteria:** each wizard produces content visible in the same editor,
   undoable in one step, and byte-identical to what the veteran's manual path produces.
+- **Status (s41–s42): COMPLETE.** `GuidedQuestWizard.tsx` (spec → `commitGraph` + history,
+  undoable one step), `GuidedRecipeWizard.tsx` (output → grid → review; the recipe store's
+  own `addRecipe` path, undoable, saves via `useRecipeSave`), `GuidedConfigWizard.tsx`
+  (search → typed form → `updateConfigValue` + `saveConfigFile`; s42 honesty surfaces:
+  extension-derived structured list, raw-only naming, no dead-ends). Each operates the same
+  editor state — completion criteria met by construction (no parallel generation).
+  **Residual:** quest goals are item-family only (kill/reach/XP are future additions to the
+  same component, §9.5); the dogfood dependency (authoring template content *using* the
+  mini-wizards, listed above) is open. Reference: §9.5.
 
 #### P0-LAUNCH — First-launch hardening
 
@@ -953,6 +957,11 @@ Conventions:
   CLI exit 0 with no game process — from workarounds #8) are the first steps of the hotswap
   arc, not a separate item: you cannot test reloads on a launch/connection you cannot
   verify. Rolled into P2-HOTSWAP below.
+- **Status (s44):** the rolled-in half shipped through the hotswap arc — pre-launch
+  companion-version detection (`get_project_companion_status`, s4c) and never-silent-failure
+  launch messaging (Prism-refusal signature, workaround #8, s44). The parked
+  materialize-step's tripwire (P2-HOTSWAP landing) has FIRED; the step itself remains open —
+  scope it or re-park with a fresh reason in a future pass.
 
 #### P0-DISTRIB — Distribution, CI, release pipeline
 
@@ -972,6 +981,8 @@ Conventions:
   everywhere; releasing artifacts mid-arc invites users before the flagship feature lands.
   **Tripwire:** revisit when P2-HOTSWAP lands or when a second machine needs the suite
   from a clone (then CI is the gatekeeper it claims to be).
+  **TRIPWIRE FIRED (s44):** P2-HOTSWAP has landed — this park is due for revisit: scope CI
+  as a real item or re-park with a fresh written reason.
 
 #### P0-HYGIENE-1 — Dead code & lying UI
 
@@ -986,6 +997,11 @@ Conventions:
 - **Complexity:** Low (mechanical) but judgment-heavy (prune-vs-park per item).
 - **Completion criteria:** `pnpm integrity` clean with no new debt; every dead command has
   a written prune/park decision recorded where the repo records debt; docs match the tree.
+- **Status (s34–s36): COMPLETE.** Dead-command triage (24 pruned / 6 parked with written
+  reasons), orphaned `components/canvas/**` + `graphConverters.ts` deleted, `mod_metadata`
+  schema dropped, NewProjectModal options derived from the adapter registry
+  (`served-matrix.ts`), integrity gate at 9 sections. Decisions recorded in
+  `docs/audit-2026-08-10.md`; completion criteria met (integrity clean, no new debt).
 
 #### P0-HYGIENE-2 — CurseForge export bug
 
@@ -997,6 +1013,10 @@ Conventions:
   verify against a real CF zip.
 - **Completion criteria:** an export of a pack with mixed CF + Modrinth mods round-trips
   all mods; a regression test covers the mixed case; the CF exporter is doc-synced.
+- **Status (s34): COMPLETE.** CF export now ships non-CF jars into `overrides/mods/`
+  (path-safe) or fails loudly when the jar can't be located — never a silent drop;
+  regression `mixed_export_ships_non_cf_jars_in_overrides_mods` covers the mixed case
+  (`imports/curseforge_tests.rs`).
 
 ### P1 — Veteran depth + the Pack Index
 
