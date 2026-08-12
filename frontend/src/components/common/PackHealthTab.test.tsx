@@ -4,6 +4,7 @@ import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
+import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { makeGraph, makeNode, makeObjective, makeChapter } from '../../core/pack-health/test-fixtures'
 import { MIN_TRUSTED_REGISTRY_ITEMS } from '../../core/pack-health'
 
@@ -32,12 +33,14 @@ describe('PackHealthTab', () => {
   beforeEach(() => {
     usePackHealthStore.setState({ questGraph: null, itemRegistry: null, hasCoverImage: true })
     useRecipeStore.setState({ recipes: [], selectedRecipeId: null })
+    useBehaviorStore.setState({ behaviors: [], loaded: false })
   })
 
   it('shows GO when the pack is healthy', () => {
     renderHealth()
     expect(screen.getByText('Ready to test')).toBeInTheDocument()
-    expect(screen.getAllByText('All clear')).toHaveLength(3)
+    // Quests + Recipes + Behaviors + Pack all clear.
+    expect(screen.getAllByText('All clear')).toHaveLength(4)
   })
 
   it('shows GO with a registry diagnostic instead of a flood on a degraded registry', () => {

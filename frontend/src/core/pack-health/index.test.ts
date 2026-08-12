@@ -8,6 +8,7 @@ import {
   makeEdge,
 } from './test-fixtures'
 import type { ItemRegistryEntry } from '../../services/quest-types'
+import type { Behavior } from '../behavior/behavior-store'
 
 function bigRegistry(missing: string[] = []): ItemRegistryEntry[] {
   const missingSet = new Set(missing)
@@ -24,6 +25,7 @@ const baseInput = {
   questGraph: null,
   itemRegistry: [] as ItemRegistryEntry[],
   recipes: [],
+  behaviors: [] as Behavior[],
   packMeta: { name: 'Pack', description: 'Desc', author: 'Me', packVersion: '1.0.0' },
   hasCoverImage: true,
   packLoaded: true,
@@ -37,7 +39,43 @@ describe('analyzePackHealth', () => {
     const report = analyzePackHealth(baseInput)
     expect(report.go).toBe(true)
     expect(report.blockingCount).toBe(0)
-    expect(report.sections.map((s) => s.key)).toEqual(['quests', 'recipes', 'pack'])
+    expect(report.sections.map((s) => s.key)).toEqual(['quests', 'recipes', 'behaviors', 'pack'])
+  })
+
+  it('flags behavior missing-item findings as recommended when the registry is trusted', () => {
+    const behaviors: Behavior[] = [
+      {
+        id: 'starter:kit',
+        name: 'Starter Kit',
+        trigger: { kind: 'player_joins_game' },
+        conditions: [],
+        actions: [{ kind: 'give_item', item: 'minecraft:ghost_item', count: 1 }],
+      },
+    ]
+    const report = analyzePackHealth({ ...baseInput, itemRegistry: bigRegistry(), behaviors })
+    expect(report.go).toBe(true)
+    expect(report.blockingCount).toBe(0)
+    const section = report.sections.find((s) => s.key === 'behaviors')!
+    const missing = section.items.filter((i) => i.id.startsWith('behaviors.missing-item.'))
+    expect(missing).toHaveLength(1)
+    expect(missing[0].severity).toBe('recommended')
+  })
+
+  it('suppresses behavior item findings when the registry is degraded', () => {
+    const behaviors: Behavior[] = [
+      {
+        id: 'starter:kit',
+        name: 'Starter Kit',
+        trigger: { kind: 'player_joins_game' },
+        conditions: [],
+        actions: [{ kind: 'give_item', item: 'minecraft:item_0', count: 1 }],
+      },
+    ]
+    const report = analyzePackHealth({ ...baseInput, itemRegistry: [{ id: 'minecraft:item_0', name: 'x', mod_id: 'm', texture_data_url: null }], behaviors })
+    const section = report.sections.find((s) => s.key === 'behaviors')!
+    expect(section.items.filter((i) => i.id.startsWith('behaviors.missing-item.'))).toEqual([])
+    const pack = report.sections.find((s) => s.key === 'pack')!
+    expect(pack.items.some((i) => i.id === 'pack.item-registry-degraded')).toBe(true)
   })
 
   it('flags a degraded registry with one diagnostic instead of item floods', () => {

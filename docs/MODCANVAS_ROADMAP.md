@@ -787,7 +787,12 @@ Backend compiler
 - **Validation story:** behaviors compile to scripts; the compiler emits deterministic
   warnings (unknown item ID, unreachable trigger). Reference validation against the Pack
   Index (§7) is the same machinery as Pack Health — a behavior referencing a missing item
-  is a Blocking health finding.
+  is a health finding. **Severity deviation (s45):** the earlier "Blocking health finding"
+  wording is superseded — behavior item findings are RECOMMENDED, never blocking, per the
+  Trust Rule (Project Bible §4): the scanned item registry cannot prove an item is absent
+  (custom/KubeJS/data-driven items are outside the jar scan; imported packs have no
+  vanilla jar), and a blocking verdict on `kubejs:custom_item` would false-GO-block a
+  released pack. Behaviors follow the quest rule exactly (`checks/quests/items.ts`).
 
 ### 11.3 MVP scope vs later
 
@@ -1068,8 +1073,8 @@ Conventions:
 - **No-code impact:** the single largest coverage jump after P0 (~5% → ~50% of behavior
   cases).
 - **Completion criteria:** an authored behavior emits real KubeJS/datapack that a test pack
-  loads without syntax errors; a behavior referencing a missing item is a Blocking health
-  finding; golden-output tests lock the compiler.
+  loads without syntax errors; a behavior referencing a missing item is a health finding
+  (recommended severity — Trust Rule, s45 deviation); golden-output tests lock the compiler.
 - **Status (s45 chunk 1):** the IR + KubeJS compiler spine landed
   (`src-tauri/src/behavior/` — typed `Behavior`/`Trigger`/`Action`/`Condition`, pure
   `compile_to_kubejs`, 5 golden-output tests, 366 Rust green). First pair implemented
@@ -1107,6 +1112,15 @@ Conventions:
   instance's own `main.js` prove scripts load from `<root>/kubejs/server_scripts/`).
   That is a flagged latent bug in the recipe flow, not fixed in this arc. 378 Rust
   green (+4 emitter tests), 673 frontend green. Details: `docs/behaviors.md`.
+- **Status (s45 chunk 5):** Pack Health integration — a behavior referencing a missing
+  item now surfaces as a RECOMMENDED finding in a new Behaviors health section
+  (`pack-health/checks/behaviors.ts`, shared coverage + degraded-registry guard).
+  SEVERITY DEVIATION: the roadmap's earlier "Blocking" wording is superseded by the Trust
+  Rule (the registry cannot prove absence; a `kubejs:custom_item` behavior would
+  false-GO-block a released pack) — recorded in §11.2/§13. New
+  `core/behavior/behavior-store.ts` (zustand, not persisted — the Rust command persists;
+  the tab mirrors into it, health reads it). 683 frontend green (673 → 683, +10).
+  Details: `docs/behaviors.md`.
 
 #### P2-CONFIG — Config recommendations
 

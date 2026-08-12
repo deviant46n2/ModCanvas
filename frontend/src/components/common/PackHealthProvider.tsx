@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
+import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { analyzePackHealth } from '../../core/pack-health'
 import type { PackHealthReport } from '../../core/pack-health/types'
@@ -40,12 +41,14 @@ export function PackHealthProvider({ project, packLoaded, children }: PackHealth
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
   const recipes = useRecipeStore((s) => s.recipes)
+  const behaviors = useBehaviorStore((s) => s.behaviors)
 
   const [report, setReport] = useState<PackHealthReport>(() =>
     analyzePackHealth({
       questGraph,
       itemRegistry,
       recipes,
+      behaviors,
       packMeta: {
         name: project.name,
         description: project.description,
@@ -64,6 +67,7 @@ export function PackHealthProvider({ project, packLoaded, children }: PackHealth
           questGraph,
           itemRegistry,
           recipes,
+          behaviors,
           packMeta: {
             name: project.name,
             description: project.description,
@@ -76,7 +80,7 @@ export function PackHealthProvider({ project, packLoaded, children }: PackHealth
       )
     }, 300)
     return () => clearTimeout(t)
-  }, [questGraph, itemRegistry, recipes, hasCoverImage, packLoaded, project])
+  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project])
 
   const value = { report }
 

@@ -1,9 +1,9 @@
 # Behaviors — no-code Trigger → Conditions → Actions (P2-BEHAVIOR)
 
-Status: **chunk 4 (s45)** — the emission step landed: saving behaviors now
-writes the compiled `.js` into the instance's KubeJS scripts dir, closing the
-arc's completion criterion ("an authored behavior emits real KubeJS that a
-test pack loads"). See `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal
+Status: **chunk 5 (s45)** — Pack Health integration landed: behaviors
+referencing missing items surface as recommended findings in a new Behaviors
+health section (Trust-Rule-consistent severity, degraded-registry guard,
+shared coverage). See `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal
 and §13 P2-BEHAVIOR for status. The roadmap's model is binding: **a constrained
 Trigger → Conditions → Actions rule with a small curated action library, NOT a
 generic visual programming language** (§11.1). Anything outside the vocabulary
@@ -149,12 +149,35 @@ PlayerEvents.loggedIn(event => {
   behavior arc); behavior emission uses `validate_under_root` and does NOT
   copy the mistake.
 
-## Not in chunk 4 (queued)
+## Pack Index validation (chunk 5) — Pack Health integration
+
+- **The check:** `pack-health/checks/behaviors.ts` — every `give_item` target is
+  normalized (namespaced-only, tags/unnamespaced skipped — the quest rule) and
+  checked against the item registry. Missing items surface in the Behaviors
+  health section.
+- **SEVERITY DECISION (s45, your call):** RECOMMENDED, never blocking. The
+  roadmap's "Blocking health finding" line (§11.2) predates the Trust Rule's
+  registry-incompleteness analysis (Project Bible §4; see the quest check).
+  The scanned registry cannot prove an item is absent — a behavior referencing
+  `kubejs:custom_item` is "missing" from the registry but valid at runtime;
+  blocking it would false-GO-block a released pack. Recorded as a written
+  deviation in the roadmap §11.2/§13.
+- **Guardrails:** behaviors share the quest degraded-registry guard — item
+  findings only fire when the registry is trusted (≥100 items, ≥50% coverage,
+  ≥20-reference sample); otherwise one `pack.item-registry-degraded`
+  diagnostic. Behavior references fold into the shared coverage metric.
+- **Wiring:** the Behaviors tab mirrors its working list into a new
+  `core/behavior/behavior-store.ts` (zustand, NOT persisted — the Rust
+  command is persistence; the store is the live truth both the tab and health
+  read, avoiding the recipe store's private-undo anti-pattern, roadmap §14.4).
+  `PackHealthProvider` + `HealthLaunchStep` pass it to the analyzer; the
+  Behaviors section renders via the existing generic section UI.
+
+## Not in chunk 5 (queued)
 
 - Conditions compile path + editor cards; remaining §11.1 triggers/actions.
 - ItemBrowser integration for GiveItem (needs the asset pipeline).
 - Datapack backend (advancement triggers / loot conditions).
-- Pack Index reference validation wiring (Blocking health finding).
 - 3 example behaviors in wizard templates.
 - **In-game API verification** — now reachable: the emitted script lands in
   the right directory, so a game run + `kubejs reload` proves the `give`

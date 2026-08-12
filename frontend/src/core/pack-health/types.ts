@@ -14,12 +14,12 @@ export interface HealthItem {
   copyText: string
   /** Optional target for future "jump to" affordances. */
   target?: {
-    section: 'quests' | 'recipes' | 'pack'
+    section: 'quests' | 'recipes' | 'behaviors' | 'pack'
     nodeId?: string
   }
 }
 
-export type HealthSectionKey = 'quests' | 'recipes' | 'pack'
+export type HealthSectionKey = 'quests' | 'recipes' | 'behaviors' | 'pack'
 
 export interface HealthSection {
   key: HealthSectionKey

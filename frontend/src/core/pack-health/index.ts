@@ -11,9 +11,11 @@
 
 import type { Recipe } from '../recipe/recipe-store'
 import type { ItemRegistryEntry, QuestGraphData } from '../../services/quest-types'
+import type { Behavior } from '../behavior/behavior-store'
 import { checkQuestStructure, checkQuestItemRefs, questItemCoverage } from './checks/quests'
 import { computeTopology } from './checks/topology'
 import { checkRecipes } from './checks/recipes'
+import { checkBehaviors, behaviorItemCoverage } from './checks/behaviors'
 import { checkPack, type PackCoverageMeta } from './checks/pack'
 import type { HealthItem, HealthSection, HealthSectionKey, PackHealthReport } from './types'
 
@@ -21,6 +23,7 @@ export interface PackHealthInput {
   questGraph: QuestGraphData | null
   itemRegistry: ItemRegistryEntry[] | null
   recipes: Recipe[] | null
+  behaviors: Behavior[] | null
   packMeta: PackCoverageMeta
   hasCoverImage: boolean
   packLoaded: boolean
@@ -45,6 +48,7 @@ export const MIN_REFERENCE_SAMPLE = 20
 const SECTION_META: Array<{ key: HealthSectionKey; label: string }> = [
   { key: 'quests', label: 'Quests' },
   { key: 'recipes', label: 'Recipes' },
+  { key: 'behaviors', label: 'Behaviors' },
   { key: 'pack', label: 'Pack' },
 ]
 
@@ -123,6 +127,7 @@ function topologyFindings(graph: QuestGraphData): HealthItem[] {
 /** Compute the full pack-health report from materialized state. */
 export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  const knownIds = new Set((input.itemRegistry ?? []).map((i) => i.id))
   const quests: HealthItem[] = []
+  const behaviors: HealthItem[] = []
   let registryNote: HealthItem | null = null
   let coverage: { total: number; found: number } = { total: 0, found: 0 }
 
@@ -133,6 +138,25 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
     if (!registryDegraded(knownIds, coverage)) {
       quests.push(...checkQuestItemRefs(input.questGraph, knownIds))
     } else {
+      registryNote = degradedRegistryDiagnostic(knownIds, coverage)
+    }
+  }
+
+  // Behaviors share the quest guardrails: item-existence findings only fire
+  // when the registry is trusted (same degraded-registry note, same
+  // recommended severity — Trust Rule, see checks/behaviors.ts). When the
+  // quest graph is absent but behaviors exist, coverage is still computed
+  // from behavior references so the guard has signal.
+  if (input.behaviors && input.behaviors.length > 0) {
+    const behaviorCoverage = behaviorItemCoverage(input.behaviors, knownIds)
+    if (coverage.total === 0) coverage = behaviorCoverage
+    else {
+      coverage.total += behaviorCoverage.total
+      coverage.found += behaviorCoverage.found
+    }
+    if (!registryDegraded(knownIds, coverage)) {
+      behaviors.push(...checkBehaviors(input.behaviors, knownIds))
+    } else if (!registryNote) {
       registryNote = degradedRegistryDiagnostic(knownIds, coverage)
     }
   }
@@ -148,7 +172,7 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
 
   const sections: HealthSection[] = SECTION_META.map((meta) => ({
     ...meta,
-    items: meta.key === 'quests' ? quests : meta.key === 'recipes' ? recipes : pack,
+    items: meta.key === 'quests' ? quests : meta.key === 'recipes' ? recipes : meta.key === 'behaviors' ? behaviors : pack,
   }))
 
   const report: PackHealthReport = {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useBehaviors } from '../../hooks/useBehaviors'
+import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import {
   makeStarterBehavior,
   type Behavior,
@@ -22,8 +23,16 @@ import {
 export function BehaviorTab({ projectId }: { projectId: string }) {
   const { loading, error, behaviors, dirty, setBehaviors, save, compile } =
     useBehaviors(projectId)
+  const mirrorToStore = useBehaviorStore((s) => s.setBehaviors)
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [compiled, setCompiled] = useState<Map<string, CompileOutput>>(new Map())
+
+  // Mirror the working list into the shared store so Pack Health reads the
+  // same in-memory truth (the behaviors slice, like recipes from the recipe
+  // store). Health recomputes on every edit.
+  useEffect(() => {
+    if (!loading) mirrorToStore(behaviors)
+  }, [behaviors, loading, mirrorToStore])
 
   const addBehavior = () => {
     const b = makeStarterBehavior(`Behavior ${behaviors.length + 1}`)

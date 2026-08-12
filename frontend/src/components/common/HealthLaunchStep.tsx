@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
+import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { analyzePackHealth } from '../../core/pack-health'
 import { testProject } from '../../services/project'
 import type { Project } from '../../services/types'
@@ -25,6 +26,7 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
   const recipes = useRecipeStore((s) => s.recipes)
+  const behaviors = useBehaviorStore((s) => s.behaviors)
   const [launching, setLaunching] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
 
@@ -34,6 +36,7 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
         questGraph,
         itemRegistry,
         recipes,
+        behaviors,
         packMeta: {
           name: project.name,
           description: project.description,
