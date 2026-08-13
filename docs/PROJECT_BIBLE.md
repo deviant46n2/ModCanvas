@@ -114,7 +114,7 @@ Therefore:
 ### 5.2 No lock-in
 
 - **Outputs are always faithful ecosystem artifacts** (real SNBT, real `.js`, real `.json`). Users can abandon ModCanvas and keep everything they made.
-- **Private editing state is always disposable.** App-private formats (`.modcanvas/quests.json`, bezier data, history journal) are editing conveniences, never the output format, and never leak into exports.
+- **Private editing state is always disposable.** App-private formats (`.modcanvas/quests.json`, edge geometry, history journal) are editing conveniences, never the output format, and never leak into exports.
 - The companion mod is a *better runtime*, never a *faster way to lose your work*.
 
 ### 5.3 Comment & file safety
@@ -131,6 +131,13 @@ Therefore:
 
 - Version support is **demand- and contributor-driven, never speculative.** One primary target, full fidelity, then expand.
 - All version/loader-specific logic lives behind the adapter matrix (`IMinecraftVersionAdapter`, `getAdapter(mcVersion, loader)`). Adding a version = new adapter file, never edits to existing ones.
+
+### 5.6 Consolidation is legitimate progress
+
+- ModCanvas does not need to continually expand its feature surface to make
+  meaningful progress. Improving the correctness, maintainability, UX, or
+  validation of existing capabilities is progress; deferring an item
+  deliberately is a decision, not a failure (s52 intervention).
 
 ---
 
@@ -166,7 +173,7 @@ These are anti-scope rules. Drift into any of these is a decision that must be m
 
 The workbench core is **largely built** — the veteran-facing power is already present:
 
-- **Quests** — near-full FTB Quests 1.21.1 parity (canvas, tasks, rewards, reward tables, smart filters, quest links, bezier edges, grid snap, undo/redo, progress simulation, book/chapter/group settings, animated + baked 3D icons, theme presets). Parity checklist lives in `MODCANVAS_ROADMAP.md` §13.
+- **Quests** — near-full FTB Quests 1.21.1 parity (canvas, tasks, rewards, reward tables, smart filters, quest links, dependency curves, grid snap, undo/redo, progress simulation, book/chapter/group settings, animated + baked 3D icons, theme presets). Parity checklist lives in `MODCANVAS_ROADMAP.md` §13.
 - **Recipes** — KubeJS + CraftTweaker + vanilla, bidirectional scan (incl. mod jars), JSON paste-import, validation, non-clobber saves.
 - **Configs** — structured + raw editors, in-place on the real instance `config/`, comment-preserving atomic writes.
 - **Pack lifecycle** — attach instance, scan textures, import/export FTB quests (flat + subdirs), import `.mrpack`/packwiz/CurseForge, export, launch via companion mod.

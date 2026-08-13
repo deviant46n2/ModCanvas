@@ -14,7 +14,13 @@ import { join } from 'node:path'
 export const RULES_PATH = join(process.cwd(), 'scripts', 'integrity-rules.json')
 
 export const DEFAULT_RULES = {
+  // Line-count policy (s52 governance): 300 is the advisory heuristic, not an
+  // absolute law — cohesion > arbitrary count. Files over the soft limit must
+  // get a written PARKED/ACCEPTED reason (reported as candidates); only files
+  // over the hard limit fail the gate. See AGENTS.md "File & Function Size
+  // Limits".
   lineLimit: 300,
+  lineLimitHard: 600,
   lineLimitPaths: ['src-tauri/src', 'frontend/src', 'workbench-companion-neoforge-1.21/src', 'scripts'],
   assetDirs: ['frontend/public', 'frontend/src/assets'],
   // Staleness is per-binary and per-workflow (F4 fix, 2026-08-09):

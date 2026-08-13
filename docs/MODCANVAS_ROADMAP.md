@@ -16,13 +16,54 @@
 
 ---
 
+## 0. Current Development Posture (s52)
+
+**STATUS: CONSOLIDATION / VALIDATION.** The s52 critical product/engineering
+intervention is complete (see `docs/CRITICAL_PRODUCT_AUDIT.md` +
+`docs/CRITICAL_PRODUCT_ACTION_PLAN.md`): ~4,400 lines of dead/superseded code
+removed, the roadmap's current-state sections re-verified against the tree,
+and the directed maintenance queue below established. **A roadmap item is not
+authorization to implement it** — the sections of this document describe the
+strategic space, including things deliberately NOT being built yet.
+
+### Directed maintenance queue (current priorities)
+
+| Priority | Item | Status | Rationale |
+|---|---|---|---|
+| 1 | **Pack Health: wire the `target` jump-to-quest** | WIRE / EXECUTION PENDING | Every quest finding carries `target: {section, nodeId}` (types.ts:16-19) — populated, never read. The "what can I do about it" link is modeled and unwired; wiring it takes the panel from "what's wrong" to "go fix it" (audit finding #8). Do not claim the jump exists until it does. |
+| 2 | **Beginner Mode redesign** | REDESIGN BOOKED | The mode gates 2 of 7 editors (code-hiding only). The goal is NOT merely hiding advanced controls — evaluate whether the product's workflow is actually understandable to a first-time modpack creator (audit finding #11). Product call first; implementation after. |
+| 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (453 Rust + 697 FE tests) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
+| 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
+
+### Deliberately deferred expansion
+
+Unless a future roadmap decision explicitly reactivates an item, the following
+feature-surface expansions are constrained. **Read this roadmap as "here is
+the strategic space; these are the things we are deliberately NOT building
+yet" — not as a build list.**
+
+- Additional Minecraft version support
+- Generalized behavior-system expansion
+- Unnecessary FTB Quests parity work (beyond currently justified gaps)
+- Major companion expansion
+- Runtime hot-swap expansion (quest+kubejs reloads are live; config/CraftTweaker stay disabled with written reasons)
+- AI features
+- Major architectural rewrites
+- Additional rendering infrastructure
+- Additional maintainer tooling
+
+Deferred is not forgotten; it is deliberate. See `docs/CRITICAL_PRODUCT_AUDIT.md`
+for the findings ledger and per-item rulings.
+
+---
+
 ## 1. Executive summary
 
 ModCanvas is **not an empty project**. The audit (2026-08-10) confirms the workbench core is
 largely built and genuinely functional:
 
 - A deep, faithful **FTB Quests 1.21.1 editor** (canvas, tasks, rewards, reward tables, smart
-  filters, quest links, bezier edges, undo/redo, progress simulation, animated + baked 3D
+  filters, quest links, dependency curves, undo/redo, progress simulation, animated + baked 3D
   icons) — `frontend/src/QuestBookEditor.tsx`, ~45 components under `components/quest/`.
 - A **recipe editor** covering KubeJS, CraftTweaker, and vanilla datapacks with bidirectional
   scan, unified per-recipe disable, authored-only save gate, JSON paste-import.

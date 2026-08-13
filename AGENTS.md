@@ -1,5 +1,40 @@
 # AGENTS.md — Developer Guidelines for AI Coding Agents
 
+## Development Posture (s52 governance — READ FIRST)
+
+**ModCanvas is in a CONSOLIDATION / VALIDATION phase.** When choosing between
+adding capabilities and improving the correctness, maintainability, UX, or
+validation of existing capabilities, prefer the latter. **A roadmap item is
+not authorization to implement it** — the roadmap describes the strategic
+space, including things deliberately NOT being built yet. Do not implement
+deferred items opportunistically.
+
+**Product-first criterion:** every change is evaluated against —
+*"a person with zero modpack-development experience can create and launch a
+playable-but-not-great Minecraft modpack without writing or understanding
+programming-language syntax."* When choosing between technically attractive
+improvements, prefer changes that directly improve this outcome. Engineering
+elegance does not substitute for product value.
+
+**Evidence-backed deletion:** before deleting code, (1) trace consumers,
+(2) search for references, (3) determine runtime reachability, (4) check
+whether it is an intentional extension point, (5) check relevant docs,
+(6) confirm no architectural invariant is violated, (7) verify after deletion.
+"Tests pass" alone does not prove code is unused.
+
+**No meta-engineering drift:** do not introduce new agent systems, audit
+systems, orchestration layers, governance frameworks, or process machinery
+unless a demonstrated problem requires them. The development process must
+remain simpler than the product it builds.
+
+**Currently deferred (do not build unless a roadmap decision reactivates):**
+additional Minecraft version support, generalized behavior-system expansion,
+unnecessary FTB Quests parity work, major companion expansion, runtime
+hot-swap expansion, AI features, major architectural rewrites, additional
+rendering infrastructure, additional maintainer tooling. See the roadmap's
+"Current Development Posture" section for the directed maintenance queue and
+rationales. Deferred is not forgotten; it is deliberate.
+
 ## Communication & Honesty
 
 - Be direct and honest. Never be sycophantic or validating — do not flatter
@@ -69,7 +104,8 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
    - **UI Layer (`/src/components/`):** React/Svelte components. UI nodes must never perform direct disk reads or trigger un-buffered file writes.
 
 2. **File & Function Size Limits:**
-   - Single files MUST NOT exceed **300 lines of code**. If a file grows beyond 300 lines, refactor helper functions or sub-components into separate utility/module files.
+   - **Line count is a heuristic, not an architectural law (s52 governance).** Keep files reasonably focused and generally below **~300 lines**; this is the *soft* limit — a file over it is reported as a CANDIDATE and must carry a written PARKED/ACCEPTED reason in the integrity allowlist. Only files over the **hard limit (600 lines)** fail the gate as violations.
+   - Do NOT split a cohesive module solely to satisfy the numeric limit when doing so increases coupling, indirection, or obscures ownership. **COHESION > ARBITRARY LINE COUNT.** The integrity gate enforces the hard limit and surfaces soft-limit candidates (`scripts/integrity-check.mjs` line-limit section; `lineLimit`/`lineLimitHard` in `scripts/integrity-rules.mjs`).
    - Functions MUST focus on a single responsibility.
 
 3. **Loose Coupling via Interfaces:**

@@ -78,6 +78,8 @@ export function checkLineLimit(rules, root) {
   const violations = []
   const parked = []
   const accepted = []
+  const candidates = []
+  const hard = rules.lineLimitHard ?? rules.lineLimit * 2
   for (const dir of rules.lineLimitPaths) {
     for (const file of walk(join(root, dir))) {
       const lines = lineCount(file)
@@ -89,10 +91,20 @@ export function checkLineLimit(rules, root) {
         // deduction, never a work item (s36). Everything else parked.
         if (entry.kind === 'accepted') accepted.push({ path: rel, lines, reason: entry.reason })
         else parked.push({ path: rel, lines, reason: entry.reason, since: entry.since })
-      } else violations.push({ path: rel, lines })
+      } else if (lines > hard) {
+        // Only genuinely runaway files fail the gate (s52 governance: the
+        // 300-line rule is a heuristic with a written-appeal path, not a law).
+        violations.push({ path: rel, lines })
+      } else {
+        candidates.push({
+          path: rel,
+          lines,
+          message: `over ${rules.lineLimit}-line soft limit (${lines} lines) — needs a written PARKED/ACCEPTED reason`,
+        })
+      }
     }
   }
-  return { violations, parked, accepted }
+  return { violations, parked, accepted, candidates }
 }
 
 export function checkAssetBundle(rules, root) {

@@ -16,6 +16,7 @@ const nLines = (n) => 'x\n'.repeat(n)
 
 const RULES = {
   lineLimit: 300,
+  lineLimitHard: 600,
   lineLimitPaths: ['src'],
   assetDirs: ['public', 'assets'],
   staleBinaries: [{ name: 'dev', path: 'bin/out', sourcePaths: ['src'] }],
@@ -23,15 +24,25 @@ const RULES = {
   allowlists: { 'line-limit': [], 'asset-bundle': [] },
 }
 
-test('line-limit: over-limit file is a violation', () => {
+test('line-limit: over-soft-limit file is a candidate (needs a written reason)', () => {
   const root = fixture()
   mkdirSync(join(root, 'src'), { recursive: true })
   writeFileSync(join(root, 'src', 'big.rs'), nLines(301))
-  const { violations, parked } = checkLineLimit(RULES, root)
+  const { violations, candidates } = checkLineLimit(RULES, root)
+  assert.equal(violations.length, 0)
+  assert.equal(candidates.length, 1)
+  assert.equal(candidates[0].path, 'src/big.rs')
+  assert.equal(candidates[0].lines, 301)
+})
+
+test('line-limit: over-HARD-limit file is a violation (s52 governance)', () => {
+  const root = fixture()
+  mkdirSync(join(root, 'src'), { recursive: true })
+  writeFileSync(join(root, 'src', 'huge.rs'), nLines(601))
+  const { violations, candidates } = checkLineLimit(RULES, root)
   assert.equal(violations.length, 1)
-  assert.equal(violations[0].path, 'src/big.rs')
-  assert.equal(violations[0].lines, 301)
-  assert.equal(parked.length, 0)
+  assert.equal(violations[0].path, 'src/huge.rs')
+  assert.equal(candidates.length, 0)
 })
 
 test('line-limit: allowlisted over-limit file is parked, not a violation', () => {
@@ -54,13 +65,14 @@ test('line-limit: at-limit file is clean', () => {
   assert.equal(violations.length, 0)
 })
 
-test('line-limit: 301 lines WITHOUT trailing newline is still a violation (F9)', () => {
+test('line-limit: 301 lines WITHOUT trailing newline is a candidate, not a violation (F9)', () => {
   const root = fixture()
   mkdirSync(join(root, 'src'), { recursive: true })
   writeFileSync(join(root, 'src', 'edge.rs'), 'x\n'.repeat(300) + 'x') // 301 lines, no trailing \n
-  const { violations } = checkLineLimit(RULES, root)
-  assert.equal(violations.length, 1)
-  assert.equal(violations[0].lines, 301)
+  const { violations, candidates } = checkLineLimit(RULES, root)
+  assert.equal(violations.length, 0)
+  assert.equal(candidates.length, 1)
+  assert.equal(candidates[0].lines, 301)
 })
 
 test('line-limit: missing directory is skipped', () => {
@@ -179,7 +191,7 @@ test('seedRules: parks violations and preserves existing entries', () => {
   const root = fixture()
   mkdirSync(join(root, 'src'), { recursive: true })
   mkdirSync(join(root, 'public'), { recursive: true })
-  writeFileSync(join(root, 'src', 'big.rs'), nLines(301))
+  writeFileSync(join(root, 'src', 'big.rs'), nLines(601)) // over hard limit
   writeFileSync(join(root, 'public', 'x.png'), 'fake')
   const rulesPath = join(root, 'rules.json')
   const rules = structuredClone(RULES)
@@ -194,7 +206,7 @@ test('seedRules: parks violations and preserves existing entries', () => {
 test('seedRules: never persists non-allowlist keys (JSON-safe seed)', () => {
   const root = fixture()
   mkdirSync(join(root, 'src'), { recursive: true })
-  writeFileSync(join(root, 'src', 'big.rs'), nLines(301))
+  writeFileSync(join(root, 'src', 'big.rs'), nLines(601)) // over hard limit
   const rulesPath = join(root, 'rules.json')
   const rules = structuredClone(RULES)
   const seeded = seedRules(rulesPath, rules, root)
