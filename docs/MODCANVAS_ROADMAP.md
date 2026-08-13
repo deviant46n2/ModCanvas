@@ -130,8 +130,8 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | History / undo | **Implemented** — durable journal, timeline drawer | `core/history/store.ts:86`; `HistoryDrawer.tsx`; `commands/history.rs:11` |
 | Pack lifecycle | **Implemented** — create/load/list/save/delete, import mrpack/CF/packwiz/instance | `commands/project.rs`; `imports/mod.rs` |
 | Launch | **Implemented** — Test → Prism via `LauncherDriver`, companion deploy | `launcher.rs`; `minecraft/launch.rs:11`; `launch_mc_instance` |
-| Companion mod | **Implemented (NeoForge 1.21.1 only)** — item rendering, texture extraction, reload (frozen), stop/restart | `workbench-companion-neoforge-1.21/` (11 Java files); `ws_protocol.rs:10-41` |
-| Texture pipeline | **Implemented** — descriptor index, lazy materialization, bake: keys, animations, tags | `instance_textures/`; `texture-loader.ts:164`; `engine_renders.rs` (CACHE_VERSION 6) |
+| Companion mod | **Implemented (NeoForge 1.21.1 only)** — item rendering, texture extraction, reload (quest+kubejs enabled s42–s44, evidence-gated), stop/restart | `workbench-companion-neoforge-1.21/` (11 Java files); `ws_protocol.rs:10-41` |
+| Texture pipeline | **Implemented** — descriptor index, lazy materialization, bake: keys, animations, tags | `instance_textures/`; `services/texture-loader/` (facade + materialize/baked/targets); `engine_renders.rs` (CACHE_VERSION 6) |
 | Mod intelligence | **Implemented (network-only)** — Modrinth + CurseForge | `mod_intelligence/modrinth.rs:7`; `curseforge_search.rs:18` |
 | Maintainer tooling | **Implemented** — integrity, health, backup, memory-check, systemd timer | `scripts/*.mjs`; `docs/tooling.md` |
 
@@ -179,16 +179,14 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
    references). `core/sync/*` stays: it is the documented hot-swap re-enable path (item 4).
 3. **`frontend/src/services/graphConverters.ts`** — orphaned (`graphToApiData`/`toRfEdges`),
    superseded by `useQuestCanvasModel`. **Deleted in the s34 debt arc.**
-4. **Hot-swap reload path frozen** — `HOTSWAP_FROZEN = true` (`core/sync/config.ts:10`),
-   send-sites dormant (`useQuestToolbarActions.ts:77`, `useRecipeSave.ts:27`,
-   `sync-pipeline.ts:32`). Documented freeze (todo.md Phase 3), not a bug — but any roadmap
-   item that assumes in-game hot reload is unavailable.
+4. **Hot-swap reload path** — **un-frozen s42–s44 behind the reload-evidence gate.** `QUEST_HOTSWAP_ENABLED = true`, `KUBEJS_HOTSWAP_ENABLED = true` (`core/sync/config.ts:26-27`); `HOTSWAP_FROZEN` is the derived inverse (`:30`). Live send-sites: `useQuestToolbarActions.ts:90` (quest, evidence-gated), `useRecipeSave.ts:28` (kubejs) → `services/hotswap.ts` (pin → broadcast → verify log line). `RELOAD_CONFIG`/`RELOAD_CRAFTTWEAKER` stay disabled with a written reason (`config.ts:22-25` — signatures unprobed). The s43b status in §13 P2-HOTSWAP (verified in-game, three save→reload cycles) is the source of truth; earlier "frozen" wording in this section and §3.2/§5.1/§14.3/risk-table was corrected in the s52 audit.
 5. **`mod_metadata` DB table is a dead schema** — created in the schema (`db.rs` init_schema), never written.
    **Removed from the schema in the s34 debt arc.** Existing databases keep the (empty,
    never-populated) orphan table — no migration warranted; fresh DBs never create it.
 6. **CurseForge export silently drops Modrinth-sourced mods** — collected into
-   `_modrinth_mods` but never written into the zip (`imports/curseforge/export.rs`).
-   **This is a real functional bug in a shipped export path.**
+   `_modrinth_mods` but never written into the zip. **FIXED (pre-s52):** `imports/curseforge/
+   export.rs:102-133` now ships non-CurseForge mods as real jars into `overrides/mods/`,
+   and a missing jar fails loudly with a named error (`:104-110`), never a silent drop.
 7. **Silent cross-version adapter fallback** — a pack whose MC version has no adapter card
    (e.g. 1.19.2, or a minor like 1.20.4) resolved to the default 1.21.1/NeoForge card with
    only a console warning (`adapters/factory.ts:46-83`), so the app would write wrong-version
@@ -199,22 +197,28 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
    tabs, so quest/recipe/loot writers are all covered). The former `NewProjectModal` 1.19.2
    lie is also gone — it was deleted in `a2b4753` (s49) and the wizard hardcodes the one
    supported combo (1.21.1/NeoForge).
-8. **300-line rule violations** — 7 frontend non-test files (largest: `core/recipe/
-   recipe-store.ts` 399, `services/texture-loader.ts` 389, `services/quest-types.ts` 361,
-   `hooks/useQuestAssetPipeline.ts` 360, `hooks/useModState.ts` 327, `core/pack-health/
-   checks/quests.ts` 324, `components/common/config-editor.tsx` 309) and 21 Rust non-test
-   files (largest: `recipes/mod.rs` 728, `scriptgen/kubejs.rs` 705, `imports/quest_config.rs`
-   680, `path_safety.rs` 679, `db.rs` 643, `mod_intelligence/modrinth.rs` 632,
-   `quest/analysis.rs` 621, `scriptgen/crafttweaker.rs` 595). Known debt; the integrity gate
-   seeds them. Splits are allowed but never the point of the work.
-9. **`ws_ipc.rs` (404 lines) has zero tests**; `quest/analysis.rs` (621 lines) has zero
-   tests; `db.rs` has 3. The WebSocket hub is the most security- and reliability-sensitive
-   surface in the app and the least tested. (Companion Java has no tests by design —
-   in-game verified only, `engine-renders.md:272-278`.)
-10. **`quest/analysis.rs` duplicate of frontend health** — lightweight structural analysis
-    that the frontend's `analyzePackHealth` also does (`core/validation/quest-validator.ts`
-    cycle detection). Not harmful, but the ownership boundary (Rust vs TS health) should be
-    stated, not drifted (§10.5).
+8. **300-line rule violations** — **mostly paid down by splits since s34** (measured s52):
+   the largest frontend file is now `recipe-store.ts` 294, `useModState.ts` 298; all seven
+   files cited in the s34 roster are under 300 (`texture-loader.ts` 31 — now a facade over
+   `texture-loader/`, `quest-types.ts` 8, `useQuestAssetPipeline.ts` 75, `checks/quests.ts`
+   28, `config-editor.tsx` 184). Rust: `recipes/mod.rs` 101, `quest_config.rs` 67,
+   `path_safety.rs` 237, `db.rs` 123, `modrinth.rs` 84, `analysis.rs` 131;
+   `scriptgen/kubejs.rs`/`crafttweaker.rs` are now directories. Run `pnpm integrity` for the
+   current roster; the gate remains the source of truth.
+9. **`ws_ipc.rs` was 404 lines with zero tests** — **now tested (s52 measurement):** the hub
+   is 213 lines with `ws_ipc/tests.rs` (143 lines, 16 test fns: handshake arms, routing
+   predicates, frame parsing). `quest/analysis.rs` (131 lines) still has zero tests, and
+   `db.rs` has 3 (`db/tests.rs`). The WebSocket hub is the most security- and
+   reliability-sensitive surface in the app; the remaining gap is the live-socket path
+   (no broadcast-counting / connection-lifecycle / emit-status integration test).
+   (Companion Java has no tests by design — in-game verified only, `engine-renders.md:272-278`.)
+10. **`quest/analysis.rs` — dead-end command** — `analyze_quest_graph` is registered
+    (`lib.rs:191`), wrapped in a service (`services/quest.ts:13`), and **called by no
+    frontend consumer** (grep s52: zero callers outside the wrapper). Zero tests. The
+    structural analysis it performs overlaps the frontend's `analyzePackHealth`
+    (`core/validation/quest-validator.ts` cycle detection). Not harmful, but it is a
+    dead-end IPC surface: either wire a consumer or prune the command. Ownership boundary
+    (Rust vs TS health) should be stated, not drifted (§10.5).
 
 ### 3.5 Documented-vs-code mismatches to correct in the docs
 
@@ -305,8 +309,10 @@ roadmap response.
 
 **Problem:** testing any change means restarting the game. **Current state:** ModCanvas
 removes file-level errors before boot (Pack Health), and the companion provides live
-reload *frozen* (`HOTSWAP_FROZEN`). **Roadmap:** P0 ships the "green check → Launch" loop
-for beginners; re-enabling hot reload is an explicit P2 item (§13 P2-BEHAVIOR, note on
+reload for quests + KubeJS behind the reload-evidence gate (s42–s44, `core/sync/config.ts`,
+§13 P2-HOTSWAP); config/CraftTweaker reloads stay disabled with a written reason.
+**Roadmap:** P0 ships the "green check → Launch" loop for beginners; extending hot reload
+beyond the current evidence-gated pair is an explicit P2 item (§13 P2-BEHAVIOR, note on
 hotswap) and must be gated on stability, not novelty.
 
 ### 5.2 The coding prerequisite (`PROJECT_BIBLE.md:36-40`)
@@ -1243,7 +1249,8 @@ Conventions:
 
 #### P2-HOTSWAP — Re-enable in-game reload (gated)
 
-- **Class:** Harden (frozen path: `core/sync/config.ts:10`).
+- **Class:** Harden (the reload path was frozen before s42; quest+kubejs un-froze s42–s44
+  behind the evidence gate, `core/sync/config.ts:26-27`).
 - **Scope:** un-freeze `RELOAD_QUESTS`/`RELOAD_KUBEJS_SCRIPTS` behind a stability gate —
   the freeze exists because reload correctness was unproven (todo.md Phase 3). The roadmap
   only re-enables it after (a) the companion reload handlers are verified in-game across
@@ -1342,8 +1349,9 @@ Incremental evolution of the existing architecture — **no rewrite**.
 ### 14.3 What gets removed or parked (with reasons)
 
 - Orphaned `components/canvas/**`, `graphConverters.ts` — deleted (superseded).
-- `core/sync/` — stays dormant while hotswap is frozen; the code is the re-enable path
-  (P2-HOTSWAP), not dead weight.
+- `core/sync/` — quest+kubejs reloads are live via `services/hotswap.ts`; the `SyncPipeline`
+  class itself is unwired (exported, never constructed — s52 grep) and its status as
+  "re-enable path" vs dead code needs a decision, not a default.
 - Dead Rust commands — pruned or parked per P0-HYGIENE-1, with written reasons.
 - `mod_metadata` table — drop or wire; dead schema is misleading schema.
 
@@ -1446,7 +1454,7 @@ Evaluated against the code and the research, each with the reasoning:
 | 1 | **Beginner UX untestable by the author** (Bible risk 1) | Fresh-eyes testers as an explicit P0 milestone — the wizard's completion criteria includes "fresh-eyes tester completes the path" | High |
 | 2 | **Pack Index key drift** — the repo's classic failure class | Canonical-key contracts per store, integrity-suite reference check, silent-miss reporting (§8.3.1) | Medium |
 | 3 | **Generated behavior code can be broken at runtime** (scripts load, but run wrong) | Golden-output compiler tests; deterministic compile warnings; Pack Index validation; honest "file-level sound, runtime-only surprises remain" framing | High |
-| 4 | **Hotswap re-enable regresses** (the s4b event-drop class) | Stay frozen until in-game-verified; explicit reload-vs-restart honesty; no silent divergence | Medium |
+| 4 | **Hotswap reload regresses** (the s4b event-drop class) | Per-type gates stay evidence-locked: a reload type ships only behind its verified log signature (s42–s44 discipline); explicit reload-vs-restart honesty; no silent divergence | Medium |
 | 5 | **Windows reality** (Bible risk 7): EBUSY paths, WebKitGTK differences | CI Windows runner when feasible; keep the atomic-write + retry discipline; real-device verification before launch audience | Medium |
 | 6 | **CI green ≠ local green** | Integrity gate is the source of truth; CI is a second witness | Low |
 | 7 | **Template content quality** | Coherency-over-ownership default ("probably a bad pack" is a win); templates editable and visible | Low |
