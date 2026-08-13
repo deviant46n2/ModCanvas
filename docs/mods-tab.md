@@ -87,7 +87,7 @@ into a category search would make the filter look broken.
 
 `+ Add` on a search result now performs a **real install** (not just a DB row):
 
-1. `install_mod_from_search` (`src-tauri/src/commands/modpack.rs`) resolves the
+1. `install_mod_from_search` (`src-tauri/src/commands/modpack/search.rs`) resolves the
    project's instance dir, path-validates `<instance>/mods`, and downloads:
    - **Modrinth** — `ModIntelligence::download_mod` picks the latest version
      matching the project's loader + MC version.

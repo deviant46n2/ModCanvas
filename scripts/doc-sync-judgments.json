@@ -119,6 +119,14 @@
   {
    "commit": "f1b4cab",
    "reason": "behaviors save-report honesty fix (warnings != emit failures) — documented same-pass in e5a6174/docs/behaviors.md (emission contract, s46) + roadmap §13 P2-BEHAVIOR status; aged out UNJUDGED (doc-judgment backlog), judged retroactively 2026-08-13, s51-followup"
+  },
+  {
+   "commit": "d24e39d",
+   "reason": "NODE_BASE_PX relocation to quest-form-constants.ts (single source, s51-followup docs audit) — internal refactor: the constant moved, default changed 28→36, label now matches the canvas truth. Behavior locked by tests (quest-form-constants.test.ts, decoration-picker.test.ts:134); the decision and the 7:6 rationale live in the code comment itself; no .md doc describes the old default, judged doc-less by the 2026-08-13 docs audit"
+  },
+  {
+   "commit": "91a6487",
+   "reason": "QuestDetailModal fixed-48px drawer tile — the commit IS a documentation change (its output is the header comment recording the deliberate identity-anchor decision and the iconBaseSize trap). No .md doc described the drawer tile size; judged doc-less by the 2026-08-13 docs audit"
   }
  ]
 }

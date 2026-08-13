@@ -1,9 +1,9 @@
 # ModCanvas — Product & Engineering Roadmap
 
 > **Status:** Living engineering document. The strategic layer above `docs/PROJECT_BIBLE.md`
-> (mission + ruleset), `featureparity.md` (FTB Quests parity checklist), and `todo.md` /
-> `todo-tooling.md` (execution backlogs). When this document conflicts with
-> `PROJECT_BIBLE.md`, the Bible wins — until it is deliberately amended there.
+> (mission + ruleset) and `todo.md` / `todo-tooling.md` (execution backlogs). When this
+> document conflicts with `PROJECT_BIBLE.md`, the Bible wins — until it is deliberately
+> amended there.
 >
 > **Audit basis:** repo state at `b294ac5` (2026-08-10), branch `fix_debt`, clean tree.
 > Every "implemented" claim below was verified against the codebase (file:line cited),
@@ -119,7 +119,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Domain | State | Evidence |
 |---|---|---|
-| Quest editor (FTB Quests) | **Implemented, deep** — near-full parity per `featureparity.md`; **export layout fixed s42** (1.21.x exports ONLY FlatChapters `quests/chapters/*.snbt` — verified against the shipped 2101.1.30 jar, which loads no other layout; the older Subdirs export loaded 0 chapters in-game) | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + version-aware export (`imports/ftb_quests/`) |
+| Quest editor (FTB Quests) | **Implemented, deep** — near-full parity (roadmap §13 P1-PARITY tracks the remaining gaps); **export layout fixed s42** (1.21.x exports ONLY FlatChapters `quests/chapters/*.snbt` — verified against the shipped 2101.1.30 jar, which loads no other layout; the older Subdirs export loaded 0 chapters in-game) | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + version-aware export (`imports/ftb_quests/`) |
 | Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:433`; `scriptgen/`; `recipe_disable.rs:29` |
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
 | Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `search_merge.rs` (s33) |
@@ -224,8 +224,8 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
   `ingest.rs`, `imports/snbt.rs`) — dated snapshot; the "remaining debt" list needs a refresh
   pass against the current tree.
 - `docs/config-editor.md` lists HOCON among parsed formats; the parser has no HOCON arm.
-- `docs/engine-renders.md` and `featureparity.md:12-14` audit notes are current; the
-  `featureparity.md` audit was last run at `6cd18dc` — re-audit at the P0 boundary.
+- `docs/engine-renders.md` audit notes are current; the FTB-parity checklist lives in this
+  document's §13 (P1-PARITY row) — re-audit it at the P0 boundary.
 
 ### 3.6 Architecture state (what the roadmap builds on)
 
@@ -265,7 +265,7 @@ Every item here exists and works. The roadmap's relationship to each is
 | # | Capability | Location | State | Roadmap action |
 |---|---|---|---|---|
 | 1 | FTB Quests canvas editor (nodes, edges, chapters, groups, decorations) | `components/quest/` | Deep | **Keep**; feed mini-wizards (§9.5) |
-| 2 | Task/reward authoring incl. smart filters | `quest-section-groups.tsx`, `core/quest/smart-filter.ts` | Deep | **Keep**; fill featureparity gaps (§13 P1-5) |
+| 2 | Task/reward authoring incl. smart filters | `quest-section-groups.tsx`, `core/quest/smart-filter.ts` | Deep | **Keep**; fill §13 P1-PARITY gaps |
 | 3 | Progress simulation | `core/quest/progress.ts`, `QuestCanvas.tsx:249` | Works | **Keep**; Pack Health Tier 2 consumes it (§10) |
 | 4 | Recipe editor (grid, 6 types, disable, bulk replace, JSON import) | `RecipeEditor.tsx`, `core/recipe/*` | Deep | **Keep**; templates/cheat-sheet follow-ups (todo.md:349-361) |
 | 5 | Recipe scan + script generation (KubeJS/CT) | `recipes/mod.rs`, `scriptgen/*` | Deep | **Keep**; behavior-system compiler backend (§11.4) |
@@ -316,7 +316,7 @@ config values, not files.
 ### 5.4 In-game editors are not workbenches (`PROJECT_BIBLE.md:48-52`)
 
 **Problem:** in-game quest editing is tedious, no copy/paste, no validation. **Current
-state:** ModCanvas beats it on every axis (`featureparity.md` §14-17 mostly ✅).
+state:** ModCanvas beats it on every axis (§13 capability rows mostly ✅).
 **Roadmap:** the remaining parity gaps (§13 P1-5: theme-file fidelity, description editor,
 book-level settings) close the last "I'll just do it in-game" escape hatches.
 
@@ -345,7 +345,7 @@ ceiling.
 | Domain | Common use cases | Current | Potential | Remaining code cases | Difficulty to close |
 |---|---|---|---|---|---|
 | Recipes | craft/smelt/stonecut/smith/shapeless, disable, replace ingredient | **~85%** — grid editor, 6 types, unified disable, bulk replace | ~95% | NBT/tag-edge cases, `replaceOutput`, startup-event recipes | Low–Medium (todo.md:349-361 follow-ups) |
-| Quests | tasks, rewards, tables, links, gating, milestones | **~90%** — full canvas parity | ~97% | `quest tags`, multi-page descriptions w/ inline images, theme-file WYSIWYG | Medium (featureparity §7-10) |
+| Quests | tasks, rewards, tables, links, gating, milestones | **~90%** — full canvas parity | ~97% | `quest tags`, multi-page descriptions w/ inline images, theme-file WYSIWYG | Medium (§13 P1-PARITY) |
 | Configs | flip a setting safely, find a setting | **~60%** — structured forms | ~85% | settings with no typed schema, cross-mod interdependencies | Medium (HOCON arm + schema heuristics + config recommendations) |
 | Mods | find, add, remove, enable/disable, compat-check | **~75%** — search+install+compat + one-click install of resolved missing deps | ~90% | curated recommendations; dep installs for optional/recommended (required-only today) | Low |
 | Progression | gating, ordering, bottlenecks, walls | **~50%** — per-quest fields + sim mode; no campaign surface | ~85% | progression-topology analytics (pure math), cross-chapter staging | Medium |
@@ -1086,16 +1086,16 @@ Conventions:
 
 #### P1-PARITY — Close the remaining FTB parity gaps
 
-- **Class:** Expand (featureparity §7, §8, §9, §10 open items).
+- **Class:** Expand (§13 P1-PARITY open items).
 - **Scope:** theme-file fidelity (`ftb_quests_theme.txt` parse → edge/panel/checkmark
-  rendering — the biggest rendering gap, `featureparity.md:294`); book icon picker / book
+  rendering — the biggest rendering gap); book icon picker / book
   default quest size / save-as-file; import/export hardening (layout choice, `min_width`/
   `invisible` alias unification, `chapter_groups.snbt`, quest `tags`); multi-page + inline
   image description editor.
 - **Complexity:** Medium–High (theme-file fidelity is the hard one). **Risk:** in-game
   pixel parity is only verifiable in-game — use the existing screenshot-measure discipline.
-- **Completion criteria:** each open featureparity item flips to ✅/🟢 with a doc-synced
-  note; re-audit `featureparity.md` against the tree.
+- **Completion criteria:** each open §13 P1-PARITY item flips to ✅/🟢 with a doc-synced
+  note; re-audit the parity rows against the tree.
 
 #### P1-HYGIENE — Second hygiene pass
 
@@ -1459,8 +1459,7 @@ drift).
 - **MVP (P0 done):** the Bible's exit criterion is met and *verified by fresh-eyes testers*:
   zero-code beginner creates + launches a playable 1.21.1/NeoForge pack.
 - **P1 done:** "where is this used" works across recipes/quests/items; Pack Health reports
-  progression topology truthfully; featureparity is re-audited and the open §7-10 items are
-  closed or explicitly parked.
+  progression topology truthfully; the §13 P1-PARITY items are closed or explicitly parked.
 - **P2 done:** a behavior authored visually compiles to loadable KubeJS/datapack with
   golden-output coverage; config recommendations apply undoable tweaks; the campaign
   progression surface ships.

@@ -5,7 +5,7 @@
 
 **Status:** Living document. Amend it as decisions change; that is the only way it dies.
 **Owner:** Project maintainer.
-**Related docs:** `README.md` (public front page), `AGENTS.md` (execution constraints for AI agents), `docs/design.md` (visual design system), `docs/*.md` (per-feature records), `featureparity.md` (FTB Quests parity checklist).
+**Related docs:** `README.md` (public front page), `AGENTS.md` (execution constraints for AI agents), `docs/design.md` (visual design system), `docs/*.md` (per-feature records).
 
 ---
 
@@ -166,7 +166,7 @@ These are anti-scope rules. Drift into any of these is a decision that must be m
 
 The workbench core is **largely built** — the veteran-facing power is already present:
 
-- **Quests** — near-full FTB Quests 1.21.1 parity (canvas, tasks, rewards, reward tables, smart filters, quest links, bezier edges, grid snap, undo/redo, progress simulation, book/chapter/group settings, animated + baked 3D icons, theme presets). See `featureparity.md`.
+- **Quests** — near-full FTB Quests 1.21.1 parity (canvas, tasks, rewards, reward tables, smart filters, quest links, bezier edges, grid snap, undo/redo, progress simulation, book/chapter/group settings, animated + baked 3D icons, theme presets). Parity checklist lives in `MODCANVAS_ROADMAP.md` §13.
 - **Recipes** — KubeJS + CraftTweaker + vanilla, bidirectional scan (incl. mod jars), JSON paste-import, validation, non-clobber saves.
 - **Configs** — structured + raw editors, in-place on the real instance `config/`, comment-preserving atomic writes.
 - **Pack lifecycle** — attach instance, scan textures, import/export FTB quests (flat + subdirs), import `.mrpack`/packwiz/CurseForge, export, launch via companion mod.
@@ -211,7 +211,7 @@ The MVP's job is to build the **guided wrapper** that hides the power that alrea
   variant (`workbench-companion-neoforge-1.21`) is the sole supported target.
   The fabric/forge/legacy-neoforge variants are archived under
   `workbench-companion-archived/` and the deploy matrix
-  (`src-tauri/src/minecraft.rs`) deploys NeoForge only. Hotswap reload commands
+  (`src-tauri/src/minecraft/companion.rs`) deploys NeoForge only. Hotswap reload commands
   (`RELOAD_*`) are frozen; the WS server, engine-render capture, and runtime
   texture extraction remain live.
 - **The companion is MVP-adjacent, not endgame**: the beginner's final act ("Launch your pack") depends on it. Companion install + basic hot-reload stability is a v1 blocker.

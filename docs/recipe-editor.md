@@ -173,7 +173,7 @@ Pure helpers under `frontend/src/core/recipe/` (no UI / IPC):
 | `json-import.ts` | Vanilla/KubeJS recipe JSON → `Recipe` parser. |
 | `loader.ts` | `normalizeLoader` / adapter loader resolution. |
 
-Backend, `src-tauri/src/recipes/` and `src-tauri/src/recipe_disable.rs`:
+Backend, `src-tauri/src/recipes/` and `src-tauri/src/recipe_disable/`:
 
 | File | Responsibility |
 |------|----------------|
@@ -183,9 +183,9 @@ Backend, `src-tauri/src/recipes/` and `src-tauri/src/recipe_disable.rs`:
 | `recipes/kubejs.rs` | Comment-aware, span-aware `event.*` call reader. |
 | `recipes/crafttweaker.rs` | Comment-aware, span-aware ZenScript reader. |
 | `recipes/cache.rs` | On-disk scan cache (path+size+mtime fingerprint). |
-| `recipe_disable.rs` | `comment_out_recipe_call` (returns SHA-256 fingerprint) / `uncomment_recipe_call` (integrity-checked) + Tauri commands. |
+| `recipe_disable/mod.rs` | `comment_out_recipe_call` (returns SHA-256 fingerprint) / `uncomment_recipe_call` (integrity-checked) + Tauri commands. |
 
-Emitters: `scriptgen/kubejs.rs` / `scriptgen/crafttweaker.rs` take a
+Emitters: `scriptgen/kubejs/` / `scriptgen/crafttweaker/` take a
 `disabled_ids` list and emit removes before adds. `generate_recipe_scripts`
 (commands/mod.rs) threads `disabled_ids` through.
 

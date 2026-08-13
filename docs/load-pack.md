@@ -149,7 +149,7 @@ root exists, `app_data/instances` is the single fallback root, and the
 
 ## Files
 
-- Backend: `src-tauri/src/ingest.rs` (`IngestProgress`,
+- Backend: `src-tauri/src/ingest/` (`IngestProgress` in `models.rs`,
   `ingest_active_instance_with_progress`, `ingest_active_instance_cmd`,
   `force` flag), `src-tauri/src/db.rs` (`sync_prism_instances`, `source` column)
 - Frontend: `frontend/src/hooks/useAppState.ts` (`openPack`, `refreshPack`,

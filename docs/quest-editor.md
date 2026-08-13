@@ -379,7 +379,7 @@ the in-game quest editor's placement behavior:
 - `src-tauri/src/quest/types/graph.rs` — `QuestGraph.grid_scale` (default 0.5).
 - `src-tauri/src/imports/ftb_quests/import/global.rs` — parses `grid_scale` from
   `data.snbt` in `parse_global_settings`.
-- `src-tauri/src/imports/ftb_quests/export.rs` — writes `grid_scale` back to
+- `src-tauri/src/imports/ftb_quests/export/book.rs` — writes `grid_scale` back to
   `data.snbt` on export.
 - `frontend/src/services/quest-types.ts` — `QuestGraphData.grid_scale`.
 - `frontend/src/components/quest/quest-form-constants.ts` — pure
@@ -399,7 +399,7 @@ the in-game quest editor's placement behavior:
 - `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` read `icon_scale`, falling back
   to the legacy `icon_scaling` key the app once emitted for subdirs layouts,
   and clamps to 0.1 – 2.0.
-- `src-tauri/src/imports/ftb_quests/export.rs` always writes `icon_scale` (both
+- `src-tauri/src/imports/ftb_quests/export/quest.rs` always writes `icon_scale` (both
   layouts), so FTB picks the value up.
 - `src-tauri/src/quest/types/node.rs` stores it as `icon_scaling: f64` (default 1.0);
   the node renderer multiplies the body-anchored icon size by it (see above).
@@ -465,7 +465,7 @@ Chapter-level settings mirror the in-game chapter editor:
 - `src-tauri/src/quest/types/chapter.rs` — `QuestChapter` carries all the fields above.
 - `src-tauri/src/imports/ftb_quests/import/chapter.rs` (SNBT) and `import/chapter_json5.rs` read the keys in both; chapter `default_quest_size` (a scalar multiplier in
   FTB) is converted to `QuestSize` grid units (24 = 1.0x).
-- `src-tauri/src/imports/ftb_quests/export.rs` — `build_subdirs_chapter` writes
+- `src-tauri/src/imports/ftb_quests/export/chapter.rs` — `build_subdirs_chapter` writes
   the fields back (booleans as SNBT `Byte(1/0)`, matching FTB's output), and
   writes `default_quest_size` only when ≠ 1.0x.
 - Round-trip covered by `chapter_metadata_fields_roundtrip` in
@@ -519,7 +519,7 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
   `EmergencyItem` and `LootCrateNoDrop` live in the same types file.
 - `src-tauri/src/imports/ftb_quests/import/global.rs` — `parse_global_settings` reads
   them from both `data.snbt` and `data.json5`.
-- `src-tauri/src/imports/ftb_quests/export.rs` — `export_ftb_quests_snbt` writes
+- `src-tauri/src/imports/ftb_quests/export/mod.rs` — `export_ftb_quests_snbt` writes
   the graph's values back to `data.snbt`.
 - `frontend/src/components/quest/book-settings.tsx` — "Global Defaults
   (data.snbt)" section: reward-team and consume-items checkboxes, autoclaim
@@ -541,7 +541,7 @@ ModCanvas stores them as quest nodes with
   `QuestNode.link_target`.
 - `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` — both quest
   parsers detect `linked_quest` and produce `QuestLink` nodes.
-- `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes
+- `src-tauri/src/imports/ftb_quests/export/quest.rs` — `quest_to_snbt` writes
   `linked_quest` (plus position/title/size) for link nodes in both subdirs and
   flat-chapters layouts; link nodes are included in the per-chapter quest map.
 - `frontend/src/components/quest/CanvasArea.tsx` — the **Add Link** button on the
@@ -585,7 +585,7 @@ under a **Settings** divider in the single scrollable column
 - `src-tauri/src/imports/ftb_quests/import/quest.rs` (SNBT) and `import/json5.rs` — quest parsers
   read the keys above (including `dependency_requirement` dialect mapping
   `one`→`one_completed`, `started`→`all_started`).
-- `src-tauri/src/imports/ftb_quests/export.rs` — `quest_to_snbt` writes them
+- `src-tauri/src/imports/ftb_quests/export/quest.rs` — `quest_to_snbt` writes them
   (booleans as SNBT `Byte(1)`, ints as SNBT `Int`, strings as SNBT `String`).
 - `frontend/src/services/quest-types.ts` — `QuestNodeData` carries all six
   fields; the legacy `repeat_time` / `repeat_min_delay` / `repeat_max_delay`
@@ -625,7 +625,7 @@ survives as a quest property).
 
 ## Editor toolbar
 
-`import-export.tsx` (presentation) + `quest-toolbar-actions.ts` (save / import
+`import-export.tsx` (presentation) + `useQuestToolbarActions.ts` (save / import
 side effects) render the editor's top toolbar — all controls are text or inline
 SVG labels, no emoji:
 
@@ -795,16 +795,21 @@ components + pure logic in `src/core/quest/`):
   mutations while leaving selection, pan, zoom, search, and Simulate available.
   It is enforced at both the React Flow prop level (`nodesDraggable`,
   `nodesConnectable`, `edgesReconnectable`) and the key/context handlers.
-- **Bezier control points per edge** — selecting an arrow shows a **🎀 Curve**
-  button in the action chip. `EdgeBezierEditor` (rendered in the viewport
-  portal) exposes two draggable handles. Control points are stored as offsets
-  relative to the **handle anchors** (`QuestEdgeData.bezier` /
-  `Rust QuestEdge.bezier`, anchored via `pickEdgeHandles`/`handleAnchor` in
-  `edge-geometry.ts`), so a curve keeps tracking its quests when nodes move.
-  Dragging streams a live preview through React Flow's local edge state and
-  commits **once on pointer-up** — every drag is a single undoable step. The
-  bezier is editor-only: FTB's quest format has no field for it, so it is not
-  written to SNBT (and is absent after a fresh import).
+- **Stateful center-to-center dependency edges** — dependency lines are drawn
+  straight between quest **centers**, matching the in-game quest screen (the
+  quest tiles draw on top of the line ends; direction is conveyed by a
+  marching-dash animation flowing source → target, never an arrowhead — the
+  game has none, s46). Each edge is drawn as a two-layer stroke (dark casing
+  under a bright core) so it stays legible over any chapter theme. Colors are
+  driven by the prerequisite's completion state (`core/quest/edge-state.ts`,
+  pure + unit-tested): completed green, uncompleted pink, unavailable faded,
+  hover fan cyan-in/yellow-out, cycles solid red. Cycle detection runs on the
+  graph (`quest-edges.tsx` `detectCycles`, DFS) and the toolbar surfaces the
+  count. Hover fan marches fast, others slow; `prefers-reduced-motion` degrades
+  to static. Thickness scales 0.17 × tile. (History: the older per-edge
+  bezier-curve editor with draggable handles was removed 2026-08-10 —
+  `8f71c2f` added it, `f59f3ae` replaced it. The `bezier` data field survives
+  in the graph type but is no longer rendered or edited.)
 - **Book-level visual presets** — the **Theme** dropdown applies a self-authored
   `BOOK_THEME_PRESETS` palette (clean-room; no FTB theme data is bundled or
   parsed). Applying one repaints every quest node's color/shape plus each
