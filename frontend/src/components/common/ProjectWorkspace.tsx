@@ -14,6 +14,7 @@ import { PackHealthTab } from './PackHealthTab'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIcon } from '../../services/mods'
 import { useConnectionPill } from '../../hooks/useConnectionPill'
+import { UnsupportedVersionBanner } from './UnsupportedVersionBanner'
 import type { IngestResult } from '../../services/api'
 
 
@@ -127,7 +128,12 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         onBeginnerModeChange={props.onBeginnerModeChange}
       />
 
-            <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot', 'behaviors'] as const).map((tab) => (
+      <UnsupportedVersionBanner
+        mcVersion={project.minecraft_version}
+        modLoader={project.mod_loader}
+      />
+
+      <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot', 'behaviors'] as const).map((tab) => (
           <button
             key={tab}
             id={`tab-${tab}`}

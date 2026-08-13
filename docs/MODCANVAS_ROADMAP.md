@@ -187,9 +187,16 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
 6. **CurseForge export silently drops Modrinth-sourced mods** — collected into
    `_modrinth_mods` but never written into the zip (`imports/curseforge/export.rs`).
    **This is a real functional bug in a shipped export path.**
-7. **`NewProjectModal` advertises 1.19.2 and Quilt** — no 1.19.x adapter exists; Quilt
-   exists for 1.21.1 only. Selecting 1.19.2 falls back to the 1.21.1 NeoForge adapter with a
-   console warning (`adapters/factory.ts:46-83`). The UI lies about the matrix.
+7. **Silent cross-version adapter fallback** — a pack whose MC version has no adapter card
+   (e.g. 1.19.2, or a minor like 1.20.4) resolved to the default 1.21.1/NeoForge card with
+   only a console warning (`adapters/factory.ts:46-83`), so the app would write wrong-version
+   syntax into the pack with no user-visible signal. **RESOLVED (s51-followup):** the
+   major-versions-only adapter scope is now a written policy (AGENTS.md), and the
+   `UnsupportedVersionBanner` (`components/common/UnsupportedVersionBanner.tsx`,
+   `adapters/support.ts`) surfaces cross-version fallbacks at the workspace level (above the
+   tabs, so quest/recipe/loot writers are all covered). The former `NewProjectModal` 1.19.2
+   lie is also gone — it was deleted in `a2b4753` (s49) and the wizard hardcodes the one
+   supported combo (1.21.1/NeoForge).
 8. **300-line rule violations** — 7 frontend non-test files (largest: `core/recipe/
    recipe-store.ts` 399, `services/texture-loader.ts` 389, `services/quest-types.ts` 361,
    `hooks/useQuestAssetPipeline.ts` 360, `hooks/useModState.ts` 327, `core/pack-health/

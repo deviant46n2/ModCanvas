@@ -82,6 +82,7 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
    - Each adapter implements `IMinecraftVersionAdapter` and lives in its own file — no shared mutable state.
    - Use `getAdapter(mcVersion, loader)` from `adapters/factory.ts` to resolve the correct adapter at runtime.
    - Adding a new version or loader means creating a new file; never modify existing adapter code.
+   - **Adapter scope: major versions only (s51 decision).** Adapters exist for major stable Minecraft versions (1.20.1, 1.21.1) — the versions modpacks actually target. Minor/patch versions (e.g. 1.20.4, 1.21.2) get NO card; they resolve through the factory fallback chain. Adding a minor card requires an explicit scope decision first — the default is no. Known cost, surfaced: a minor-version pack resolves to the default card (1.21.1/neoforge), which is wrong for pre-1.20.5 minors — acceptable because the app targets major-version packs, and the `UnsupportedVersionBanner` (workspace-level, cross-version fallback only) tells the user their pack is on unsupported rules. Revisit if real packs demand it.
    - Test coverage in `adapters/matrix.test.ts` must verify isolation, exact resolution, and fallback behavior.
 
 ---
