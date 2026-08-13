@@ -127,6 +127,10 @@
   {
    "commit": "91a6487",
    "reason": "QuestDetailModal fixed-48px drawer tile — the commit IS a documentation change (its output is the header comment recording the deliberate identity-anchor decision and the iconBaseSize trap). No .md doc described the drawer tile size; judged doc-less by the 2026-08-13 docs audit"
+  },
+  {
+   "commit": "aff5c18",
+   "reason": "s52 audit rulings batch (sync layer removal, adapter fix) — doc-covered by the following governance commit 9d6f97f: roadmap §14.3 core/sync note rewritten to the unwired reality, §0 directed queue records the adapter fix, AGENTS.md posture section. Cross-commit coverage, judged 2026-08-13"
   }
  ]
 }

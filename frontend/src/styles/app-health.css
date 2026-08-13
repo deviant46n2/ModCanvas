@@ -189,6 +189,25 @@
   background: var(--color-accent-subtle);
 }
 
+/* Jump-to-finding (s52 directed queue #1): "go fix it" affordance. Accent-
+ * colored so it reads as the primary action; Copy stays secondary beside it. */
+.health-jump {
+  flex-shrink: 0;
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.health-jump:hover {
+  background: var(--color-accent);
+  color: var(--color-bg-surface-0);
+}
+
 .health-verdict-stats {
   margin: var(--space-3) 0 0;
   color: var(--color-text-tertiary);

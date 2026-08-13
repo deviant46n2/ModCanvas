@@ -31,7 +31,26 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   )
 }
 
-function HealthItemRow({ item }: { item: HealthItem }) {
+/** Jump-to-finding affordance (s52 directed queue #1): a finding whose target
+ *  carries a quest nodeId gets a "go fix it" button that selects + centers
+ *  that quest in the editor. Only quests have nodeIds today; other sections
+ *  simply render no button. */
+function JumpButton({ item, onJump }: { item: HealthItem; onJump?: (item: HealthItem) => void }) {
+  if (!onJump || item.target?.section !== 'quests' || !item.target.nodeId) return null
+  return (
+    <button
+      className="health-jump"
+      type="button"
+      aria-label={`Go to ${item.message}`}
+      title="Go to the quest"
+      onClick={() => onJump(item)}
+    >
+      →
+    </button>
+  )
+}
+
+function HealthItemRow({ item, onJump }: { item: HealthItem; onJump?: (item: HealthItem) => void }) {
   return (
     <li className={`health-item health-item--${item.severity}`}>
       <span className="health-item-badge" aria-hidden="true" />
@@ -39,12 +58,13 @@ function HealthItemRow({ item }: { item: HealthItem }) {
         <div className="health-item-message">{item.message}</div>
         {item.detail && <div className="health-item-detail">{item.detail}</div>}
       </div>
+      <JumpButton item={item} onJump={onJump} />
       <CopyButton text={item.copyText} label={`Copy ${item.severity} text`} />
     </li>
   )
 }
 
-function HealthSectionBlock({ section }: { section: HealthSection }) {
+function HealthSectionBlock({ section, onJump }: { section: HealthSection; onJump?: (item: HealthItem) => void }) {
   const blocking = section.items.filter((i) => i.severity === 'blocking').length
   const recommended = section.items.filter((i) => i.severity === 'recommended').length
   return (
@@ -61,7 +81,7 @@ function HealthSectionBlock({ section }: { section: HealthSection }) {
         <>
           <ul className="health-items">
             {section.items.slice(0, MAX_RENDERED_ITEMS).map((item) => (
-              <HealthItemRow key={item.id} item={item} />
+              <HealthItemRow key={item.id} item={item} onJump={onJump} />
             ))}
           </ul>
           {section.items.length > MAX_RENDERED_ITEMS && (
@@ -76,8 +96,8 @@ function HealthSectionBlock({ section }: { section: HealthSection }) {
 }
 
 /** Persistent go/no-go surface (Project Bible §9). Renders the derived report —
- * never rescans, never blocks on I/O. */
-export function PackHealthTab() {
+ *  never rescans, never blocks on I/O. */
+export function PackHealthTab({ onJumpToFinding }: { onJumpToFinding?: (item: HealthItem) => void }) {
   const { report } = usePackHealth()
 
   return (
@@ -108,7 +128,7 @@ export function PackHealthTab() {
 
       <div className="health-sections">
         {report.sections.map((section) => (
-          <HealthSectionBlock key={section.key} section={section} />
+          <HealthSectionBlock key={section.key} section={section} onJump={onJumpToFinding} />
         ))}
       </div>
     </div>

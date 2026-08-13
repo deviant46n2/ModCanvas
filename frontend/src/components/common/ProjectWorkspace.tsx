@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { CanvasThemeProvider } from '../theme/theme-provider'
 import { TopBar } from './topbar'
@@ -11,6 +11,7 @@ import { LootTab } from '../loot/LootTab'
 import { BehaviorTab } from '../behavior/BehaviorTab'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
+import type { HealthItem } from '../../core/pack-health/types'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIcon } from '../../services/mods'
 import { useConnectionPill } from '../../hooks/useConnectionPill'
@@ -74,6 +75,18 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
     packLoaded,
   } = props
   const { view: connectionView, signals: connectionSignals } = useConnectionPill(project)
+
+  // Pending Pack Health jump (s52 directed queue #1): a finding's target
+  // carries a quest nodeId; the workspace holds the pending nodeId so it
+  // survives the tab switch (all panels stay mounted, so the quest editor is
+  // alive the moment the tab lands), and clears it once the editor consumes it.
+  const [focusQuestNode, setFocusQuestNode] = useState<string | null>(null)
+  const handleJumpToFinding = useCallback((item: HealthItem) => {
+    const nodeId = item.target?.nodeId
+    if (!nodeId) return
+    setFocusQuestNode(nodeId)
+    onTabChange('quests')
+  }, [onTabChange])
 
   // Tabs are always navigable (all panels stay mounted and handle their own
   // empty state), so no disabled gating is needed here.
@@ -157,7 +170,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
               hidden via CSS rather than unmounted. */}
           <div id="tabpanel-health" role="tabpanel" aria-labelledby="tab-health" className={activeTab === 'health' ? '' : 'tab-hidden'}>
             <ErrorBoundary>
-              <PackHealthTab />
+              <PackHealthTab onJumpToFinding={handleJumpToFinding} />
             </ErrorBoundary>
           </div>
           <div id="tabpanel-mods" role="tabpanel" aria-labelledby="tab-mods" className={activeTab === 'mods' ? '' : 'tab-hidden'}>
@@ -181,6 +194,8 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                   isTesting={props.isTesting}
                   showGuidedQuest={props.showGuidedQuest}
                   onGuidedQuestClose={props.onGuidedQuestClose}
+                  focusQuestNode={focusQuestNode}
+                  onFocusQuestNodeConsumed={() => setFocusQuestNode(null)}
                 />
               </CanvasThemeProvider>
             </ErrorBoundary>

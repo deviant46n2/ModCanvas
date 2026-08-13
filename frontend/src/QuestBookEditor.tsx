@@ -33,11 +33,15 @@ interface QuestBookEditorProps {
   /** External handoff (P0-MINIWIZ wizard step 5): open the guided quest modal. */
   showGuidedQuest?: boolean
   onGuidedQuestClose?: () => void
+  /** External handoff (s52 directed queue #1): a Pack Health finding asked to
+   *  jump to a quest. Select + center that node, then ack via onConsumed. */
+  focusQuestNode?: string | null
+  onFocusQuestNodeConsumed?: () => void
 }
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting, showGuidedQuest, onGuidedQuestClose }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting, showGuidedQuest, onGuidedQuestClose, focusQuestNode, onFocusQuestNodeConsumed }: QuestBookEditorProps) {
   const adapter = useMemo(
     () => getAdapter(minecraftVersion ?? '1.21.1', normalizeLoader(modLoader)),
     [minecraftVersion, modLoader],
@@ -69,6 +73,29 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   }, [onGuidedQuestClose])
   const toolbarApiRef = useRef<ToolbarAPI | null>(null)
   const history = useHistory()
+
+  // External handoff (s52 directed queue #1): a Pack Health finding asked to
+  // jump to a quest. Select + reveal that node, then ack so the workspace
+  // clears the pending jump. Two passes when the quest lives in a different
+  // chapter: switch activeChapter first; this effect re-runs once the chapter
+  // renders (activeChapter is a dep), then the canvas has the node to fly to.
+  useEffect(() => {
+    if (!focusQuestNode || !graph) return
+    const node = graph.nodes.find((n) => n.id === focusQuestNode)
+    if (!node) {
+      // The finding points at a quest that no longer exists (stale registry).
+      // Ack and drop — nothing to jump to, and a dangling jump would stick.
+      onFocusQuestNodeConsumed?.()
+      return
+    }
+    if (activeChapter !== node.chapter_id) {
+      setActiveChapter(node.chapter_id)
+      return
+    }
+    setSelectedNodeId(node.id)
+    toolbarApiRef.current?.focusNode?.(node.id)
+    onFocusQuestNodeConsumed?.()
+  }, [focusQuestNode, graph, activeChapter, setActiveChapter, setSelectedNodeId, onFocusQuestNodeConsumed])
 
   // Restore history steps that target this quest graph.
   useEffect(() => {

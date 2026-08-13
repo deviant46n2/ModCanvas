@@ -1,19 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
+import type { HealthItem } from '../../core/pack-health/types'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
 import { useBehaviorStore } from '../../core/behavior/behavior-store'
-import { makeGraph, makeNode, makeObjective, makeChapter } from '../../core/pack-health/test-fixtures'
+import { makeGraph, makeNode, makeObjective, makeChapter, makeReward } from '../../core/pack-health/test-fixtures'
 import { MIN_TRUSTED_REGISTRY_ITEMS } from '../../core/pack-health'
 
 const project = { name: 'Pack', description: 'Desc', author: 'Me', pack_version: '1.0.0' }
 
-function renderHealth(packLoaded = true) {
+function renderHealth(packLoaded = true, onJumpToFinding?: (item: HealthItem) => void) {
   return render(
     <PackHealthProvider project={project} packLoaded={packLoaded}>
-      <PackHealthTab />
+      <PackHealthTab onJumpToFinding={onJumpToFinding} />
     </PackHealthProvider>,
   )
 }
@@ -92,5 +93,42 @@ describe('PackHealthTab', () => {
     renderHealth()
     expect(screen.getByText('Ready to test')).toBeInTheDocument()
     expect(screen.getAllByText(/cover image/i).length).toBeGreaterThan(0)
+  })
+
+  it('offers a jump button on quest findings with a nodeId and forwards the finding', () => {
+    // A quest referencing an undefined reward table fires a blocking finding
+    // carrying target.nodeId (checks/quests/structure.ts:44-51) — no graph
+    // edges needed, so the fixture stays small.
+    usePackHealthStore.setState({
+      questGraph: makeGraph({
+        chapters: [makeChapter({ id: 'ch', title: 'Start' })],
+        nodes: [
+          makeNode({
+            id: 'q1',
+            chapter_id: 'ch',
+            label: 'Ghost Table Quest',
+            rewards: [makeReward({ table_id: 'ghost_table' })],
+          }),
+        ],
+      }),
+      itemRegistry: bigRegistry(),
+    })
+    const onJumpToFinding = vi.fn()
+    renderHealth(true, onJumpToFinding)
+    // Both findings (undefined reward table + missing item) carry nodeId q1 —
+    // each renders its own jump button; clicking either forwards the quest.
+    const jumps = screen.getAllByTitle('Go to the quest')
+    expect(jumps.length).toBeGreaterThan(0)
+    fireEvent.click(jumps[0])
+    expect(onJumpToFinding).toHaveBeenCalledTimes(1)
+    const received = onJumpToFinding.mock.calls[0][0] as HealthItem
+    expect(received.target?.section).toBe('quests')
+    expect(received.target?.nodeId).toBe('q1')
+  })
+
+  it('renders no jump button when the finding has no nodeId', () => {
+    usePackHealthStore.setState({ hasCoverImage: false }) // pack findings have no nodeId
+    renderHealth(true, vi.fn())
+    expect(screen.queryByTitle('Go to the quest')).toBeNull()
   })
 })
