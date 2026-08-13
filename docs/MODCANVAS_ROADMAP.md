@@ -222,6 +222,14 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
 
 ### 3.5 Documented-vs-code mismatches to correct in the docs
 
+The 2026-08-13 **critical product audit** (`docs/CRITICAL_PRODUCT_AUDIT.md` +
+`docs/CRITICAL_PRODUCT_ACTION_PLAN.md`, s52) re-verified §3.2 and §3.4 against
+the tree and corrected the stale rows directly (hot-swap freeze myth, CF
+export "bug" that was already fixed, the 300-line roster, ws_ipc test
+status) — see the audit's findings ledger. Remaining OPEN rulings (dead
+`core/sync/` layer, dead-end `analyze_quest_graph`, protocol dead items,
+Beginner Mode scope) live in that ledger, not here.
+
 All items in this list were fixed by the 2026-08-13 docs audit (`docs/audit-2026-08-13.md`),
 except where noted. The list is kept for the record of what the audit found; do not treat
 its entries as current drift.
