@@ -11,6 +11,8 @@ use std::path::Path;
 use crate::mod_intelligence::types::*;
 use crate::mod_intelligence::ModIntelligence;
 
+use super::version_url;
+
 /// The counted-download endpoint for a Modrinth version: redirects to the
 /// CDN and increments the author's counter. Direct CDN url fetches bypass it.
 pub(crate) fn modrinth_download_url(version_id: &str) -> String {
@@ -51,10 +53,7 @@ impl ModIntelligence {
         }
 
         // Fall back to fetching the latest version for this loader + MC version
-        let url = format!(
-            "{}/project/{}/version?loaders=[\"{}\"]&game_versions=[\"{}\"]",
-            MODRINTH_API, mod_id, loader_str, mc_version
-        );
+        let url = version_url(MODRINTH_API, mod_id, loader_str, mc_version);
         let resp = self.client.get(&url)
             .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()

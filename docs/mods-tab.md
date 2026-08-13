@@ -116,6 +116,16 @@ with the repo as contact). The prototype placeholder UA ("MMM/0.1.0
 API terms and can strip attribution. CurseForge downloads use the API-returned
 `downloadUrl` (the counted path); the raw-CDN fallback stays a last resort.
 
+**Version-list queries are percent-encoded (s49):** the version fetch
+(`GET /v2/project/{id}/version?loaders=...&game_versions=...`) builds its JSON
+filters through `version_url` (`mod_intelligence/modrinth.rs`), which
+percent-encodes them exactly like the search facets. Raw `["neoforge"]` in the
+query made the `url` crate encode only the quotes and leave raw brackets, and
+Modrinth returned **404 for every version fetch** — the s49 walkthrough
+finding: curated downloads and dependency resolution silently broke. Search
+always encoded (`urlencoding`); the version fetches now do too, and a
+regression test locks the encoded form.
+
 Notes: after installing, the jar is visible to Prism and the game immediately
 (next launch). Quest-editor textures/items for the new jar appear after the
 next Refresh / texture re-index (`scan_instance_textures` validates layer

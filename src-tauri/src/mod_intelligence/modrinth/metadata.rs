@@ -9,6 +9,8 @@ use crate::models::ModMetadata;
 use crate::mod_intelligence::types::*;
 use crate::mod_intelligence::ModIntelligence;
 
+use super::version_url;
+
 impl ModIntelligence {
     pub async fn get_mod_metadata(&self, mod_id: &str) -> anyhow::Result<Option<ModMetadata>> {
         let url = format!("{}/project/{}", MODRINTH_API, mod_id);
@@ -50,10 +52,7 @@ impl ModIntelligence {
         let project: ModrinthProject = resp.json().await?;
         let mut metadata: ModMetadata = project.into();
 
-        let versions_url = format!(
-            "{}/project/{}/version?loaders=[\"{}\"]&game_versions=[\"{}\"]",
-            MODRINTH_API, mod_id, loader_str, mc_version
-        );
+        let versions_url = version_url(MODRINTH_API, mod_id, loader_str, mc_version);
         let versions_resp = self.client.get(&versions_url)
             .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
@@ -180,10 +179,7 @@ impl ModIntelligence {
         let project: ModrinthProject = resp.json().await?;
         let mut metadata: ModMetadata = project.into();
 
-        let versions_url = format!(
-            "{}/project/{}/version?loaders=[\"{}\"]&game_versions=[\"{}\"]",
-            MODRINTH_API, mod_id, loader_str, mc_version
-        );
+        let versions_url = version_url(MODRINTH_API, mod_id, loader_str, mc_version);
         let versions_resp = client.get(&versions_url)
             .header("User-Agent", MODCANVAS_USER_AGENT)
             .send()
