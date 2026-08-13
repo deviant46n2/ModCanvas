@@ -22,13 +22,16 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const nodeWidth = pixelSize?.width || 180;
   const nodeHeight = pixelSize?.height || 120;
   // FTB shape tiles are always square, so size the tile off the node's smaller
-  // dimension regardless of the node box. The factor is calibrated against the
-  // in-game render by the maintainer's eye (2026-08-12) — CALIBRATION IN
-  // PROGRESS: every value from 0.8 to 1.8 read smaller than in-game; 1.8 still
-  // reads "way too small compared to the icon". The dial continues at the next
-  // session (2.0+ direction). The ICON does NOT scale with this factor: the
-  // maintainer calibrated the icon separately (see QuestTile.iconBaseSize).
-  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 1.8));
+  // dimension regardless of the node box. CALIBRATED 2026-08-13 (s51): factor
+  // 1.0 — the tile equals the quest body (36px for a 1.0x quest, icon 24px
+  // anchored to the same body). History: the 0.8 → 3.45 arc was BLIND — the
+  // node's flex column shrank the plate's height to ~30px at any factor > 1.0
+  // until flex-shrink: 0 landed in canvas-nodes.css (every "too small" read
+  // was the same clipped circle); once visible, 3.45 read "comically large"
+  // and the maintainer dialed down by eye to 1.0 — "closest to perfect we
+  // have ever been" against the in-game canvas. The ICON anchors to the body
+  // (iconBaseSize) and does NOT scale with this factor (QuestTile.iconBaseSize).
+  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 1.0));
   // The icon anchors to the quest BODY (unscaled by the plate factor) so plate
   // growth never inflates the icon — s49-followup, calibrated 2026-08-12.
   const iconBaseSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight)));

@@ -91,6 +91,16 @@
   border: 2px solid;
   position: relative;
   transition: box-shadow 0.15s;
+  /* flex-shrink: 0 — THE plate-size gate (2026-08-13). The quest node is a
+     small flex COLUMN (36px, the quest body); without this the wrap is a flex
+     item that flex-shrinks to fit the column, collapsing the plate's HEIGHT to
+     ~30px at any plate factor above 1.0 — the s50 calibration (0.8 → 3.45)
+     dialed a value that was clipped away every time ("nothing changed", icon
+     "breaking out": the 24px icon inside a ~30px circle). Both the icon and
+     the clip source derive from min(node)=36, so the icon:plate relation was
+     stuck at 0.667. The plate MUST overflow the node box — in-game quest
+     tiles overlap at 1-unit spacing. */
+  flex-shrink: 0;
 }
 
 /* Quest icon centered inside the shape */

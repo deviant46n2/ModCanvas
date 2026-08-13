@@ -183,11 +183,14 @@ Assets").
    `textureIndex` via `textureDisplayUrl` (usable index value, else the
    `getMaterialized` data URL) and passes the URLs to `quest-nodes.tsx`. When all
     layers resolve, `bakeShapeTile` (`shape-textures.ts`) rasterizes the whole
-    tile **once into a single square PNG at the node's display size** (1.8 of
-    the node's smaller dimension — eye-calibrated 2026-08-12, CALIBRATION IN
-    PROGRESS: 0.8 through 1.8 all read smaller than in-game; the dial continues
-    at the next session, 2.0+ direction, anchored to the maintainer's read that
-    the in-game tile is much larger relative to its icon): the white
+     tile **once into a single square PNG at the node's display size** (1.0 of
+     the node's smaller dimension — CALIBRATED 2026-08-13 (s51): the tile
+     equals the quest body; the maintainer dialed by eye against the in-game
+     canvas until "closest to perfect we have ever been". History: the 0.8 →
+     3.45 arc was BLIND — the node's flex column shrank the plate's height to
+     ~30px at any factor > 1.0 until `flex-shrink: 0` was added to
+     `.ftb-quest-shape-wrap` (canvas-nodes.css); every "too small" read was
+     the same clipped circle, and 3.45 read "comically large" once visible): the white
    `background.png` silhouette is filled ONCE via a `source-in` fill with a
    FLAT solid dark-grey plate — measured (63,63,70) across a 28px run of an
    in-game screenshot (2026-08-09); the game's plate has no gradient and no
