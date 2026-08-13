@@ -145,4 +145,63 @@ describe('WizardStepper', () => {
     )
     expect(screen.getByText('Create & continue')).toBeTruthy()
   })
+
+  it('reopening the wizard resets to a fresh session (no stale step or project)', async () => {
+    // s49 regression: the wizard stays mounted when hidden, so every open
+    // must reset — a previous session's step/project leaked into the next
+    // pick ("immediately step 3", "project not found" from a stale id).
+    const onGuidedQuest = vi.fn()
+    const { rerender } = render(
+      <WizardStepper
+        show
+        presetTemplateId="ide-tour"
+        postCreate
+        onClose={() => {}}
+        onCreate={vi.fn().mockResolvedValue(created)}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+        packLoaded={false}
+        onDone={() => {}}
+        onGuidedQuest={onGuidedQuest}
+      />,
+    )
+
+    // Advance to the curated step (create), then to the guided-quest step.
+    fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
+    fireEvent.click(screen.getByText('Create & continue'))
+    await waitFor(() => expect(createMcInstance).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByText('Skip'))
+    expect(screen.getByText('Add my first quest')).toBeTruthy()
+
+    // Close and reopen — must land on step 1 with an empty name.
+    rerender(
+      <WizardStepper
+        show={false}
+        presetTemplateId="ide-tour"
+        postCreate
+        onClose={() => {}}
+        onCreate={vi.fn().mockResolvedValue(created)}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+        packLoaded={false}
+        onDone={() => {}}
+        onGuidedQuest={vi.fn()}
+      />,
+    )
+    rerender(
+      <WizardStepper
+        show
+        presetTemplateId="ide-tour"
+        postCreate
+        onClose={() => {}}
+        onCreate={vi.fn().mockResolvedValue(created)}
+        onRefresh={vi.fn().mockResolvedValue(undefined)}
+        packLoaded={false}
+        onDone={() => {}}
+        onGuidedQuest={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByPlaceholderText('My First Pack')).toBeTruthy())
+    expect((screen.getByPlaceholderText('My First Pack') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByText('Add my first quest')).toBeNull()
+  })
 })

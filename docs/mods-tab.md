@@ -106,15 +106,20 @@ into a category search would make the filter look broken.
    the project's mod list and shows a success/error toast. Per-row buttons
    switch to a disabled "Installing..." state while the download runs.
 
-**Author attribution (s48):** every download must count toward the author's
-stats. Modrinth downloads route through the counted endpoint
-(`GET /v2/version/{id}/download` — `modrinth_download_url`), never the raw CDN
-`file.url`, and every registry/CDN request carries the real User-Agent
-(`MODCANVAS_USER_AGENT` in `mod_intelligence/types.rs` — `ModCanvas/<version>`
-with the repo as contact). The prototype placeholder UA ("MMM/0.1.0
-(contact@example.com)") was removed — a placeholder UA both violates Modrinth's
-API terms and can strip attribution. CurseForge downloads use the API-returned
-`downloadUrl` (the counted path); the raw-CDN fallback stays a last resort.
+**Author attribution (s48, s49 fallback):** Modrinth downloads route through
+the counted endpoint (`GET /v2/version/{id}/download` — `modrinth_download_url`)
+**with a CDN fallback**: when the counted endpoint fails (s49: Modrinth removed
+it from their OpenAPI spec and it 404s for every id), the download falls back
+to the version's primary CDN file URL from `files[].url`, which still serves.
+Attribution is best-effort, never a hard dependency — the app never silently
+fails a download over attribution. Order is locked by test
+(`download_urls_prefer_counted_then_cdn_fallback`). Every registry/CDN request
+carries the real User-Agent (`MODCANVAS_USER_AGENT` in
+`mod_intelligence/types.rs` — `ModCanvas/<version>` with the repo as contact).
+The prototype placeholder UA ("MMM/0.1.0 (contact@example.com)") was removed —
+a placeholder UA both violates Modrinth's API terms and can strip attribution.
+CurseForge downloads use the API-returned `downloadUrl` (the counted path);
+the raw-CDN fallback stays a last resort.
 
 **Version-list queries are percent-encoded (s49):** the version fetch
 (`GET /v2/project/{id}/version?loaders=...&game_versions=...`) builds its JSON

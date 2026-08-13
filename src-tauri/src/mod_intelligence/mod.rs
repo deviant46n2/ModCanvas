@@ -54,6 +54,26 @@ impl ModIntelligence {
 
         Ok(file_path.to_string_lossy().to_string())
     }
+
+    /// Try each URL in order, first success wins. The counted-download
+    /// endpoint is preferred for author attribution, but if it fails (s49:
+    /// Modrinth removed `/version/{id}/download` from their spec and it 404s
+    /// for every id) we fall back to the version's CDN file URL, which still
+    /// works. All URLs failing is a real error — never silently empty.
+    pub(crate) async fn download_file_first_working(
+        &self,
+        urls: &[&str],
+        dest_dir: &Path,
+    ) -> anyhow::Result<String> {
+        let mut last_err: Option<anyhow::Error> = None;
+        for url in urls {
+            match self.download_file(url, dest_dir).await {
+                Ok(path) => return Ok(path),
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no download URLs provided")))
+    }
 }
 
 /// Keep only safe filename characters and reject anything that could traverse

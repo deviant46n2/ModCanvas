@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   createMcInstance,
   resolveLoaderVersion,
@@ -67,6 +67,19 @@ export function WizardStepper({
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<Project | null>(null)
+
+  // The wizard stays mounted (returns null when hidden), so every open MUST
+  // reset to a fresh session — otherwise the next pick reopens at the stale
+  // step with the stale project (s49: "immediately step 3", "project not
+  // found" on the curated step from a previous session's project id).
+  useEffect(() => {
+    if (!show) return
+    setStep(1)
+    setName('')
+    setCreating(false)
+    setError(null)
+    setProject(null)
+  }, [show])
 
   async function handleCreate() {
     if (!name.trim()) return
