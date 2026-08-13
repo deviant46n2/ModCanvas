@@ -125,8 +125,8 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:85`; `scriptgen/`; `recipe_disable/mod.rs` |
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
 | Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `commands/modpack/search_merge.rs` (s33) |
-| Pack Health | **Implemented (Tier 1)** — go/no-go, 3 honest states, pure derivation | `core/pack-health/index.ts:77`; `PackHealthTab.tsx:80`; `checks/{quests,recipes,pack}.ts` |
-| Loot tab | **MVP (s44)** — read-only scan + list + detail (pack data + mod jars, both `loot_table`/`loot_tables` dirs, full-path ids); editor not built | `components/loot/LootTab.tsx`; `services/loot.ts`; `hooks/useLootTables.ts`; `src-tauri/src/loot/` (`parse.rs` pure, `pack_scan.rs` walker); roadmap §13 P3-LOOT |
+| Pack Health | **Implemented (Tier 1)** — go/no-go, 3 honest states, pure derivation | `core/pack-health/index.ts:128`; `PackHealthTab.tsx:80`; `checks/{quests,recipes,pack}.ts` |
+| Loot tab | **Implemented (s44 scan, s47 editor)** — scan + list + detail (pack data + mod jars, both `loot_table`/`loot_tables` dirs, full-path ids); full-depth editor, verbatim atomic save, new-table creation (see §13 P3-LOOT) | `components/loot/LootTab.tsx`; `services/loot.ts`; `hooks/useLootTables.ts`; `src-tauri/src/loot/` (`parse.rs` pure, `pack_scan.rs` walker, `editor.rs`, `create.rs`); roadmap §13 P3-LOOT |
 | History / undo | **Implemented** — durable journal, timeline drawer | `core/history/store.ts:86`; `HistoryDrawer.tsx`; `commands/history.rs:11` |
 | Pack lifecycle | **Implemented** — create/load/list/save/delete, import mrpack/CF/packwiz/instance | `commands/project.rs`; `imports/mod.rs` |
 | Launch | **Implemented** — Test → Prism via `LauncherDriver`, companion deploy | `launcher.rs`; `minecraft/launch.rs:11`; `launch_mc_instance` |
