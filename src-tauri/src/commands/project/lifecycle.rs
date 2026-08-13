@@ -145,3 +145,28 @@ pub async fn save_project(
     // This command exists as an explicit save point for the frontend
     Ok(())
 }
+
+/// Open the pack's user-writable texture folder in the system file manager:
+/// `<instance>/kubejs/assets` — the folder the texture index scans for
+/// self-authored PNGs (instance_textures/index.rs). The folder is created if
+/// missing so a first-time user gets a working drop-target (s49: the
+/// decorations library's "add your own assets" path was invisible before).
+#[tauri::command]
+pub fn open_assets_folder(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+    project_id: String,
+) -> Result<(), String> {
+    use tauri_plugin_shell::ShellExt;
+    let id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let project = db
+        .get_project(&id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+    let assets = std::path::Path::new(&project.path).join("kubejs").join("assets");
+    std::fs::create_dir_all(&assets)
+        .map_err(|e| format!("Failed to create assets folder: {e}"))?;
+    app.shell()
+        .open(assets.to_string_lossy().to_string(), None)
+        .map_err(|e| format!("Failed to open assets folder: {e}"))
+}

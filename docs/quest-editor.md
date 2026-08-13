@@ -345,6 +345,19 @@ the in-game quest editor's placement behavior:
 - **Overlay placement** — the add buttons float top-left; the bottom-left
   corner is ReactFlow's zoom/fit Controls, so the buttons never cover them.
 
+## Decorations library & the assets folder (s49)
+
+- The decorations panel's **+ Library** browses the pack's texture index
+  (jars, resource packs, and `<instance>/kubejs/assets` — the one folder a
+  user writes PNGs into).
+- **Open folder** (in the library header) opens that folder in the system
+  file manager via `open_assets_folder` (commands/project/lifecycle.rs): it
+  resolves the project path, creates `kubejs/assets` if missing, and opens
+  it. Dropping PNGs there makes them searchable in the library after the next
+  texture scan.
+- Wired `QuestBookEditor → QuestEditorLayout → QuestCanvas → CanvasArea →
+  DecorationPanel`; the callback calls `services/open-assets-folder.ts`.
+
 ## Data flow
 
 - `src-tauri/src/quest/types/graph.rs` — `QuestGraph.grid_scale` (default 0.5).

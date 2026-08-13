@@ -12,6 +12,9 @@ interface DecorationPanelProps {
   selectedIndex: number | null;
   onAddImage: (key: string) => void;
   onChangeImages: (images: ChapterImage[]) => void;
+  /** Open the pack's user-writable texture folder (kubejs/assets) so a user
+   *  can drop in their own PNGs and see them in the library (s49). */
+  onOpenAssetsFolder: () => void;
 }
 
 const THUMB_LIMIT = 200;
@@ -46,6 +49,7 @@ export function DecorationPanel({
   selectedIndex,
   onAddImage,
   onChangeImages,
+  onOpenAssetsFolder,
 }: DecorationPanelProps) {
   const [query, setQuery] = useState('');
   const [showPicker, setShowPicker] = useState(false);
@@ -80,12 +84,21 @@ export function DecorationPanel({
 
       {showPicker && (
         <div className="quest-deco-library">
-          <input
-            className="quest-deco-search"
-            placeholder="Search pack textures…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="quest-deco-library-header">
+            <input
+              className="quest-deco-search"
+              placeholder="Search pack textures…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              className="toolbar-btn quest-deco-open-folder"
+              onClick={onOpenAssetsFolder}
+              title="Open the assets folder — drop PNGs in there to add them to this library"
+            >
+              Open folder
+            </button>
+          </div>
           <div className="quest-deco-thumb-grid">
             {candidates.map((c) => (
               <button

@@ -28,6 +28,7 @@ interface QuestEditorLayoutProps {
   projectId: string
   projectPath?: string
   instancePath: string
+  onOpenAssetsFolder: () => void
   packLoaded?: boolean
   wsConnected?: boolean
   isTesting?: boolean
@@ -179,6 +180,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onAddNode={props.onAddQuest}
             onAddLink={props.onAddQuestLink}
             onAddQuestWithTask={props.onAddQuestWithTask}
+            onOpenAssetsFolder={props.onOpenAssetsFolder}
             onUpdateChapterImages={props.onUpdateChapterImages}
             selectedNodeId={props.selectedNodeId}
             setSelectedNodeId={props.setSelectedNodeId}

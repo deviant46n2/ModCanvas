@@ -107,6 +107,22 @@
   gap: 8px;
 }
 
+.quest-deco-library-header {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.quest-deco-library-header .quest-deco-search {
+  flex: 1;
+}
+
+.quest-deco-open-folder {
+  white-space: nowrap;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .quest-deco-search {
   width: 100%;
   box-sizing: border-box;

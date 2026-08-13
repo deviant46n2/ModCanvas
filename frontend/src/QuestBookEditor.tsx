@@ -5,6 +5,7 @@ import type { QuestGraphData } from './services/quest-types'
 import type { IngestResult } from './services/quest-types'
 import type { ItemTagInfo } from './services/quest-types'
 import { listItemTags } from './services/recipes'
+import { openAssetsFolder } from './services/open-assets-folder'
 import { QuestBookSkeleton } from './components/quest/QuestBookSkeleton'
 import type { ToolbarAPI } from './components/quest/import-export'
 import { getAdapter } from './adapters'
@@ -239,6 +240,7 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       projectId={projectId}
       projectPath={projectPath}
       instancePath={instancePath}
+      onOpenAssetsFolder={() => openAssetsFolder(projectId)}
       packLoaded={packLoaded}
       wsConnected={wsConnected}
       isTesting={isTesting}

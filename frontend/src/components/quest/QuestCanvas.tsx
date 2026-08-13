@@ -38,6 +38,7 @@ interface QuestCanvasProps {
   onAddNode: (chapterId: string, position?: { x: number; y: number }, count?: number) => void;
   onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void;
   onAddQuestWithTask?: (chapterId: string, objectiveType: string, position?: { x: number; y: number }) => void;
+  onOpenAssetsFolder: () => void;
   onUpdateChapterImages: (chapterId: string, images: ChapterImage[]) => void;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
@@ -80,6 +81,7 @@ function QuestCanvasInner({
   onAddNode,
   onAddLink,
   onAddQuestWithTask,
+  onOpenAssetsFolder,
   onUpdateChapterImages,
   selectedNodeId: _selectedNodeId,
   setSelectedNodeId,
@@ -267,6 +269,7 @@ function QuestCanvasInner({
         onDeleteEdge={onDeleteEdge} setSelectedEdgeId={setSelectedEdgeId}
         nodeLabelById={nodeLabelById}
         selectedDecoIndex={selectedDecoIndex} onSelectDeco={setSelectedDecoIndex}
+        onOpenAssetsFolder={onOpenAssetsFolder}
         onChangeDecorations={activeChapter ? (imgs) => onUpdateChapterImages(activeChapter, imgs) : () => {}}
       />
     </div>

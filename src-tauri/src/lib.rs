@@ -141,6 +141,7 @@ pub fn run() {
             commands::list_project_templates,
             commands::list_projects,
             commands::delete_project,
+            commands::open_assets_folder,
             commands::add_mod,
             commands::remove_mod,
             commands::get_project_mods,

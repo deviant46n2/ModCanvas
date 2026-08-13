@@ -83,6 +83,7 @@ interface CanvasAreaProps {
   nodeLabelById: (id: string) => string
   selectedDecoIndex: number | null
   onSelectDeco: (index: number | null) => void
+  onOpenAssetsFolder: () => void
   onChangeDecorations: (images: ChapterImage[]) => void
 }
 
@@ -102,7 +103,7 @@ export function CanvasArea({
   showShortcuts, onCloseShortcuts, activeChapter, onAddNode, onAddLink,
   selectedEdge,
   onDeleteEdge, setSelectedEdgeId, nodeLabelById, selectedDecoIndex,
-  onSelectDeco, onChangeDecorations,
+  onSelectDeco, onChangeDecorations, onOpenAssetsFolder,
 }: CanvasAreaProps) {
   return (
     <div className={`quest-canvas-wrapper${questBackgroundUrl ? ' has-backdrop' : ''}${connectMode ? ' connect-mode' : ''}`}>
@@ -256,6 +257,7 @@ export function CanvasArea({
               onChangeDecorations([...activeChapterImages, defaultDecorationImage(key)])
             }
             onChangeImages={onChangeDecorations}
+            onOpenAssetsFolder={onOpenAssetsFolder}
           />
         </>
       )}
