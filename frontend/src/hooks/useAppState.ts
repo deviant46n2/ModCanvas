@@ -5,9 +5,9 @@ import { useModState } from './useModState'
 import { useConfigState } from './useConfigState'
 import { useLaunchState } from './useLaunchState'
 import { useBeginnerMode } from './useBeginnerMode'
-import { useFirstBootRouting } from './useFirstBootRouting'
 import type { LoadPackProgress, CreateProjectInput } from '../services/types'
 import { usePackIo } from './use-pack-io'
+import type { StartIntent } from '../components/common/StartChooser'
 import {
   type AppTab,
   subscribePackProgress,
@@ -43,6 +43,10 @@ export function useAppState() {
   const [showLeavePack, setShowLeavePack] = useState(false)
   // Settings modal (CurseForge API key).
   const [showSettings, setShowSettings] = useState(false)
+  // StartChooser (s49): the four-card front door. The picked intent drives the
+  // wizard's template preset + post-create steps + the beginner-mode landing.
+  const [showStartChooser, setShowStartChooser] = useState(false)
+  const [startIntent, setStartIntent] = useState<StartIntent | null>(null)
   const autoReopenDone = useRef(false)
 
   // Listen for granular progress events emitted by the backend during ingest
@@ -101,6 +105,22 @@ export function useAppState() {
     setActiveTab('mods')
     await openPack(project)
     return project
+  }
+
+  /** StartChooser pick (s49): record the intent and open the wizard. Blank and
+   *  load close the chooser — blank lands in the IDE via the wizard's skip. */
+  function pickStart(intent: StartIntent) {
+    setStartIntent(intent)
+    setShowStartChooser(false)
+    if (intent.kind === 'load') return
+    setShowWizard(true)
+  }
+
+  /** Wizard Done (s49 mode-per-choice): intro lands in Beginner Mode; IDE-tour
+   *  and blank land with the full IDE on. The toggle stays in the topbar. */
+  function handleWizardDone() {
+    setBeginnerMode(startIntent?.kind === 'intro')
+    setShowWizard(false)
   }
 
   /** Dismiss the load modal. If a fresh open failed, also leave the workspace. */
@@ -196,16 +216,6 @@ export function useAppState() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectState.projects])
 
-  // First-boot routing: a brand-new install (no projects, first_boot_seen
-  // unset) gets the First-Pack wizard auto-opened instead of a passive
-  // "No projects yet" launcher. Guarded in useFirstBootRouting (one-shot,
-  // waits for a successful load, never re-triggers).
-  useFirstBootRouting(
-    projectState.projectsLoaded,
-    projectState.projects.length,
-    () => setShowWizard(true),
-  )
-
   // Drag-and-drop pack import: the native dialog can hang on some Wayland
   // setups, so dropping a pack file onto the window is a reliable alternative.
   // Tauri's drag-drop event carries real absolute paths (unlike a hidden
@@ -279,6 +289,9 @@ export function useAppState() {
     showLeavePack,
     requestClosePack,
     showSettings, setShowSettings,
+    showStartChooser, setShowStartChooser,
+    pickStart, startIntent,
+    handleWizardDone,
     saveAndClosePack,
     discardAndClosePack,
     cancelLeavePack,

@@ -31,9 +31,8 @@ export function useProjectState() {
   const [confirmCloseProject, setConfirmCloseProject] = useState(false)
   // True once listProjects() has SUCCEEDED (success path only). The launcher
   // boots with an empty list, so `projects.length === 0` is ambiguous until
-  // this flips — first-boot routing waits on it and must not fire on a
-  // failed load (which would wrongly open the wizard for a user whose
-  // projects just failed to list).
+  // this flips — the empty-state "no projects yet" prompt must not flash for
+  // a user whose projects just failed to list.
   const [projectsLoaded, setProjectsLoaded] = useState(false)
 
   function persistSelection(id: string | null) {

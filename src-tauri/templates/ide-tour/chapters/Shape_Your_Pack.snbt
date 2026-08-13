@@ -1,7 +1,7 @@
 {
     id = "100000000000002"
     filename = "Shape_Your_Pack"
-    title = "Shape Your Pack"
+    title = "IDE Tour"
     order_index = 1
     quests = [
         {
@@ -279,7 +279,7 @@
             x = 20.0d
             y = -4.0d
             title = "Beginner Mode"
-            description = ["You're in Beginner Mode right now — the top bar toggle reads Beginner mode: on.", "Beginner Mode hides the code-shaped surfaces: the raw config textarea and the generated script preview, so a first-timer never trips on code.", "Flip the toggle off to see the full IDE, then back on. Check me off when you know where the switch lives."]
+            description = ["Beginner Mode is the app's training-wheels switch: it hides the code-shaped surfaces — the raw config textarea and the generated script preview — so a first-timer never trips on code.", "You're in the full IDE right now (the top bar toggle reads Beginner mode: off).", "Flip the toggle on to see the reduced view, then back off. Check me off when you know where the switch lives."]
             icon = "minecraft:compass"
             dependencies = ["1000000000000202"]
             tasks = [
@@ -302,6 +302,22 @@
             ]
             rewards = [
                 { id = "3000000000000220", type = "xp", xp = 150 }
+            ]
+        }
+        {
+            id = "1000000000000221"
+            x = 40.0d
+            y = 0.0d
+            title = "Shed the Guide"
+            description = ["You've walked the whole workbench: quests, recipes, configs, behaviors, loot, mods, health, launch, export. This chapter was the training wheels.", "Your pack is now yours — this tour doesn't belong in it.", "Delete this chapter: hover over it in the chapter tree on the left, click the gear icon, then Delete Chapter.", "It's the last lesson: every guide is meant to be removed. Check me off when the chapter is gone."]
+            icon = "minecraft:compass"
+            shape = "rsquare"
+            dependencies = ["1000000000000210"]
+            tasks = [
+                { id = "2000000000000221", type = "checkmark", title = "Delete this chapter" }
+            ]
+            rewards = [
+                { id = "3000000000000221", type = "xp", xp = 500 }
             ]
         }
     ]

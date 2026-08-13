@@ -6,8 +6,7 @@ import {
   resolveLoaderVersion,
   type MinecraftInstance,
 } from '../../services/instances'
-import { listProjectTemplates } from '../../services/project'
-import type { CreateProjectInput, Project, ProjectTemplate } from '../../services/types'
+import type { CreateProjectInput, Project } from '../../services/types'
 import { CuratedModsStep } from './CuratedModsStep'
 import { GuidedQuestStep } from './GuidedQuestStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
@@ -18,6 +17,12 @@ export type { CreateProjectInput } from '../../services/types'
 interface WizardStepperProps {
   show: boolean
   onClose: () => void
+  /** The template the StartChooser picked; null for a blank pack. The wizard
+   *  no longer offers a template step — that decision lives in the chooser. */
+  presetTemplateId: string | null
+  /** Run the post-create steps (curated mods, guided quest, green check).
+   *  Blank starts skip them and land straight in the IDE. */
+  postCreate: boolean
   /** Create + open the pack (the App runs the load pipeline). Resolves with
    *  the created project so the wizard can continue to its post-create steps;
    *  throws on failure so the wizard stays open and shows why. */
@@ -37,21 +42,24 @@ type Mode = WizardMode
 
 const STEP_LABELS: Record<number, string> = {
   1: 'where your pack lives',
-  2: 'what it is about',
-  3: 'review and create',
-  4: 'some mods to start',
-  5: 'add your first quest',
-  6: 'green check',
+  2: 'review and create',
+  3: 'some mods to start',
+  4: 'add your first quest',
+  5: 'green check',
 }
 
 /**
- * The First-Pack wizard (roadmap P0-WIZARD, §9.3). Steps 1-2 have zero side
+ * The First-Pack wizard (roadmap P0-WIZARD, §9.3). Step 1 has zero side
  * effects — nothing is written until Create — so closing the wizard at any
  * point strands nobody. After Create the pack loads underneath the wizard and
- * steps 4-5 (curated mods, green check + launch) run against the live pack.
+ * the post-create steps (curated mods, guided quest, green check + launch)
+ * run against the live pack — unless `postCreate` is false (a blank start),
+ * which lands straight in the IDE.
  */
 export function WizardStepper({
   show,
+  presetTemplateId,
+  postCreate,
   onClose,
   onCreate,
   onRefresh,
@@ -62,9 +70,7 @@ export function WizardStepper({
   const [step, setStep] = useState(1)
   const [mode, setMode] = useState<Mode>('instance')
   const [instances, setInstances] = useState<MinecraftInstance[] | null>(null)
-  const [templates, setTemplates] = useState<ProjectTemplate[] | null>(null)
   const [instanceId, setInstanceId] = useState<string | null>(null)
-  const [templateId, setTemplateId] = useState('')
   const [scratch, setScratch] = useState({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,20 +81,16 @@ export function WizardStepper({
     setStep(1)
     setMode('instance')
     setInstanceId(null)
-    setTemplateId('')
     setScratch({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
     setError(null)
     setCreating(false)
     setProject(null)
     setInstances(null)
-    setTemplates(null)
     listMcInstances().then(setInstances).catch((e) => setError(String(e)))
-    listProjectTemplates().then(setTemplates).catch((e) => setError(String(e)))
   }, [show])
 
   const candidates = instances ? wizardCandidates(instances) : []
   const instance = candidates.find((i) => i.id === instanceId) ?? null
-  const template = templates?.find((t) => t.id === templateId) ?? null
 
   function buildInput(): CreateProjectInput {
     if (mode === 'instance' && instance) {
@@ -97,18 +99,18 @@ export function WizardStepper({
         mcVersion: instance.mc_version,
         modLoader: instance.loader,
         path: instance.game_dir,
-        templateId: templateId === '' ? null : templateId,
+        templateId: presetTemplateId,
       }
     }
     // 'new' mode has no path yet — the instance is created at the commit
-    // point (step 3) and buildInput is only used for the review display.
+    // point (step 2) and buildInput is only used for the review display.
     if (mode === 'new') {
       return {
         name: scratch.name,
         mcVersion: '1.21.1',
         modLoader: 'NeoForge',
         path: 'New Prism instance',
-        templateId: templateId === '' ? null : templateId,
+        templateId: presetTemplateId,
       }
     }
     return {
@@ -116,7 +118,7 @@ export function WizardStepper({
       mcVersion: scratch.mcVersion,
       modLoader: scratch.modLoader,
       path: `~/modpacks/${scratch.name.toLowerCase().replace(/\s+/g, '-')}`,
-      templateId: templateId === '' ? null : templateId,
+      templateId: presetTemplateId,
     }
   }
 
@@ -146,13 +148,18 @@ export function WizardStepper({
           mcVersion: '1.21.1',
           modLoader: 'NeoForge',
           path: mcInstance.game_dir,
-          templateId: templateId === '' ? null : templateId,
+          templateId: presetTemplateId,
         })
       } else {
         created = await onCreate(buildInput())
       }
       setProject(created)
-      setStep(4)
+      // Blank starts skip the post-create steps and land straight in the IDE.
+      if (!postCreate) {
+        onDone()
+      } else {
+        setStep(3)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -162,21 +169,12 @@ export function WizardStepper({
 
   if (!show) return null
 
-  const card = (active: boolean) => ({
-    padding: '12px',
-    border: active ? '2px solid var(--color-accent)' : '1px solid var(--color-border-default)',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    background: 'var(--color-bg-surface-1)',
-    marginBottom: '8px',
-  } as const)
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of 6 — {STEP_LABELS[step]}
+          Step {step} of {postCreate ? 5 : 2} — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -199,28 +197,6 @@ export function WizardStepper({
         )}
 
         {step === 2 && (
-          <>
-            <div style={{ color: 'var(--color-text-secondary)', fontSize: 14, marginBottom: 10 }}>
-              Pick a starting point for <strong>{mode === 'instance' ? instance?.name : scratch.name}</strong>.
-              Templates add a starter quest book — you can always edit or delete it later.
-            </div>
-            {templates === null && <div style={{ color: 'var(--color-text-tertiary)' }}>Loading templates…</div>}
-            {templates?.map((t) => (
-              <div key={t.id} style={card(templateId === t.id)} onClick={() => setTemplateId(t.id)}>
-                <strong>{t.name}</strong>
-                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{t.description}</div>
-              </div>
-            ))}
-            <div style={card(templateId === '')} onClick={() => setTemplateId('')}>
-              <strong>Start empty</strong>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                No starter content — add quests, recipes, and configs yourself.
-              </div>
-            </div>
-          </>
-        )}
-
-        {step === 3 && (
           <div style={{ fontSize: 14 }}>
             <div style={{ marginBottom: 8 }}>
               <div style={{ color: 'var(--color-text-tertiary)' }}>Name</div>
@@ -238,27 +214,33 @@ export function WizardStepper({
             </div>
             <div>
               <div style={{ color: 'var(--color-text-tertiary)' }}>Starting point</div>
-              <strong>{template ? template.name : 'Empty pack'}</strong>
+              <strong>
+                {presetTemplateId === 'intro'
+                  ? 'Intro template'
+                  : presetTemplateId === 'ide-tour'
+                    ? 'IDE tour template'
+                    : 'Empty pack'}
+              </strong>
             </div>
           </div>
         )}
 
-        {step === 4 && project && (
+        {step === 3 && project && (
           <CuratedModsStep
             project={project}
             onRefresh={onRefresh}
-            onContinue={() => setStep(5)}
+            onContinue={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && project && (
+          <GuidedQuestStep
+            onAdd={onGuidedQuest}
+            onSkip={() => setStep(5)}
           />
         )}
 
         {step === 5 && project && (
-          <GuidedQuestStep
-            onAdd={onGuidedQuest}
-            onSkip={() => setStep(6)}
-          />
-        )}
-
-        {step === 6 && project && (
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}
@@ -269,16 +251,13 @@ export function WizardStepper({
 
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
-          {step > 1 && step < 4 && (
+          {step > 1 && step < 3 && (
             <button className="btn-secondary" onClick={() => setStep(step - 1)} disabled={creating}>Back</button>
           )}
           {step === 1 && (
             <button className="btn-primary" onClick={() => setStep(2)} disabled={!step1Complete}>Next</button>
           )}
           {step === 2 && (
-            <button className="btn-primary" onClick={() => setStep(3)}>Next</button>
-          )}
-          {step === 3 && (
             <button className="btn-primary" onClick={handleCreate} disabled={creating}>
               {creating ? 'Creating…' : 'Create & continue'}
             </button>

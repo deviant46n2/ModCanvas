@@ -1,0 +1,4 @@
+{
+    version = 13
+    default_quest_shape = "circle"
+}

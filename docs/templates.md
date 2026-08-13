@@ -1,8 +1,23 @@
-# Templates — First-Pack wizard content packages
+# Templates — first-pack content packages
 
-Templates are self-authored starter content that the First-Pack wizard (roadmap
-P0-WIZARD) scaffolds into a new project on creation. They exist so a beginner
-creates a *coherent* pack, not an empty directory.
+Templates are self-authored starter content that a start path scaffolds into a
+new project on creation. They exist so a new pack is a *coherent* pack, not an
+empty directory.
+
+## The shipped templates (s49)
+
+The registry ships two templates, both consumed by the four-card StartChooser
+(`frontend/src/components/common/StartChooser.tsx`):
+
+| id | Name | What it scaffolds |
+|---|---|---|
+| `intro` | Intro — your first pack in minutes | One chapter, 6 quests: the core loop (workbench → add quest → task+reward → save → health) + a final **Shed the Guide** quest that teaches deleting the chapter. Lands in Beginner Mode. No behaviors state. |
+| `ide-tour` | IDE Tour — learn every tool | One chapter, 21 quests: the full feature walkthrough (quests, recipes, configs, behaviors, loot, mods, health, launch, export) + **Shed the Guide**. Pure tool teaching — no play chapter. Ships 3 example behaviors (both backends). |
+
+Both end with **Shed the Guide** — a self-removing lesson: the last quest of a
+guided start teaches the user to delete the guide chapter, converging a guided
+start to the same result as a blank one (gear icon in the chapter tree →
+Delete Chapter, `ChapterSettings.tsx`).
 
 ## Where templates live
 
@@ -10,18 +25,19 @@ creates a *coherent* pack, not an empty directory.
   `src/`, so the integrity line-limit scan (`lineLimitPaths` in
   `integrity-rules.json`) treats them as data, not code.
 - **Registry:** `src-tauri/src/templates/mod.rs` — the `TEMPLATES` const array.
-  Each entry is a `TemplateMeta { id, name, description, files }`, where
-  `files` maps a relative path to content embedded at compile time via
-  `include_str!`.
-- **The only ids that exist are the ids in the registry.** The frontend never
-  hardcodes a template list; it asks `list_project_templates` (which returns
-  `{id, name, description}`).
+  Each entry is a `TemplateMeta { id, name, description, files, state_files }`,
+  where `files` maps a relative path to content embedded at compile time via
+  `include_str!`, and `state_files` maps project-root private state (e.g.
+  `.modcanvas/behaviors.json`).
+- **The only ids that exist are the ids in the registry.** The chooser's two
+  template cards pass the ids `intro` and `ide-tour`; adding a third template
+  means a third card + a registry entry, never a hardcoded content list.
 
 ## The scaffold
 
 `create_project` (with `template_id: Some(id)`) calls
 `crate::templates::scaffold_template(&path, &id)` in the same command — there
-is never a "created but empty" state. The modal passes `None` and behaves
+is never a "created but empty" state. A blank start passes `None` and behaves
 exactly as before.
 
 Each file is written to `<project>/config/ftbquests/quests/<rel>` through:

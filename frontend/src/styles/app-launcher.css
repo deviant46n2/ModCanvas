@@ -228,3 +228,13 @@
   color: var(--color-text-tertiary);
 }
 
+
+/* StartChooser (s49) — four-card front door at the launcher's New Pack
+   entry. Cards match the wizard's inline card pattern; icons inherit the
+   secondary text color and align to the title's cap height. */
+.start-chooser-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-text-secondary);
+}

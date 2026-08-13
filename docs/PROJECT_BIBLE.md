@@ -257,12 +257,18 @@ The panel's power is that tiers 1–2 are *true*. Every step of scope creep towa
 
 ### 10.2 First-Pack wizard flow
 
+The start is a **user choice, not detection** (s49): a four-card StartChooser
+offers Intro (guided, ends in Beginner Mode), IDE Tour (feature walkthrough,
+full IDE), Blank (empty pack, straight to the IDE), and Load (existing
+projects). The chooser owns the template decision; the wizard runs from there:
+
 1. **Instance** — detect Prism installs, offer existing instances or "browse for folder." Never create instances from scratch (out of scope).
-2. **What's your pack about?** — one plain-language question (vibe, not mod list). The hook for scaffolding.
-3. **The template** — a content skeleton: starter quest chapters, suggested mods, default config profile. Coherent by default; user may break it later.
-4. **Curated mod picks (optional)** — a short "these go well together" list, defaults pre-checked. Not a 10k-item browser.
-5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest." The zero-code proof point, emitted as real SNBT.
-6. **The green check** — diagnostics pass, one button: **Launch** (delegated to Prism via Test).
+2. **Review & create** — the picked template (or empty) is reviewed and committed.
+3. **Curated mod picks (optional)** — a short "these go well together" list, defaults pre-checked. Not a 10k-item browser.
+4. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest." The zero-code proof point, emitted as real SNBT.
+5. **The green check** — diagnostics pass, one button: **Launch** (delegated to Prism via Test).
+
+Blank starts skip steps 3–5 and land in the IDE immediately.
 
 ### 10.3 Template commit level
 

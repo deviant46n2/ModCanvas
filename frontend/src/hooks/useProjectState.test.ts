@@ -95,7 +95,7 @@ describe('useProjectState', () => {
       mcVersion: '1.21.1',
       modLoader: 'NeoForge',
       path: '~/modpacks/new-pack',
-      templateId: 'exploration',
+      templateId: 'ide-tour',
     }
 
     await act(async () => {
@@ -103,7 +103,7 @@ describe('useProjectState', () => {
       expect(returned.id).toBe('p9')
     })
     expect(createProject).toHaveBeenCalledWith(
-      'New Pack', '1.21.1', 'NeoForge', '~/modpacks/new-pack', 'exploration',
+      'New Pack', '1.21.1', 'NeoForge', '~/modpacks/new-pack', 'ide-tour',
     )
     expect(result.current.selectedProject?.id).toBe('p9')
     expect(result.current.openProject).toBeNull()

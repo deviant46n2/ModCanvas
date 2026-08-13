@@ -137,10 +137,10 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3).** `WizardStepper.tsx`: instance pick or start-from-scratch → template pick → review → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). `create_project` scaffolds template packages. Step 5 (guided first quest) lands with P0-MINIWIZ. |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: instance pick or start-from-scratch → review+create → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
-| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`; first template: a 2-chapter book — a 7-quest survival intro plus a 16-quest ModCanvas tour). Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
+| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
 | Progression editor / campaign surface | `workspace-actions.md:15` (stale tab), §3.1 of this doc | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
@@ -532,7 +532,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | **Wizard shipped (P0-WIZARD chunks 1–3):** instance pick or start-from-scratch, template pick, review+create, curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
+| Create Pack | **StartChooser + wizard shipped (P0-WIZARD chunks 1–3; s49 reshape):** four-card start (intro / IDE tour / blank / load), instance pick or start-from-scratch, review+create, curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Blank starts skip the post-create steps. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -569,23 +569,24 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    deferred (written reason: `import_instance_folder` covers it; every extra step is
    surface a first-timer can trip on — revisit when a user asks).
 2. **"What's your pack about?"** — one plain-language question (vibe, not mod list). The
-   answer selects a **template pack**. **Status (chunk 2):** rendered as template cards
-   plus an explicit "Start empty" card, on both paths.
+   answer selects a **template pack**. **Status (s49):** this decision moved OUT of the
+   wizard into the four-card **`StartChooser`** (intro / IDE tour / blank / load) at the
+   launcher's New Pack entry — a user choice on every project start, never first-run
+   detection. The wizard receives the picked template as a preset and no longer offers a
+   template step; blank starts skip the post-create steps and land straight in the IDE.
 3. **Template** — a content skeleton: starter quest chapter(s), a handful of coherent
    starter recipes, a config profile. Templates are **real content files shipped in the
    bundle** (self-authored JSON/SNBT — not game assets, so the no-bundling rule is
    unaffected) scaffolded into the instance on create. First template: "Skyblock-ish",
    "Exploration", "Tech intro" — keep the set small (2–3) and coherent-by-default
-   (Bible §10.3: "probably a bad pack" is a win). **Status (P0-WIZARD chunks 1–2):** the
-   scaffold path is implemented — `create_project` takes an optional `template_id`,
+   (Bible §10.3: "probably a bad pack" is a win). **Status (P0-WIZARD chunks 1–2; s49):**
+   the scaffold path is implemented — `create_project` takes an optional `template_id`,
    template packages are embedded in the Rust binary (`src-tauri/templates/`, format in
-   `docs/templates.md`), and the first package ships with fidelity tests: a 2-chapter
-   book titled "First Steps — Play & Shape Your Pack" (a 7-quest vanilla survival chain
-    plus a 20-quest ModCanvas tour — a 10-quest teaching spine (tabs, save, refresh,
-    add/task/connect/simulate quests, health, launch, export) with ten side branches
-    (undo, beginner mode, chapters, book settings, recipes, configs, mods, behaviors,
-    loot, config tweaks); the health quest converges all content branches (s48),
-    mods, health, launch, export). The `WizardStepper` UI (chunk 2) lets a user pick it.
+   `docs/templates.md`), and two templates ship with fidelity tests: `intro` (6-quest
+   core loop + Shed the Guide, lands in Beginner Mode) and `ide-tour` (21-quest feature
+   walkthrough with a 10-quest teaching spine + ten side branches + Shed the Guide;
+   health quest converges all content branches; 3 example behaviors). The four-card
+   `StartChooser` (chunk 2/3) lets the user pick which to start with.
  4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
     pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
     **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
@@ -695,7 +696,9 @@ coverage — the 20-quest tour now spans every feature) and Chunk 2 (first-boot 
 shipped first, and the remaining plumbing (switching the workspace tab from inside the
 quest editor) is the rat's-nest risk. **Tripwire:** revisit when a fresh-eyes user test
 shows quests-by-name aren't enough, or when the dogfood item (authoring template content
-*using* the mini-wizards) gets scheduled.
+*using* the mini-wizards) gets scheduled. *(s49: first-boot routing was REMOVED — the
+onboarding entry point is now a user-choice four-card start, so any future driver hooks
+the choice cards, not a first-run flag.)*
 
 ---
 

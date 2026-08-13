@@ -32,34 +32,48 @@ pub struct TemplateMeta {
     state_files: &'static [(&'static str, &'static str)],
 }
 
-const TEMPLATES: &[TemplateMeta] = &[TemplateMeta {
-    id: "exploration",
-    name: "First Steps — Play & Shape Your Pack",
-    description: "A survival intro that doubles as a ModCanvas tour: quests, recipes, configs, behaviors, loot, mods, health, launch, export.",
-    files: &[
-        (
-            "data.snbt",
-            include_str!("../../templates/exploration/data.snbt"),
-        ),
-        (
-            "chapters/Exploration_Starter.snbt",
-            include_str!("../../templates/exploration/chapters/Exploration_Starter.snbt"),
-        ),
-        (
-            "chapters/Shape_Your_Pack.snbt",
-            include_str!("../../templates/exploration/chapters/Shape_Your_Pack.snbt"),
-        ),
-    ],
-    // Example behaviors ship with the template so a new pack demonstrates
-    // the Behaviors tab (roadmap §11.3: "Loot-on-kill / advancement gating
-    // examples shipped in templates"). They are scaffolded as PRIVATE state
-    // (`.modcanvas/`), same as the app writes on save — the Behaviors tab
-    // lists them on first open, and Save re-emits the artifacts.
-    state_files: &[(
-        ".modcanvas/behaviors.json",
-        include_str!("../../templates/exploration/behaviors.json"),
-    )],
-}];
+const TEMPLATES: &[TemplateMeta] = &[
+    TemplateMeta {
+        id: "intro",
+        name: "Intro — your first pack in minutes",
+        description: "The core loop: add a quest, give it a task, save, and check your pack's health. Ends in Beginner Mode.",
+        files: &[
+            (
+                "data.snbt",
+                include_str!("../../templates/intro/data.snbt"),
+            ),
+            (
+                "chapters/Your_First_Pack.snbt",
+                include_str!("../../templates/intro/chapters/Your_First_Pack.snbt"),
+            ),
+        ],
+        state_files: &[],
+    },
+    TemplateMeta {
+        id: "ide-tour",
+        name: "IDE Tour — learn every tool",
+        description: "A guided walk through the full workbench: quests, recipes, configs, behaviors, loot, mods, health, launch, export. For creators ready for the whole IDE.",
+        files: &[
+            (
+                "data.snbt",
+                include_str!("../../templates/ide-tour/data.snbt"),
+            ),
+            (
+                "chapters/Shape_Your_Pack.snbt",
+                include_str!("../../templates/ide-tour/chapters/Shape_Your_Pack.snbt"),
+            ),
+        ],
+        // Example behaviors ship with the template so a new pack demonstrates
+        // the Behaviors tab (roadmap §11.3: "Loot-on-kill / advancement gating
+        // examples shipped in templates"). They are scaffolded as PRIVATE state
+        // (`.modcanvas/`), same as the app writes on save — the Behaviors tab
+        // lists them on first open, and Save re-emits the artifacts.
+        state_files: &[(
+            ".modcanvas/behaviors.json",
+            include_str!("../../templates/ide-tour/behaviors.json"),
+        )],
+    },
+];
 
 /// List the templates the wizard can offer. Ids here are the only ids the
 /// scaffold command accepts — the frontend never hardcodes a template list.

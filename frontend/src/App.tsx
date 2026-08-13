@@ -32,6 +32,7 @@ import { Launcher } from './components/launcher/Launcher'
 import { ProjectWorkspace } from './components/common/ProjectWorkspace'
 import { ImportModal, ExportModal, DeleteConfirmModal } from './components/common/modals'
 import { WizardStepper } from './components/common/WizardStepper'
+import { StartChooser } from './components/common/StartChooser'
 import { SettingsModal } from './components/common/SettingsModal'
 import { LeavePackModal } from './components/common/LeavePackModal'
 import { LoadPackModal } from './components/common/LoadPackModal'
@@ -208,25 +209,26 @@ function AppRoot() {
           onRefresh={s.loadProjects}
           onOpenPrism={s.openPrismLauncher}
           onImport={() => s.setShowImport(true)}
-          onNewProject={() => s.setShowWizard(true)}
+          onNewProject={() => s.setShowStartChooser(true)}
           onDeleteProject={() => s.setConfirmCloseProject(true)}
         />
       )}
 
       <SettingsModal show={s.showSettings} onClose={() => s.setShowSettings(false)} />
+      <StartChooser
+        show={s.showStartChooser}
+        onPick={s.pickStart}
+        onClose={() => s.setShowStartChooser(false)}
+      />
       <WizardStepper
         show={s.showWizard}
+        presetTemplateId={s.startIntent?.kind === 'intro' || s.startIntent?.kind === 'ide-tour' ? s.startIntent.templateId : null}
+        postCreate={s.startIntent?.kind === 'blank' ? false : true}
         onClose={() => s.setShowWizard(false)}
         onCreate={s.handleCreateProject}
         onRefresh={() => s.refreshPack(false)}
         packLoaded={s.packLoaded}
-        onDone={() => {
-          // P0-BEGINNER: onboarding completes → first-timers land in
-          // Beginner mode (raw/code surfaces hidden). They can switch to
-          // the full IDE from the prominent topbar toggle.
-          s.setBeginnerMode(true)
-          s.setShowWizard(false)
-        }}
+        onDone={s.handleWizardDone}
         onGuidedQuest={s.handleGuidedQuest}
       />
 

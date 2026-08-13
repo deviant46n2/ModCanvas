@@ -11,12 +11,7 @@ vi.mock('../../services/instances', async (importOriginal) => {
     resolveLoaderVersion: vi.fn(),
   }
 })
-vi.mock('../../services/project', () => ({
-  listProjectTemplates: vi.fn(),
-}))
-
 import { listMcInstances, createMcInstance, resolveLoaderVersion } from '../../services/instances'
-import { listProjectTemplates } from '../../services/project'
 import type { MinecraftInstance } from '../../services/instances'
 
 const instances: MinecraftInstance[] = [
@@ -43,9 +38,6 @@ const instances: MinecraftInstance[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listMcInstances).mockResolvedValue(instances)
-  vi.mocked(listProjectTemplates).mockResolvedValue([
-    { id: 'exploration', name: 'First Steps — Play & Shape Your Pack', description: 'A starter chapter.' },
-  ])
 })
 
 const created = {
@@ -62,17 +54,20 @@ const created = {
   source: 'modcanvas',
 }
 
-async function renderWizard() {
+async function renderWizard(overrides: Partial<Parameters<typeof WizardStepper>[0]> = {}) {
   const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
   render(
     <WizardStepper
       show
+      presetTemplateId="ide-tour"
+      postCreate
       onClose={() => {}}
       onCreate={onCreate}
       onRefresh={vi.fn().mockResolvedValue(undefined)}
       packLoaded={false}
       onDone={() => {}}
       onGuidedQuest={() => {}}
+      {...overrides}
     />,
   )
   await screen.findByText('Starter World')
@@ -80,12 +75,10 @@ async function renderWizard() {
 }
 
 describe('WizardStepper', () => {
-  it('instance path derives version/loader/path from the picked instance and passes the template', async () => {
+  it('instance path derives version/loader/path from the picked instance and passes the preset template', async () => {
     const onCreate = await renderWizard()
 
     fireEvent.click(screen.getByText('Starter World'))
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Create & continue'))
 
@@ -95,7 +88,7 @@ describe('WizardStepper', () => {
       mcVersion: '1.21.1',
       modLoader: 'NeoForge',
       path: '/prism/instances/starter-world/minecraft',
-      templateId: 'exploration',
+      templateId: 'ide-tour',
     })
   })
 
@@ -105,14 +98,31 @@ describe('WizardStepper', () => {
     expect(screen.getByText('Starter World')).toBeTruthy()
   })
 
-  it('scratch path keeps the classic form and starts empty', async () => {
-    const onCreate = await renderWizard()
+  it('a blank preset (null template) creates an empty pack and skips the post-create steps', async () => {
+    const onDone = vi.fn()
+    const onCreate = await renderWizard({ presetTemplateId: null, postCreate: false, onDone })
+
+    fireEvent.click(screen.getByText('Starter World'))
+    fireEvent.click(screen.getByText('Next'))
+    fireEvent.click(screen.getByText('Create & continue'))
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    expect(onCreate).toHaveBeenCalledWith({
+      name: 'Starter World',
+      mcVersion: '1.21.1',
+      modLoader: 'NeoForge',
+      path: '/prism/instances/starter-world/minecraft',
+      templateId: null,
+    })
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('scratch path keeps the classic form and starts empty with a blank preset', async () => {
+    const onCreate = await renderWizard({ presetTemplateId: null })
 
     fireEvent.click(screen.getByText('Start from scratch'))
     const name = screen.getByPlaceholderText('My Modpack')
     fireEvent.change(name, { target: { value: 'My First Pack' } })
-    fireEvent.click(screen.getByText('Next'))
-    // Start empty (no template) is the default for the veteran path.
     fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Create & continue'))
 
@@ -148,8 +158,6 @@ describe('WizardStepper', () => {
     fireEvent.click(screen.getByText('Create a new instance'))
     fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
     fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
-    fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Create & continue'))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
@@ -162,17 +170,19 @@ describe('WizardStepper', () => {
       mcVersion: '1.21.1',
       modLoader: 'NeoForge',
       path: '/prism/instances/My_First_Pack/minecraft',
-      templateId: 'exploration',
+      templateId: 'ide-tour',
     })
   })
 
-  it('step 5 is the guided-first-quest handoff: primary button fires onGuidedQuest, skip advances to green check', async () => {
+  it('guided-quest step: primary button fires onGuidedQuest, skip advances to green check', async () => {
     const onGuidedQuest = vi.fn()
     const onDone = vi.fn()
     const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
     render(
       <WizardStepper
         show
+        presetTemplateId="ide-tour"
+        postCreate
         onClose={() => {}}
         onCreate={onCreate}
         onRefresh={vi.fn().mockResolvedValue(undefined)}
@@ -184,11 +194,9 @@ describe('WizardStepper', () => {
     await screen.findByText('Starter World')
     fireEvent.click(screen.getByText('Starter World'))
     fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('First Steps — Play & Shape Your Pack'))
-    fireEvent.click(screen.getByText('Next'))
     fireEvent.click(screen.getByText('Create & continue'))
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
-    // Curated mods step: Skip advances to step 5 (guided quest).
+    // Curated mods step: Skip advances to the guided-quest step.
     fireEvent.click(screen.getByText('Skip'))
     fireEvent.click(screen.getByText('Add my first quest'))
     expect(onGuidedQuest).toHaveBeenCalledTimes(1)

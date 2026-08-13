@@ -217,7 +217,7 @@ skipped). Shared degraded-registry guard + coverage metric.
 
 ## Template examples (s46)
 
-The exploration template ships 3 example behaviors in
+The `ide-tour` template ships 3 example behaviors in
 `.modcanvas/behaviors.json` (scaffolded as project-root private state via
 `TemplateMeta.state_files`, never under `config/`): a join-time starter kit
 (KubeJS), a zombie-kill reward with a random-chance condition + stage

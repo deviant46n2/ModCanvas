@@ -217,7 +217,7 @@ mod real_path_tests {
         // 1/2/3-prefixed ids, dependencies), import it, export with the re-base,
         // and re-import — the edges must survive end to end.
         let tmp = tempfile::tempdir().unwrap();
-        crate::templates::scaffold_template(&tmp.path().to_path_buf(), "exploration").unwrap();
+        crate::templates::scaffold_template(&tmp.path().to_path_buf(), "ide-tour").unwrap();
 
         let imported = import_ftb_quests(tmp.path()).unwrap();
         assert!(imported.graph.edges.len() >= 5, "template graph must import with edges, got {}", imported.graph.edges.len());
