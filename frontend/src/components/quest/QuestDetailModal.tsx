@@ -68,6 +68,13 @@ export function QuestDetailModal({
   // Header tile renders exactly like the canvas: same effective shape, same
   // runtime shape textures, same icon scale. The state ring uses the same
   // palette as the dependency edges so the header and canvas never disagree.
+  // DELIBERATE (s51): the tile is a FIXED 48px identity anchor — it does NOT
+  // scale with the quest's size, and no iconBaseSize is passed (the icon keeps
+  // the 0.667 plate fraction, matching the canvas relation at 1.0x: 32/48 =
+  // 24/36). Passing iconBaseSize here would shrink the icon to 24px in a 48px
+  // plate (0.5 relation) and break the verified match. The drawer is a detail
+  // surface, not a spatial view — scaled quests read their true size on the
+  // canvas, not here. Verified against the in-game canvas 2026-08-13.
   const shape = effectiveShape || node.shape || ''
   const shapeKeys = shapeTextureKeys(shape)
   const shapeTextures = {
