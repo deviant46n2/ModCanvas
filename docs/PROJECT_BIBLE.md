@@ -260,15 +260,17 @@ The panel's power is that tiers 1–2 are *true*. Every step of scope creep towa
 The start is a **user choice, not detection** (s49): a four-card StartChooser
 offers Intro (guided, ends in Beginner Mode), IDE Tour (feature walkthrough,
 full IDE), Blank (empty pack, straight to the IDE), and Load (existing
-projects). The chooser owns the template decision; the wizard runs from there:
+projects). The chooser owns the template + where decisions; the wizard is a
+thin commit point from there:
 
-1. **Instance** — detect Prism installs, offer existing instances or "browse for folder." Never create instances from scratch (out of scope).
-2. **Review & create** — the picked template (or empty) is reviewed and committed.
-3. **Curated mod picks (optional)** — a short "these go well together" list, defaults pre-checked. Not a 10k-item browser.
-4. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest." The zero-code proof point, emitted as real SNBT.
-5. **The green check** — diagnostics pass, one button: **Launch** (delegated to Prism via Test).
+1. **Name your pack** — one input; ModCanvas auto-creates a fresh Prism
+   instance (MC 1.21.1 · NeoForge, the first supported combo). No technical
+   where-question is asked of a beginner.
+2. **Curated mod picks (optional)** — a short "these go well together" list, defaults pre-checked. Not a 10k-item browser.
+3. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest." The zero-code proof point, emitted as real SNBT.
+4. **The green check** — diagnostics pass, one button: **Launch** (delegated to Prism via Test).
 
-Blank starts skip steps 3–5 and land in the IDE immediately.
+Blank starts skip steps 2–4 and land in the IDE immediately.
 
 ### 10.3 Template commit level
 

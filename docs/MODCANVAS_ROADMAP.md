@@ -137,7 +137,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: instance pick or start-from-scratch → review+create → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
@@ -532,7 +532,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | **StartChooser + wizard shipped (P0-WIZARD chunks 1–3; s49 reshape):** four-card start (intro / IDE tour / blank / load), instance pick or start-from-scratch, review+create, curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Blank starts skip the post-create steps. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
+| Create Pack | **StartChooser + wizard shipped (P0-WIZARD chunks 1–3; s49 reshape):** four-card start (intro / IDE tour / blank / load), name your pack (auto-creates a Prism instance), curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Blank starts skip the post-create steps and land straight in the IDE. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -567,7 +567,12 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    test). More combos unlock by extending the resolver + the card — never before. The
    adapter lie is already fixed (`servedMatrix`). Browse-for-folder
    deferred (written reason: `import_instance_folder` covers it; every extra step is
-   surface a first-timer can trip on — revisit when a user asks).
+   surface a first-timer can trip on — revisit when a user asks). **s49 reshape:** the
+   where-picker is GONE — the wizard no longer lists instances or offers
+   instance/scratch/new modes. Every wizard start auto-creates a fresh Prism instance
+   (the "create a new instance" card became the only path; the resolver detail above is
+   unchanged and load-bearing). `WizardWhereStep.tsx` + `scratch-form.tsx` were deleted;
+   `list_mc_instances` remains for `restart-instance` + the connection pill.
 2. **"What's your pack about?"** — one plain-language question (vibe, not mod list). The
    answer selects a **template pack**. **Status (s49):** this decision moved OUT of the
    wizard into the four-card **`StartChooser`** (intro / IDE tour / blank / load) at the
@@ -599,30 +604,26 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     the CF pick resolves DIRECTLY (not through the batch) so every failure mode — missing key,
     fetch failure (e.g. a CF API 403), version mismatch — surfaces as a blocked row with the
     precise reason; a core pick never vanishes silently. The wizard's
-    step 4 installs the pre-ticked picks sequentially, then auto-runs the compat check so
+    curated-mods step (step 2) installs the pre-ticked picks sequentially, then auto-runs the compat check so
     transitive libraries (FTB Library, Rhino, Architectury) appear as one-click installs,
     then refreshes the pack so the green check sees the new mods.
  5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
     the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
     export path. The zero-code proof point. **Implemented (s41, P0-MINIWIZ):** the wizard's
-    step 5 is a handoff — it closes, switches to the quests tab, and opens the
+    guided-quest step (step 3) is a handoff — it closes, switches to the quests tab, and opens the
     `GuidedQuestWizard` modal in the editor (pick item → collect/craft goal → review →
     create). The quest lands through the same `commitGraph` history path (undoable in one
     step) and the same export path; a collect-N-get-N reward is the default. A "✨ Add a
     quest" toolbar button in the quest editor opens the same wizard at any time.
  6. **The green check + Launch** — run Pack Health's `analyzePackHealth` over the scaffolded
     pack; show blocking/recommended; one button: **Launch** (reuse `test_project`).
-    **Status (chunk 3):** implemented — the wizard's step 6 (moved from 5 when the guided
-    quest step landed, s41) computes the same pure report
+    **Status (chunk 3; s49):** implemented — the wizard's step 4 (renumbered when the
+    where-picker was removed, s49) computes the same pure report
     the Health tab renders (from the already-materialized stores, no rescans) and offers
-    Launch via `test_project` with the same defaults as the topbar Test button. Honesty
-    rule: a pack created via "start from scratch" has no Prism instance, so Launch is
-    hidden with an explanation — the wizard never offers a launch it cannot perform.
-    **Parked: "link a scratch pack to an instance".** Written reason: recreating via the
-    instance path is free before content exists (the current scratch packs have none); a
-    real link feature means moving the pack home (path swap), merging app-managed content
-    into the instance with a clobber guard, and handling orphaned source dirs — build it
-    when someone with substantial scratch content actually asks.
+    Launch via `test_project` with the same defaults as the topbar Test button. Every
+    pack now has a Prism instance (s49: the wizard auto-creates one; scratch mode was
+    deleted), so Launch is always available — the old "launch hidden for scratch packs"
+    rule and the parked "link a scratch pack to an instance" entry are obsolete.
 
 Completion criteria (P0-WIZARD): a fresh-eyes tester completes steps 1–6 on 1.21.1/NeoForge
 without opening a code file, a raw config, or the KubeJS drawer; the wizard is restartable

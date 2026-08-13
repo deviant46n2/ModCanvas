@@ -6,43 +6,16 @@ vi.mock('../../services/instances', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/instances')>()
   return {
     ...actual,
-    listMcInstances: vi.fn(),
     createMcInstance: vi.fn(),
     resolveLoaderVersion: vi.fn(),
   }
 })
-import { listMcInstances, createMcInstance, resolveLoaderVersion } from '../../services/instances'
-import type { MinecraftInstance } from '../../services/instances'
 
-const instances: MinecraftInstance[] = [
-  {
-    id: 'i1',
-    name: 'Starter World',
-    mc_version: '1.21.1',
-    loader: 'NeoForge',
-    loader_version: '21.1.45',
-    game_dir: '/prism/instances/starter-world/minecraft',
-    status: 'Offline',
-  },
-  {
-    id: 'i2',
-    name: 'Busy Instance',
-    mc_version: '1.21.1',
-    loader: 'NeoForge',
-    loader_version: null,
-    game_dir: '/prism/instances/busy/minecraft',
-    status: 'Running',
-  },
-]
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  vi.mocked(listMcInstances).mockResolvedValue(instances)
-})
+import { createMcInstance, resolveLoaderVersion } from '../../services/instances'
 
 const created = {
   id: 'p1',
-  name: 'Starter World',
+  name: 'My First Pack',
   description: '',
   minecraft_version: '1.21.1',
   mod_loader: 'NeoForge',
@@ -50,7 +23,7 @@ const created = {
   author: '',
   created_at: '',
   updated_at: '',
-  path: '/prism/instances/starter-world/minecraft',
+  path: '/prism/instances/My_First_Pack/minecraft',
   source: 'modcanvas',
 }
 
@@ -70,80 +43,18 @@ async function renderWizard(overrides: Partial<Parameters<typeof WizardStepper>[
       {...overrides}
     />,
   )
-  await screen.findByText('Starter World')
   return onCreate
 }
 
+async function createPack() {
+  fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
+  fireEvent.click(screen.getByText('Create & continue'))
+  await waitFor(() => expect(createMcInstance).toHaveBeenCalledTimes(1))
+}
+
 describe('WizardStepper', () => {
-  it('instance path derives version/loader/path from the picked instance and passes the preset template', async () => {
-    const onCreate = await renderWizard()
-
-    fireEvent.click(screen.getByText('Starter World'))
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create & continue'))
-
-    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
-    expect(onCreate).toHaveBeenCalledWith({
-      name: 'Starter World',
-      mcVersion: '1.21.1',
-      modLoader: 'NeoForge',
-      path: '/prism/instances/starter-world/minecraft',
-      templateId: 'ide-tour',
-    })
-  })
-
-  it('running instances are not offered as candidates', async () => {
-    await renderWizard()
-    expect(screen.queryByText('Busy Instance')).toBeNull()
-    expect(screen.getByText('Starter World')).toBeTruthy()
-  })
-
-  it('a blank preset (null template) creates an empty pack and skips the post-create steps', async () => {
-    const onDone = vi.fn()
-    const onCreate = await renderWizard({ presetTemplateId: null, postCreate: false, onDone })
-
-    fireEvent.click(screen.getByText('Starter World'))
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create & continue'))
-
-    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
-    expect(onCreate).toHaveBeenCalledWith({
-      name: 'Starter World',
-      mcVersion: '1.21.1',
-      modLoader: 'NeoForge',
-      path: '/prism/instances/starter-world/minecraft',
-      templateId: null,
-    })
-    expect(onDone).toHaveBeenCalledTimes(1)
-  })
-
-  it('scratch path keeps the classic form and starts empty with a blank preset', async () => {
-    const onCreate = await renderWizard({ presetTemplateId: null })
-
-    fireEvent.click(screen.getByText('Start from scratch'))
-    const name = screen.getByPlaceholderText('My Modpack')
-    fireEvent.change(name, { target: { value: 'My First Pack' } })
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create & continue'))
-
-    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
-    expect(onCreate).toHaveBeenCalledWith({
-      name: 'My First Pack',
-      mcVersion: '1.21.1',
-      modLoader: 'Forge',
-      path: '~/modpacks/my-first-pack',
-      templateId: null,
-    })
-  })
-
-  it('cannot advance step 1 without a choice', async () => {
-    await renderWizard()
-    const next = screen.getByText('Next') as HTMLButtonElement
-    expect(next.disabled).toBe(true)
-  })
-
-  it('create-a-new-instance path resolves the loader version, creates the instance, and creates the pack on it', async () => {
-    const onCreate = await renderWizard()
+  beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(resolveLoaderVersion).mockResolvedValue('21.1.248')
     vi.mocked(createMcInstance).mockResolvedValue({
       id: 'i-new',
@@ -154,15 +65,19 @@ describe('WizardStepper', () => {
       game_dir: '/prism/instances/My_First_Pack/minecraft',
       status: 'Offline',
     })
+  })
 
-    fireEvent.click(screen.getByText('Create a new instance'))
-    fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create & continue'))
+  it('cannot create without a name', () => {
+    renderWizard()
+    const create = screen.getByText('Create & continue') as HTMLButtonElement
+    expect(create.disabled).toBe(true)
+  })
 
-    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
-    // The loader version comes from the resolver, the pack lands ON the new
-    // instance's game dir — launchable by construction.
+  it('resolves the loader version, creates the instance, and creates the pack on it with the preset template', async () => {
+    const onCreate = await renderWizard()
+
+    await createPack()
+
     expect(resolveLoaderVersion).toHaveBeenCalledWith('1.21.1', 'NeoForge')
     expect(createMcInstance).toHaveBeenCalledWith('My First Pack', '1.21.1', 'NeoForge', '21.1.248')
     expect(onCreate).toHaveBeenCalledWith({
@@ -174,32 +89,60 @@ describe('WizardStepper', () => {
     })
   })
 
-  it('guided-quest step: primary button fires onGuidedQuest, skip advances to green check', async () => {
+  it('an unresolvable loader version fails loudly and keeps the wizard open', async () => {
+    const onCreate = await renderWizard()
+    vi.mocked(resolveLoaderVersion).mockResolvedValue(null)
+
+    fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
+    fireEvent.click(screen.getByText('Create & continue'))
+
+    await waitFor(() =>
+      expect(screen.getByText(/Couldn't determine the latest NeoForge version/)).toBeTruthy(),
+    )
+    expect(createMcInstance).not.toHaveBeenCalled()
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('a blank preset (null template) creates an empty pack and skips the post-create steps', async () => {
+    const onDone = vi.fn()
+    const onCreate = await renderWizard({ presetTemplateId: null, postCreate: false, onDone })
+
+    await createPack()
+
+    expect(onCreate).toHaveBeenCalledWith({
+      name: 'My First Pack',
+      mcVersion: '1.21.1',
+      modLoader: 'NeoForge',
+      path: '/prism/instances/My_First_Pack/minecraft',
+      templateId: null,
+    })
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('guided path runs the post-create steps: curated skip advances to the guided-quest step', async () => {
     const onGuidedQuest = vi.fn()
     const onDone = vi.fn()
-    const onCreate = vi.fn<(input: CreateProjectInput) => Promise<typeof created>>().mockResolvedValue(created)
-    render(
-      <WizardStepper
-        show
-        presetTemplateId="ide-tour"
-        postCreate
-        onClose={() => {}}
-        onCreate={onCreate}
-        onRefresh={vi.fn().mockResolvedValue(undefined)}
-        packLoaded={false}
-        onDone={onDone}
-        onGuidedQuest={onGuidedQuest}
-      />,
-    )
-    await screen.findByText('Starter World')
-    fireEvent.click(screen.getByText('Starter World'))
-    fireEvent.click(screen.getByText('Next'))
-    fireEvent.click(screen.getByText('Create & continue'))
-    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    await renderWizard({ onGuidedQuest, onDone })
+
+    await createPack()
+
     // Curated mods step: Skip advances to the guided-quest step.
     fireEvent.click(screen.getByText('Skip'))
     fireEvent.click(screen.getByText('Add my first quest'))
     expect(onGuidedQuest).toHaveBeenCalledTimes(1)
     expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('guided path create failure shows the error and keeps the wizard open', async () => {
+    await renderWizard()
+    vi.mocked(createMcInstance).mockRejectedValueOnce(new Error('scaffold refused: instance already has a quest book'))
+
+    fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
+    fireEvent.click(screen.getByText('Create & continue'))
+
+    await waitFor(() =>
+      expect(screen.getByText(/instance already has a quest book/)).toBeTruthy(),
+    )
+    expect(screen.getByText('Create & continue')).toBeTruthy()
   })
 })

@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
-  listMcInstances,
-  wizardCandidates,
   createMcInstance,
   resolveLoaderVersion,
-  type MinecraftInstance,
 } from '../../services/instances'
 import type { CreateProjectInput, Project } from '../../services/types'
 import { CuratedModsStep } from './CuratedModsStep'
 import { GuidedQuestStep } from './GuidedQuestStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
-import { WizardWhereStep, type WizardMode } from './WizardWhereStep'
 
 export type { CreateProjectInput } from '../../services/types'
 
@@ -18,7 +14,8 @@ interface WizardStepperProps {
   show: boolean
   onClose: () => void
   /** The template the StartChooser picked; null for a blank pack. The wizard
-   *  no longer offers a template step — that decision lives in the chooser. */
+   *  no longer offers a template or where step — those decisions live in the
+   *  chooser. Every wizard start auto-creates a Prism instance. */
   presetTemplateId: string | null
   /** Run the post-create steps (curated mods, guided quest, green check).
    *  Blank starts skip them and land straight in the IDE. */
@@ -38,23 +35,21 @@ interface WizardStepperProps {
   onGuidedQuest: () => void
 }
 
-type Mode = WizardMode
-
 const STEP_LABELS: Record<number, string> = {
-  1: 'where your pack lives',
-  2: 'review and create',
-  3: 'some mods to start',
-  4: 'add your first quest',
-  5: 'green check',
+  1: 'name your pack',
+  2: 'some mods to start',
+  3: 'add your first quest',
+  4: 'green check',
 }
 
 /**
- * The First-Pack wizard (roadmap P0-WIZARD, §9.3). Step 1 has zero side
- * effects — nothing is written until Create — so closing the wizard at any
- * point strands nobody. After Create the pack loads underneath the wizard and
- * the post-create steps (curated mods, guided quest, green check + launch)
- * run against the live pack — unless `postCreate` is false (a blank start),
- * which lands straight in the IDE.
+ * The First-Pack wizard (roadmap P0-WIZARD, §9.3, s49 reshape). The
+ * StartChooser owns the template + where decisions, so the wizard is a thin
+ * commit point: one name input (the pack lands on a fresh auto-created Prism
+ * instance, MC 1.21.1 · NeoForge — the first supported combo), then the
+ * post-create steps (curated mods, guided quest, green check + launch) run
+ * against the live pack — unless `postCreate` is false (a blank start), which
+ * lands straight in the IDE.
  */
 export function WizardStepper({
   show,
@@ -68,97 +63,39 @@ export function WizardStepper({
   onGuidedQuest,
 }: WizardStepperProps) {
   const [step, setStep] = useState(1)
-  const [mode, setMode] = useState<Mode>('instance')
-  const [instances, setInstances] = useState<MinecraftInstance[] | null>(null)
-  const [instanceId, setInstanceId] = useState<string | null>(null)
-  const [scratch, setScratch] = useState({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
+  const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<Project | null>(null)
 
-  useEffect(() => {
-    if (!show) return
-    setStep(1)
-    setMode('instance')
-    setInstanceId(null)
-    setScratch({ name: '', mcVersion: '1.21.1', modLoader: 'Forge' })
-    setError(null)
-    setCreating(false)
-    setProject(null)
-    setInstances(null)
-    listMcInstances().then(setInstances).catch((e) => setError(String(e)))
-  }, [show])
-
-  const candidates = instances ? wizardCandidates(instances) : []
-  const instance = candidates.find((i) => i.id === instanceId) ?? null
-
-  function buildInput(): CreateProjectInput {
-    if (mode === 'instance' && instance) {
-      return {
-        name: instance.name,
-        mcVersion: instance.mc_version,
-        modLoader: instance.loader,
-        path: instance.game_dir,
-        templateId: presetTemplateId,
-      }
-    }
-    // 'new' mode has no path yet — the instance is created at the commit
-    // point (step 2) and buildInput is only used for the review display.
-    if (mode === 'new') {
-      return {
-        name: scratch.name,
-        mcVersion: '1.21.1',
-        modLoader: 'NeoForge',
-        path: 'New Prism instance',
-        templateId: presetTemplateId,
-      }
-    }
-    return {
-      name: scratch.name,
-      mcVersion: scratch.mcVersion,
-      modLoader: scratch.modLoader,
-      path: `~/modpacks/${scratch.name.toLowerCase().replace(/\s+/g, '-')}`,
-      templateId: presetTemplateId,
-    }
-  }
-
-  const step1Complete =
-    mode === 'instance'
-      ? instanceId !== null
-      : scratch.name.trim().length > 0
-
   async function handleCreate() {
+    if (!name.trim()) return
     setCreating(true)
     setError(null)
     try {
-      let created: Project
-      if (mode === 'new') {
-        // The wizard's one supported combo (NeoForge 1.21.1). Resolve the
-        // latest loader version, create the Prism instance, then create the
-        // project ON it — one commit, no created-but-empty states.
-        const loaderVersion = await resolveLoaderVersion('1.21.1', 'NeoForge')
-        if (!loaderVersion) {
-          throw new Error(
-            "Couldn't determine the latest NeoForge version — check your connection and retry.",
-          )
-        }
-        const mcInstance = await createMcInstance(scratch.name, '1.21.1', 'NeoForge', loaderVersion)
-        created = await onCreate({
-          name: scratch.name,
-          mcVersion: '1.21.1',
-          modLoader: 'NeoForge',
-          path: mcInstance.game_dir,
-          templateId: presetTemplateId,
-        })
-      } else {
-        created = await onCreate(buildInput())
+      // The wizard's one supported combo (NeoForge 1.21.1). Resolve the
+      // latest loader version, create the Prism instance, then create the
+      // project ON it — one commit, no created-but-empty states.
+      const loaderVersion = await resolveLoaderVersion('1.21.1', 'NeoForge')
+      if (!loaderVersion) {
+        throw new Error(
+          "Couldn't determine the latest NeoForge version — check your connection and retry.",
+        )
       }
+      const mcInstance = await createMcInstance(name.trim(), '1.21.1', 'NeoForge', loaderVersion)
+      const created = await onCreate({
+        name: name.trim(),
+        mcVersion: '1.21.1',
+        modLoader: 'NeoForge',
+        path: mcInstance.game_dir,
+        templateId: presetTemplateId,
+      })
       setProject(created)
       // Blank starts skip the post-create steps and land straight in the IDE.
       if (!postCreate) {
         onDone()
       } else {
-        setStep(3)
+        setStep(2)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -174,7 +111,7 @@ export function WizardStepper({
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of {postCreate ? 5 : 2} — {STEP_LABELS[step]}
+          Step {step} of {postCreate ? 4 : 1} — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -184,81 +121,52 @@ export function WizardStepper({
         )}
 
         {step === 1 && (
-          <WizardWhereStep
-            mode={mode}
-            onModeChange={setMode}
-            candidates={candidates}
-            instancesLoading={instances === null}
-            instanceId={instanceId}
-            onInstanceSelect={setInstanceId}
-            scratch={scratch}
-            onScratchChange={setScratch}
-          />
+          <>
+            <div className="form-group">
+              <label>Pack name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My First Pack"
+                autoFocus
+              />
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
+              MC 1.21.1 · NeoForge — ModCanvas creates a fresh Prism instance
+              for this pack. The game downloads on first launch.
+            </div>
+          </>
         )}
 
-        {step === 2 && (
-          <div style={{ fontSize: 14 }}>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ color: 'var(--color-text-tertiary)' }}>Name</div>
-              <strong>{buildInput().name}</strong>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ color: 'var(--color-text-tertiary)' }}>Version / loader</div>
-              <strong>
-                MC {buildInput().mcVersion} · {buildInput().modLoader}
-              </strong>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ color: 'var(--color-text-tertiary)' }}>Where it lives</div>
-              <strong style={{ wordBreak: 'break-all' }}>{buildInput().path}</strong>
-            </div>
-            <div>
-              <div style={{ color: 'var(--color-text-tertiary)' }}>Starting point</div>
-              <strong>
-                {presetTemplateId === 'intro'
-                  ? 'Intro template'
-                  : presetTemplateId === 'ide-tour'
-                    ? 'IDE tour template'
-                    : 'Empty pack'}
-              </strong>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && project && (
+        {step === 2 && project && (
           <CuratedModsStep
             project={project}
             onRefresh={onRefresh}
-            onContinue={() => setStep(4)}
+            onContinue={() => setStep(3)}
+          />
+        )}
+
+        {step === 3 && project && (
+          <GuidedQuestStep
+            onAdd={onGuidedQuest}
+            onSkip={() => setStep(4)}
           />
         )}
 
         {step === 4 && project && (
-          <GuidedQuestStep
-            onAdd={onGuidedQuest}
-            onSkip={() => setStep(5)}
-          />
-        )}
-
-        {step === 5 && project && (
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}
-            launchable={mode !== 'scratch'}
+            launchable
             onDone={onDone}
           />
         )}
 
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
-          {step > 1 && step < 3 && (
-            <button className="btn-secondary" onClick={() => setStep(step - 1)} disabled={creating}>Back</button>
-          )}
           {step === 1 && (
-            <button className="btn-primary" onClick={() => setStep(2)} disabled={!step1Complete}>Next</button>
-          )}
-          {step === 2 && (
-            <button className="btn-primary" onClick={handleCreate} disabled={creating}>
+            <button className="btn-primary" onClick={handleCreate} disabled={creating || !name.trim()}>
               {creating ? 'Creating…' : 'Create & continue'}
             </button>
           )}

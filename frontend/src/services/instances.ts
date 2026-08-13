@@ -1,9 +1,8 @@
 // Instance metadata for the First-Pack wizard (list_mc_instances).
 //
-// `list_prism_instances` returns only {name, path}; the wizard needs the
-// full record — mc_version, loader, game_dir, status — because it derives
-// the project's version/loader from the picked instance and never asks a
-// beginner a technical question.
+// The s49 wizard reshape: every wizard start auto-creates a fresh Prism
+// instance (MC 1.21.1 · NeoForge), so the where-picker and its instance
+// listing are gone — only create + resolve remain.
 import { invoke } from '@tauri-apps/api/core'
 
 export interface MinecraftInstance {
@@ -16,11 +15,7 @@ export interface MinecraftInstance {
   status: string
 }
 
-export async function listMcInstances(): Promise<MinecraftInstance[]> {
-  return invoke<MinecraftInstance[]>('list_mc_instances')
-}
-
-/** Create a fresh Prism instance (wizard's "create a new instance" path). */
+/** Create a fresh Prism instance (the wizard's auto-create path). */
 export async function createMcInstance(
   name: string,
   mcVersion: string,
@@ -42,11 +37,4 @@ export async function resolveLoaderVersion(
   loader: string,
 ): Promise<string | null> {
   return invoke<string | null>('resolve_loader_version', { mcVersion, loader })
-}
-
-/** Instances the wizard can scaffold into: known loader, not running. */
-export function wizardCandidates(instances: MinecraftInstance[]): MinecraftInstance[] {
-  return instances.filter(
-    (i) => i.status !== 'Running' && i.loader !== 'Unknown' && i.mc_version !== 'Unknown',
-  )
 }
