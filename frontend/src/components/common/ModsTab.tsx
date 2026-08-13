@@ -5,6 +5,7 @@ import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
 import { CategorySelect, CategorySourceHint } from './CategorySelect'
 import { SourceToggles, type ModSource } from './SourceToggles'
 import { ModsTabCompatPanel } from './ModsTabCompatPanel'
+import { openPrismForProject } from '../../services/project'
 import type {
   CompatibilityInstall,
   CompatibilityResult,
@@ -140,6 +141,14 @@ export function ModsTab(props: ModsTabProps) {
             <div className="section-actions">
               <button
                 className="btn-secondary btn-sm"
+                onClick={() => props.project && openPrismForProject(props.project.id)}
+                disabled={!props.project}
+                title="Open Prism Launcher on this pack — Prism's downloader handles versions and dependencies"
+              >
+                Add mods in Prism
+              </button>
+              <button
+                className="btn-secondary btn-sm"
                 onClick={props.onScanInstanceMods}
                 disabled={!props.project}
                 title="Scan instance's mods folder and populate database"
@@ -203,7 +212,7 @@ export function ModsTab(props: ModsTabProps) {
 
           <div className="mod-list">
             {props.projectMods.length === 0 ? (
-              <div className="empty-state">No mods in this project yet. Search and add mods below.</div>
+              <div className="empty-state">No mods in this project yet. Add mods in Prism (the button above), or drop jars into the pack's mods folder, then scan.</div>
             ) : props.filteredMods.length === 0 ? (
               <div className="empty-state">No mods match your filter.</div>
             ) : (

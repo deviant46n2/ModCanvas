@@ -78,3 +78,9 @@ export async function clearCurseforgeApiKey(): Promise<void> {
 export async function openPrismLauncher(): Promise<void> {
   return invoke('open_prism_launcher')
 }
+
+/** Open Prism focused on the project's instance (PRISM-LEAN s53): Prism's own
+ * mod downloader takes over — version matching + dependency resolution. */
+export async function openPrismForProject(projectId: string): Promise<void> {
+  return invoke('open_prism_instance', { projectId })
+}

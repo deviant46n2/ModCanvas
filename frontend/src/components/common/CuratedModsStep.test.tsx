@@ -4,16 +4,14 @@ import { CuratedModsStep } from './CuratedModsStep'
 
 vi.mock('../../services/mods', () => ({
   listCuratedMods: vi.fn(),
-  installModFromSearch: vi.fn(),
-  checkCompatibility: vi.fn(),
 }))
 
 vi.mock('../../services/project', () => ({
-  setCurseforgeApiKey: vi.fn(),
+  openPrismForProject: vi.fn(),
 }))
 
-import { listCuratedMods, installModFromSearch, checkCompatibility } from '../../services/mods'
-import { setCurseforgeApiKey } from '../../services/project'
+import { listCuratedMods } from '../../services/mods'
+import { openPrismForProject } from '../../services/project'
 
 const project = {
   id: 'p1',
@@ -25,7 +23,7 @@ const project = {
   author: '',
   created_at: '',
   updated_at: '',
-  path: '/tmp/instance',
+  path: '/tmp/PrismLauncher/instances/Test/minecraft',
   source: 'modcanvas',
 }
 
@@ -36,8 +34,7 @@ beforeEach(() => {
     { source: 'modrinth', mod_id: 'jei', slug: 'jei', name: 'Just Enough Items', description: 'See recipes.', ticked: true, core: false, blocked_reason: null, page_url: null },
     { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null, page_url: null },
   ])
-  vi.mocked(installModFromSearch).mockResolvedValue({ name: 'installed' })
-  vi.mocked(checkCompatibility).mockResolvedValue({ compatible: false, issues: [], warnings: [] })
+  vi.mocked(openPrismForProject).mockResolvedValue(undefined)
 })
 
 function renderStep(over = {}) {
@@ -51,143 +48,74 @@ function renderStep(over = {}) {
   return props
 }
 
-describe('CuratedModsStep', () => {
-  it('renders the filtered list with pre-ticked defaults', async () => {
-    renderStep()
-    const jei = await screen.findByText('Just Enough Items')
-    expect(jei).toBeInTheDocument()
-    const jeiBox = screen.getByRole('checkbox', { name: 'Install Just Enough Items' })
-    expect(jeiBox).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Install Controllable' })).not.toBeChecked()
-  })
-
-  it('renders core picks in their own section', async () => {
+describe('CuratedModsStep (PRISM-LEAN)', () => {
+  it('renders the curated list with core and optional sections', async () => {
     renderStep()
     await screen.findByText('Just Enough Items')
     expect(screen.getByText('Needed by ModCanvas')).toBeInTheDocument()
     expect(screen.getByText('Goes great with your pack')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Install KubeJS' })).toBeChecked()
+    expect(screen.getByText('KubeJS')).toBeInTheDocument()
+    expect(screen.getByText('Controllable')).toBeInTheDocument()
   })
 
-  it('shows a blocked CurseForge pick disabled with its reason, never ticked', async () => {
-    vi.mocked(listCuratedMods).mockResolvedValue([
-      {
-        source: 'curseforge', mod_id: '', slug: '', name: 'FTB Quests',
-        description: 'The quest book.', ticked: false, core: true,
-        blocked_reason: 'needs a CurseForge API key — add one in Settings (gear icon)',
-        page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests',
-      },
-    ])
-    renderStep()
-    const ftb = await screen.findAllByText('FTB Quests')
-    expect(ftb.length).toBeGreaterThan(0)
-    // The blocked row carries its reason AND the guidance box appears with
-    // an inline key field so the user can unlock the pick right here.
-    expect(screen.getAllByText(/needs a CurseForge API key/).length).toBeGreaterThan(0)
-    expect(screen.getByPlaceholderText('CurseForge API key')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Install FTB Quests' })).toBeDisabled()
-    // The blocked box also offers the manual-download page (s48).
-    expect(screen.getByRole('link', { name: /curseforge.com\/minecraft\/mc-mods\/ftb-quests/ })).toBeInTheDocument()
-  })
-
-  it('saving a key offers a re-check that refetches the list', async () => {
-    vi.mocked(listCuratedMods).mockResolvedValue([
-      {
-        source: 'curseforge', mod_id: '', slug: '', name: 'FTB Quests',
-        description: 'The quest book.', ticked: false, core: true,
-        blocked_reason: 'needs a CurseForge API key',
-        page_url: null,
-      },
-    ])
-    vi.mocked(setCurseforgeApiKey).mockResolvedValue('kernel keyring')
-    renderStep()
-    await screen.findAllByText('FTB Quests')
-    fireEvent.change(screen.getByPlaceholderText('CurseForge API key'), { target: { value: 'cf-secret' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save key' }))
-    const recheck = await screen.findByRole('button', { name: 'Re-check' })
-    fireEvent.click(recheck)
-    // The refetch calls the service again with the same project.
-    await waitFor(() => {
-      expect(listCuratedMods).toHaveBeenCalledTimes(2)
-    })
-  })
-
-  it('install selected installs only ticked mods, then surfaces transitive deps', async () => {
-    vi.mocked(checkCompatibility).mockResolvedValue({
-      compatible: false,
-      issues: [
-        {
-          severity: 'Warning',
-          message: "'JEI' requires 'cloth-config' which is not in the project",
-          affected_mods: ['jei', 'cloth-config'],
-          affected_mod_names: ['JEI', 'Cloth Config'],
-          install: { source: 'modrinth', mod_id: 'cloth-config', slug: 'cloth-config', name: 'Cloth Config' },
-        },
-      ],
-      warnings: [],
-    })
+  it('offers the Prism handoff as the only install action — no in-app install', async () => {
     renderStep()
     await screen.findByText('Just Enough Items')
-    fireEvent.click(screen.getByRole('button', { name: /install selected/i }))
-
-    await waitFor(() => {
-      expect(installModFromSearch).toHaveBeenCalledTimes(1)
-    })
-    // Unticked mod is not installed.
-    expect(installModFromSearch).toHaveBeenCalledWith(expect.objectContaining({ modId: 'jei' }))
-    expect(installModFromSearch).not.toHaveBeenCalledWith(expect.objectContaining({ modId: 'controllable' }))
-
-    // The transitive dep shows with its own one-click install.
-    const depButton = await screen.findByRole('button', { name: 'Install' })
-    fireEvent.click(depButton)
-    await waitFor(() => {
-      expect(installModFromSearch).toHaveBeenCalledWith(expect.objectContaining({ modId: 'cloth-config' }))
-    })
+    expect(screen.getByRole('button', { name: 'Open Prism to install these' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /install selected/i })).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
-  it('skip goes straight to continue without installing', async () => {
-    const { onContinue } = renderStep()
+  it('opens Prism focused on the project instance', async () => {
+    renderStep()
     await screen.findByText('Just Enough Items')
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
-    expect(installModFromSearch).not.toHaveBeenCalled()
-    expect(onContinue).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Prism to install these' }))
+    await waitFor(() => {
+      expect(openPrismForProject).toHaveBeenCalledWith('p1')
+    })
   })
 
-  it('failed installs offer a per-mod Retry that re-runs the install', async () => {
-    // One ticked mod, so the failure is unambiguous.
+  it('falls back to manual project-page links when the pack has no Prism instance', async () => {
+    vi.mocked(openPrismForProject).mockRejectedValue(
+      'This pack is not tied to a Prism instance — install its mods manually from the project pages instead.',
+    )
     vi.mocked(listCuratedMods).mockResolvedValue([
-      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: null },
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
     ])
-    vi.mocked(installModFromSearch)
-      .mockRejectedValueOnce('Invalid CurseForge project id: curseforge:289412')
-      .mockResolvedValueOnce({ name: 'installed' })
     renderStep()
     await screen.findByText('FTB Quests')
-    fireEvent.click(screen.getByRole('button', { name: /install selected/i }))
-
-    // The failure surfaces with the real error and a Retry button.
-    const retry = await screen.findByRole('button', { name: 'Retry' })
-    expect(screen.getByText(/Invalid CurseForge project id/)).toBeInTheDocument()
-    expect(screen.getByText(/check it in Settings/)).toBeInTheDocument()
-
-    fireEvent.click(retry)
-    await waitFor(() => {
-      expect(installModFromSearch).toHaveBeenCalledTimes(2)
-    })
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
-    expect(screen.getByText('Installed ✓')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Prism to install these' }))
+    const link = await screen.findByRole('link', { name: 'FTB Quests' })
+    expect(link).toHaveAttribute('href', 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests')
   })
 
-  it('continue after installs refreshes the pack then advances', async () => {
+  it('shows the project page link on rows that have one', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
+    ])
+    renderStep()
+    await screen.findByText('FTB Quests')
+    expect(screen.getByRole('link', { name: 'Project page' })).toHaveAttribute(
+      'href',
+      'https://www.curseforge.com/minecraft/mc-mods/ftb-quests',
+    )
+  })
+
+  it('continue refreshes the pack (picking up Prism-installed mods) then advances', async () => {
     const { onRefresh, onContinue } = renderStep()
     await screen.findByText('Just Enough Items')
-    fireEvent.click(screen.getByRole('button', { name: /install selected/i }))
-    // Dep check returns no issues -> Continue becomes available.
-    const cont = await screen.findByRole('button', { name: 'Continue' })
-    fireEvent.click(cont)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await waitFor(() => {
       expect(onRefresh).toHaveBeenCalledTimes(1)
       expect(onContinue).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it('skip advances without refreshing', async () => {
+    const { onRefresh, onContinue } = renderStep()
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(onRefresh).not.toHaveBeenCalled()
+    expect(onContinue).toHaveBeenCalled()
   })
 })

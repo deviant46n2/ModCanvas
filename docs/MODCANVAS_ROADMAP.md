@@ -34,6 +34,8 @@ strategic space, including things deliberately NOT being built yet.
 | 2 | **Beginner Mode redesign** | **STRIP SHIPPED (s53)** — product call ruled s52: the mode becomes a coach, not just a hiding switch. First iteration: the hint strip (4-step wedge journey, real-signal states, never claims quest completion). See `docs/beginner-mode.md`. Remainder parked with written reasons: the driver (quest editor → tab wiring, the §9.5 rat's-nest) and the §9.4 preset forms. | The mode gates 2 of 7 editors (code-hiding only). The goal is NOT merely hiding advanced controls — evaluate whether the product's workflow is actually understandable to a first-time modpack creator (audit finding #11). Product call first; implementation after. |
 | 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (453 Rust + 697 FE tests) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
 | 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
+| 5 | **PRISM-LEAN (s53)** — mod EXECUTION moves to Prism Launcher | **CHUNK 1 DONE (s53)** — handoff shipped: `open_prism_instance` (`prismlauncher --show <instanceId>`), wizard curated step = curated list + "Open Prism to install these" (manual-link fallback for non-instance packs), Mods tab "Add mods in Prism" button. Docs: `docs/mods-tab.md`. | ModCanvas curates + diagnoses; Prism executes (version matching + dependency resolution — verified: FTB Quests in Prism pulls Library/Teams/Architecury; ModCanvas's own search cannot surface CF mods: `searchFilter=ftb` → 50 irrelevant hits, zero FTB mods, live-verified 2026-08-13). Student ruling; rationale: delegate risky high-surface execution to battle-tested software. |
+| 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | BOOKED (chunk 1 shipped) | Delete `search_mods` / `install_mod_from_search` / the Mods-tab search UI / compat-panel install buttons / CF-key use for installs with the s52 evidence pattern (consumer tracing, grep-proof, tests moved or killed). Do NOT rush — the deprecated surface stays functional until then. |
 
 ### Deliberately deferred expansion
 
@@ -173,14 +175,14 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Launch | **Implemented** — Test → Prism via `LauncherDriver`, companion deploy | `launcher.rs`; `minecraft/launch.rs:11`; `launch_mc_instance` |
 | Companion mod | **Implemented (NeoForge 1.21.1 only)** — item rendering, texture extraction, reload (quest+kubejs enabled s42–s44, evidence-gated), stop/restart | `workbench-companion-neoforge-1.21/` (11 Java files); `ws_protocol.rs:10-41` |
 | Texture pipeline | **Implemented** — descriptor index, lazy materialization, bake: keys, animations, tags | `instance_textures/`; `services/texture-loader/` (facade + materialize/baked/targets); `engine_renders.rs` (CACHE_VERSION 6) |
-| Mod intelligence | **Implemented (network-only)** — Modrinth + CurseForge | `mod_intelligence/modrinth.rs:7`; `curseforge_search.rs:18` |
+| Mod intelligence | **Implemented (network-only) — search/install DEPRECATED under PRISM-LEAN (s53); kept for import paths** | `mod_intelligence/modrinth.rs:7`; `curseforge_search.rs:18` |
 | Maintainer tooling | **Implemented** — integrity, health, backup, memory-check, systemd timer | `scripts/*.mjs`; `docs/tooling.md` |
 
 ### 3.3 Documented-but-aspirational (verified missing from code)
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked; execution hands off to Prism — s53 PRISM-LEAN) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — external handoff via `showGuidedQuest`/`onGuidedQuestClose` (`App.tsx:119-120`), one-shot open. Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
@@ -332,7 +334,7 @@ Every item here exists and works. The roadmap's relationship to each is
 | 4 | Recipe editor (grid, 6 types, disable, bulk replace, JSON import) | `RecipeEditor.tsx`, `core/recipe/*` | Deep | **Keep**; templates/cheat-sheet follow-ups (todo.md:349-361) |
 | 5 | Recipe scan + script generation (KubeJS/CT) | `recipes/mod.rs`, `scriptgen/*` | Deep | **Keep**; behavior-system compiler backend (§11.4) |
 | 6 | Config structured+raw editor | `config-editor.tsx`, `config_parser/` | Works | **Keep**; add HOCON arm or drop from docs (P1-HYGIENE) |
-| 7 | Mods search/install/compat | `ModsTab.tsx`, `mod_intelligence/` | Works | **Keep**; wizard curated picks consume it (§9.3) |
+| 7 | Mods search/install/compat | `ModsTab.tsx`, `mod_intelligence/` | Works (search/install) | **PRISM-LEAN (s53)** — in-app search/install DEPRECATED; Mods tab hands off to Prism (`open_prism_instance`). Diagnosis (scan, track, compat-check) stays. Chunk-2 deletion booked (§0 row 6). |
 | 8 | Pack Health Tier 1 | `core/pack-health/*` | Works | **Harden** (trust-scope gaps) + **Expand** to Tier 2 (§10) |
 | 9 | History/undo w/ journal | `core/history/*`, `history-provider.tsx` | Works | **Keep**; mini-wizards must route through it |
 | 10 | Pack import (mrpack/CF/packwiz/instance) + FTB import | `imports/*` | Works (entry points partially dead) | **Integrate** into wizard's instance-pick; wire or prune dead variants |
@@ -411,7 +413,7 @@ ceiling.
 | Recipes | craft/smelt/stonecut/smith/shapeless, disable, replace ingredient | **~85%** — grid editor, 6 types, unified disable, bulk replace | ~95% | NBT/tag-edge cases, `replaceOutput`, startup-event recipes | Low–Medium (todo.md:349-361 follow-ups) |
 | Quests | tasks, rewards, tables, links, gating, milestones | **~90%** — full canvas parity | ~97% | `quest tags`, multi-page descriptions w/ inline images, theme-file WYSIWYG | Medium (§13 P1-PARITY) |
 | Configs | flip a setting safely, find a setting | **~60%** — structured forms | ~85% | settings with no typed schema, cross-mod interdependencies | Medium (HOCON arm + schema heuristics + config recommendations) |
-| Mods | find, add, remove, enable/disable, compat-check | **~75%** — search+install+compat + one-click install of resolved missing deps | ~90% | curated recommendations; dep installs for optional/recommended (required-only today) | Low |
+| Mods | find, add, remove, enable/disable, compat-check | **~60% (s53 PRISM-LEAN)** — install/search DEPRECATED (Prism owns execution: versions + deps); ModCanvas keeps scan, tracking, remove/toggle, compat DIAGNOSIS + curated list | ~90% | chunk-2 deletion of the deprecated machinery; compat panel install buttons → Prism handoff | Low–Medium |
 | Progression | gating, ordering, bottlenecks, walls | **~50%** — per-quest fields + sim mode; no campaign surface | ~85% | progression-topology analytics (pure math), cross-chapter staging | Medium |
 | Behaviors | "when X, if Y, do Z" (commands, loot on kill, stage gating) | **~5%** — nothing authorable | ~65% | anything requiring custom logic beyond the action library | **High** (the hard no-code problem; §11) |
 | Loot | table edits, drops, weighted tables | **~5%** — nothing | ~60% | deep loot-table composition (nested pools, conditions-in-JSON) | Medium–High |
@@ -664,20 +666,18 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    health quest converges all content branches; 3 example behaviors). The four-card
    `StartChooser` (chunk 2/3) lets the user pick which to start with.
  4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
-    pre-checked, driven by `search_mods` + `install_mod_from_search` (`search.rs:15`).
-    **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
-    file (mod IDs + one-line "why this").     **Status (chunk 3):** implemented — `list_curated_mods` (`commands/modpack/curated.rs`)
+    pre-checked. **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
+    file (mod IDs + one-line "why this").     **Status (chunk 3; s53 PRISM-LEAN):** implemented — `list_curated_mods` (`commands/modpack/curated.rs`)
     serves the list filtered per pack by loader/version (trust rule: unknown support = kept,
     not dropped). Two **core** picks back ModCanvas's own features — FTB Quests (the quest
     book, CurseForge-only, id 289412) and KubeJS (recipe scripts, Modrinth, all loaders) —
-    and render in their own "Needed by ModCanvas" section. A CurseForge pick with no API
-    key configured shows **blocked with a reason**, never a silent absence. Since 2026-08-10
-    the CF pick resolves DIRECTLY (not through the batch) so every failure mode — missing key,
-    fetch failure (e.g. a CF API 403), version mismatch — surfaces as a blocked row with the
-    precise reason; a core pick never vanishes silently. The wizard's
-    curated-mods step (step 2) installs the pre-ticked picks sequentially, then auto-runs the compat check so
-    transitive libraries (FTB Library, Rhino, Architectury) appear as one-click installs,
-    then refreshes the pack so the green check sees the new mods.
+    and render in their own "Needed by ModCanvas" section. **Execution is a Prism handoff
+    (s53):** the step CURATES (what to install) and hands off via "Open Prism to install
+    these" (`prismlauncher --show <instanceId>`) — Prism resolves versions and dependencies,
+    so the old in-app install, the CF-key box, and the one-click transitive-dep installs are
+    GONE (deprecated, chunk-2 deletion booked). Non-instance packs fall back to manual
+    project-page links. Continue refreshes the pack so the green check sees Prism-installed
+    mods.
  5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
     the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
     export path. The zero-code proof point. **Implemented (s41, P0-MINIWIZ):** the wizard's

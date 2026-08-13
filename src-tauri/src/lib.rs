@@ -186,6 +186,7 @@ pub fn run() {
             commands::set_curseforge_api_key,
             commands::clear_curseforge_api_key,
             commands::open_prism_launcher,
+            commands::open_prism_instance,
             commands::get_quest_graph,
             commands::save_quest_graph,
             commands::list_behaviors,

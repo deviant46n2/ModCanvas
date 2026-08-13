@@ -50,6 +50,67 @@ pub async fn open_prism_launcher() -> Result<(), String> {
     Ok(())
 }
 
+/// Open Prism Launcher focused on the project's instance (PRISM-LEAN, s53):
+/// `prismlauncher --show <instanceId>` lands the user on the instance window,
+/// where Prism's own mod downloader — version matching AND dependency
+/// resolution — takes over. The instance ID is the folder name of the
+/// instance dir under `instances/`. Non-instance-backed projects (scratch
+/// packs) error; the UI falls back to manual-download links.
+#[tauri::command]
+pub async fn open_prism_instance(
+    project_id: String,
+    db: State<'_, Database>,
+) -> Result<(), String> {
+    let pid = Uuid::parse_str(&project_id).map_err(|e| format!("Invalid project id: {e}"))?;
+    let project = db
+        .get_project(&pid)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found".to_string())?;
+
+    let instance_id = prism_instance_id(&project.path).ok_or_else(|| {
+        "This pack is not tied to a Prism instance — install its mods manually from the project pages instead."
+            .to_string()
+    })?;
+
+    std::process::Command::new("prismlauncher")
+        .arg("--show")
+        .arg(&instance_id)
+        .spawn()
+        .map_err(|e| format!("Failed to open Prism Launcher: {e}"))?;
+    Ok(())
+}
+
+/// Derive a Prism instance ID from a project's game dir. Prism layouts are
+/// `<root>/instances/<instanceId>/minecraft` — the ID is the instance folder
+/// name, validated by its parent being `instances`. Anything else (scratch
+/// packs, imported folders outside Prism) is not instance-backed.
+fn prism_instance_id(game_dir: &str) -> Option<String> {
+    let minecraft_dir = std::path::Path::new(game_dir);
+    let instance_dir = minecraft_dir.parent()?;
+    let instances_dir = instance_dir.parent()?;
+    if instances_dir.file_name()?.to_str()? != "instances" {
+        return None;
+    }
+    Some(instance_dir.file_name()?.to_string_lossy().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prism_instance_id;
+
+    #[test]
+    fn prism_instance_id_from_instance_layout() {
+        let id = prism_instance_id("/home/u/.local/share/PrismLauncher/instances/My Pack/minecraft");
+        assert_eq!(id.as_deref(), Some("My Pack"));
+    }
+
+    #[test]
+    fn prism_instance_id_rejects_scratch_pack_paths() {
+        assert_eq!(prism_instance_id("/home/u/packs/my-scratch-pack/minecraft"), None);
+        assert_eq!(prism_instance_id("/home/u/.local/share/PrismLauncher/instances"), None);
+    }
+}
+
 #[tauri::command]
 pub async fn import_instance_folder(
     path: String,
