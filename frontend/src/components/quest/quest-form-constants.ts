@@ -39,12 +39,22 @@ export function questScaleFromSize(size?: { width?: number; height?: number } | 
   return Math.round((w / 24) * 10) / 10
 }
 
+// Base pixel size for a 1.0x quest node — the single source of truth, shared
+// by the canvas (`quest-canvas-model.ts` re-exports it) and the detail-panel
+// scale label (`quest-section-groups.tsx`). 36 : 42 (= 6:7 with GRID_SCALE)
+// keeps the editor's quest-body:grid-pitch ratio identical to the in-game
+// quest panel (pitch = zoom*(3/2 + quest_spacing/4), body = zoom*(3/2) at the
+// default quest_spacing=1.0 → 7:6). The s50 "28px label lie" was this constant
+// living only in quest-canvas-model while the label defaulted to 28.
+export const NODE_BASE_PX = 36
+
 // Convert a node's FTB size (grid units, default 24x24) into canvas pixel
-// dimensions. `basePx` is the pixel size of a 1.0x node; the result is clamped
-// so pathological sizes cannot blow up the canvas.
+// dimensions. `basePx` is the pixel size of a 1.0x node (defaults to the
+// canonical NODE_BASE_PX); the result is clamped so pathological sizes cannot
+// blow up the canvas.
 export function questSizeToPixels(
   size?: { width?: number; height?: number } | null,
-  basePx = 28
+  basePx = NODE_BASE_PX
 ): { width: number; height: number } {
   const w = size?.width || 24
   const h = size?.height || 24

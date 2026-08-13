@@ -28,12 +28,12 @@ describe('questScaleFromSize', () => {
 });
 
 describe('questSizeToPixels', () => {
-  it('maps 1.0x node to base pixel size', () => {
-    expect(questSizeToPixels({ width: 24, height: 24 })).toEqual({ width: 28, height: 28 });
+  it('maps 1.0x node to the canonical NODE_BASE_PX (36)', () => {
+    expect(questSizeToPixels({ width: 24, height: 24 })).toEqual({ width: 36, height: 36 });
   });
 
   it('scales proportionally', () => {
-    expect(questSizeToPixels({ width: 48, height: 24 })).toEqual({ width: 56, height: 28 });
+    expect(questSizeToPixels({ width: 48, height: 24 })).toEqual({ width: 72, height: 36 });
   });
 
   it('honors custom base pixel size', () => {
@@ -46,7 +46,7 @@ describe('questSizeToPixels', () => {
   });
 
   it('handles missing size', () => {
-    expect(questSizeToPixels()).toEqual({ width: 28, height: 28 });
+    expect(questSizeToPixels()).toEqual({ width: 36, height: 36 });
   });
 });
 

@@ -6,7 +6,7 @@ import { resolveEdgeState, edgeStyleForState } from '../../core/quest/edge-state
 import { questIconUrl } from './questIcons';
 import { textureDisplayUrl } from '../../services/texture-loader';
 import { shapeTextureKeys, effectiveShape, type ShapeTextures } from '../../core/quest/quest-shapes';
-import { normalizeShape, questSizeToPixels, snapToGridStep } from './quest-form-constants';
+import { normalizeShape, questSizeToPixels, snapToGridStep, NODE_BASE_PX } from './quest-form-constants';
 
 // FTB Quests coordinate spacing — display scale, not snap grain.
 // Kept at exactly 7:6 vs NODE_BASE_PX to mirror the in-game quest panel, where
@@ -14,11 +14,10 @@ import { normalizeShape, questSizeToPixels, snapToGridStep } from './quest-form-
 // default quest_spacing=1.0 → pitch:body = 7:6.
 export const GRID_SCALE = 42
 
-// Base pixel size for a 1.0x quest node. Actual size is derived per quest from
-// `node.size` (FTB grid units, default 24x24 = 1.0x) so scaled quests are
-// visually distinguishable on the canvas. 36 : 42 (= 6:7 with GRID_SCALE) keeps
-// the editor's quest-body:grid-pitch ratio identical to the in-game quest panel.
-export const NODE_BASE_PX = 36
+// Re-exported from quest-form-constants (the single source of truth) so
+// canvas consumers keep one import site. Actual size is derived per quest
+// from `node.size` (FTB grid units, default 24x24 = 1.0x).
+export { NODE_BASE_PX }
 
 // Convert a ReactFlow flow coordinate (node-center anchored) into FTB grid
 // cells. Shared by the AddQuestOverlay and the viewport API so cursor-spawn
