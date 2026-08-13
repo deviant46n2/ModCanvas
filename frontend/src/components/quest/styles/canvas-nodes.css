@@ -144,10 +144,17 @@
   cursor: text;
 }
 
-/* Node handles — invisible, only exist for edge routing */
+/* Node handles — invisible, only exist for edge routing.
+   Zero-sized: getHandlePosition anchors a Position.Bottom handle at its BOTTOM
+   edge (y + height), so any nonzero height biases every edge endpoint below
+   the shape center (the 4px !important below still lost to the library's
+   min-width:5px and put edges 2.5px low). 0×0 + center transform → exact
+   center-to-center anchoring (s49-followup). */
 .ftb-node-handle {
-  width: 4px !important;
-  height: 4px !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   background: transparent !important;
   border: none !important;
   opacity: 0;

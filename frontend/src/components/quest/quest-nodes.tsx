@@ -22,9 +22,16 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
   const nodeWidth = pixelSize?.width || 180;
   const nodeHeight = pixelSize?.height || 120;
   // FTB shape tiles are always square, so size the tile off the node's smaller
-  // dimension regardless of the node box. 0.95 fills the tile like the in-game
-  // quest book (where the shape IS the tile), leaving a hair for the outline.
-  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 0.95));
+  // dimension regardless of the node box. The factor is calibrated against the
+  // in-game render by the maintainer's eye (2026-08-12) — CALIBRATION IN
+  // PROGRESS: every value from 0.8 to 1.8 read smaller than in-game; 1.8 still
+  // reads "way too small compared to the icon". The dial continues at the next
+  // session (2.0+ direction). The ICON does NOT scale with this factor: the
+  // maintainer calibrated the icon separately (see QuestTile.iconBaseSize).
+  const shapeSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight) * 1.8));
+  // The icon anchors to the quest BODY (unscaled by the plate factor) so plate
+  // growth never inflates the icon — s49-followup, calibrated 2026-08-12.
+  const iconBaseSize = Math.max(16, Math.round(Math.min(nodeWidth, nodeHeight)));
   const iconScale =
     typeof d.icon_scaling === 'number' && Number.isFinite(d.icon_scaling)
       ? Math.min(2.0, Math.max(0.1, d.icon_scaling))
@@ -102,6 +109,7 @@ const QuestNodeComponent = memo(function QuestNodeComponent({ data, selected }: 
         iconScaling={iconScale}
         smartFilter={smartFilter}
         textureIndex={d.textureIndex || {}}
+        iconBaseSize={iconBaseSize}
       >
         <Handle
           type="target"

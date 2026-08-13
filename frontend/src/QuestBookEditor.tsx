@@ -14,11 +14,11 @@ import type { ProgressState } from './core/quest/progress'
 import { usePackHealthStore } from './core/pack-health/pack-health-store'
 import { textureDisplayUrl, isTexturePending, requestMaterialize } from './services/texture-loader'
 import { useQuestAssetPipeline } from './hooks/useQuestAssetPipeline'
+import { useGuidedQuestCreate } from './hooks/useGuidedQuestCreate'
 import { useQuestNodeMutations } from './hooks/useQuestNodeMutations'
 import { useQuestStructureMutations } from './hooks/useQuestStructureMutations'
 import { QuestEditorLayout } from './components/quest/QuestEditorLayout'
-import { GuidedQuestWizard, type GuidedQuestSpec } from './components/quest/GuidedQuestWizard'
-import { defaultObjective, defaultReward, defaultQuestNodeData } from './components/quest/quest-helpers'
+import { GuidedQuestWizard } from './components/quest/GuidedQuestWizard'
 
 interface QuestBookEditorProps {
   projectId: string
@@ -107,37 +107,13 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   }, [])
 
   const scheduleAutoSave = useCallback(() => {
-    setTimeout(() => toolbarApiRef.current?.scheduleAutoSave(), 300)
+    setTimeout(() => toolbarApiRef.current?.scheduleAutoSave?.(), 300)
   }, [])
 
-  // Guided quest create (P0-MINIWIZ): build the full node (title + task +
-  // reward) and commit ONCE through the same history path as every other edit,
-  // so the wizard is undoable in a single step. The reward is the collect-N-
-  // get-N loop the template pack teaches; deleting it is one click.
-  const handleGuidedQuestCreate = useCallback((spec: GuidedQuestSpec) => {
-    if (!graph || !activeChapter) return
-    const node = defaultQuestNodeData({
-      chapter_id: activeChapter,
-      label: spec.title || 'New Quest',
-      position: { x: 80, y: 80 },
-    })
-    const objective = {
-      ...defaultObjective(),
-      objective_type: spec.objectiveType,
-      target: spec.target,
-      target_count: spec.count,
-    }
-    const newNode = {
-      ...node,
-      objectives: [objective],
-      rewards: spec.includeReward
-        ? [{ ...defaultReward(), reward_type: 'item', item_id: spec.rewardItem, item_count: spec.rewardCount }]
-        : [],
-    }
-    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] }, { split: true })
-    setSelectedNodeId(newNode.id)
-    scheduleAutoSave()
-  }, [graph, activeChapter, commitGraph, setSelectedNodeId, scheduleAutoSave])
+  // Guided "Add a quest" create — see useGuidedQuestCreate (P0-MINIWIZ).
+  const handleGuidedQuestCreate = useGuidedQuestCreate({
+    graph, activeChapter, commitGraph, setSelectedNodeId, scheduleAutoSave, toolbarApiRef,
+  })
 
   const instancePath = ingestResult?.active_instance || projectPath || ''
 
@@ -223,11 +199,6 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }))
   }, [])
 
-  const histStatus = useMemo(() => ({
-    undo: history.canUndo,
-    redo: history.canRedo,
-  }), [history])
-
   if (!graph) {
     return <QuestBookSkeleton />
   }
@@ -275,10 +246,6 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       simMode={simMode}
       setSimMode={setSimMode}
       simProgress={simProgress}
-      onUndo={history.undo}
-      onRedo={history.redo}
-      canUndo={histStatus.undo}
-      canRedo={histStatus.redo}
       onOpenGuidedQuest={() => setGuidedQuestLocal(true)}
       {...nodeMutations}
       {...structureMutations}

@@ -51,7 +51,8 @@ undo" reverses that exact sequence in the same order.
 - `App.tsx` wraps the workspace in `HistoryProvider`.
 - `QuestBookEditor` — `commitGraph` commits each graph mutation into the shared
   store (removing its old local undo/redo); a `'graph'` handler restores
-  snapshots to the canvas. Toolbar undo/redo buttons reflect the global state.
+  snapshots to the canvas. Undo/redo is keyboard-only (Ctrl+Z / Ctrl+Y) —
+  the canvas toolbar buttons were removed as surface duplication (s49-followup).
 - `useConfigState` / `ConfigsTab` — `updateConfigValue` commits before/after
   `ConfigValue` trees into the store; raw-mode textarea edits go through
   `setRawConfigContent`, which commits the before/after file content too (rapid

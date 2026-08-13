@@ -17,9 +17,6 @@ interface CanvasToolbarProps {
   setShowMiniMap: (v: boolean) => void
   showBackground: boolean
   setShowBackground: (v: boolean) => void
-  connectMode: boolean
-  onToggleConnect: () => void
-  onFitView: () => void
   editLocked: boolean
   onToggleEditLocked: () => void
   onShowShortcuts: () => void
@@ -41,10 +38,6 @@ interface CanvasToolbarProps {
   onToggleSim: () => void
   onCompleteAll?: () => void
   onResetAll?: () => void
-  onUndo?: () => void
-  canUndo?: boolean
-  onRedo?: () => void
-  canRedo?: boolean
 }
 
 export function CanvasToolbar({
@@ -57,9 +50,6 @@ export function CanvasToolbar({
   setShowMiniMap,
   showBackground,
   setShowBackground,
-  connectMode,
-  onToggleConnect,
-  onFitView,
   editLocked,
   onToggleEditLocked,
   onShowShortcuts,
@@ -81,31 +71,10 @@ export function CanvasToolbar({
   onToggleSim,
   onCompleteAll,
   onResetAll,
-  onUndo,
-  canUndo,
-  onRedo,
-  canRedo,
 }: CanvasToolbarProps) {
   return (
     <div className="canvas-toolbar">
       <div className="toolbar-group">
-        <button className="toolbar-btn" onClick={onFitView} title="Fit View">
-          Fit
-        </button>
-        <button className="toolbar-btn" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">
-          Undo
-        </button>
-        <button className="toolbar-btn" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Y)">
-          Redo
-        </button>
-        <button
-          className={`toolbar-btn${connectMode ? ' toolbar-btn-active' : ''}`}
-          onClick={onToggleConnect}
-          disabled={editLocked}
-          title="Toggle dependency editing: drag between quest connection ports"
-        >
-          Connect
-        </button>
         <EditLockButton locked={editLocked} onToggle={onToggleEditLocked} />
         <button className="toolbar-btn" onClick={onShowShortcuts} title="Shortcuts & gestures (?)">
           ?

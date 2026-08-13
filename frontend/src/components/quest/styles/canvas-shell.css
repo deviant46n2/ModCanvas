@@ -173,6 +173,15 @@
   background: var(--ftb-accent-hover);
 }
 
+/* Connect mode ON (the toggle moved into this overlay s49-followup): same
+   active-state language as .toolbar-btn-active, scoped to the overlay. */
+.chapter-add-button-active {
+  background: var(--ftb-accent-hover);
+  border-color: var(--ftb-accent);
+  color: #fff;
+  opacity: 1;
+}
+
 /* Add-quest count ticker (s49): a ± stepper next to "+ Add Quest" so several
    quests can spawn at once, cascaded by the mutation — never stacked. */
 .chapter-add-row {

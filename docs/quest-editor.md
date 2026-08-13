@@ -109,9 +109,11 @@ Cycle detection (`detectCycles`) flags any edge that is part of a strongly-conne
 
 ## Creating Edges
 
-1. Toggle **Connect** in the canvas toolbar. A banner appears and each quest exposes a
-   connection port at its CENTER (React Flow v12 renders source handles with a bare
-   `source` class — the connect-mode CSS targets `.react-flow__handle.source`).
+1. Toggle **Connect** on the floating canvas overlay (next to + Add Quest and
+   Add Link; the connect banner offers the secondary exit). A banner appears and
+   each quest exposes a connection port at its CENTER (React Flow v12 renders
+   source handles with a bare `source` class — the connect-mode CSS targets
+   `.react-flow__handle.source`).
 2. Drag from the port on the prerequisite quest to the quest that depends on it.
 
 Only the **source** ports are interactive in connect mode. Because React Flow is in loose connection mode, grabbing a *target* port would invert the dependency direction; hiding them makes **drag-from-A-to-B always produce "A → B"** (A required before B). The connection acceptance radius is widened (`connectionRadius` 40) so a drop anywhere on a large quest tile still lands on its center target handle.
@@ -180,10 +182,12 @@ Assets").
 3. **Rendering** — `quest-canvas-model.ts` (`buildCanvasNodes`/`getShapeTextures`, driven by the `useQuestCanvasModel.ts` hook) resolves the keys against the materialized
    `textureIndex` via `textureDisplayUrl` (usable index value, else the
    `getMaterialized` data URL) and passes the URLs to `quest-nodes.tsx`. When all
-   layers resolve, `bakeShapeTile` (`shape-textures.ts`) rasterizes the whole
-   tile **once into a single square PNG at the node's display size** (0.95 of
-   the node's smaller dimension — matching the game, where the shape IS the
-   tile; 0.8 rendered it visibly small): the white
+    layers resolve, `bakeShapeTile` (`shape-textures.ts`) rasterizes the whole
+    tile **once into a single square PNG at the node's display size** (1.8 of
+    the node's smaller dimension — eye-calibrated 2026-08-12, CALIBRATION IN
+    PROGRESS: 0.8 through 1.8 all read smaller than in-game; the dial continues
+    at the next session, 2.0+ direction, anchored to the maintainer's read that
+    the in-game tile is much larger relative to its icon): the white
    `background.png` silhouette is filled ONCE via a `source-in` fill with a
    FLAT solid dark-grey plate — measured (63,63,70) across a 28px run of an
    in-game screenshot (2026-08-09); the game's plate has no gradient and no
@@ -202,10 +206,14 @@ Assets").
    `image-rendering` stretching can distort the geometry (gear teeth, octagon
    sides, hexagon orientation) — this is what kept circles round under WebKit
    and avoids a grey plate box behind each shape. The node adds a    `has-texture`
-     modifier that disables the CSS clip-path/border fallback. The quest icon is
-     sized to **2/3 of the shape**, matching the in-game icon-to-tile ratio
-     (2/3 scaled by the quest's `icon_scale`) — the old 85% rendered texels
-     ~28% larger than in-game. The quest's per-quest `icon_scale` (0.1 – 2.0,
+    modifier that disables the CSS clip-path/border fallback. The quest icon is
+    sized from the quest **body** (`iconBaseSize` — the pixel size unscaled by
+    the plate factor): 24px for a 1.0 quest, stable while the plate grows for
+    in-game overlap parity (s49-followup, calibrated 2026-08-12 — the icon was
+    once a fraction of the plate, so plate growth inflated it past the
+    maintainer's "perfect" size). Surfaces passing only `size` (the detail
+    modal) keep the 0.667 fraction of their tile. The quest's per-quest
+    `icon_scale` (0.1 – 2.0,
      the "Icon Scale" Appearance field) multiplies the icon size too, so a 1.5× quest
      renders a 150%-sized icon exactly as it does in-game; the factor is clamped
      to the 0.1 – 2.0 range in `quest-nodes.tsx`.
@@ -328,6 +336,11 @@ the in-game quest editor's placement behavior:
   steps.
 - **Shift disables snapping** — holding Shift during a drag places objects at
   arbitrary (free) coordinates, exactly like the in-game shift behavior.
+- **The background grid IS the snap grain** — the canvas background dots
+  render at `GRID_SCALE × grid_scale` (21px at defaults), not the 1-unit
+  pitch, so every snapped quest center sits exactly on a dot. (It used to
+  render at 1-unit spacing, leaving half-unit snapped quests visibly between
+  dots — s49-followup.)
 - **Group drags snap as a unit** — the selection's min corner is snapped and the
   relative offsets between selected quests are preserved, matching in-game
   `questX + (obj.pos − minCorner)`.
@@ -386,7 +399,7 @@ the in-game quest editor's placement behavior:
 - `src-tauri/src/imports/ftb_quests/export.rs` always writes `icon_scale` (both
   layouts), so FTB picks the value up.
 - `src-tauri/src/quest/types/node.rs` stores it as `icon_scaling: f64` (default 1.0);
-  the node renderer multiplies the 2/3 icon size by it (see above).
+  the node renderer multiplies the body-anchored icon size by it (see above).
 
 ## Quest id validity (FTB `Long.parseLong`)
 
@@ -747,8 +760,9 @@ editing UX:
 
 ## Undo / redo
 
-Edits are undoable via **Ctrl+Z** (undo) / **Ctrl+Y** (redo), and the canvas
-toolbar's **↩ Undo / ↪ Redo** buttons (disabled when no history exists). Every
+Edits are undoable via **Ctrl+Z** (undo) / **Ctrl+Y** (redo) — the app-wide
+key handler (the canvas toolbar buttons were removed as surface duplication,
+s49-followup). Every
 mutating graph change goes through `QuestBookEditor.commitGraph`, which pushes
 the pre-mutation graph onto the app-wide shared `HistoryStore`
 (`frontend/src/core/history/store.ts`, bounded to `DEFAULT_MAX_ENTRIES = 200`

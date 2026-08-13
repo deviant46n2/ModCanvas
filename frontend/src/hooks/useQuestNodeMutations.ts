@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type { QuestGraphData, QuestNodeData, QuestEdgeData } from '../services/quest-types'
 import { generateFtbHexId, defaultObjective, defaultReward, defaultQuestNodeData, moveArrayItem } from '../components/quest/quest-helpers'
+import { snapToGridStep } from '../components/quest/quest-form-constants'
 
 /** Grid position for the i-th quest in a multi-add cascade: 2 cells along x,
  *  alternating 1 cell up/down in y — distinct for every i, so a 10-quest
@@ -44,7 +45,15 @@ export function useQuestNodeMutations({
 
   const onAddQuest = useCallback((_chapterId?: string, position?: { x: number; y: number }, count = 1) => {
     if (!graph || !activeChapter) return
-    const base = position || { x: 0, y: 0 }
+    const gs = graph.grid_scale || 0.5
+    // Spawn positions are snapped to the same grain quests drag to (grid_scale
+    // × minSize, 0.5 units for a default quest) so freshly created quests sit
+    // on the background grid dots — spawn-at-cursor used to leave quests at
+    // arbitrary fractional positions that stayed off-grid until dragged
+    // (s49-followup; the walk found a quest at x=17.87).
+    const base = position
+      ? { x: snapToGridStep(position.x, gs, 1), y: snapToGridStep(position.y, gs, 1) }
+      : { x: 0, y: 0 }
     // Cascade new nodes along the grid so a multi-add never stacks them on
     // top of each other (s49 walkthrough: every add landed at (0,0) and
     // refits piled them in the corner). The last node stays selected so the
@@ -63,10 +72,13 @@ export function useQuestNodeMutations({
 
   const onAddQuestWithTask = useCallback((_chapterId: string, objectiveType: string, position?: { x: number; y: number }) => {
     if (!graph || !activeChapter) return
+    const gs = graph.grid_scale || 0.5
     const node = defaultQuestNodeData({
       chapter_id: activeChapter,
       label: 'New Quest',
-      position: position || { x: 0, y: 0 },
+      position: position
+        ? { x: snapToGridStep(position.x, gs, 1), y: snapToGridStep(position.y, gs, 1) }
+        : { x: 0, y: 0 },
     })
     const objective = { ...defaultObjective(), objective_type: objectiveType }
     const newNode = { ...node, objectives: [objective] }
@@ -77,11 +89,14 @@ export function useQuestNodeMutations({
 
   const onAddQuestLink = useCallback((_chapterId?: string, position?: { x: number; y: number }) => {
     if (!graph || !activeChapter) return
+    const gs = graph.grid_scale || 0.5
     const newNode = defaultQuestNodeData({
       chapter_id: activeChapter,
       node_type: 'quest_link',
       label: 'New Link',
-      position: position || { x: 0, y: 0 },
+      position: position
+        ? { x: snapToGridStep(position.x, gs, 1), y: snapToGridStep(position.y, gs, 1) }
+        : { x: 0, y: 0 },
       link_target: graph.nodes.find((n: QuestNodeData) => n.node_type === 'quest')?.id || '',
     })
     commitGraph({ ...graph, nodes: [...graph.nodes, newNode] })

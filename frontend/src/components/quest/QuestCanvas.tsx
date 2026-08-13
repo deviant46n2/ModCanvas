@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState, useMemo, useRef } from 'react';
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -8,12 +8,14 @@ import type {
   QuestGraphData, QuestChapter, QuestNodeData, QuestEdgeData, ChapterImage,
 } from '../../services/quest-types';
 import type { ProgressState } from '../../core/quest/progress';
+import type { ToolbarAPI } from './import-export';
 import { isMilestoneShape } from '../../core/quest/quest-shapes';
 import { useQuestCanvasModel } from './useQuestCanvasModel';
 import { useChapterDisplayState } from './useChapterDisplayState';
 import { useQuestCanvasKeyboard } from './useQuestCanvasKeyboard';
 import { useQuestCanvasInteractions } from './useQuestCanvasInteractions';
 import { useQuestCanvasContextMenu } from './useQuestCanvasContextMenu';
+import { useQuestViewportApi } from './useQuestViewportApi';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasArea } from './CanvasArea';
 import '@xyflow/react/dist/style.css';
@@ -50,10 +52,8 @@ interface QuestCanvasProps {
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void;
   onCompleteAll?: () => void;
   onResetAll?: () => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
+  /** ToolbarAPI ref — the hook fills in the canvas-owned viewport members. */
+  toolbarApiRef: React.MutableRefObject<ToolbarAPI | null>;
 }
 
 export function QuestCanvas(props: QuestCanvasProps) {
@@ -93,10 +93,7 @@ function QuestCanvasInner({
   onSetQuestProgress,
   onCompleteAll,
   onResetAll,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
+  toolbarApiRef,
 }: QuestCanvasProps) {
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
@@ -112,6 +109,8 @@ function QuestCanvasInner({
   const [editLocked, setEditLocked] = useState(false);
   const { fitView, screenToFlowPosition } = useReactFlow();
   const { zoom } = useViewport();
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  useQuestViewportApi({ toolbarApiRef, paneRef, screenToFlowPosition, fitView });
 
   const {
     nodes, edges, onNodesChange, onEdgesChange, setEdges,
@@ -143,7 +142,7 @@ function QuestCanvasInner({
     handleConnect, handleNodesChange, handleEdgesChange, handleReconnect,
     handleEdgeClick, handleEdgeDoubleClick, handleNodeClick,
     handleNodeMouseEnter, handleNodeMouseLeave, handlePaneClick,
-    handleNodeDoubleClick, handleNodeDragStop, handleAddNode, handleFitView,
+    handleNodeDoubleClick, handleNodeDragStop, handleAddNode,
   } = useQuestCanvasInteractions({
     setSelectedIds, setSelectedEdgeId, setSelectedNodeId, setHoveredNodeId,
     setSelectedDecoIndex,
@@ -151,7 +150,6 @@ function QuestCanvasInner({
     onAddEdge, onUpdateEdge, onDeleteEdge, onUpdateNodes, onAddNode,
     editLocked, simMode, onSetQuestProgress, simProgress,
     questGridScale: questGraph.grid_scale,
-    fitView,
   });
 
   const {
@@ -220,8 +218,6 @@ function QuestCanvasInner({
         cycleCount={cycleEdges.size}
         showMiniMap={showMiniMap} setShowMiniMap={setShowMiniMap}
         showBackground={showBackground} setShowBackground={setShowBackground}
-        connectMode={connectMode} onToggleConnect={handleToggleConnect}
-        onFitView={handleFitView}
         editLocked={editLocked} onToggleEditLocked={() => setEditLocked((v) => !v)}
         onShowShortcuts={() => setShowShortcuts(true)}
         searchQuery={searchQuery} searchMatchCount={searchMatchIds ? searchMatchIds.size : 0}
@@ -233,11 +229,11 @@ function QuestCanvasInner({
         decorEditMode={decorEditMode} onToggleDecorEdit={handleToggleDecorEdit}
         simMode={simMode} onToggleSim={() => setSimMode?.(!simMode)}
         onCompleteAll={onCompleteAll} onResetAll={onResetAll}
-        onUndo={onUndo} canUndo={canUndo} onRedo={onRedo} canRedo={canRedo}
       />
       <CanvasArea
         questBackgroundUrl={questBackgroundUrl}
         connectMode={connectMode} onExitConnect={() => setConnectMode(false)}
+        onToggleConnect={handleToggleConnect}
         decorEditMode={decorEditMode}
         textureIndex={textureIndex} activeChapterImages={activeChapterImages}
         zoom={zoom}
@@ -270,6 +266,8 @@ function QuestCanvasInner({
         nodeLabelById={nodeLabelById}
         selectedDecoIndex={selectedDecoIndex} onSelectDeco={setSelectedDecoIndex}
         onOpenAssetsFolder={onOpenAssetsFolder}
+        paneRef={paneRef}
+        gridScale={questGraph.grid_scale}
         onChangeDecorations={activeChapter ? (imgs) => onUpdateChapterImages(activeChapter, imgs) : () => {}}
       />
     </div>

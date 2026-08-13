@@ -20,6 +20,13 @@ export const GRID_SCALE = 42
 // the editor's quest-body:grid-pitch ratio identical to the in-game quest panel.
 export const NODE_BASE_PX = 36
 
+// Convert a ReactFlow flow coordinate (node-center anchored) into FTB grid
+// cells. Shared by the AddQuestOverlay and the viewport API so cursor-spawn
+// and center-spawn use the same mapping (s49-followup).
+export function flowToGridPos(flow: { x: number; y: number }): { x: number; y: number } {
+  return { x: (flow.x - NODE_BASE_PX / 2) / GRID_SCALE, y: (flow.y - NODE_BASE_PX / 2) / GRID_SCALE }
+}
+
 // Resolve a node's shape textures from the materialized texture index. Keys
 // come from the instance's FTB Quests jar (`ftbquests:textures/shapes/...`) and
 // are materialized lazily at runtime — nothing is bundled with the app. Returns

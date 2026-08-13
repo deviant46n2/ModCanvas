@@ -30,6 +30,7 @@ import { XIcon } from '../ui/icons'
 interface CanvasAreaProps {
   questBackgroundUrl?: string | null
   connectMode: boolean
+  onToggleConnect: () => void
   onExitConnect: () => void
   decorEditMode: boolean
   textureIndex?: Record<string, string>
@@ -85,10 +86,16 @@ interface CanvasAreaProps {
   onSelectDeco: (index: number | null) => void
   onOpenAssetsFolder: () => void
   onChangeDecorations: (images: ChapterImage[]) => void
+  /** The element wrapping <ReactFlow>; its rect defines the visible pane. */
+  paneRef?: React.RefObject<HTMLDivElement | null>
+  /** Pack snap scale (QuestGraph.grid_scale, default 0.5) — the background
+   *  grid renders at GRID_SCALE × grid_scale so snapped quests always sit ON
+   *  a dot (s49-followup; the old 1-unit dots misaligned half-unit snaps). */
+  gridScale?: number
 }
 
 export function CanvasArea({
-  questBackgroundUrl, connectMode, onExitConnect, decorEditMode, textureIndex,
+  questBackgroundUrl, connectMode, onExitConnect, onToggleConnect, decorEditMode, textureIndex,
   activeChapterImages,
   zoom,
   nodes, edges, onNodesChange, onEdgesChange,
@@ -104,9 +111,10 @@ export function CanvasArea({
   selectedEdge,
   onDeleteEdge, setSelectedEdgeId, nodeLabelById, selectedDecoIndex,
   onSelectDeco, onChangeDecorations, onOpenAssetsFolder,
+  paneRef, gridScale,
 }: CanvasAreaProps) {
   return (
-    <div className={`quest-canvas-wrapper${questBackgroundUrl ? ' has-backdrop' : ''}${connectMode ? ' connect-mode' : ''}`}>
+    <div ref={paneRef} className={`quest-canvas-wrapper${questBackgroundUrl ? ' has-backdrop' : ''}${connectMode ? ' connect-mode' : ''}`}>
       {questBackgroundUrl && (
         <div
           className="quest-canvas-backdrop"
@@ -180,7 +188,7 @@ export function CanvasArea({
         nodesDraggable={!connectMode && !editLocked}
         nodesConnectable={connectMode && !editLocked}
       >
-        {showBackground && <Background variant={BackgroundVariant.Dots} gap={GRID_SCALE} size={1} color="#3a3a3a" />}
+        {showBackground && <Background variant={BackgroundVariant.Dots} gap={GRID_SCALE * (gridScale || 0.5)} size={1} color="#3a3a3a" />}
         {showMiniMap && <MiniMap nodeColor={(node: any) => (node.data?.color as string) || '#89b4fa'} />}
         <Controls />
       </ReactFlow>
@@ -213,11 +221,14 @@ export function CanvasArea({
         />
       )}
 
-      {activeChapter && !decorEditMode && !connectMode && !editLocked && (
+      {/* Visible in connect mode too, so the Connect toggle (moved here s49-
+          followup) stays operable — the banner X is the secondary exit. */}
+      {activeChapter && !decorEditMode && !editLocked && (
         <AddQuestOverlay
           activeChapter={activeChapter}
           editLocked={editLocked}
           connectMode={connectMode}
+          onToggleConnect={onToggleConnect}
           decorEditMode={decorEditMode}
           onAddNode={onAddNode}
           onAddLink={onAddLink}

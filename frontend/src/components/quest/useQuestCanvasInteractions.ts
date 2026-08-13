@@ -24,7 +24,6 @@ interface UseQuestCanvasInteractionsArgs {
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void
   simProgress: ProgressState
   questGridScale: number | undefined
-  fitView: (options?: { duration?: number; padding?: number; maxZoom?: number; nodes?: Array<{ id: string }> }) => void
 }
 
 export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs) {
@@ -34,7 +33,7 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
     onNodesChange, onEdgesChange, setEdges,
     onAddEdge, onUpdateEdge, onDeleteEdge, onUpdateNodes, onAddNode,
     editLocked, simMode, onSetQuestProgress, simProgress,
-    questGridScale, fitView,
+    questGridScale,
   } = args
 
   const handleConnect = useCallback(
@@ -159,14 +158,10 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
     [onAddNode]
   )
 
-  const handleFitView = useCallback(() => {
-    fitView({ duration: 500 })
-  }, [fitView])
-
   return {
     handleConnect, handleNodesChange, handleEdgesChange, handleReconnect,
     handleEdgeClick, handleEdgeDoubleClick, handleNodeClick,
     handleNodeMouseEnter, handleNodeMouseLeave, handlePaneClick,
-    handleNodeDoubleClick, handleNodeDragStop, handleAddNode, handleFitView,
+    handleNodeDoubleClick, handleNodeDragStop, handleAddNode,
   }
 }

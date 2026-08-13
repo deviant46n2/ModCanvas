@@ -12,11 +12,19 @@ import { pickDir } from './pick-dir'
 import { TagIcon, SettingsIcon, TrophyIcon } from '../ui/icons'
 
 export interface ToolbarAPI {
-  scheduleAutoSave: () => void
-  openIconPicker: (target: { type: 'quest' | 'objective' | 'reward' | 'chapter' | 'book'; index?: number; nodeId?: string }) => void
+  /** Populated by the toolbar; consumers always optional-chain (the api
+   *  legitimately starts life without members until each owner mounts). */
+  scheduleAutoSave?: () => void
+  openIconPicker?: (target: { type: 'quest' | 'objective' | 'reward' | 'chapter' | 'book'; index?: number; nodeId?: string }) => void
+  /** Spawn position for surfaces outside <ReactFlow> (the guided-quest
+   *  wizard): the visible pane center in FTB grid coords, or null when the
+   *  canvas isn't laid out yet. Populated by QuestCanvas (s49-followup). */
+  getSpawnGridPos?: () => { x: number; y: number } | null
+  /** Animated fitView to a node so a just-created quest is revealed. */
+  focusNode?: (nodeId: string) => void
 }
 
-type IconPickerTarget = Parameters<ToolbarAPI['openIconPicker']>[0]
+type IconPickerTarget = Parameters<NonNullable<ToolbarAPI['openIconPicker']>>[0]
 
 interface ImportExportToolbarProps {
   graph: QuestGraphData

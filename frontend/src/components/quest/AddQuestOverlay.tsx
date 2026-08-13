@@ -7,12 +7,13 @@
 
 import { useState } from 'react'
 import { useReactFlow } from '@xyflow/react'
-import { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
+import { flowToGridPos } from './quest-canvas-model'
 
 interface AddQuestOverlayProps {
   activeChapter: string | null
   editLocked: boolean
   connectMode: boolean
+  onToggleConnect: () => void
   decorEditMode: boolean
   onAddNode: (chapterId: string, position?: { x: number; y: number }, count?: number) => void
   onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void
@@ -24,6 +25,7 @@ export function AddQuestOverlay({
   activeChapter,
   editLocked,
   connectMode,
+  onToggleConnect,
   decorEditMode,
   onAddNode,
   onAddLink,
@@ -31,17 +33,16 @@ export function AddQuestOverlay({
   const { screenToFlowPosition } = useReactFlow()
   const [count, setCount] = useState(1)
 
-  if (!activeChapter || decorEditMode || connectMode || editLocked) return null
+  // The overlay stays visible in connect mode so the toggle can turn it off —
+  // hiding here would make the mode switch unreachable (s49-followup).
+  if (!activeChapter || decorEditMode || editLocked) return null
 
   // Same flow-position mapping as the context menu: the node's center lands
   // on the cursor, so clicking "where I want it" spawns it there — never at
   // the off-screen (0,0) corner the old fallback produced (s49).
   function clickFlowPos(e: React.MouseEvent<HTMLDivElement>) {
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-    return {
-      x: (p.x - NODE_BASE_PX / 2) / GRID_SCALE,
-      y: (p.y - NODE_BASE_PX / 2) / GRID_SCALE,
-    }
+    return flowToGridPos(p)
   }
 
   function bump(delta: number) {
@@ -78,6 +79,13 @@ export function AddQuestOverlay({
       </div>
       <div className="chapter-add-button chapter-add-link-button" onClick={(e) => onAddLink?.(activeChapter, clickFlowPos(e))} title="Add a quest link that references another quest (cross-chapter)">
         Add Link
+      </div>
+      <div
+        className={`chapter-add-button${connectMode ? ' chapter-add-button-active' : ''}`}
+        onClick={onToggleConnect}
+        title="Toggle dependency editing: drag between quest connection ports"
+      >
+        Connect
       </div>
     </div>
   )

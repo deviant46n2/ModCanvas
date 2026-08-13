@@ -22,6 +22,10 @@ export interface QuestTileProps {
   shapeTextures?: { background: string; outline: string; shape: string }
   /** The baked-tile display size in px (the visible square). */
   size: number
+  /** Quest BODY size in px (unscaled by the plate factor). When provided, the
+   *  icon anchors to this instead of `size`, so growing the plate (in-game
+   *  parity) never inflates the icon (s49-followup). */
+  iconBaseSize?: number
   /** Item registry key of the quest icon. */
   icon?: string
   /** Materialized icon URL (may lag the key; AnimatedSprite falls back). */
@@ -51,6 +55,7 @@ export function QuestTile({
   color,
   shapeTextures,
   size,
+  iconBaseSize,
   icon,
   iconUrl,
   iconScaling,
@@ -68,14 +73,18 @@ export function QuestTile({
   const hasQuestColor = !!color;
   const fallbackColor = hasQuestColor ? color! : SHAPE_OUTLINE_GREY;
 
-  // In-game the quest icon renders at 2/3 of the quest tile's size, scaled by
-  // the quest's `icon_scale` (editor range 0.1–2.0), clamped — mirrors the
-  // canvas node exactly.
+  // In-game the quest icon renders at ~0.45 of the quest tile's size at
+  // icon_scale 1.0 (measured from an in-game screenshot 2026-08-12: a 58px
+  // icon inside a 128px plate). The canvas node passes iconBaseSize — the
+  // quest body unscaled by the plate factor — so the icon size is stable at
+  // 24px for a 1.0 quest while the plate grows for in-game parity; surfaces
+  // that pass only `size` (the detail modal) keep the fraction of their tile.
   const scale =
     typeof iconScaling === 'number' && Number.isFinite(iconScaling)
       ? Math.min(2.0, Math.max(0.1, iconScaling))
       : 1.0;
-  const iconSize = Math.max(8, Math.round(size * (2 / 3) * scale));
+  const iconAnchor = iconBaseSize ?? size;
+  const iconSize = Math.max(8, Math.round(iconAnchor * 0.667 * scale));
 
   const [imgError, setImgError] = useState(false);
   const [tileUrl, setTileUrl] = useState<string | null>(null);

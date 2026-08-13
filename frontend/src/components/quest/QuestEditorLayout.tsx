@@ -63,10 +63,6 @@ interface QuestEditorLayoutProps {
   simMode: boolean
   setSimMode: (on: boolean) => void
   simProgress: ProgressState
-  onUndo: () => void
-  onRedo: () => void
-  canUndo: boolean
-  canRedo: boolean
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void
   onAddEdge: (edge: { source: string; target: string }) => void
@@ -191,10 +187,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onSetQuestProgress={props.onSetQuestProgress}
             onCompleteAll={props.onCompleteAll}
             onResetAll={props.onResetAll}
-            onUndo={props.onUndo}
-            onRedo={props.onRedo}
-            canUndo={props.canUndo}
-            canRedo={props.canRedo}
+            toolbarApiRef={props.toolbarApiRef}
           />
         </main>
         {selectedNode && (
@@ -214,7 +207,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onUpdateReward={props.onUpdateReward}
             onMoveObjective={props.onMoveObjective}
             onMoveReward={props.onMoveReward}
-            openIconPicker={(target) => props.toolbarApiRef.current?.openIconPicker(target)}
+            openIconPicker={(target) => props.toolbarApiRef.current?.openIconPicker?.(target)}
             onOpenItemPicker={props.setItemPickerTarget}
             onClose={() => props.setSelectedNodeId(null)}
             simProgress={props.simProgress}
@@ -253,7 +246,7 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onUpdate={(data) => props.onUpdateChapter(editChapter.id, data)}
             onDelete={() => props.onDeleteChapter(editChapter.id)}
             onMove={(dir) => props.onMoveChapter(editChapter.id, dir)}
-            onPickIcon={() => props.toolbarApiRef.current?.openIconPicker({ type: 'chapter', nodeId: editChapter.id })}
+            onPickIcon={() => props.toolbarApiRef.current?.openIconPicker?.({ type: 'chapter', nodeId: editChapter.id })}
             onMoveToGroup={(groupId) => props.onAssignChapterToGroup(editChapter.id, groupId)}
             onClose={() => props.setEditChapterId(null)}
           />
