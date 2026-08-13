@@ -206,25 +206,36 @@ maintainer's.
 | 2 | Hot-swap freeze myth, 6 sites | Doc drift | P2 | **FIXED** (b539f5b) |
 | 3 | §3.4 roster (4 stale items) | Doc drift | P2 | **FIXED** (b539f5b) |
 | 4 | texture-loader.ts:164 dead citation | Doc drift | P3 | **FIXED** (b539f5b) |
-| 5 | SyncPipeline dead class | Dead code | P2 | OPEN |
+| 5 | SyncPipeline dead class | Dead code | P2 | **FIXED** (aff5c18) — removed; reload live via hotswap.ts |
 | 6 | reactflow dead dependency | Dead code | P3 | **FIXED** (b539f5b) |
-| 7 | Protocol dead items (PING/PONG, RELOAD_ALL, replay, ws-ipc:status) | Dead code | P3 | OPEN |
-| 8 | Pack Health target dead payload | Dead payload | P3 | OPEN |
-| 9 | quest/analysis.rs dead-end command | Dead code | P2 | OPEN |
-| 10 | npm lockfile stale + competing | Duplication | P3 | OPEN |
-| 11 | Beginner Mode gates 2/7 | Product | P1/P2 | OPEN |
-| 12 | No real-pack fixture, zero e2e | Testing | P1 | OPEN |
-| 13 | companion-socket.ts + Java zero tests | Testing | P2 | OPEN |
-| 14 | useBehaviorItemPicker hardcoded adapter | Over-abstraction smell | P3 | OPEN |
-| 15 | Doc-sync gate verifies anchors not truth | Governance | P2 | OPEN |
+| 7 | Protocol dead items (PING/PONG, ws-ipc:status, CLIENT_INFO replay) | Dead code | P3 | **FIXED** (aff5c18) — app-side removed; RELOAD_ALL (Java) staged for companion session |
+| 8 | Pack Health target dead payload | Dead payload | P3 | **OPEN** — ruled WIRE; execution pending (cross-tab focus work) |
+| 9 | quest/analysis.rs dead-end command | Dead code | P2 | **FIXED** (aff5c18) — pruned |
+| 10 | npm lockfile stale + competing | Duplication | P3 | **FIXED** (aff5c18) — removed |
+| 11 | Beginner Mode gates 2/7 | Product | P1/P2 | **OPEN** — ruled REDESIGN; booked as directed item |
+| 12 | No real-pack fixture, zero e2e | Testing | P1 | **OPEN** — ruled DEFER; booked as directed item |
+| 13 | companion-socket.ts + Java zero tests | Testing | P2 | **OPEN** — ruled DEFER with written reason |
+| 14 | useBehaviorItemPicker hardcoded adapter | Over-abstraction smell | P3 | **FIXED** (aff5c18) — real adapter resolution |
+| 15 | Doc-sync gate verifies anchors not truth | Governance | P2 | **OPEN** — ruled REJECT (semantic-truth automation low-confidence, high-cost) |
 
 ## Problems discovered but NOT fixed (prompt done-definition #10)
 
-All OPEN-ruled findings above (§5,7,8,9,10,11,12,13,14,15) plus: the stale npm
-lockfile (10), the missing jump-to-quest (8), the untested bridge surface (13).
-Each has evidence and a recommended action in its section; none was changed
-because each requires a maintainer ruling — judgment was not made for the
-student.
+Findings 8, 11, 12, 13, 15 remain OPEN by maintainer ruling:
+- **8** (Pack Health `target` dead payload) — ruled WIRE; execution is the
+  cross-tab jump-to-quest pass (separate focused work with a test).
+- **11** (Beginner Mode gates 2/7) — ruled REDESIGN; a product call booked as a
+  directed-maintenance item, not a code fix.
+- **12** (no real-pack fixture) — ruled DEFER; the golden-artifact fixture
+  suite is the highest-value next milestone, booked in todo.md.
+- **13** (companion-socket.ts + Java zero tests) — ruled DEFER with written
+  reason: medium cost, lower value than the fixture; revisit after it lands.
+- **15** (doc-sync gate) — ruled REJECT: semantic-truth automation is
+  low-confidence and high-cost; the §3.4 rewrite already corrected current
+  rows, and the human re-verification cadence is the pragmatic control.
+
+Each has evidence and a recommended action in its section. None was changed
+beyond the rulings above — judgment was the maintainer's, execution waits for
+the directed-maintenance queue.
 
 ---
 
@@ -234,5 +245,12 @@ Commit `c670f66`: Pack Health citation (index.ts:77→128), Loot row aligned
 with §13 P3-LOOT.
 Commit `b539f5b`: all 6 hot-swap stale sites; §3.4 items 4/6/8/9/10 rewritten
 to measured current state; §5.1/§14.3/risk-table/§13 class-line corrected;
-`reactflow` ^11.11.4 removed (733 tests pass, build clean, integrity 0
-violations). The repo is more truthful than it was this morning.
+`reactflow` ^11.11.4 removed.
+Commit `779156d`: the audit + action plan deliverables themselves.
+Commit `aff5c18` (maintainer rulings): SyncPipeline/FileWatcher layer removed
+(#5); protocol dead items PING/PONG, ws-ipc:status, CLIENT_INFO replay removed
+(#7, app-side — RELOAD_ALL staged for companion session); `quest/analysis.rs`
+pruned (#9); stale npm lockfile removed (#10); `useBehaviorItemPicker`
+adapter hardcode fixed to real resolution (#14). Verified: cargo test 453
+pass, FE 697 pass, integrity clean. **4,403 lines deleted, 67 added.** The
+repo is smaller and more truthful than it was this morning.
