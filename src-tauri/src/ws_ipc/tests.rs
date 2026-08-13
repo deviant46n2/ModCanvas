@@ -137,7 +137,7 @@ fn parse_frame_drops_non_event_json() {
 
 #[test]
 fn parse_frame_ignores_unknown_fields() {
-    let event = parse_frame(r#"{"event":"PING","timestamp":1,"extra":{"unused":true}}"#)
+    let event = parse_frame(r#"{"event":"ASSETS_READY","timestamp":1,"extra":{"unused":true}}"#)
         .expect("unknown fields are ignored by serde");
-    assert_eq!(event.event, "PING");
+    assert_eq!(event.event, "ASSETS_READY");
 }

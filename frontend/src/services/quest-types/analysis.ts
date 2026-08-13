@@ -3,17 +3,6 @@
 
 import type { QuestGraphData } from './graph'
 
-export interface QuestAnalysis {
-  total_quests: number
-  total_chapters: number
-  total_objectives: number
-  total_rewards: number
-  orphaned_quests: Array<{ quest_id: string; quest_label: string }>
-  incomplete_quests: Array<{ quest_id: string; quest_label: string; missing_objectives: number; missing_rewards: boolean }>
-  chapters: Array<{ chapter_id: string; chapter_label: string; quest_count: number }>
-  issues: Array<{ severity: string; message: string; node_id: string | null }>
-}
-
 export interface PrismInstance {
   name: string
   path: string

@@ -15,8 +15,6 @@ pub mod events {
     pub const RELOAD_PROGRESSION: &str = "RELOAD_PROGRESSION";
     pub const ASSETS_READY: &str = "ASSETS_READY";
     pub const CLIENT_INFO: &str = "CLIENT_INFO";
-    pub const PING: &str = "PING";
-    pub const PONG: &str = "PONG";
     /// ModCanvas -> companion: render a batch of item ids with the real
     /// Minecraft renderer (payload: `requestId`, `size`, `items[]`).
     pub const RENDER_ITEMS_REQUEST: &str = "RENDER_ITEMS_REQUEST";

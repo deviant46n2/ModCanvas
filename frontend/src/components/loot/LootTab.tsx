@@ -28,7 +28,7 @@ export function LootTab({
 }) {
   const { scanning, error, tables, refresh } = useLootTables(projectPath)
   const editor = useLootEditor(projectPath)
-  const { items, tags, getTextureUrl } = useBehaviorItemPicker(projectPath)
+  const { items, tags, getTextureUrl } = useBehaviorItemPicker(projectPath, minecraftVersion, modLoader)
   const [selected, setSelected] = useState<DiscoveredLootTable | null>(null)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')

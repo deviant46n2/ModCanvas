@@ -2,7 +2,7 @@ use tauri::State;
 use uuid::Uuid;
 
 use crate::db::Database;
-use crate::quest::{QuestGraph, QuestAnalysis};
+use crate::quest::{QuestGraph};
 
 // ─── Quest Graph Commands ───────────────────────────────────────────────────
 
@@ -34,13 +34,4 @@ pub fn save_quest_graph(
     crate::path_safety::atomic_write_str(&graph_path, &content).map_err(|e| e.to_string())?;
     crate::quest_cache::put(&project_id, &graph);
     Ok(())
-}
-
-#[tauri::command]
-pub fn analyze_quest_graph(
-    db: State<'_, Database>,
-    project_id: String,
-) -> Result<QuestAnalysis, String> {
-    let graph = get_quest_graph(db, project_id)?;
-    Ok(crate::quest::analyze_quest_graph(&graph))
 }

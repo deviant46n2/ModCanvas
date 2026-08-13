@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { QuestGraphData, QuestAnalysis, FtbQuestsImportResult, PrismInstance } from './quest-types'
+import type { QuestGraphData, FtbQuestsImportResult, PrismInstance } from './quest-types'
 
 export async function getQuestGraph(projectId: string): Promise<QuestGraphData> {
   return invoke<QuestGraphData>('get_quest_graph', { projectId })
@@ -7,10 +7,6 @@ export async function getQuestGraph(projectId: string): Promise<QuestGraphData> 
 
 export async function saveQuestGraph(projectId: string, graph: QuestGraphData): Promise<void> {
   return invoke('save_quest_graph', { projectId, graph })
-}
-
-export async function analyzeQuestGraph(projectId: string): Promise<QuestAnalysis> {
-  return invoke<QuestAnalysis>('analyze_quest_graph', { projectId })
 }
 
 export async function importFtbQuestsFromDir(packDir: string): Promise<FtbQuestsImportResult> {

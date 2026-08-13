@@ -27,7 +27,17 @@ import { BehaviorCard } from './BehaviorCard'
  * too: it resolves against the pack-health registry + texture index, and the
  * picked id lands in the same IR the compiler reads.
  */
-export function BehaviorTab({ projectId, projectPath }: { projectId: string; projectPath: string }) {
+export function BehaviorTab({
+  projectId,
+  projectPath,
+  minecraftVersion,
+  modLoader,
+}: {
+  projectId: string
+  projectPath: string
+  minecraftVersion?: string
+  modLoader?: string
+}) {
   const { loading, error, behaviors, dirty, setBehaviors, save, compile } =
     useBehaviors(projectId)
   const mirrorToStore = useBehaviorStore((s) => s.setBehaviors)
@@ -35,7 +45,7 @@ export function BehaviorTab({ projectId, projectPath }: { projectId: string; pro
   const [compiled, setCompiled] = useState<Map<string, CompileOutput>>(new Map())
   // ItemBrowser pick target: which behavior + action index to write into.
   const [pickTarget, setPickTarget] = useState<{ behaviorId: string; actionIndex: number } | null>(null)
-  const { items, tags, getTextureUrl } = useBehaviorItemPicker(projectPath)
+  const { items, tags, getTextureUrl } = useBehaviorItemPicker(projectPath, minecraftVersion, modLoader)
 
   // Mirror the working list into the shared store so Pack Health reads the
   // same in-memory truth. Health recomputes on every edit.

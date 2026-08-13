@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
-use serde_json::Value;
 use tauri::{AppHandle, Manager};
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -21,7 +20,6 @@ pub(super) async fn handle_connection(
     stream: tokio::net::TcpStream,
     addr: SocketAddr,
     clients: Arc<RwLock<HashMap<String, WsClient>>>,
-    last_companion_info: Arc<RwLock<Option<Value>>>,
     app_handle: AppHandle,
     actual_port: u16,
 ) {
@@ -64,7 +62,6 @@ pub(super) async fn handle_connection(
     let client_id_recv = client_id.clone();
     let clients_recv = clients.clone();
     let app_handle_recv = app_handle.clone();
-    let last_companion_info_recv = last_companion_info.clone();
     let recv_task = tokio::spawn(async move {
         while let Some(msg) = ws_receiver.next().await {
             match msg {
@@ -78,7 +75,6 @@ pub(super) async fn handle_connection(
                         &client_id_recv,
                         event,
                         &clients_recv,
-                        &last_companion_info_recv,
                         &app_handle_recv,
                         actual_port,
                     )
@@ -123,7 +119,6 @@ async fn route_frame(
     sender_id: &str,
     event: ModEvent,
     clients: &Arc<RwLock<HashMap<String, WsClient>>>,
-    last_companion_info: &Arc<RwLock<Option<Value>>>,
     app_handle: &AppHandle,
     actual_port: u16,
 ) {
@@ -140,17 +135,11 @@ async fn route_frame(
         match route_decision(&event.event, role, payload.is_some()) {
             FrameAction::HandshakeApp => {
                 // Push the current state so a freshly-connected app peer is
-                // immediately in sync, and replay the last companion identity.
+                // immediately in sync.
                 let _ = app_handle.state::<Arc<WsIpcServer>>().emit_status().await;
-                let _ = app_handle
-                    .state::<Arc<WsIpcServer>>()
-                    .replay_companion_info_to_app()
-                    .await;
             }
             FrameAction::HandshakeCompanion => {
                 if let Some(payload) = payload {
-                    let mut cached = last_companion_info.write().await;
-                    *cached = Some(payload.clone());
                     // forward the identity to the app peer
                     let _ = app_handle
                         .state::<Arc<WsIpcServer>>()

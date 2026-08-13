@@ -188,7 +188,6 @@ pub fn run() {
             commands::open_prism_launcher,
             commands::get_quest_graph,
             commands::save_quest_graph,
-            commands::analyze_quest_graph,
             commands::list_behaviors,
             commands::save_behaviors,
             commands::compile_behavior,

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use serde_json::Value;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio_tungstenite::tungstenite::Message;
@@ -52,9 +52,6 @@ pub struct WsIpcServer {
     app_handle: AppHandle,
     port: Arc<RwLock<u16>>,
     clients: Arc<RwLock<HashMap<String, WsClient>>>,
-    /// Most recent companion CLIENT_INFO payload, replayed to late-joining
-    /// app peers so the frontend can show companion identity.
-    last_companion_info: Arc<RwLock<Option<Value>>>,
     shutdown_tx: Arc<RwLock<Option<broadcast::Sender<()>>>>,
     server_task: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
 }
@@ -65,7 +62,6 @@ impl WsIpcServer {
             app_handle,
             port: Arc::new(RwLock::new(DEFAULT_PORT)),
             clients: Arc::new(RwLock::new(HashMap::new())),
-            last_companion_info: Arc::new(RwLock::new(None)),
             shutdown_tx: Arc::new(RwLock::new(None)),
             server_task: Arc::new(RwLock::new(None)),
         }
@@ -85,7 +81,6 @@ impl WsIpcServer {
 
         let app_handle = self.app_handle.clone();
         let clients = self.clients.clone();
-        let last_companion_info = self.last_companion_info.clone();
         let port = self.port.clone();
 
         let server_port = *port.read().await;
@@ -102,12 +97,10 @@ impl WsIpcServer {
                                 debug!("New WebSocket connection from {}", addr);
                                 let clients = clients.clone();
                                 let app_handle = app_handle.clone();
-                                let last_companion_info = last_companion_info.clone();
                                 tokio::spawn(handlers::handle_connection(
                                     stream,
                                     addr,
                                     clients,
-                                    last_companion_info,
                                     app_handle,
                                     server_port,
                                 ));
@@ -190,24 +183,9 @@ impl WsIpcServer {
 
     async fn emit_status(&self) {
         let status = self.get_status().await;
-        // Tauri event channel (works on most stacks; silently dropped on the
-        // Linux/WebKitGTK configurations we no longer depend on it for).
-        let _ = self.app_handle.emit("ws-ipc:status", status.clone());
         // Primary channel: push the state to app peers over their sockets.
         let payload = serde_json::to_value(&status).unwrap_or(Value::Null);
         self.send_to_app_clients(ModEvent::new(events::CONNECTION_STATUS).with_payload(payload))
             .await;
-    }
-
-    async fn cache_companion_info(&self, payload: Value) {
-        *self.last_companion_info.write().await = Some(payload);
-    }
-
-    async fn replay_companion_info_to_app(&self) {
-        let cached = self.last_companion_info.read().await.clone();
-        if let Some(payload) = cached {
-            self.send_to_app_clients(ModEvent::new(events::CLIENT_INFO).with_payload(payload))
-                .await;
-        }
     }
 }

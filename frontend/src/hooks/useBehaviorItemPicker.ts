@@ -5,6 +5,7 @@ import { useInstanceTextures } from './useInstanceTextures'
 import { scanItemRegistry } from '../components/recipe/recipe-editor-utils'
 import { buildRegistryUrlMap, makeTextureUrlGetter } from '../components/recipe/recipe-editor-utils'
 import { getAdapter } from '../adapters/factory'
+import { normalizeLoader } from '../core/recipe/loader'
 
 /**
  * The Behaviors tab's item-picker data: the shared item registry (Pack
@@ -16,7 +17,11 @@ import { getAdapter } from '../adapters/factory'
  * Health read the SAME scanned truth; when the store is empty (tab opened
  * before the recipe editor ever scanned), this hook runs the scan once.
  */
-export function useBehaviorItemPicker(projectPath: string) {
+export function useBehaviorItemPicker(
+  projectPath: string,
+  minecraftVersion?: string,
+  modLoader?: string,
+) {
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const setItemRegistry = usePackHealthStore((s) => s.setItemRegistry)
   const [tags, setTags] = useState<ItemTagInfo[]>([])
@@ -24,7 +29,13 @@ export function useBehaviorItemPicker(projectPath: string) {
 
   useEffect(() => {
     let disposed = false
-    const kubejsNamespace = getAdapter('1.21.1', 'neoforge').getKubejsDefaultNamespace()
+    // Resolve the pack's real adapter rather than hardcoding a card: the
+    // KubeJS default namespace is matrix-constant today, but a future
+    // adapter override must be respected (s52 audit finding #14).
+    const kubejsNamespace = getAdapter(
+      minecraftVersion ?? '1.21.1',
+      normalizeLoader(modLoader ?? 'neoforge'),
+    ).getKubejsDefaultNamespace()
     scanItemRegistry(projectPath, kubejsNamespace)
       .then(({ registry, tags }) => {
         if (disposed) return
@@ -37,7 +48,7 @@ export function useBehaviorItemPicker(projectPath: string) {
     return () => {
       disposed = true
     }
-  }, [projectPath, setItemRegistry])
+  }, [projectPath, minecraftVersion, modLoader, setItemRegistry])
 
   const registryUrlById = useMemo(() => buildRegistryUrlMap(itemRegistry ?? []), [itemRegistry])
   const getTextureUrl = useMemo(
