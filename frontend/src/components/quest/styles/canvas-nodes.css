@@ -1,26 +1,3 @@
-.chapter-add-button {
-  padding: 6px 14px;
-  background: var(--ftb-accent);
-  color: var(--ftb-bg, #1a1a1e);
-  border: 2px solid var(--ftb-accent-hover);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.15s ease;
-  opacity: 0.85;
-  text-align: center;
-  text-transform: uppercase;
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.5px;
-  line-height: 1;
-}
-
-.chapter-add-button:hover {
-  opacity: 1;
-  background: var(--ftb-accent-hover);
-}
-
 /* FTB Quest Node - in-game style */
 .ftb-quest-node {
   display: flex;

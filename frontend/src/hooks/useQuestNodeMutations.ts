@@ -2,6 +2,13 @@ import { useCallback } from 'react'
 import type { QuestGraphData, QuestNodeData, QuestEdgeData } from '../services/quest-types'
 import { generateFtbHexId, defaultObjective, defaultReward, defaultQuestNodeData, moveArrayItem } from '../components/quest/quest-helpers'
 
+/** Grid position for the i-th quest in a multi-add cascade: 2 cells along x,
+ *  alternating 1 cell up/down in y — distinct for every i, so a 10-quest
+ *  batch spawns as a visible spread, never stacked on the base (s49). */
+export function cascadePosition(base: { x: number; y: number }, i: number): { x: number; y: number } {
+  return { x: base.x + i * 2, y: base.y + (i % 2) }
+}
+
 interface UseQuestNodeMutationsOptions {
   graph: QuestGraphData | null
   commitGraph: (next: QuestGraphData, opts?: { split?: boolean }) => void
@@ -35,11 +42,22 @@ export function useQuestNodeMutations({
     scheduleAutoSave()
   }, [graph, scheduleAutoSave])
 
-  const onAddQuest = useCallback((_chapterId?: string, position?: { x: number; y: number }) => {
+  const onAddQuest = useCallback((_chapterId?: string, position?: { x: number; y: number }, count = 1) => {
     if (!graph || !activeChapter) return
-    const newNode = defaultQuestNodeData({ chapter_id: activeChapter, label: 'New Quest', position: position || { x: 0, y: 0 } })
-    commitGraph({ ...graph, nodes: [...graph.nodes, newNode] })
-    setSelectedNodeId(newNode.id)
+    const base = position || { x: 0, y: 0 }
+    // Cascade new nodes along the grid so a multi-add never stacks them on
+    // top of each other (s49 walkthrough: every add landed at (0,0) and
+    // refits piled them in the corner). The last node stays selected so the
+    // batch can be dragged as a group once multi-select lands.
+    const newNodes = Array.from({ length: count }, (_, i) =>
+      defaultQuestNodeData({
+        chapter_id: activeChapter,
+        label: 'New Quest',
+        position: cascadePosition(base, i),
+      }),
+    )
+    commitGraph({ ...graph, nodes: [...graph.nodes, ...newNodes] })
+    setSelectedNodeId(newNodes[newNodes.length - 1].id)
     scheduleAutoSave()
   }, [graph, activeChapter, scheduleAutoSave, setSelectedNodeId])
 

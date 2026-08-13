@@ -332,6 +332,19 @@ the in-game quest editor's placement behavior:
   relative offsets between selected quests are preserved, matching in-game
   `questX + (obj.pos − minCorner)`.
 
+## Selection & multi-add (s49)
+
+- **Multi-select** — box-select by dragging on empty canvas space
+  (`selectionOnDrag`), or Shift-click to toggle membership. The selected set
+  feeds align/distribute, clipboard, and the context menu's count — those
+  tools existed but nothing enabled multi-selection until s49.
+- **+ Add Quest** — spawns at the click position (not the old (0,0) corner),
+  with a count ticker (1–10) next to the button: a batch cascades along the
+  grid (`cascadePosition` in `useQuestNodeMutations.ts`) so quests never
+  stack, and the batch stays selected for group dragging.
+- **Overlay placement** — the add buttons float top-left; the bottom-left
+  corner is ReactFlow's zoom/fit Controls, so the buttons never cover them.
+
 ## Data flow
 
 - `src-tauri/src/quest/types/graph.rs` — `QuestGraph.grid_scale` (default 0.5).

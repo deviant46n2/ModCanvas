@@ -8,6 +8,7 @@ import {
   Background,
   BackgroundVariant,
   ViewportPortal,
+  SelectionMode,
 } from '@xyflow/react'
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@xyflow/react'
 import type { QuestEdgeData, ChapterImage } from '../../services/quest-types'
@@ -21,6 +22,7 @@ import { ChapterImagesLayer } from './ChapterImagesLayer'
 import { ChapterDecorationsCanvas } from './ChapterDecorationsCanvas'
 import { DecorationPanel } from './DecorationPanel'
 import { EdgeActionChip } from './EdgeActionChip'
+import { AddQuestOverlay } from './AddQuestOverlay'
 import { defaultDecorationImage } from './decoration-picker'
 import { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
 import { XIcon } from '../ui/icons'
@@ -73,7 +75,7 @@ interface CanvasAreaProps {
   showShortcuts: boolean
   onCloseShortcuts: () => void
   activeChapter: string | null
-  onAddNode: (chapterId: string) => void
+  onAddNode: (chapterId: string, position?: { x: number; y: number }, count?: number) => void
   onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void
   selectedEdge: QuestEdgeData | null
   onDeleteEdge: (edgeId: string) => void
@@ -164,6 +166,13 @@ export function CanvasArea({
         panOnDrag
         zoomOnScroll
         zoomOnPinch
+        // Multi-select (s49): box-select by dragging on empty space + shift-
+        // click toggles membership. The selectedIds Set, align/distribute,
+        // clipboard, and context-menu count all existed but nothing enabled
+        // multi-selection — these two props are the switch that turns them on.
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        multiSelectionKeyCode={['Shift']}
         minZoom={0.1}
         maxZoom={64}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
@@ -204,14 +213,14 @@ export function CanvasArea({
       )}
 
       {activeChapter && !decorEditMode && !connectMode && !editLocked && (
-        <div className="canvas-overlay">
-          <div className="chapter-add-button" onClick={() => onAddNode(activeChapter)}>
-            + Add Quest
-          </div>
-          <div className="chapter-add-button chapter-add-link-button" onClick={() => onAddLink?.(activeChapter)} title="Add a quest link that references another quest (cross-chapter)">
-            Add Link
-          </div>
-        </div>
+        <AddQuestOverlay
+          activeChapter={activeChapter}
+          editLocked={editLocked}
+          connectMode={connectMode}
+          decorEditMode={decorEditMode}
+          onAddNode={onAddNode}
+          onAddLink={onAddLink}
+        />
       )}
 
       {selectedEdge && (

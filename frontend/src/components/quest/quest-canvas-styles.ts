@@ -2,6 +2,7 @@
 // under 300). Import order below IS the cascade order — do not reorder.
 // This barrel keeps the import chain out of QuestCanvas.tsx (which would
 // otherwise exceed the 300-line cap).
+import './styles/canvas-toolbar.css';
 import './styles/canvas-shell.css';
 import './styles/canvas-nodes.css';
 import './styles/canvas-shape-tiles.css';

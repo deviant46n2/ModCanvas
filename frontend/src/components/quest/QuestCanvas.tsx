@@ -35,7 +35,7 @@ interface QuestCanvasProps {
   onMoveNodesToChapter?: (nodeIds: string[], chapterId: string) => void;
   onPasteNodes?: (nodes: QuestNodeData[], edges: QuestEdgeData[]) => void;
   onDeleteEdge: (edgeId: string) => void;
-  onAddNode: (chapterId: string, position?: { x: number; y: number }) => void;
+  onAddNode: (chapterId: string, position?: { x: number; y: number }, count?: number) => void;
   onAddLink?: (chapterId: string, position?: { x: number; y: number }) => void;
   onAddQuestWithTask?: (chapterId: string, objectiveType: string, position?: { x: number; y: number }) => void;
   onUpdateChapterImages: (chapterId: string, images: ChapterImage[]) => void;

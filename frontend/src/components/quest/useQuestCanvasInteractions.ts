@@ -18,7 +18,7 @@ interface UseQuestCanvasInteractionsArgs {
   onUpdateEdge: (edgeId: string, data: { source?: string; target?: string }) => void
   onDeleteEdge: (edgeId: string) => void
   onUpdateNodes: (updates: Array<{ nodeId: string; data: Partial<QuestNodeData> }>) => void
-  onAddNode: (chapterId: string, position?: { x: number; y: number }) => void
+  onAddNode: (chapterId: string, position?: { x: number; y: number }, count?: number) => void
   editLocked: boolean
   simMode: boolean
   onSetQuestProgress?: (questId: string, status: 'started' | 'complete' | null) => void
@@ -153,8 +153,8 @@ export function useQuestCanvasInteractions(args: UseQuestCanvasInteractionsArgs)
   )
 
   const handleAddNode = useCallback(
-    (chapterId: string) => {
-      onAddNode(chapterId)
+    (chapterId: string, position?: { x: number; y: number }, count?: number) => {
+      onAddNode(chapterId, position, count)
     },
     [onAddNode]
   )

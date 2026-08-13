@@ -76,7 +76,7 @@ interface QuestEditorLayoutProps {
   onMoveNodesToChapter?: (nodeIds: string[], chapterId: string) => void
   onPasteNodes: (nodes: QuestNodeData[], edges: QuestEdgeData[]) => void
   onDeleteEdge: (edgeId: string) => void
-  onAddQuest: (chapterId?: string, position?: { x: number; y: number }) => void
+  onAddQuest: (chapterId?: string, position?: { x: number; y: number }, count?: number) => void
   onAddQuestLink: (chapterId?: string, position?: { x: number; y: number }) => void
   onAddQuestWithTask: (chapterId: string, objectiveType: string, position?: { x: number; y: number }) => void
   onUpdateChapterImages: (chapterId: string, images: ChapterImage[]) => void
