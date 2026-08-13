@@ -115,6 +115,10 @@
   {
    "commit": "e5a6174",
    "reason": "pure structural refactor — test file split (tests.rs 475 → 3 files, identical test set verified by diff) + CSS rule consolidation; zero behavior change, documented by judgment (the s34-audit class: doc-sync CANDIDATES for mechanical splits are judgment calls), s46"
+  },
+  {
+   "commit": "f1b4cab",
+   "reason": "behaviors save-report honesty fix (warnings != emit failures) — documented same-pass in e5a6174/docs/behaviors.md (emission contract, s46) + roadmap §13 P2-BEHAVIOR status; aged out UNJUDGED (doc-judgment backlog), judged retroactively 2026-08-13, s51-followup"
   }
  ]
 }
