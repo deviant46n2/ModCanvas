@@ -5,7 +5,9 @@
 > document conflicts with `PROJECT_BIBLE.md`, the Bible wins — until it is deliberately
 > amended there.
 >
-> **Audit basis:** repo state at `b294ac5` (2026-08-10), branch `fix_debt`, clean tree.
+> **Audit basis:** repo state at `b294ac5` (2026-08-10), branch `fix_debt`, clean tree,
+> **refreshed 2026-08-13** (s51-followup docs audit — §3.2/§3.3/§3.5 re-verified against
+> the tree; the P0/P1/P2 §13 sections carry their own per-chunk session-tagged statuses).
 > Every "implemented" claim below was verified against the codebase (file:line cited),
 > not against documentation. "Documented-but-aspirational" means the docs describe it
 > and the code does not contain it.
@@ -120,15 +122,15 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Domain | State | Evidence |
 |---|---|---|
 | Quest editor (FTB Quests) | **Implemented, deep** — near-full parity (roadmap §13 P1-PARITY tracks the remaining gaps); **export layout fixed s42** (1.21.x exports ONLY FlatChapters `quests/chapters/*.snbt` — verified against the shipped 2101.1.30 jar, which loads no other layout; the older Subdirs export loaded 0 chapters in-game) | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + version-aware export (`imports/ftb_quests/`) |
-| Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:433`; `scriptgen/`; `recipe_disable.rs:29` |
+| Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:85`; `scriptgen/`; `recipe_disable/mod.rs` |
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
-| Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `search_merge.rs` (s33) |
+| Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `commands/modpack/search_merge.rs` (s33) |
 | Pack Health | **Implemented (Tier 1)** — go/no-go, 3 honest states, pure derivation | `core/pack-health/index.ts:77`; `PackHealthTab.tsx:80`; `checks/{quests,recipes,pack}.ts` |
 | Loot tab | **MVP (s44)** — read-only scan + list + detail (pack data + mod jars, both `loot_table`/`loot_tables` dirs, full-path ids); editor not built | `components/loot/LootTab.tsx`; `services/loot.ts`; `hooks/useLootTables.ts`; `src-tauri/src/loot/` (`parse.rs` pure, `pack_scan.rs` walker); roadmap §13 P3-LOOT |
 | History / undo | **Implemented** — durable journal, timeline drawer | `core/history/store.ts:86`; `HistoryDrawer.tsx`; `commands/history.rs:11` |
 | Pack lifecycle | **Implemented** — create/load/list/save/delete, import mrpack/CF/packwiz/instance | `commands/project.rs`; `imports/mod.rs` |
 | Launch | **Implemented** — Test → Prism via `LauncherDriver`, companion deploy | `launcher.rs`; `minecraft/launch.rs:11`; `launch_mc_instance` |
-| Companion mod | **Implemented (NeoForge 1.21.1 only)** — item rendering, texture extraction, reload (frozen), stop/restart | `workbench-companion-neoforge-1.21/` (8 Java files); `ws_protocol.rs:10-41` |
+| Companion mod | **Implemented (NeoForge 1.21.1 only)** — item rendering, texture extraction, reload (frozen), stop/restart | `workbench-companion-neoforge-1.21/` (11 Java files); `ws_protocol.rs:10-41` |
 | Texture pipeline | **Implemented** — descriptor index, lazy materialization, bake: keys, animations, tags | `instance_textures/`; `texture-loader.ts:164`; `engine_renders.rs` (CACHE_VERSION 6) |
 | Mod intelligence | **Implemented (network-only)** — Modrinth + CurseForge | `mod_intelligence/modrinth.rs:7`; `curseforge_search.rs:18` |
 | Maintainer tooling | **Implemented** — integrity, health, backup, memory-check, systemd timer | `scripts/*.mjs`; `docs/tooling.md` |
@@ -138,11 +140,11 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Thing | Documented in | Reality |
 |---|---|---|
 | First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked, transitive deps one-click) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
-| Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Does not exist.** No mode flag, no surface-hiding, no onboarding state machine. |
-| Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Does not exist.** |
+| Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
+| Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — external handoff via `showGuidedQuest`/`onGuidedQuestClose` (`App.tsx:119-120`), one-shot open. Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
-| Progression editor / campaign surface | `workspace-actions.md:15` (stale tab), §3.1 of this doc | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed. |
+| Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
 | Modpack Model / unified model | this document's problem statement | **Does not exist** — see §7. The correct form is the Pack Index. |
 
@@ -216,16 +218,23 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
 
 ### 3.5 Documented-vs-code mismatches to correct in the docs
 
-- `workspace-actions.md:15` still lists a **progression tab** that was killed; actual tabs
-  are health/mods/configs/quests/recipes (`ProjectWorkspace.tsx:31,119`).
-- `README.md:31` says the beginner layer "is the active focus" — no code exists. Either
-  build it (this roadmap's P0) or restate the status honestly.
+All items in this list were fixed by the 2026-08-13 docs audit (`docs/audit-2026-08-13.md`),
+except where noted. The list is kept for the record of what the audit found; do not treat
+its entries as current drift.
+
+- ~~`workspace-actions.md:15` lists a progression tab that was killed~~ — **fixed** in the
+  audit (diagram now shows all 7 tabs: health/mods/configs/quests/recipes/loot/behaviors).
+- ~~`README.md:31` says the beginner layer "is the active focus" — no code exists~~ —
+  **superseded**: Beginner Mode shipped (s47–s49, see §3.3 row) and README was updated to
+  state the beginner layer "is in place" with hot-swapping as the focus.
 - `docs/audit-2026-08-05.md` cites deleted files (`progression.rs`, `commands/progression.rs`,
-  `ingest.rs`, `imports/snbt.rs`) — dated snapshot; the "remaining debt" list needs a refresh
-  pass against the current tree.
+  `ingest.rs`, `imports/snbt.rs`) — dated snapshot by definition (it is a historical record);
+  the "remaining debt" list needs a refresh pass against the current tree.
 - `docs/config-editor.md` lists HOCON among parsed formats; the parser has no HOCON arm.
-- `docs/engine-renders.md` audit notes are current; the FTB-parity checklist lives in this
-  document's §13 (P1-PARITY row) — re-audit it at the P0 boundary.
+  **Still open** (P1-HYGIENE).
+- ~~`docs/engine-renders.md` and `featureparity.md` audit notes~~ — **fixed** in the audit:
+  featureparity.md was a phantom (never committed), unlinked everywhere; parity checklist
+  lives in this document's §13 P1-PARITY.
 
 ### 3.6 Architecture state (what the roadmap builds on)
 
@@ -385,7 +394,7 @@ codebase as *indexes*:
   `item.<ns>.<path>` with a non-UI namespace, verified against the vanilla 1.21.1 client lang.
 - **Tag index** — `resolve_item_tags_cmd` / `list_item_tags_cmd` (`instance_textures/tags.rs`)
 - **Texture descriptor index** — `scan_instance_textures_cmd` (`instance_textures.rs:267`)
-- **Recipe scan cache** — `scan_pack_recipes_cmd` (`recipes/mod.rs:433`)
+- **Recipe scan cache** — `scan_pack_recipes_cmd` (`recipes/mod.rs:85`)
 - **Quest graph** — `get_quest_graph` (`quest_graph.rs:18`), persisted `.modcanvas/quests.json`
 - **Mod inventory** — `get_project_mods` (`project.rs:258`) + `db.rs` `mods` table
 - **Config inventory** — `list_config_files` (`config.rs:84`)
