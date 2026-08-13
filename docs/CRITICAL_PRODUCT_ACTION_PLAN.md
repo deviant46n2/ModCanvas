@@ -19,7 +19,7 @@
 | 5 | **Remove stale npm `package-lock.json`** (D4) | None | Low | Medium | High | Trivial | **OPEN** |
 | 6 | **Remove protocol dead items** PING/PONG, RELOAD_ALL, replay, ws-ipc:status (D3) | None | Low | Medium | High (never sent) | Small (wire-contract touch — companion restart) | **OPEN** |
 | 7 | **`useBehaviorItemPicker` hardcode → resolveAdapter** (G1) | None | Low (latent) | Low | High | Trivial | **OPEN** |
-| 8 | **Beginner Mode product decision** (I1/J1) | **Highest** (the wedge) | Medium | Medium | Medium (needs a product call, not a code call) | Medium–High | **OPEN** |
+| 8 | **Beginner Mode product decision** (I1/J1) | **Highest** (the wedge) | Medium | Medium | Medium (needs a product call, not a code call) | Medium–High | **STRIP SHIPPED (s53, partial)** — product call ruled (s52, REDESIGN): the mode becomes a coach. First iteration: the hint strip (`docs/beginner-mode.md`). Driver + preset forms parked with written reasons. |
 | 9 | **companion-socket.ts + Java test investment** (H2) | Low direct | Medium | Low | Medium | Medium | **OPEN** |
 | 10 | **Doc-sync semantic check** (M2) | None | Medium | Low | Low (semantic truth is hard to automate) | High | **OPEN — likely rejected** |
 

@@ -212,7 +212,7 @@ maintainer's.
 | 8 | Pack Health target dead payload | Dead payload | P3 | **OPEN** — ruled WIRE; execution pending (cross-tab focus work) |
 | 9 | quest/analysis.rs dead-end command | Dead code | P2 | **FIXED** (aff5c18) — pruned |
 | 10 | npm lockfile stale + competing | Duplication | P3 | **FIXED** (aff5c18) — removed |
-| 11 | Beginner Mode gates 2/7 | Product | P1/P2 | **OPEN** — ruled REDESIGN; booked as directed item |
+| 11 | Beginner Mode gates 2/7 | Product | P1/P2 | **OPEN** — ruled REDESIGN; **STRIP SHIPPED (s53, partial)** — product call ruled: the mode becomes a coach; first iteration is the hint strip (4-step wedge journey, real-signal states). Remainder (driver wiring, preset forms) parked with written reasons in `docs/beginner-mode.md`. |
 | 12 | No real-pack fixture, zero e2e | Testing | P1 | **OPEN** — ruled DEFER; booked as directed item |
 | 13 | companion-socket.ts + Java zero tests | Testing | P2 | **OPEN** — ruled DEFER with written reason |
 | 14 | useBehaviorItemPicker hardcoded adapter | Over-abstraction smell | P3 | **FIXED** (aff5c18) — real adapter resolution |

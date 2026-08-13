@@ -11,6 +11,7 @@ import { LootTab } from '../loot/LootTab'
 import { BehaviorTab } from '../behavior/BehaviorTab'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
+import { BeginnerHintStrip } from './BeginnerHintStrip'
 import type { HealthItem } from '../../core/pack-health/types'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIcon } from '../../services/mods'
@@ -146,6 +147,14 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         modLoader={project.mod_loader}
       />
 
+      <PackHealthProvider project={project} packLoaded={packLoaded}>
+        {props.beginnerMode === true && (
+          <BeginnerHintStrip
+            connection={connectionSignals}
+            onJumpToTab={onTabChange}
+          />
+        )}
+
       <div className="workspace-tabs" role="tablist">        {(['health', 'mods', 'configs', 'quests', 'recipes', 'loot', 'behaviors'] as const).map((tab) => (
           <button
             key={tab}
@@ -163,8 +172,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         ))}
       </div>
 
-      <PackHealthProvider project={project} packLoaded={packLoaded}>
-        <div className="workspace-content">
+      <div className="workspace-content">
           {/* All tabs stay mounted so switching never re-runs their load effects
               (texture scans, quest graph, config reads). Inactive panels are
               hidden via CSS rather than unmounted. */}

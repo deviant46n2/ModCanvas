@@ -31,7 +31,7 @@ strategic space, including things deliberately NOT being built yet.
 | Priority | Item | Status | Rationale |
 |---|---|---|---|
 | 1 | **Pack Health: wire the `target` jump-to-quest** | **DONE (s52)** — jump button on quest findings with a nodeId (undefined reward table, missing item, cycles, unreachable quests) selects + centers the quest in the editor, switching chapters as needed. Two tests lock the wiring. See `docs/CRITICAL_PRODUCT_AUDIT.md` finding #8. | Every quest finding carries `target: {section, nodeId}` (types.ts:16-19) — populated, never read. The "what can I do about it" link is modeled and unwired; wiring it takes the panel from "what's wrong" to "go fix it" (audit finding #8). Do not claim the jump exists until it does. |
-| 2 | **Beginner Mode redesign** | REDESIGN BOOKED | The mode gates 2 of 7 editors (code-hiding only). The goal is NOT merely hiding advanced controls — evaluate whether the product's workflow is actually understandable to a first-time modpack creator (audit finding #11). Product call first; implementation after. |
+| 2 | **Beginner Mode redesign** | **STRIP SHIPPED (s53)** — product call ruled s52: the mode becomes a coach, not just a hiding switch. First iteration: the hint strip (4-step wedge journey, real-signal states, never claims quest completion). See `docs/beginner-mode.md`. Remainder parked with written reasons: the driver (quest editor → tab wiring, the §9.5 rat's-nest) and the §9.4 preset forms. | The mode gates 2 of 7 editors (code-hiding only). The goal is NOT merely hiding advanced controls — evaluate whether the product's workflow is actually understandable to a first-time modpack creator (audit finding #11). Product call first; implementation after. |
 | 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (453 Rust + 697 FE tests) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
 | 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
 
@@ -713,7 +713,13 @@ review, before any further P0/P2 item is declared done.
 
 - A mode flag on the workspace shell (`ProjectWorkspace.tsx`) that **hides raw/code
   surfaces**: KubeJS drawer, raw config textarea, script drawer, the recipes tab's script
-  preview. Shows simplified forms instead (configs as preset forms, §5.3).
+  preview. **Status (s47):** hiding shipped. The original spec's "shows simplified forms
+  instead (configs as preset forms, §5.3)" was never built — **PARKED with written reason**
+  (s53): preset forms are a separate surface simplification; the coach strip is the guidance.
+- **The hint strip (s53)** — a persistent coach above the workspace tabs, visible in
+  Beginner Mode: the wedge journey (follow the guide → save → fix what Pack Health found →
+  launch), states derived from real signals (Pack Health report, connection pill), the guide
+  step never claiming quest completion. Reference: `docs/beginner-mode.md`.
 - **Onboarding turns it ON for first-timers; it is off by default for everyone else**
   (Bible §11). One obvious control to flip both ways (a topbar toggle).
 - Under the hood: a `useBeginnerMode` flag persisted in the DB `settings` table
@@ -770,7 +776,10 @@ quest editor) is the rat's-nest risk. **Tripwire:** revisit when a fresh-eyes us
 shows quests-by-name aren't enough, or when the dogfood item (authoring template content
 *using* the mini-wizards) gets scheduled. *(s49: first-boot routing was REMOVED — the
 onboarding entry point is now a user-choice four-card start, so any future driver hooks
-the choice cards, not a first-run flag.)*
+the choice cards, not a first-run flag.)* *(s53: the **hint strip chunk shipped** — the
+Beginner Mode coach (`docs/beginner-mode.md`) under the s52 REDESIGN ruling; the driver's
+remaining direction — quest editor → workspace tab wiring — stays parked on the same
+tripwire.)*
 
 ---
 
