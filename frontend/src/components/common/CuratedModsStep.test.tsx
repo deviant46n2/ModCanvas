@@ -5,13 +5,14 @@ import { CuratedModsStep } from './CuratedModsStep'
 vi.mock('../../services/mods', () => ({
   listCuratedMods: vi.fn(),
   installModrinthMod: vi.fn(),
+  checkCompatibility: vi.fn(),
 }))
 
 vi.mock('../../services/project', () => ({
   openPrismForProject: vi.fn(),
 }))
 
-import { listCuratedMods, installModrinthMod } from '../../services/mods'
+import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
 import { openPrismForProject } from '../../services/project'
 
 const project = {
@@ -37,6 +38,7 @@ beforeEach(() => {
   ])
   vi.mocked(openPrismForProject).mockResolvedValue(undefined)
   vi.mocked(installModrinthMod).mockResolvedValue({})
+  vi.mocked(checkCompatibility).mockResolvedValue({ compatible: true, issues: [], warnings: [] })
 })
 
 function renderStep(over = {}) {
@@ -99,6 +101,49 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Install KubeJS' }))
     await screen.findByText('registry down')
     expect(screen.getByRole('button', { name: 'Install KubeJS' })).toBeInTheDocument()
+  })
+
+  it('closes the dep loop inline: a pick\'s missing required dep gets a one-click Install', async () => {
+    vi.mocked(checkCompatibility).mockResolvedValue({
+      compatible: false,
+      issues: [{
+        severity: 'Warning',
+        message: "'KubeJS' requires 'Rhino' which is not in the project",
+        affected_mods: ['kubejs', 'rhino'],
+        affected_mod_names: ['KubeJS', 'Rhino'],
+        install: { mod_id: 'rhino', slug: 'rhino', name: 'Rhino' },
+      }],
+      warnings: [],
+    })
+    renderStep()
+    await screen.findByText("'KubeJS' requires 'Rhino' which is not in the project")
+    fireEvent.click(screen.getByRole('button', { name: 'Install Rhino' }))
+    await waitFor(() => {
+      expect(installModrinthMod).toHaveBeenCalledWith({
+        projectId: 'p1',
+        modId: 'rhino',
+        slug: 'rhino',
+        name: 'Rhino',
+      })
+    })
+  })
+
+  it('an unresolvable dep issue renders without an install button (no lie)', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([])
+    vi.mocked(checkCompatibility).mockResolvedValue({
+      compatible: false,
+      issues: [{
+        severity: 'Warning',
+        message: "'X' requires 'Y' which is not in the project",
+        affected_mods: ['x', 'y'],
+        affected_mod_names: ['X', 'Y'],
+        install: null,
+      }],
+      warnings: [],
+    })
+    renderStep()
+    await screen.findByText(/requires 'Y'/)
+    expect(screen.queryByRole('button', { name: /^Install/ })).toBeNull()
   })
 
   it('renders blocked_reason on a pick whose metadata could not be verified', async () => {

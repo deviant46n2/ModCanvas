@@ -8,9 +8,9 @@
 // (scratch projects) fall back to manual-download links.
 
 import { useEffect, useState } from 'react'
-import { listCuratedMods, installModrinthMod } from '../../services/mods'
+import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
 import { openPrismForProject } from '../../services/project'
-import type { CuratedMod } from '../../services/types'
+import type { CompatibilityInstall, CompatibilityIssue, CuratedMod } from '../../services/types'
 import type { Project } from '../../services/types'
 import { CuratedModRow } from './CuratedModRow'
 
@@ -28,6 +28,11 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
   const [opening, setOpening] = useState(false)
   const [installing, setInstalling] = useState<Set<string>>(new Set())
   const [installed, setInstalled] = useState<Set<string>>(new Set())
+  // Missing required deps (the compat check's issues, s54-A: the step closes
+  // its own one-click loop — a pick like KubeJS pulls a dep like Rhino, and
+  // the fix appears here, not in a hidden tab).
+  const [depIssues, setDepIssues] = useState<CompatibilityIssue[]>([])
+  const [installingDep, setInstallingDep] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -43,6 +48,29 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
     }
   }, [project.id])
 
+  useEffect(() => {
+    let alive = true
+    checkCompatibility(project.id)
+      .then((result) => {
+        if (alive) setDepIssues(result.issues)
+      })
+      .catch(() => {
+        /* a failed dep check degrades to no claim — the Mods tab can retry */
+      })
+    return () => {
+      alive = false
+    }
+  }, [project.id])
+
+  async function refreshDepCheck() {
+    try {
+      const result = await checkCompatibility(project.id)
+      setDepIssues(result.issues)
+    } catch {
+      /* same degrade-to-no-claim rule */
+    }
+  }
+
   async function handleInstall(mod: CuratedMod) {
     if (installing.has(mod.mod_id)) return
     setInstalling((prev) => new Set(prev).add(mod.mod_id))
@@ -56,12 +84,37 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
         description: mod.description,
       })
       setInstalled((prev) => new Set(prev).add(mod.mod_id))
+      // The pick's own deps may now be missing — close the loop inline.
+      await refreshDepCheck()
     } catch (e: any) {
       setError(typeof e === 'string' ? e : e?.message || String(e))
     } finally {
       setInstalling((prev) => {
         const next = new Set(prev)
         next.delete(mod.mod_id)
+        return next
+      })
+    }
+  }
+
+  async function handleInstallDep(install: CompatibilityInstall) {
+    if (installingDep.has(install.mod_id)) return
+    setInstallingDep((prev) => new Set(prev).add(install.mod_id))
+    setError(null)
+    try {
+      await installModrinthMod({
+        projectId: project.id,
+        modId: install.mod_id,
+        slug: install.slug,
+        name: install.name,
+      })
+      await refreshDepCheck()
+    } catch (e: any) {
+      setError(typeof e === 'string' ? e : e?.message || String(e))
+    } finally {
+      setInstallingDep((prev) => {
+        const next = new Set(prev)
+        next.delete(install.mod_id)
         return next
       })
     }
@@ -182,6 +235,35 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
           installed={installed.has(mod.mod_id)}
         />
       ))}
+
+      {depIssues.length > 0 && (
+        <div style={{ margin: '10px 0' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-warning, #d97706)', marginBottom: 6 }}>
+            Needs these to run
+          </div>
+          {depIssues.map((issue) => (
+            <div
+              key={issue.install?.mod_id ?? issue.message}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                border: '1px solid var(--color-border-default)', borderRadius: 8, marginBottom: 6,
+              }}
+            >
+              <div style={{ flex: 1, fontSize: 13 }}>{issue.message}</div>
+              {issue.install && (
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => handleInstallDep(issue.install!)}
+                  disabled={installingDep.has(issue.install.mod_id)}
+                  aria-label={`Install ${issue.install.name}`}
+                >
+                  {installingDep.has(issue.install.mod_id) ? 'Installing…' : 'Install'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginTop: 14 }}>
         <button

@@ -36,6 +36,7 @@ strategic space, including things deliberately NOT being built yet.
 | 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
 | 5 | **PRISM-LEAN (s53)** — mod EXECUTION moves to Prism Launcher | **CHUNK 1 DONE (s53)** — handoff shipped: `open_prism_instance` (`prismlauncher --show <instanceId>`), wizard curated step = curated list + "Open Prism to install these" (manual-link fallback for non-instance packs), Mods tab "Add mods in Prism" button. Docs: `docs/mods-tab.md`. | ModCanvas curates + diagnoses; Prism executes (version matching + dependency resolution — verified: FTB Quests in Prism pulls Library/Teams/Architecury; ModCanvas's own search cannot surface CF mods: `searchFilter=ftb` → 50 irrelevant hits, zero FTB mods, live-verified 2026-08-13). Student ruling; rationale: delegate risky high-surface execution to battle-tested software. |
 | 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | **DONE (s54)** — search surface deleted: `search_mods` / `install_mod_from_search` (renamed `install_modrinth_mod`, Modrinth-only) / `search_merge.rs` / orphaned CF download fns / Mods-tab search UI / SearchResultRow / CategorySelect / SourceToggles (4 test files deleted, 2 edited, s52 evidence pattern). **Refined on ruling:** the one-click Modrinth installer was KEPT (wizard curated picks + compat panel) — keyless and loop-closing; CF installs (FTB Quests) go to Prism with explicit guide copy naming the three required deps (wizard step + core-mod gate finding). CF-key use for installs is dead everywhere. Docs: `docs/mods-tab.md`. | See row 5 for the ruling rationale. The refinement (s54): the s53 kill-list overreached on the compat one-click — Modrinth's API is keyless, so an app-diagnosed missing dep can be repaired in-app honestly; CF deps stay invisible (`CurseForgeFileInfo` parses none), so FTB Quests always installs through Prism. |
+| 7 | **Dep-gate the green check (s54-B, booked on ruling)** — "ready to test" must mean no missing required deps | BOOKED (s54-A shipped) | The wizard's green check runs the compat check in its Mods section: missing required deps become blocking findings with one-click installs (the same `install_modrinth_mod` loop). Rationale: A (the curated step closing its own loop) surfaced deps but the gate can still bless a pack whose KubeJS lacks Rhino — the s53 "ready" promise stays half-honest until B lands. Design question to resolve first: the gate is currently offline; the compat check needs registry metadata (network). Options: degrade-to-no-claim on fetch failure (the compat check already does), or a cached-metadata fallback. Do NOT build until the network-dependence question is ruled. |
 
 ### Deliberately deferred expansion
 
@@ -678,9 +679,13 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     (`prismlauncher --show <instanceId>`) — Prism resolves versions AND the CF
     dependencies ModCanvas cannot parse, and the step's guide names FTB
     Quests' three required deps (FTB Library, FTB Teams, Architectury). The
-    old dual-source search surface is deleted (chunk 2, s54). Non-instance
-    packs fall back to manual project-page links. Continue refreshes the pack
-    so the green check sees Prism-installed mods.
+    step closes its own dep loop (s54-A): after a Modrinth install it runs the
+    compat check and offers missing required deps (e.g. KubeJS → Rhino) with
+    the same one-click, inline — the fix appears where the friction happened,
+    not in the Mods tab. The old dual-source search surface is deleted (chunk
+    2, s54). Non-instance packs fall back to manual project-page links.
+    Continue refreshes the pack so the green check sees Prism-installed mods.
+    (Dep-gating the green check itself is booked as roadmap §0 row 7.)
  5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through the
     **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
     export path. The zero-code proof point. **MOVED TO THE LIVE SURFACE (s53):** the wizard

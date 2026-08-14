@@ -46,6 +46,11 @@ missing Modrinth dependencies install in-app.
   install a broken mod: CF deps aren't parsed, so e.g. FTB Quests would land
   without its three required deps). Serves two surfaces: the wizard's curated
   step (Modrinth picks) and the compat panel's missing-dependency buttons.
+  **The curated step closes its own dep loop (s54-A):** after a Modrinth
+  install it runs the compat check and offers the pick's missing required
+  deps (e.g. KubeJS → Rhino) with the same one-click, inline — the fix
+  appears where the friction happened. (Dep-gating the wizard's green check
+  is booked — roadmap §0 row 7.)
 - **FTB Quests installs in Prism** — the one CurseForge core pick. The
   wizard's curated step renders a step-by-step guide (Prism → Mods → Download
   Mods → search FTB Quests → Install, and accept **FTB Library**, **FTB
