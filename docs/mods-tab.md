@@ -31,13 +31,15 @@ missing Modrinth dependencies install in-app.
 ## Adding mods (PRISM-LEAN)
 
 - **Add mods in Prism** (section-actions button) — `open_prism_instance`
-  (`src-tauri/src/commands/modpack/mod.rs`): spawns
-  `prismlauncher --show <instanceId>` where the instance ID is the folder name
+  (`src-tauri/src/commands/modpack/mod.rs`): spawns `prismlauncher --show
+  <instanceId>` (via the launcher driver's binary resolution — s54: Flatpak-
+  only installs get `flatpak run org.prismlauncher.PrismLauncher --show …`
+  instead of "command not found") where the instance ID is the folder name
   of the instance dir under `instances/` (validated; scratch packs without a
-  Prism instance get a clear error and fall back to manual project-page links).
-  Prism opens focused on the pack — its downloader resolves versions and
-  dependencies. **The app never needs a CurseForge key for installs: Prism
-  bundles its own.**
+  Prism instance get a clear error and fall back to manual project-page
+  links). Prism opens focused on the pack — its downloader resolves versions
+  and dependencies. The app never needs a CurseForge key for installs:
+  **Prism bundles its own.**
 - **One-click Modrinth installs** — `install_modrinth_mod`
   (`src-tauri/src/commands/modpack/install.rs`, s54): downloads a Modrinth
   jar into `<instance>/mods/` and records the DB row with jar-derived
