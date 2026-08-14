@@ -4,13 +4,14 @@ import { CuratedModsStep } from './CuratedModsStep'
 
 vi.mock('../../services/mods', () => ({
   listCuratedMods: vi.fn(),
+  installModrinthMod: vi.fn(),
 }))
 
 vi.mock('../../services/project', () => ({
   openPrismForProject: vi.fn(),
 }))
 
-import { listCuratedMods } from '../../services/mods'
+import { listCuratedMods, installModrinthMod } from '../../services/mods'
 import { openPrismForProject } from '../../services/project'
 
 const project = {
@@ -35,6 +36,7 @@ beforeEach(() => {
     { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null, page_url: null },
   ])
   vi.mocked(openPrismForProject).mockResolvedValue(undefined)
+  vi.mocked(installModrinthMod).mockResolvedValue({})
 })
 
 function renderStep(over = {}) {
@@ -58,12 +60,54 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
     expect(screen.getByText('Controllable')).toBeInTheDocument()
   })
 
-  it('offers the Prism handoff as the only install action — no in-app install', async () => {
+  it('Modrinth picks get a one-click Install; CurseForge picks get the Prism guide instead', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: null },
+    ])
+    renderStep()
+    await screen.findByText('KubeJS')
+    expect(screen.getByRole('button', { name: 'Install KubeJS' })).toBeInTheDocument()
+    // CF pick has no in-app install button — the app can't back a CF download.
+    expect(screen.queryByRole('button', { name: /install ftb quests/i })).toBeNull()
+    expect(screen.getByText(/FTB Quests installs in Prism/i)).toBeInTheDocument()
+    expect(screen.getByText('FTB Library')).toBeInTheDocument()
+    expect(screen.getByText('FTB Teams')).toBeInTheDocument()
+    expect(screen.getByText('Architectury')).toBeInTheDocument()
+  })
+
+  it('one-click installs a Modrinth pick in-app and marks it installed', async () => {
     renderStep()
     await screen.findByText('Just Enough Items')
-    expect(screen.getByRole('button', { name: 'Open Prism to install these' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /install selected/i })).toBeNull()
-    expect(screen.queryByRole('checkbox')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Install KubeJS' }))
+    await waitFor(() => {
+      expect(installModrinthMod).toHaveBeenCalledWith({
+        projectId: 'p1',
+        modId: 'kubejs',
+        slug: 'kubejs',
+        name: 'KubeJS',
+        description: 'Recipe scripting.',
+      })
+    })
+    expect(await screen.findByRole('button', { name: 'KubeJS installed' })).toBeDisabled()
+  })
+
+  it('install failure surfaces the error and leaves the row installable', async () => {
+    vi.mocked(installModrinthMod).mockRejectedValueOnce('registry down')
+    renderStep()
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Install KubeJS' }))
+    await screen.findByText('registry down')
+    expect(screen.getByRole('button', { name: 'Install KubeJS' })).toBeInTheDocument()
+  })
+
+  it('renders blocked_reason on a pick whose metadata could not be verified', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: 'CurseForge metadata fetch failed', page_url: null },
+    ])
+    renderStep()
+    await screen.findAllByText('FTB Quests')
+    expect(screen.getByText('CurseForge metadata fetch failed')).toBeInTheDocument()
   })
 
   it('opens Prism focused on the project instance', async () => {
@@ -83,7 +127,7 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
       { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
     ])
     renderStep()
-    await screen.findByText('FTB Quests')
+    await screen.findAllByText('FTB Quests')
     fireEvent.click(screen.getByRole('button', { name: 'Open Prism to install these' }))
     const link = await screen.findByRole('link', { name: 'FTB Quests' })
     expect(link).toHaveAttribute('href', 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests')
@@ -94,7 +138,7 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
       { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
     ])
     renderStep()
-    await screen.findByText('FTB Quests')
+    await screen.findAllByText('FTB Quests')
     expect(screen.getByRole('link', { name: 'Project page' })).toHaveAttribute(
       'href',
       'https://www.curseforge.com/minecraft/mc-mods/ftb-quests',

@@ -1,16 +1,22 @@
-// One curated-mod row in the wizard's step 4: name, description, and a project
-// page link where the mod has one. PRISM-LEAN (s53): the row is display-only —
-// installation happens in Prism's own downloader, so the checkbox/status/retry
-// machinery is gone. The page link is the manual fallback for packs not tied
-// to a Prism instance.
+// One curated-mod row in the wizard's step 4. PRISM-LEAN (s54): Modrinth picks
+// install in-app with one click (keyless — the honest one-click); CurseForge
+// picks (FTB Quests) install through Prism, so their rows carry the project
+// page link and the step-level Prism guide instead of a button the app can't
+// back. `blocked_reason` renders as a warning so a pick whose metadata
+// couldn't be verified is never silently absent (s37).
 
 import type { CuratedMod } from '../../services/types'
 
 interface CuratedModRowProps {
   mod: CuratedMod
+  /** One-click install handler (Modrinth picks only; undefined for CF picks). */
+  onInstall?: (mod: CuratedMod) => Promise<void>
+  installing: boolean
+  installed: boolean
 }
 
-export function CuratedModRow({ mod }: CuratedModRowProps) {
+export function CuratedModRow({ mod, onInstall, installing, installed }: CuratedModRowProps) {
+  const canInstall = !!onInstall && !installed
   return (
     <div
       style={{
@@ -22,6 +28,11 @@ export function CuratedModRow({ mod }: CuratedModRowProps) {
       <div style={{ flex: 1 }}>
         <strong>{mod.name}</strong>
         <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{mod.description}</div>
+        {mod.blocked_reason && (
+          <div style={{ fontSize: 12, color: 'var(--color-warning, #d97706)', marginTop: 4 }}>
+            {mod.blocked_reason}
+          </div>
+        )}
       </div>
       {mod.page_url && (
         <a
@@ -33,6 +44,16 @@ export function CuratedModRow({ mod }: CuratedModRowProps) {
         >
           Project page
         </a>
+      )}
+      {onInstall && (
+        <button
+          className={installed || installing ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+          onClick={() => canInstall && !installing && onInstall(mod)}
+          disabled={installing || installed}
+          aria-label={installed ? `${mod.name} installed` : installing ? `Installing ${mod.name}` : `Install ${mod.name}`}
+        >
+          {installed ? 'Installed ✓' : installing ? 'Installing…' : 'Install'}
+        </button>
       )}
     </div>
   )

@@ -1,13 +1,14 @@
-// Wizard step 4: curated mod picks (roadmap §9.3 step 4). PRISM-LEAN (s53):
+// Wizard step 4: curated mod picks (roadmap §9.3 step 4). PRISM-LEAN (s53/s54):
 // the step CURATES — it tells the user which mods a first pack needs, filtered
-// backend-side to what the pack's loader/version supports — and hands
-// EXECUTION to Prism's own downloader, which resolves versions AND
-// dependencies (something ModCanvas does not reimplement; the in-app install
-// machinery was deprecated under the s53 ruling). Non-instance-backed packs
+// backend-side to what the pack's loader/version supports. Execution splits on
+// registry: Modrinth picks install in-app with one click (keyless); CurseForge
+// picks (FTB Quests) install through Prism's own downloader, which resolves
+// versions AND dependencies ModCanvas cannot see — the step guides that flow
+// explicitly, naming the three required FTB deps. Non-instance-backed packs
 // (scratch projects) fall back to manual-download links.
 
 import { useEffect, useState } from 'react'
-import { listCuratedMods } from '../../services/mods'
+import { listCuratedMods, installModrinthMod } from '../../services/mods'
 import { openPrismForProject } from '../../services/project'
 import type { CuratedMod } from '../../services/types'
 import type { Project } from '../../services/types'
@@ -25,6 +26,8 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
   const [mods, setMods] = useState<CuratedMod[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
+  const [installing, setInstalling] = useState<Set<string>>(new Set())
+  const [installed, setInstalled] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -39,6 +42,30 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
       alive = false
     }
   }, [project.id])
+
+  async function handleInstall(mod: CuratedMod) {
+    if (installing.has(mod.mod_id)) return
+    setInstalling((prev) => new Set(prev).add(mod.mod_id))
+    setError(null)
+    try {
+      await installModrinthMod({
+        projectId: project.id,
+        modId: mod.mod_id,
+        slug: mod.slug,
+        name: mod.name,
+        description: mod.description,
+      })
+      setInstalled((prev) => new Set(prev).add(mod.mod_id))
+    } catch (e: any) {
+      setError(typeof e === 'string' ? e : e?.message || String(e))
+    } finally {
+      setInstalling((prev) => {
+        const next = new Set(prev)
+        next.delete(mod.mod_id)
+        return next
+      })
+    }
+  }
 
   async function handleOpenPrism() {
     if (opening) return
@@ -65,6 +92,9 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
   const coreMods = mods?.filter((m) => m.core) ?? []
   const funMods = mods?.filter((m) => !m.core) ?? []
   const manualLinks = mods?.filter((m) => m.page_url) ?? []
+  // FTB Quests is the only CurseForge pick (CF-only) — it needs the Prism
+  // guide; everything else installs in-app.
+  const needsPrismGuide = mods?.some((m) => m.source === 'curseforge') ?? false
 
   return (
     <div>
@@ -103,14 +133,55 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
           Needed by ModCanvas
         </div>
       )}
-      {coreMods.map((mod) => <CuratedModRow key={mod.slug} mod={mod} />)}
+      {coreMods.map((mod) => (
+        <CuratedModRow
+          key={mod.slug}
+          mod={mod}
+          onInstall={mod.source === 'modrinth' ? handleInstall : undefined}
+          installing={installing.has(mod.mod_id)}
+          installed={installed.has(mod.mod_id)}
+        />
+      ))}
+
+      {needsPrismGuide && (
+        <div
+          style={{
+            fontSize: 12, color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-default)', borderRadius: 8,
+            padding: '10px 12px', margin: '8px 0',
+          }}
+        >
+          <strong style={{ color: 'var(--color-text-primary)' }}>FTB Quests installs in Prism</strong>
+          {' — '}it's CurseForge-only, and ModCanvas's one-click install can't
+          reach CurseForge (Prism carries its own access and also installs the
+          mods FTB Quests needs to run):
+          <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            <li>Open Prism (the button below), click your instance, then <strong>Mods → Download Mods</strong>.</li>
+            <li>Search <strong>FTB Quests</strong> and click <strong>Install</strong>.</li>
+            <li>
+              When Prism asks about <strong>FTB Library</strong>, <strong>FTB Teams</strong>, and{' '}
+              <strong>Architectury</strong> — install those too. They're required;
+              without them the quest book won't load in-game.
+            </li>
+            <li>Back here, hit <strong>Continue</strong> — the check will see what Prism installed.</li>
+          </ol>
+        </div>
+      )}
 
       {funMods.length > 0 && (
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', margin: '10px 0 6px' }}>
           Goes great with your pack
         </div>
       )}
-      {funMods.map((mod) => <CuratedModRow key={mod.slug} mod={mod} />)}
+      {funMods.map((mod) => (
+        <CuratedModRow
+          key={mod.slug}
+          mod={mod}
+          onInstall={mod.source === 'modrinth' ? handleInstall : undefined}
+          installing={installing.has(mod.mod_id)}
+          installed={installed.has(mod.mod_id)}
+        />
+      ))}
 
       <div style={{ marginTop: 14 }}>
         <button
