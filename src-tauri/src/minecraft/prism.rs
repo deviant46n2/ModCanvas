@@ -185,7 +185,7 @@ pub(super) fn generate_instance_cfg(
 ConfigVersion=1.3
 InstanceType={instance_type}
 ManagedPack=false
-Name={name}
+name={name}
 "#,
         instance_type = instance_type,
         name = name,
@@ -244,4 +244,21 @@ pub(super) fn generate_mmc_pack(
         lv = lv,
         loader_name = loader_name,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_instance_cfg;
+
+    #[test]
+    fn instance_cfg_writes_lowercase_name_key_like_prism_itself() {
+        // Prism reads the display name from `name=` — the capitalized `Name=`
+        // form is ignored and Prism falls back to "Unnamed Instance" (observed
+        // live 2026-08-13: the wizard's fresh instance showed "Unnamed
+        // Instance" despite Name= in its cfg; real Prism instances on disk use
+        // lowercase `name=`). Match the tool's own output.
+        let cfg = generate_instance_cfg("My Pack", "1.21.1", "neoforge", Some("21.1.248"));
+        assert!(cfg.contains("name=My Pack"), "cfg must carry the lowercase name key: {cfg}");
+        assert!(!cfg.contains("Name="), "capitalized Name= is ignored by Prism: {cfg}");
+    }
 }
