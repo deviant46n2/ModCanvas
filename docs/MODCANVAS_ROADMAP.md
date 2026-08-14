@@ -35,7 +35,7 @@ strategic space, including things deliberately NOT being built yet.
 | 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (453 Rust + 697 FE tests) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
 | 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
 | 5 | **PRISM-LEAN (s53)** — mod EXECUTION moves to Prism Launcher | **CHUNK 1 DONE (s53)** — handoff shipped: `open_prism_instance` (`prismlauncher --show <instanceId>`), wizard curated step = curated list + "Open Prism to install these" (manual-link fallback for non-instance packs), Mods tab "Add mods in Prism" button. Docs: `docs/mods-tab.md`. | ModCanvas curates + diagnoses; Prism executes (version matching + dependency resolution — verified: FTB Quests in Prism pulls Library/Teams/Architecury; ModCanvas's own search cannot surface CF mods: `searchFilter=ftb` → 50 irrelevant hits, zero FTB mods, live-verified 2026-08-13). Student ruling; rationale: delegate risky high-surface execution to battle-tested software. |
-| 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | BOOKED (chunk 1 shipped) | Delete `search_mods` / `install_mod_from_search` / the Mods-tab search UI / compat-panel install buttons / CF-key use for installs with the s52 evidence pattern (consumer tracing, grep-proof, tests moved or killed). Do NOT rush — the deprecated surface stays functional until then. |
+| 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | **DONE (s54)** — search surface deleted: `search_mods` / `install_mod_from_search` (renamed `install_modrinth_mod`, Modrinth-only) / `search_merge.rs` / orphaned CF download fns / Mods-tab search UI / SearchResultRow / CategorySelect / SourceToggles (4 test files deleted, 2 edited, s52 evidence pattern). **Refined on ruling:** the one-click Modrinth installer was KEPT (wizard curated picks + compat panel) — keyless and loop-closing; CF installs (FTB Quests) go to Prism with explicit guide copy naming the three required deps (wizard step + core-mod gate finding). CF-key use for installs is dead everywhere. Docs: `docs/mods-tab.md`. | See row 5 for the ruling rationale. The refinement (s54): the s53 kill-list overreached on the compat one-click — Modrinth's API is keyless, so an app-diagnosed missing dep can be repaired in-app honestly; CF deps stay invisible (`CurseForgeFileInfo` parses none), so FTB Quests always installs through Prism. |
 
 ### Deliberately deferred expansion
 
@@ -167,7 +167,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Quest editor (FTB Quests) | **Implemented, deep** — near-full parity (roadmap §13 P1-PARITY tracks the remaining gaps); **export layout fixed s42** (1.21.x exports ONLY FlatChapters `quests/chapters/*.snbt` — verified against the shipped 2101.1.30 jar, which loads no other layout; the older Subdirs export loaded 0 chapters in-game) | `QuestBookEditor.tsx:32`; `components/quest/` (~45 files); SNBT/JSON5 import + version-aware export (`imports/ftb_quests/`) |
 | Recipe editor (KubeJS/CT/vanilla) | **Implemented** — scan, unified disable, authored-only save, 6 specialized types | `RecipeEditor.tsx:45`; `recipes/mod.rs:85`; `scriptgen/`; `recipe_disable/mod.rs` |
 | Config editor | **Implemented** — structured forms + raw, TOML comment-preserving in place | `ConfigsTab.tsx:32`, `config-editor.tsx:26`; `config_parser/toml_update.rs:11` |
-| Mods tab | **Implemented** — dual-source search, install, compat | `ModsTab.tsx:74`; `commands/modpack/search.rs:115`; `commands/modpack/search_merge.rs` (s33) |
+| Mods tab | **Implemented (PRISM-LEAN, s54)** — grid, bulk, compat diagnosis + Modrinth one-click installs, Prism handoff | `ModsTab.tsx:58`; `commands/modpack/install.rs` (Modrinth-only installer); `open_prism_instance` (`modpack/mod.rs`); search surface deleted (chunk 2) |
 | Pack Health | **Implemented (Tier 1)** — go/no-go, 3 honest states, pure derivation | `core/pack-health/index.ts:128`; `PackHealthTab.tsx:80`; `checks/{quests,recipes,pack}.ts` |
 | Loot tab | **Implemented (s44 scan, s47 editor)** — scan + list + detail (pack data + mod jars, both `loot_table`/`loot_tables` dirs, full-path ids); full-depth editor, verbatim atomic save, new-table creation (see §13 P3-LOOT) | `components/loot/LootTab.tsx`; `services/loot.ts`; `hooks/useLootTables.ts`; `src-tauri/src/loot/` (`parse.rs` pure, `pack_scan.rs` walker, `editor.rs`, `create.rs`); roadmap §13 P3-LOOT |
 | History / undo | **Implemented** — durable journal, timeline drawer | `core/history/store.ts:86`; `HistoryDrawer.tsx`; `commands/history.rs:11` |
@@ -671,13 +671,16 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     serves the list filtered per pack by loader/version (trust rule: unknown support = kept,
     not dropped). Two **core** picks back ModCanvas's own features — FTB Quests (the quest
     book, CurseForge-only, id 289412) and KubeJS (recipe scripts, Modrinth, all loaders) —
-    and render in their own "Needed by ModCanvas" section. **Execution is a Prism handoff
-    (s53):** the step CURATES (what to install) and hands off via "Open Prism to install
-    these" (`prismlauncher --show <instanceId>`) — Prism resolves versions and dependencies,
-    so the old in-app install, the CF-key box, and the one-click transitive-dep installs are
-    GONE (deprecated, chunk-2 deletion booked). Non-instance packs fall back to manual
-    project-page links. Continue refreshes the pack so the green check sees Prism-installed
-    mods.
+    and render in their own "Needed by ModCanvas" section. **Execution splits on
+    registry (s54):** Modrinth picks install in-app with one click
+    (`install_modrinth_mod` — keyless, the honest one-click); CurseForge picks
+    (FTB Quests) hand off via "Open Prism to install these"
+    (`prismlauncher --show <instanceId>`) — Prism resolves versions AND the CF
+    dependencies ModCanvas cannot parse, and the step's guide names FTB
+    Quests' three required deps (FTB Library, FTB Teams, Architectury). The
+    old dual-source search surface is deleted (chunk 2, s54). Non-instance
+    packs fall back to manual project-page links. Continue refreshes the pack
+    so the green check sees Prism-installed mods.
  5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through the
     **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
     export path. The zero-code proof point. **MOVED TO THE LIVE SURFACE (s53):** the wizard

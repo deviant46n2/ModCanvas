@@ -1,17 +1,19 @@
 # Mods Tab
 
-> **Status: s53 — PRISM-LEAN.** ModCanvas *curates and diagnoses*; Prism
-> Launcher *executes* mod installation. The in-app Add-Mods search and
-> install machinery is **DEPRECATED** under the s53 ruling (roadmap §0) —
-> Prism's own downloader does version matching AND dependency resolution
-> (verified: installing FTB Quests in Prism pulls FTB Library + FTB Teams +
-> Architectury API automatically). ModCanvas does not reimplement it. The
-> deprecated surface stays functional until its evidence-backed deletion
-> (chunk 2, roadmap §0) — the code is not a lie, it is a documented state.
+> **Status: s54 — PRISM-LEAN (chunk 2 shipped).** ModCanvas *curates and
+> diagnoses*; Prism Launcher *executes* the mods the app cannot download
+> itself. The old Add-Mods search surface (search commands, cross-source
+> merge, source toggles, category filter, result rows) was **deleted** in
+> chunk 2 (roadmap §0 row 6) — evidence-backed, s52 pattern. What remains is
+> the split of labor: **Modrinth** installs happen in-app with one click
+> (the Modrinth API is keyless — an honest one-click); **CurseForge**
+> installs (FTB Quests) happen in Prism, which carries its own CF key and
+> parses CF dependencies ModCanvas cannot see.
 
 The Mods tab is the project's mod-management surface: browse installed mods,
 toggle them on/off (individually or in bulk), scan the instance's `mods/`
-folder, and check missing dependencies. Adding new mods hands off to Prism.
+folder, and check missing dependencies. Adding new mods hands off to Prism;
+missing Modrinth dependencies install in-app.
 
 ## Layout
 
@@ -34,8 +36,22 @@ folder, and check missing dependencies. Adding new mods hands off to Prism.
   of the instance dir under `instances/` (validated; scratch packs without a
   Prism instance get a clear error and fall back to manual project-page links).
   Prism opens focused on the pack — its downloader resolves versions and
-  dependencies. The app never needs a CurseForge key for installs: **Prism
+  dependencies. **The app never needs a CurseForge key for installs: Prism
   bundles its own.**
+- **One-click Modrinth installs** — `install_modrinth_mod`
+  (`src-tauri/src/commands/modpack/install.rs`, s54): downloads a Modrinth
+  jar into `<instance>/mods/` and records the DB row with jar-derived
+  metadata. Modrinth-only by design — the Modrinth API is keyless, so the
+  button is honest (a CF one-click would either need the user's key or
+  install a broken mod: CF deps aren't parsed, so e.g. FTB Quests would land
+  without its three required deps). Serves two surfaces: the wizard's curated
+  step (Modrinth picks) and the compat panel's missing-dependency buttons.
+- **FTB Quests installs in Prism** — the one CurseForge core pick. The
+  wizard's curated step renders a step-by-step guide (Prism → Mods → Download
+  Mods → search FTB Quests → Install, and accept **FTB Library**, **FTB
+  Teams**, **Architectury** — all required), and the core-mod gate finding
+  carries the same fix copy. ModCanvas cannot download FTB Quests itself
+  (CF-only, keyless path impossible) and cannot see its deps — Prism can.
 - **The core-mod gate (s53)** — Pack Health's **Mods** section
   (`core/pack-health/checks/mods.ts`) verifies ModCanvas's own dependencies
   (FTB Quests + KubeJS) against the scanned mods/ jar names riding the ingest
@@ -43,24 +59,22 @@ folder, and check missing dependencies. Adding new mods hands off to Prism.
   Trust Rule). Missing core mods are **blocking**, and the wizard's green check
   disables Launch until they land. The gate makes the handoff *verified*: a
   skipped Prism install can no longer produce a "ready to test" pack whose
-  quest book never appears in-game.
-- **Curated step (wizard step 2)** — same handoff: the curated list
-  (backend-filtered to the pack's loader/version) tells the user *what* to
-  install; "Open Prism to install these" does the *how*.
+  quest book never appears in-game. Each finding's detail now carries the
+  exact fix (s54): the FTB Quests one names the three deps.
 - **Scan Instance Mods** — re-scans the instance `mods/` folder and records
   what's there, so Prism-installed mods are tracked without re-import.
 
-### DEPRECATED (chunk 2 pending — see roadmap §0)
+### Deleted in chunk 2 (s54) — the search surface
 
 The Add-Mods search (Modrinth/CurseForge source toggles, category filter,
-`+ Add` install) and the one-click missing-dependency install in the compat
-panel. The s53 ruling's rationale: ModCanvas's own search cannot reliably
-surface CF mods (verified: `searchFilter=ftb` returns 50 irrelevant hits,
-zero FTB mods; the s33 slug fallback cannot rescue a query that is no mod's
-slug), CF file dependencies are not even parsed
-(`CurseForgeFileInfo`, `mod_intelligence/types.rs`), and Prism does both —
-maturely. The machinery stays until chunk 2's evidence-backed deletion
-(consumer tracing, grep-proof, tests moved or killed — the s52 pattern).
+`+ Add` install), the `search_mods` / `install_mod_from_search` commands, the
+cross-source merge (`search_merge.rs`), the orphaned CurseForge download
+functions, and `SearchResultRow` / `CategorySelect` / `SourceToggles` were
+removed with consumer tracing + grep proof (4 test files deleted, 2 edited).
+Rationale (unchanged from s53): ModCanvas's own search cannot reliably surface
+CF mods (verified: `searchFilter=ftb` returns 50 irrelevant hits, zero FTB
+mods), CF file dependencies are not parsed (`CurseForgeFileInfo`,
+`mod_intelligence/types.rs`), and Prism does both — maturely.
 
 ## Removing mods
 
@@ -95,8 +109,9 @@ stay NULL (no backfill).
 The compatibility check (`check_compatibility_async`, `modrinth/compat.rs`)
 walks Modrinth version dependency metadata and surfaces missing required
 dependencies. **This is ModCanvas's diagnosis job under PRISM-LEAN** — the
-panel tells the user what's missing; the fix is a Prism install (the
-one-click install buttons are DEPRECATED, see above). Two honesty rules: a dep
+panel tells the user what's missing, and resolved **Modrinth** deps install
+with one click (`install_payload_for` is Modrinth-only, s54; CurseForge deps
+render without a button — installs execute in Prism). Two honesty rules: a dep
 whose metadata could not be resolved gets no claim, and only **required**
 dependencies are gaps (optional/recommended are the player's choice).
 
@@ -107,26 +122,32 @@ dependencies are gaps (optional/recommended are the player's choice).
 - **`open_prism_instance`** (`modpack/mod.rs`) — the handoff: project id →
   instance id (parent folder under `instances/`) → `prismlauncher --show <id>`.
   Non-instance-backed projects error with the manual-install fallback.
-- **`search_mods` / `install_mod_from_search`** — DEPRECATED (chunk 2).
-- **Compatibility**: `check_compatibility_async` — diagnosis only going
-  forward; install payloads (`CompatibilityInstall`) deprecated with the panel.
+- **`install_modrinth_mod`** (`modpack/install.rs`) — the one-click Modrinth
+  installer (wizard + compat panel). Replaces the deleted
+  `install_mod_from_search`; CurseForge-only by removal.
+- **Compatibility**: `check_compatibility_async` — diagnosis + Modrinth-only
+  install payloads (`CompatibilityInstall` carries no source since s54).
 
 ## Components
 
 - `frontend/src/components/common/ModsTab.tsx` — grid, filter input, selection
   state, bulk bar, compatibility panel, **Add mods in Prism** handoff.
 - `frontend/src/components/common/CuratedModsStep.tsx` — wizard step 4:
-  curated list (display-only rows) + **Open Prism to install these** handoff +
-  manual-link fallback for non-instance packs.
-- `frontend/src/hooks/useModState.ts` — installed-mod state, compat check.
-- `frontend/src/services/mods.ts` / `services/project.ts` —
-  `openPrismForProject(projectId)`.
+  curated list with **one-click Install on Modrinth picks**, the **FTB Quests
+  installs in Prism** guide (three deps named), **Open Prism to install
+  these** handoff, and manual-link fallback for non-instance packs.
+- `frontend/src/hooks/useModState.ts` — installed-mod state, compat check +
+  the compat panel's one-click installs (`useCompatInstall`).
+- `frontend/src/services/mods.ts` — `installModrinthMod`, `listCuratedMods`,
+  metadata/compat calls; the search service functions were deleted.
 
 ## CurseForge API key storage & security
 
-The CurseForge API key is still held (the CF zip import resolves manifest
-mods — `import-flow.md`), but **no longer needed for mod installs** — Prism
-bundles its own key. Storage contract (`src-tauri/src/key_store.rs`):
+The CurseForge API key is still held for **ModCanvas's own CF API calls**
+(the CF zip import resolves manifest mods — `import-flow.md`; curated pick
+resolution; CF metadata in the grid/compat) — but **never for installs**:
+Prism bundles its own key, and the in-app installer is Modrinth-only
+(keyless) since s54. Storage contract (`src-tauri/src/key_store.rs`):
 
 - **Kernel keyring** (keyutils) is the primary store.
 - **Database fallback**: when no keyring exists, the key falls back to the
