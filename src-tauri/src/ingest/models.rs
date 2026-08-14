@@ -28,6 +28,10 @@ pub struct IngestResult {
     pub jars_scanned: usize,
     pub textures_indexed: usize,
     pub active_instance: String,
+    /// Jar file names in the instance's mods/ folder (the scan proof for the
+    /// pack-health core-mod gate, s53). `None` when the mods dir doesn't
+    /// exist — nothing was scanned, so no claim can be made about presence.
+    pub mods: Option<Vec<String>>,
 }
 
 /// An empty result for an instance that has no scannable mods directory.
@@ -42,6 +46,7 @@ pub(crate) fn empty_ingest_result(active_instance: String) -> IngestResult {
         jars_scanned: 0,
         textures_indexed: 0,
         active_instance,
+        mods: None,
     }
 }
 

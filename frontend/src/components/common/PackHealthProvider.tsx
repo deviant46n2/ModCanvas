@@ -13,6 +13,8 @@ export interface PackHealthProviderProps {
     pack_version: string
   }
   packLoaded: boolean
+  /** Scanned mods/ jar names (ingest result; null = no mods dir = unknown). */
+  installedMods: string[] | null
   children: React.ReactNode
 }
 
@@ -36,12 +38,19 @@ export function usePackHealth(): PackHealthContextValue {
  * Bible §9.2). The debounce means a large recipe import (which commits in
  * chunks) analyzes only the final state instead of every intermediate chunk.
  */
-export function PackHealthProvider({ project, packLoaded, children }: PackHealthProviderProps) {
+export function PackHealthProvider({ project, packLoaded, installedMods, children }: PackHealthProviderProps) {
   const questGraph = usePackHealthStore((s) => s.questGraph)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
   const recipes = useRecipeStore((s) => s.recipes)
   const behaviors = useBehaviorStore((s) => s.behaviors)
+
+  const packMeta = {
+    name: project.name,
+    description: project.description,
+    author: project.author,
+    packVersion: project.pack_version,
+  }
 
   const [report, setReport] = useState<PackHealthReport>(() =>
     analyzePackHealth({
@@ -49,14 +58,10 @@ export function PackHealthProvider({ project, packLoaded, children }: PackHealth
       itemRegistry,
       recipes,
       behaviors,
-      packMeta: {
-        name: project.name,
-        description: project.description,
-        author: project.author,
-        packVersion: project.pack_version,
-      },
+      packMeta,
       hasCoverImage,
       packLoaded,
+      installedMods,
     }),
   )
 
@@ -68,19 +73,15 @@ export function PackHealthProvider({ project, packLoaded, children }: PackHealth
           itemRegistry,
           recipes,
           behaviors,
-          packMeta: {
-            name: project.name,
-            description: project.description,
-            author: project.author,
-            packVersion: project.pack_version,
-          },
+          packMeta,
           hasCoverImage,
           packLoaded,
+          installedMods,
         }),
       )
     }, 300)
     return () => clearTimeout(t)
-  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project])
+  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods])
 
   const value = { report }
 

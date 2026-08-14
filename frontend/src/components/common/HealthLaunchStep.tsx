@@ -1,7 +1,10 @@
-// Wizard step 5: the green check + Launch (roadmap §9.3 step 6). The verdict
+// Wizard step 3: the green check + Launch (roadmap §9.3 step 6). The verdict
 // is the same pure `analyzePackHealth` the Health tab renders, computed here
 // from the already-materialized stores — the wizard never rescans, never
-// blocks on I/O. GO means "ready to test", not "ready to ship".
+// blocks on I/O. GO means "ready to test", not "ready to ship". The s53
+// core-mod gate: without FTB Quests + KubeJS scanned in mods/, the report
+// carries blocking findings and Launch is disabled — "ready to test" must not
+// bless a pack whose quest book cannot appear in-game.
 
 import { useMemo, useState } from 'react'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
@@ -18,10 +21,12 @@ interface HealthLaunchStepProps {
    *  scratch) — it cannot be launched from ModCanvas, so Launch must not be
    *  offered as if it could. */
   launchable: boolean
+  /** Scanned mods/ jar names (ingest result; null = no mods dir = unknown). */
+  installedMods: string[] | null
   onDone: () => void
 }
 
-export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: HealthLaunchStepProps) {
+export function HealthLaunchStep({ project, packLoaded, launchable, installedMods, onDone }: HealthLaunchStepProps) {
   const questGraph = usePackHealthStore((s) => s.questGraph)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
@@ -45,9 +50,12 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
         },
         hasCoverImage,
         packLoaded,
+        installedMods,
       }),
-    [questGraph, itemRegistry, recipes, hasCoverImage, packLoaded, project],
+    [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods],
   )
+
+  const blockingItems = report.sections.flatMap((s) => s.items).filter((i) => i.severity === 'blocking')
 
   async function handleLaunch() {
     setLaunching(true)
@@ -85,6 +93,20 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
         {report.optionalCount} optional — details live in the Health tab.
       </div>
 
+      {blockingItems.length > 0 && (
+        <div style={{ marginBottom: 12, padding: 10, border: '1px solid var(--color-error)', borderRadius: 8 }}>
+          {blockingItems.map((item) => (
+            <div key={item.id} style={{ fontSize: 13, color: 'var(--color-error)', marginBottom: 4 }}>
+              {item.message}
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6 }}>
+            Install the missing mods from Prism (the curated mods step), then come back and
+            continue — the check updates when the pack refreshes.
+          </div>
+        </div>
+      )}
+
       {launchError && (
         <div className="launch-error" style={{ marginBottom: 12 }}>
           <pre className="copyable" style={{ whiteSpace: 'pre-wrap' }}>{launchError}</pre>
@@ -104,7 +126,12 @@ export function HealthLaunchStep({ project, packLoaded, launchable, onDone }: He
           Done
         </button>
         {launchable && (
-          <button className="btn-primary" onClick={handleLaunch} disabled={launching}>
+          <button
+            className="btn-primary"
+            onClick={handleLaunch}
+            disabled={launching || !report.go}
+            title={!report.go ? 'Fix the blocking findings before launching' : undefined}
+          >
             {launching ? 'Launching…' : 'Launch the pack'}
           </button>
         )}

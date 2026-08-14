@@ -36,7 +36,15 @@ folder, and check missing dependencies. Adding new mods hands off to Prism.
   Prism opens focused on the pack — its downloader resolves versions and
   dependencies. The app never needs a CurseForge key for installs: **Prism
   bundles its own.**
-- **Curated step (wizard step 4)** — same handoff: the curated list
+- **The core-mod gate (s53)** — Pack Health's **Mods** section
+  (`core/pack-health/checks/mods.ts`) verifies ModCanvas's own dependencies
+  (FTB Quests + KubeJS) against the scanned mods/ jar names riding the ingest
+  result (`IngestResult.mods`, null when the mods dir doesn't exist — no claim,
+  Trust Rule). Missing core mods are **blocking**, and the wizard's green check
+  disables Launch until they land. The gate makes the handoff *verified*: a
+  skipped Prism install can no longer produce a "ready to test" pack whose
+  quest book never appears in-game.
+- **Curated step (wizard step 2)** — same handoff: the curated list
   (backend-filtered to the pack's loader/version) tells the user *what* to
   install; "Open Prism to install these" does the *how*.
 - **Scan Instance Mods** — re-scans the instance `mods/` folder and records

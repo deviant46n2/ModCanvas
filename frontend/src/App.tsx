@@ -117,8 +117,6 @@ function AppRoot() {
           project={openProject}
           activeTab={s.activeTab}
           onTabChange={s.handleTabChange}
-          showGuidedQuest={s.showGuidedQuest}
-          onGuidedQuestClose={s.handleGuidedQuestClose}
           onRestartWebSocket={s.restartWebSocket}
           onRestartInstance={s.handleRestartInstance}
           isRestarting={s.isRestarting}
@@ -230,7 +228,7 @@ function AppRoot() {
         onRefresh={() => s.refreshPack(false)}
         packLoaded={s.packLoaded}
         onDone={s.handleWizardDone}
-        onGuidedQuest={s.handleGuidedQuest}
+        installedMods={s.ingestResult?.mods ?? null}
       />
 
       <ImportModal

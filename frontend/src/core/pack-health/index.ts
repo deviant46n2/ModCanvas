@@ -16,6 +16,7 @@ import { checkQuestStructure, checkQuestItemRefs, questItemCoverage } from './ch
 import { computeTopology } from './checks/topology'
 import { checkRecipes } from './checks/recipes'
 import { checkBehaviors, behaviorItemCoverage } from './checks/behaviors'
+import { checkCoreMods } from './checks/mods'
 import { checkPack, type PackCoverageMeta } from './checks/pack'
 import type { HealthItem, HealthSection, HealthSectionKey, PackHealthReport } from './types'
 
@@ -27,6 +28,10 @@ export interface PackHealthInput {
   packMeta: PackCoverageMeta
   hasCoverImage: boolean
   packLoaded: boolean
+  /** Scanned mods/ jar names from the ingest (null = no mods dir = unknown).
+   *  Feeds the core-mod gate (s53): ModCanvas's editors depend on FTB Quests
+   *  + KubeJS, and "ready to test" must not bless a pack without them. */
+  installedMods: string[] | null
 }
 
 export interface PackHealthStats {
@@ -49,6 +54,7 @@ const SECTION_META: Array<{ key: HealthSectionKey; label: string }> = [
   { key: 'quests', label: 'Quests' },
   { key: 'recipes', label: 'Recipes' },
   { key: 'behaviors', label: 'Behaviors' },
+  { key: 'mods', label: 'Mods' },
   { key: 'pack', label: 'Pack' },
 ]
 
@@ -162,6 +168,7 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
   }
 
   const recipes = checkRecipes(input.recipes ?? [])
+  const mods = checkCoreMods(input.installedMods)
   const pack = checkPack({
     meta: input.packMeta,
     hasCoverImage: input.hasCoverImage,
@@ -172,7 +179,12 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
 
   const sections: HealthSection[] = SECTION_META.map((meta) => ({
     ...meta,
-    items: meta.key === 'quests' ? quests : meta.key === 'recipes' ? recipes : meta.key === 'behaviors' ? behaviors : pack,
+    items:
+      meta.key === 'quests' ? quests
+      : meta.key === 'recipes' ? recipes
+      : meta.key === 'behaviors' ? behaviors
+      : meta.key === 'mods' ? mods
+      : pack,
   }))
 
   const report: PackHealthReport = {

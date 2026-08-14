@@ -11,9 +11,9 @@ import { MIN_TRUSTED_REGISTRY_ITEMS } from '../../core/pack-health'
 
 const project = { name: 'Pack', description: 'Desc', author: 'Me', pack_version: '1.0.0' }
 
-function renderHealth(packLoaded = true, onJumpToFinding?: (item: HealthItem) => void) {
+function renderHealth(packLoaded = true, onJumpToFinding?: (item: HealthItem) => void, installedMods: string[] | null = null) {
   return render(
-    <PackHealthProvider project={project} packLoaded={packLoaded}>
+    <PackHealthProvider project={project} packLoaded={packLoaded} installedMods={installedMods}>
       <PackHealthTab onJumpToFinding={onJumpToFinding} />
     </PackHealthProvider>,
   )
@@ -40,8 +40,8 @@ describe('PackHealthTab', () => {
   it('shows GO when the pack is healthy', () => {
     renderHealth()
     expect(screen.getByText('Ready to test')).toBeInTheDocument()
-    // Quests + Recipes + Behaviors + Pack all clear.
-    expect(screen.getAllByText('All clear')).toHaveLength(4)
+    // Quests + Recipes + Behaviors + Mods + Pack all clear.
+    expect(screen.getAllByText('All clear')).toHaveLength(5)
   })
 
   it('shows GO with a registry diagnostic instead of a flood on a degraded registry', () => {

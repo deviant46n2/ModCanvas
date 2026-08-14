@@ -141,6 +141,7 @@ pub fn ingest_active_instance_with_progress(
                                 jars_scanned,
                                 textures_indexed: cached.textures_indexed,
                                 active_instance: act,
+                                mods: Some(scanned_jar_names(&current_jars)),
                             };
                         } else {
                             eprintln!("[Ingestion] kubejs/assets changed (mtime or texture count), re-scanning...");
@@ -271,7 +272,22 @@ pub fn ingest_active_instance_with_progress(
         jars_scanned,
         textures_indexed,
         active_instance: act,
+        mods: Some(scanned_jar_names(&current_jars)),
     }
+}
+
+/// The jar file names present in the mods dir — the scan proof for the
+/// pack-health core-mod gate (s53). Collected on every ingest, cache hit or
+/// not, because `collect_jars_with_meta` runs before the cache check.
+fn scanned_jar_names(current_jars: &[(std::path::PathBuf, u64, u64, String)]) -> Vec<String> {
+    current_jars
+        .iter()
+        .map(|(p, _, _, _)| {
+            p.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default()
+        })
+        .collect()
 }
 
 #[cfg(test)]

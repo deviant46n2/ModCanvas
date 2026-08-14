@@ -182,9 +182,9 @@ documented capability had no code behind it, it is labeled **aspirational**.
 
 | Thing | Documented in | Reality |
 |---|---|---|
-| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked; execution hands off to Prism — s53 PRISM-LEAN) → **green check + Launch** (same report as the Health tab, `test_project`). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
+| First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked; execution hands off to Prism — s53 PRISM-LEAN) → **green check + Launch** (same report as the Health tab, `test_project`). The guided first quest moved OUT of the wizard to the live surface (s53 — see step 5 below). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
-| Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — external handoff via `showGuidedQuest`/`onGuidedQuestClose` (`App.tsx:119-120`), one-shot open. Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
+| Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — entries: the quest editor's `✨ Add a quest` toolbar button (everyone) and the Beginner Mode live banner (s53, first companion connect per session). The external wizard handoff (`showGuidedQuest`) was removed with the wizard step (s53). Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
 | Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
@@ -605,7 +605,7 @@ Export (mrpack/CF zip) → Playable Modpack
 
 | Step | Status | Breakage |
 |---|---|---|
-| Create Pack | **StartChooser + wizard shipped (P0-WIZARD chunks 1–3; s49 reshape):** four-card start (intro / IDE tour / blank / load), name your pack (auto-creates a Prism instance), curated mod picks, **guided first quest (P0-MINIWIZ "Add a quest" — handoff to the quests tab, s41)** + green check + Launch. Blank starts skip the post-create steps and land straight in the IDE. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
+| Create Pack | **StartChooser + wizard shipped (P0-WIZARD chunks 1–3; s49 reshape):** four-card start (intro / IDE tour / blank / load), name your pack (auto-creates a Prism instance), curated mod picks, **green check + Launch** + guided first quest **moved to the live surface** (s53 — Beginner Mode banner on first companion connect; the pre-launch wizard step was removed). Blank starts skip the post-create steps and land straight in the IDE. Scaffold refuses instances that already have a quest book (no clobber) | User can now reach a scaffolded, coherent pack in one flow |
 | Add Mods | Full search works (`ModsTab.tsx`) but no curated picks, no "these go together" defaults | User must know mod names to search |
 | Customize | Full editors exist; zero guidance; raw surfaces visible (KubeJS drawer, raw config) | First-time user faces an IDE |
 | Health | Tier 1 works, always visible | No wizard-driven green-check moment |
@@ -678,23 +678,35 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
     GONE (deprecated, chunk-2 deletion booked). Non-instance packs fall back to manual
     project-page links. Continue refreshes the pack so the green check sees Prism-installed
     mods.
- 5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through
-    the **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
-    export path. The zero-code proof point. **Implemented (s41, P0-MINIWIZ):** the wizard's
-    guided-quest step (step 3) is a handoff — it closes, switches to the quests tab, and opens the
-    `GuidedQuestWizard` modal in the editor (pick item → collect/craft goal → review →
-    create). The quest lands through the same `commitGraph` history path (undoable in one
-    step) and the same export path; a collect-N-get-N reward is the default. A "✨ Add a
-    quest" toolbar button in the quest editor opens the same wizard at any time.
+ 5. **Guided first quest** — "pick an item → pick a goal → wizard writes the quest" through the
+    **same quest editor** (mini-wizard, §9.5), emitted as real SNBT via the existing
+    export path. The zero-code proof point. **MOVED TO THE LIVE SURFACE (s53):** the wizard
+    no longer hosts the step — calling it before the instance has ever run handed the user
+    an empty item picker (no game data = no registry). The teaching moment now happens when
+    the companion connects in **Beginner Mode**: a one-time-per-session banner in the quest
+    editor ("Your pack is running — add a quest and watch it change in-game") opens the
+    same mini-wizard, where the picker is full (game downloaded → real registry + textures)
+    and hotswap is on display. The `✨ Add a quest` toolbar button remains for everyone.
+    The external handoff (close wizard → switch tab → open modal) was removed with the step.
  6. **The green check + Launch** — run Pack Health's `analyzePackHealth` over the scaffolded
     pack; show blocking/recommended; one button: **Launch** (reuse `test_project`).
-    **Status (chunk 3; s49):** implemented — the wizard's step 4 (renumbered when the
-    where-picker was removed, s49) computes the same pure report
+    **Status (chunk 3; s49 + s53):** implemented — the wizard's step 3 (renumbered when the
+    where-picker was removed, s49; renumbered again when the guided-quest step moved to the
+    live surface, s53) computes the same pure report
     the Health tab renders (from the already-materialized stores, no rescans) and offers
     Launch via `test_project` with the same defaults as the topbar Test button. Every
     pack now has a Prism instance (s49: the wizard auto-creates one; scratch mode was
     deleted), so Launch is always available — the old "launch hidden for scratch packs"
     rule and the parked "link a scratch pack to an instance" entry are obsolete.
+    **The core-mod gate (s53):** the report now carries a **Mods** section —
+    `checkCoreMods` (`core/pack-health/checks/mods.ts`) verifies ModCanvas's own
+    dependencies (FTB Quests + KubeJS) against the scanned mods/ jar names riding the
+    ingest result (null = no mods dir = silent, Trust Rule). Missing core mods are
+    **blocking** and Launch is disabled until they land — "ready to test" must not bless a
+    pack whose quest book cannot appear in-game (the wedge gap observed live 2026-08-13:
+    the wizard launched a pack with no FTB Quests). Blocking findings render inline with
+    the fix hint (install from Prism, then continue — Continue refreshes the pack and the
+    gate re-evaluates).
 
 Completion criteria (P0-WIZARD): a fresh-eyes tester completes steps 1–6 on 1.21.1/NeoForge
 without opening a code file, a raw config, or the KubeJS drawer; the wizard is restartable

@@ -99,6 +99,9 @@ interface QuestEditorLayoutProps {
   onResetAll: () => void
   /** Open the guided "Add a quest" wizard (P0-MINIWIZ). */
   onOpenGuidedQuest?: () => void
+  /** s53 live invitation: visible on first companion connect in Beginner Mode. */
+  liveInviteVisible: boolean
+  onDismissLiveInvite: () => void
 }
 
 export function QuestEditorLayout(props: QuestEditorLayoutProps) {
@@ -136,6 +139,24 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
           onRunInstance={() => props.onTest?.()}
           onDismiss={() => props.setEnginePromptDismissed(true)}
         />
+      )}
+      {props.liveInviteVisible && (
+        <div className="live-invite-banner" role="status">
+          <span className="live-invite-text">
+            Your pack is running — edit your quest book and watch it change in-game.
+          </span>
+          <button className="btn-primary btn-sm" onClick={props.onOpenGuidedQuest}>
+            ✨ Add my first quest
+          </button>
+          <button
+            className="live-invite-dismiss"
+            onClick={props.onDismissLiveInvite}
+            aria-label="Dismiss live quest invitation"
+            title="Dismiss for this session"
+          >
+            {'\u00D7'}
+          </button>
+        </div>
       )}
       <div className="quest-editor-body">
         <aside className="quest-editor-chapters" role="navigation" aria-label="Chapters">

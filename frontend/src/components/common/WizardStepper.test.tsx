@@ -39,7 +39,7 @@ async function renderWizard(overrides: Partial<Parameters<typeof WizardStepper>[
       onRefresh={vi.fn().mockResolvedValue(undefined)}
       packLoaded={false}
       onDone={() => {}}
-      onGuidedQuest={() => {}}
+      installedMods={null}
       {...overrides}
     />,
   )
@@ -119,18 +119,16 @@ describe('WizardStepper', () => {
     expect(onDone).toHaveBeenCalledTimes(1)
   })
 
-  it('guided path runs the post-create steps: curated skip advances to the guided-quest step', async () => {
-    const onGuidedQuest = vi.fn()
+  it('guided path runs the post-create steps: curated skip advances to the green check', async () => {
     const onDone = vi.fn()
-    await renderWizard({ onGuidedQuest, onDone })
+    await renderWizard({ onDone })
 
     await createPack()
 
-    // Curated mods step: Skip advances to the guided-quest step.
+    // Curated mods step: Skip advances to the green-check step.
     fireEvent.click(screen.getByText('Skip'))
-    fireEvent.click(screen.getByText('Add my first quest'))
-    expect(onGuidedQuest).toHaveBeenCalledTimes(1)
     expect(onDone).not.toHaveBeenCalled()
+    expect(screen.getByText(/green check/)).toBeInTheDocument()
   })
 
   it('guided path create failure shows the error and keeps the wizard open', async () => {
@@ -150,7 +148,6 @@ describe('WizardStepper', () => {
     // s49 regression: the wizard stays mounted when hidden, so every open
     // must reset — a previous session's step/project leaked into the next
     // pick ("immediately step 3", "project not found" from a stale id).
-    const onGuidedQuest = vi.fn()
     const { rerender } = render(
       <WizardStepper
         show
@@ -161,16 +158,16 @@ describe('WizardStepper', () => {
         onRefresh={vi.fn().mockResolvedValue(undefined)}
         packLoaded={false}
         onDone={() => {}}
-        onGuidedQuest={onGuidedQuest}
+        installedMods={null}
       />,
     )
 
-    // Advance to the curated step (create), then to the guided-quest step.
+    // Advance to the curated step (create), then to the green check.
     fireEvent.change(screen.getByPlaceholderText('My First Pack'), { target: { value: 'My First Pack' } })
     fireEvent.click(screen.getByText('Create & continue'))
     await waitFor(() => expect(createMcInstance).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByText('Skip'))
-    expect(screen.getByText('Add my first quest')).toBeTruthy()
+    expect(screen.getByText(/green check/)).toBeTruthy()
 
     // Close and reopen — must land on step 1 with an empty name.
     rerender(
@@ -183,7 +180,7 @@ describe('WizardStepper', () => {
         onRefresh={vi.fn().mockResolvedValue(undefined)}
         packLoaded={false}
         onDone={() => {}}
-        onGuidedQuest={vi.fn()}
+        installedMods={null}
       />,
     )
     rerender(
@@ -196,12 +193,12 @@ describe('WizardStepper', () => {
         onRefresh={vi.fn().mockResolvedValue(undefined)}
         packLoaded={false}
         onDone={() => {}}
-        onGuidedQuest={vi.fn()}
+        installedMods={null}
       />,
     )
 
     await waitFor(() => expect(screen.getByPlaceholderText('My First Pack')).toBeTruthy())
     expect((screen.getByPlaceholderText('My First Pack') as HTMLInputElement).value).toBe('')
-    expect(screen.queryByText('Add my first quest')).toBeNull()
+    expect(screen.queryByText(/green check/)).toBeNull()
   })
 })

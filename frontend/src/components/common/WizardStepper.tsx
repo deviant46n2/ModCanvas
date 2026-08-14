@@ -5,7 +5,6 @@ import {
 } from '../../services/instances'
 import type { CreateProjectInput, Project } from '../../services/types'
 import { CuratedModsStep } from './CuratedModsStep'
-import { GuidedQuestStep } from './GuidedQuestStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
 
 export type { CreateProjectInput } from '../../services/types'
@@ -17,8 +16,8 @@ interface WizardStepperProps {
    *  no longer offers a template or where step — those decisions live in the
    *  chooser. Every wizard start auto-creates a Prism instance. */
   presetTemplateId: string | null
-  /** Run the post-create steps (curated mods, guided quest, green check).
-   *  Blank starts skip them and land straight in the IDE. */
+  /** Run the post-create steps (curated mods, green check). Blank starts skip
+   *  them and land straight in the IDE. */
   postCreate: boolean
   /** Create + open the pack (the App runs the load pipeline). Resolves with
    *  the created project so the wizard can continue to its post-create steps;
@@ -30,26 +29,27 @@ interface WizardStepperProps {
   packLoaded: boolean
   /** Close the wizard (Done / after Launch). The pack stays open. */
   onDone: () => void
-  /** Guided first quest (P0-MINIWIZ): close the wizard, switch to the quests
-   *  tab, and open the guided-quest modal inside the editor. */
-  onGuidedQuest: () => void
+  /** Scanned mods/ jar names (ingest result) — feeds the core-mod gate in the
+   *  green-check step. */
+  installedMods: string[] | null
 }
 
 const STEP_LABELS: Record<number, string> = {
   1: 'name your pack',
   2: 'some mods to start',
-  3: 'add your first quest',
-  4: 'green check',
+  3: 'green check',
 }
 
 /**
- * The First-Pack wizard (roadmap P0-WIZARD, §9.3, s49 reshape). The
- * StartChooser owns the template + where decisions, so the wizard is a thin
- * commit point: one name input (the pack lands on a fresh auto-created Prism
- * instance, MC 1.21.1 · NeoForge — the first supported combo), then the
- * post-create steps (curated mods, guided quest, green check + launch) run
- * against the live pack — unless `postCreate` is false (a blank start), which
- * lands straight in the IDE.
+ * The First-Pack wizard (roadmap P0-WIZARD, §9.3, s49 reshape; s53 PRISM-LEAN
+ * + guided-quest move). The StartChooser owns the template + where decisions,
+ * so the wizard is a thin commit point: one name input (the pack lands on a
+ * fresh auto-created Prism instance, MC 1.21.1 · NeoForge — the first
+ * supported combo), then the post-create steps (curated mods → Prism handoff,
+ * green check + launch) run against the live pack — unless `postCreate` is
+ * false (a blank start), which lands straight in the IDE. The guided first
+ * quest no longer lives here: the teaching moment moved to the live surface
+ * (first companion connect in Beginner Mode — see QuestBookEditor).
  */
 export function WizardStepper({
   show,
@@ -60,7 +60,7 @@ export function WizardStepper({
   onRefresh,
   packLoaded,
   onDone,
-  onGuidedQuest,
+  installedMods,
 }: WizardStepperProps) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
@@ -124,7 +124,7 @@ export function WizardStepper({
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of {postCreate ? 4 : 1} — {STEP_LABELS[step]}
+          Step {step} of {postCreate ? 3 : 1} — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -161,17 +161,11 @@ export function WizardStepper({
         )}
 
         {step === 3 && project && (
-          <GuidedQuestStep
-            onAdd={onGuidedQuest}
-            onSkip={() => setStep(4)}
-          />
-        )}
-
-        {step === 4 && project && (
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}
             launchable
+            installedMods={installedMods}
             onDone={onDone}
           />
         )}

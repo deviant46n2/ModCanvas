@@ -35,4 +35,7 @@ export interface IngestResult {
   jars_scanned: number
   textures_indexed: number
   active_instance: string
+  /** Jar file names in the mods/ folder (scan proof for the core-mod gate);
+   *  null when the mods dir doesn't exist — no claim can be made. */
+  mods: string[] | null
 }

@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('HealthLaunchStep', () => {
   it('hides Launch and explains when the pack is not instance-backed', () => {
-    render(<HealthLaunchStep project={project} packLoaded launchable={false} onDone={() => {}} />)
+    render(<HealthLaunchStep project={project} packLoaded launchable={false} installedMods={null} onDone={() => {}} />)
     expect(screen.queryByRole('button', { name: /launch the pack/i })).toBeNull()
     expect(screen.getByText(/without a Prism instance/)).toBeInTheDocument()
     // The green check still shows — the pack itself can be healthy.
@@ -37,7 +37,7 @@ describe('HealthLaunchStep', () => {
   })
 
   it('offers Launch when the pack is instance-backed', () => {
-    render(<HealthLaunchStep project={project} packLoaded launchable onDone={() => {}} />)
+    render(<HealthLaunchStep project={project} packLoaded launchable installedMods={null} onDone={() => {}} />)
     expect(screen.getByRole('button', { name: /launch the pack/i })).toBeInTheDocument()
   })
 })

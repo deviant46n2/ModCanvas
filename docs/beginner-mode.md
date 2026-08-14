@@ -50,6 +50,14 @@ order — the in-pack guide and the app-shell coach agree):
 | 3. Fix what Pack Health found | Blocking: "N problems must be fixed before launch"; non-blocking: "N things worth a look"; clean: "ready to test" | The Pack Health report — **real** |
 | 4. Launch your pack | Press Test (top bar) — it starts the game with the companion attached | The connection pill — **real**, and only what the app owns (external launches are not tracked) |
 
+**The live quest invitation (s53):** the guided "add your first quest" teaching moment moved
+out of the pre-launch wizard (it fired before any game data existed → an empty item picker)
+to the live surface: on the first companion connect of a session in Beginner Mode, the quest
+editor shows a banner — "Your pack is running — add a quest and watch it change in-game" —
+that opens the guided-quest mini-wizard, where the picker is full (game downloaded → real
+registry + textures) and hotswap is on display. Per-session dismiss; Beginner Mode gating
+keeps it off veteran surfaces (ide-tour, blank, full-IDE users never see it).
+
 Honest-state rules specific to the strip:
 
 - **The guide step never claims done.** The app does not track in-game quest

@@ -35,9 +35,6 @@ export interface ProjectWorkspaceProps {
   }
   activeTab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'behaviors' | 'health'
   onTabChange: (tab: 'mods' | 'configs' | 'quests' | 'recipes' | 'loot' | 'behaviors' | 'health') => void
-  /** Guided "Add a quest" handoff (P0-MINIWIZ, wizard step 5). */
-  showGuidedQuest?: boolean
-  onGuidedQuestClose?: () => void
   onRestartWebSocket: () => void
   onRestartInstance: () => void
   isRestarting: boolean
@@ -83,6 +80,12 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
   // alive the moment the tab lands), and clears it once the editor consumes it.
   const [focusQuestNode, setFocusQuestNode] = useState<string | null>(null)
   const handleJumpToFinding = useCallback((item: HealthItem) => {
+    const section = item.target?.section
+    if (section === 'mods') {
+      // Core-mod finding (s53): the mods tab is where the Prism handoff lives.
+      onTabChange('mods')
+      return
+    }
     const nodeId = item.target?.nodeId
     if (!nodeId) return
     setFocusQuestNode(nodeId)
@@ -147,7 +150,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
         modLoader={project.mod_loader}
       />
 
-      <PackHealthProvider project={project} packLoaded={packLoaded}>
+      <PackHealthProvider project={project} packLoaded={packLoaded} installedMods={ingestResult?.mods ?? null}>
         {props.beginnerMode === true && (
           <BeginnerHintStrip
             connection={connectionSignals}
@@ -198,10 +201,9 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
                   wsConnected={connectionSignals.companionConnected}
                   ingestResult={ingestResult}
                   packLoaded={packLoaded}
+                  beginnerMode={props.beginnerMode === true}
                   onTest={props.onTest}
                   isTesting={props.isTesting}
-                  showGuidedQuest={props.showGuidedQuest}
-                  onGuidedQuestClose={props.onGuidedQuestClose}
                   focusQuestNode={focusQuestNode}
                   onFocusQuestNodeConsumed={() => setFocusQuestNode(null)}
                 />

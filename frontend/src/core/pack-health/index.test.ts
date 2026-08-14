@@ -29,6 +29,7 @@ const baseInput = {
   packMeta: { name: 'Pack', description: 'Desc', author: 'Me', packVersion: '1.0.0' },
   hasCoverImage: true,
   packLoaded: true,
+  installedMods: null,
 }
 
 const itemNode = (id: string, target: string) =>
@@ -39,7 +40,15 @@ describe('analyzePackHealth', () => {
     const report = analyzePackHealth(baseInput)
     expect(report.go).toBe(true)
     expect(report.blockingCount).toBe(0)
-    expect(report.sections.map((s) => s.key)).toEqual(['quests', 'recipes', 'behaviors', 'pack'])
+    expect(report.sections.map((s) => s.key)).toEqual(['quests', 'recipes', 'behaviors', 'mods', 'pack'])
+  })
+
+  it('blocks on missing core mods when the mods dir was scanned', () => {
+    const report = analyzePackHealth({ ...baseInput, installedMods: ['workbench-companion-1.0.0.jar'] })
+    expect(report.go).toBe(false)
+    expect(report.blockingCount).toBe(2)
+    const modsItems = report.sections.find((s) => s.key === 'mods')!.items
+    expect(modsItems.map((i) => i.id)).toEqual(['mods.core-missing.ftb-quests', 'mods.core-missing.kubejs'])
   })
 
   it('flags behavior missing-item findings as recommended when the registry is trusted', () => {

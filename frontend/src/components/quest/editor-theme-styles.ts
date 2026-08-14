@@ -9,6 +9,7 @@ import './editor-theme/quest-editor-popup.css';
 import './editor-theme/chapter-hover.css';
 import './editor-theme/skeleton.css';
 import './editor-theme/engine-render-prompt.css';
+import './editor-theme/live-invite.css';
 import './editor-theme/animated-textures.css';
 import './editor-theme/glyph-close.css';
 import './editor-theme/toolbar.css';

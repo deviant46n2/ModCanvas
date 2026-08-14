@@ -28,11 +28,10 @@ interface QuestBookEditorProps {
   wsConnected?: boolean
   ingestResult?: IngestResult | null
   packLoaded?: boolean
+  /** s53: the live invitation shows only in Beginner Mode. */
+  beginnerMode: boolean
   onTest?: () => void
   isTesting?: boolean
-  /** External handoff (P0-MINIWIZ wizard step 5): open the guided quest modal. */
-  showGuidedQuest?: boolean
-  onGuidedQuestClose?: () => void
   /** External handoff (s52 directed queue #1): a Pack Health finding asked to
    *  jump to a quest. Select + center that node, then ack via onConsumed. */
   focusQuestNode?: string | null
@@ -41,7 +40,7 @@ interface QuestBookEditorProps {
 
 const MIN_SKELETON_MS = 250
 
-export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, onTest, isTesting, showGuidedQuest, onGuidedQuestClose, focusQuestNode, onFocusQuestNodeConsumed }: QuestBookEditorProps) {
+export default function QuestBookEditor({ projectId, projectPath, minecraftVersion, modLoader, wsConnected, ingestResult, packLoaded, beginnerMode, onTest, isTesting, focusQuestNode, onFocusQuestNodeConsumed }: QuestBookEditorProps) {
   const adapter = useMemo(
     () => getAdapter(minecraftVersion ?? '1.21.1', normalizeLoader(modLoader)),
     [minecraftVersion, modLoader],
@@ -63,14 +62,16 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   const [simMode, setSimMode] = useState(false)
   const [enginePromptDismissed, setEnginePromptDismissed] = useState(false)
   const [guidedQuestLocal, setGuidedQuestLocal] = useState(false)
-  // External handoff (wizard step 5) vs internal toolbar button: the external
-  // prop is one-shot (the App clears it after the modal closes) — derive the
-  // effective open state from either source.
-  const guidedQuestOpen = showGuidedQuest || guidedQuestLocal
+  // Live-surface invitation (s53): the guided first quest happens when the
+  // companion connects in Beginner Mode — the pack is running, the item
+  // picker is full, and hotswap is on display. Per-session dismiss only (the
+  // student's ruling: not worth a first-ever-run check; Beginner Mode gating
+  // keeps it off veteran surfaces — ide-tour, blank, full IDE).
+  const [liveInviteDismissed, setLiveInviteDismissed] = useState(false)
+  const guidedQuestOpen = guidedQuestLocal
   const closeGuidedQuest = useCallback(() => {
     setGuidedQuestLocal(false)
-    onGuidedQuestClose?.()
-  }, [onGuidedQuestClose])
+  }, [])
   const toolbarApiRef = useRef<ToolbarAPI | null>(null)
   const history = useHistory()
 
@@ -212,6 +213,7 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
     setActiveChapter(null)
     setSelectedNodeId(null)
     setEnginePromptDismissed(false)
+    setLiveInviteDismissed(false)
   }, [projectId])
 
   // Feed the Pack Health panel with the already-materialized quest graph and
@@ -225,6 +227,10 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
   const handleToggleGroup = useCallback((id: string) => {
     setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }))
   }, [])
+
+  // The live invitation: companion connected + Beginner Mode + not dismissed
+  // this session. The pack is running — the picker is full, hotswap is live.
+  const liveInviteVisible = !!wsConnected && !!beginnerMode && !!packLoaded && !liveInviteDismissed
 
   if (!graph) {
     return <QuestBookSkeleton />
@@ -274,6 +280,8 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       setSimMode={setSimMode}
       simProgress={simProgress}
       onOpenGuidedQuest={() => setGuidedQuestLocal(true)}
+      liveInviteVisible={liveInviteVisible}
+      onDismissLiveInvite={() => setLiveInviteDismissed(true)}
       {...nodeMutations}
       {...structureMutations}
       />
