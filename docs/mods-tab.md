@@ -120,7 +120,12 @@ panel tells the user what's missing, and resolved **Modrinth** deps install
 with one click (`install_payload_for` is Modrinth-only, s54; CurseForge deps
 render without a button — installs execute in Prism). Two honesty rules: a dep
 whose metadata could not be resolved gets no claim, and only **required**
-dependencies are gaps (optional/recommended are the player's choice).
+dependencies are gaps (optional/recommended are the player's choice). **Two id
+systems, one reality (s54 live fix):** a dep reference is the numeric Modrinth
+project id while an installed row carries the jar-derived mod id
+(`mods.toml` `modId`) — `dep_is_satisfied()` resolves the dep's metadata
+identity (slug/mod_id) before declaring it missing, so an installed Rhino
+never stays flagged as missing (and never gets a duplicate install offer).
 
 ## Backend & Data Flow
 

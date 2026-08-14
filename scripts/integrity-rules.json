@@ -16,6 +16,12 @@
         "path": "frontend/src/RecipeEditor.tsx",
         "reason": "P0-BEGINNER (s47): beginnerMode additions pushed the file to 305 lines. Parked by student decision 2026-08-12 (pay-later debt-triage) — TRIPWIRE: the next touching edit to RecipeEditor.tsx MUST split it (extract the script-preview-pref seam) or update this entry",
         "since": "2026-08-12T08:30:00"
+      },
+      {
+        "path": "src-tauri/src/launcher.rs",
+        "reason": "ACCEPTED (s54): the PrismLauncherDriver grew shared spawn plumbing + --show/launcher methods for the Flatpak-fallback fix (313 lines). One cohesive driver file — splitting it for the numeric limit would scatter the binary-resolution + flatpak-env logic and obscure ownership. AGENTS.md 'COHESION > ARBITRARY LINE COUNT'. TRIPWIRE: a future non-cohesive addition to this file must split it",
+        "since": "2026-08-14T19:30:00",
+        "kind": "accepted"
       }
     ],
     "asset-bundle": [
@@ -91,6 +97,26 @@
       {
         "commit": "e9c5d07",
         "reason": "the resolver freshness-window doc landed in the next commit: roadmap §9.3 step 1 — 'skips versions inside a 24h settling window and verifies the chosen component serves'"
+      },
+      {
+        "commit": "d61ab2a",
+        "reason": "the wizard one-click + FTB Quests Prism guide + gate fix copy shipped in 09efcae (docs commit, same session): roadmap §9.3 step 4 + mods-tab.md rewritten for s54"
+      },
+      {
+        "commit": "293ac49",
+        "reason": "the id-systems identity rule (dep_is_satisfied) is documented in mods-tab.md's Missing-dependency diagnosis section — landed in the s54 handoff commit"
+      },
+      {
+        "commit": "40a3bca",
+        "reason": "the launcher-driver routing of the Open-Prism buttons is documented in mods-tab.md — landed in de9c850 (docs commit, same session)"
+      },
+      {
+        "commit": "0a44ce1",
+        "reason": "the chunk-2 Rust deletion/narrowing (search surface, install_modrinth_mod) is documented in 09efcae (docs commit, same session): roadmap §0 row 6 + mods-tab.md rewritten"
+      },
+      {
+        "commit": "34aa372",
+        "reason": "the FE search-surface removal is documented in 09efcae (docs commit, same session): roadmap §0 row 6 + mods-tab.md rewritten"
       }
     ]
   }
