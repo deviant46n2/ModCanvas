@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use crate::commands::{load_quest_from_pack, resolve_curseforge_api_key};
 use crate::db::Database;
 use crate::imports::{ImportResult, resolution};
+use crate::launcher::PrismLauncherDriver;
 use crate::minecraft::deploy_companion_mod_to_dir;
 use crate::mod_intelligence::ModIntelligence;
 use crate::models::*;
@@ -41,12 +42,14 @@ fn try_deploy_companion(loader: &ModLoader, mc_version: &str, game_dir: &str) {
 }
 
 /// Open Prism Launcher's main window (for modpack browsing/management).
+/// Routes through the launcher driver so Flatpak-only installs work
+/// (`flatpak run org.prismlauncher.PrismLauncher`) — s54 fix, previously
+/// hardcoded `prismlauncher` on PATH.
 #[tauri::command]
 pub async fn open_prism_launcher() -> Result<(), String> {
-    std::process::Command::new("prismlauncher")
-        .spawn()
-        .map_err(|e| format!("Failed to open Prism Launcher: {e}"))?;
-    Ok(())
+    PrismLauncherDriver::new()
+        .open_launcher()
+        .map(|_| ())
 }
 
 /// Open Prism Launcher focused on the project's instance (PRISM-LEAN, s53):
@@ -71,12 +74,13 @@ pub async fn open_prism_instance(
             .to_string()
     })?;
 
-    std::process::Command::new("prismlauncher")
-        .arg("--show")
-        .arg(&instance_id)
-        .spawn()
-        .map_err(|e| format!("Failed to open Prism Launcher: {e}"))?;
-    Ok(())
+    // Route through the launcher driver's binary resolution (s54): a
+    // Flatpak-only Prism install has no `prismlauncher` command on PATH —
+    // the driver spawns `flatpak run org.prismlauncher.PrismLauncher --show …`
+    // instead of dying with "command not found".
+    PrismLauncherDriver::new()
+        .show_instance(&instance_id)
+        .map(|_| ())
 }
 
 /// Derive a Prism instance ID from a project's game dir. Prism layouts are

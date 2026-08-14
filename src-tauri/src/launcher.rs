@@ -87,6 +87,79 @@ impl PrismLauncherDriver {
     pub fn new() -> Self {
         Self
     }
+
+    /// Shared spawn plumbing for every Prism invocation: flatpak env
+    /// passthrough + detached stdio. `args` are already fully formed
+    /// (including the `flatpak run org.prismlauncher.PrismLauncher` prefix
+    /// when the flatpak binary is in use).
+    fn spawn_prism(
+        &self,
+        args: &[String],
+        working_dir: Option<&std::path::Path>,
+    ) -> Result<Child, String> {
+        let binary = self.binary_name();
+
+        eprintln!(
+            "[ModCanvas] Spawning Prism: {} {} (workdir={:?})",
+            binary,
+            args.join(" "),
+            working_dir
+        );
+
+        let mut cmd = Command::new(binary);
+        cmd.args(args);
+
+        // Set environment for Flatpak sandbox isolation if applicable
+        if cfg!(target_os = "linux") && binary == "flatpak" {
+            cmd.env("PULSE_SERVER", std::env::var("PULSE_SERVER").unwrap_or_default());
+            // Pass through Wayland/X11 display
+            if let Ok(display) = std::env::var("DISPLAY") {
+                cmd.env("DISPLAY", display);
+            }
+            if let Ok(wayland) = std::env::var("WAYLAND_DISPLAY") {
+                cmd.env("WAYLAND_DISPLAY", wayland);
+            }
+        }
+
+        if let Some(dir) = working_dir {
+            cmd.current_dir(dir);
+        }
+
+        // Non-blocking: we don't wait on stdin/stdout/stderr
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+
+        cmd.spawn().map_err(|e| format!("Failed to spawn Prism Launcher: {e}"))
+    }
+
+    /// Open Prism's main window.
+    pub fn open_launcher(&self) -> Result<Child, String> {
+        self.spawn_prism(&[], None)
+    }
+
+    /// Open Prism focused on a named instance (`--show <id>`) — the
+    /// PRISM-LEAN handoff surface. s54 fix: the commands previously
+    /// hardcoded `prismlauncher` on PATH and silently died on Flatpak-only
+    /// systems; this goes through the same binary resolution as launch.
+    pub fn show_instance(&self, instance_name: &str) -> Result<Child, String> {
+        self.spawn_prism(&show_instance_args(self.binary_name(), instance_name), None)
+    }
+}
+
+/// CLI arguments to focus Prism on an instance, for either binary form.
+/// Pure + tested so the flatpak form can't regress.
+fn show_instance_args(binary: &str, instance_name: &str) -> Vec<String> {
+    if binary == "flatpak" {
+        vec![
+            "run".into(),
+            "org.prismlauncher.PrismLauncher".into(),
+            "--show".into(),
+            instance_name.into(),
+        ]
+    } else {
+        vec!["--show".into(), instance_name.into()]
+    }
 }
 
 impl Default for PrismLauncherDriver {
@@ -145,41 +218,8 @@ impl LauncherDriver for PrismLauncherDriver {
         instance_name: &str,
         working_dir: Option<&std::path::Path>,
     ) -> Result<Child, String> {
-        let binary = self.binary_name();
         let args = self.launch_args(instance_name);
-
-        eprintln!(
-            "[ModCanvas] Spawning Prism: {} {} (workdir={:?})",
-            binary,
-            args.join(" "),
-            working_dir
-        );
-
-        let mut cmd = Command::new(binary);
-        cmd.args(&args);
-
-        // Set environment for Flatpak sandbox isolation if applicable
-        if cfg!(target_os = "linux") && binary == "flatpak" {
-            cmd.env("PULSE_SERVER", std::env::var("PULSE_SERVER").unwrap_or_default());
-            // Pass through Wayland/X11 display
-            if let Ok(display) = std::env::var("DISPLAY") {
-                cmd.env("DISPLAY", display);
-            }
-            if let Ok(wayland) = std::env::var("WAYLAND_DISPLAY") {
-                cmd.env("WAYLAND_DISPLAY", wayland);
-            }
-        }
-
-        if let Some(dir) = working_dir {
-            cmd.current_dir(dir);
-        }
-
-        // Non-blocking: we don't wait on stdin/stdout/stderr
-        cmd.stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-
-        cmd.spawn().map_err(|e| format!("Failed to spawn Prism Launcher: {e}"))
+        self.spawn_prism(&args, working_dir)
     }
 }
 
@@ -250,5 +290,24 @@ mod tests {
         let args = driver.launch_args("MyPack");
         assert!(args.contains(&"--launch".to_string()));
         assert!(args.contains(&"MyPack".to_string()));
+    }
+
+    #[test]
+    fn test_show_instance_args_native_and_flatpak() {
+        // Native form: `--show <id>`
+        let native = show_instance_args("prismlauncher", "MyPack");
+        assert_eq!(native, vec!["--show", "MyPack"]);
+        // Flatpak form: `flatpak run … --show <id>` — the s54 regression the
+        // handoff buttons hit on Flatpak-only systems.
+        let flatpak = show_instance_args("flatpak", "MyPack");
+        assert_eq!(
+            flatpak,
+            vec![
+                "run",
+                "org.prismlauncher.PrismLauncher",
+                "--show",
+                "MyPack",
+            ]
+        );
     }
 }
