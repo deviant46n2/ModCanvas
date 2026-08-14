@@ -61,31 +61,22 @@ export async function listCuratedMods(projectId: string): Promise<CuratedMod[]> 
   return invoke<CuratedMod[]>('list_curated_mods', { projectId })
 }
 
-export async function searchMods(
-  query: string,
-  loader: string,
-  mcVersion: string,
-  sources: Array<'modrinth' | 'curseforge'>,
-  categories: string[] = [],
-): Promise<ModMetadata[]> {
-  return invoke<ModMetadata[]>('search_mods', { query, loader, mcVersion, sources, categories })
-}
-
-export interface InstallModArgs {
+export interface InstallModrinthArgs {
   projectId: string
-  source: 'modrinth' | 'curseforge'
   modId: string
   slug: string
   name: string
-  author: string
-  description: string
+  author?: string
+  description?: string
   version?: string
   icon?: string | null
 }
 
-/** Download a searched mod's jar into the instance's mods/ folder + record it. */
-export async function installModFromSearch(args: InstallModArgs): Promise<any> {
-  return invoke<any>('install_mod_from_search', { ...args })
+/** Download a Modrinth mod's jar into the instance's mods/ folder + record it.
+ *  PRISM-LEAN (s54): the one-click installer is Modrinth-only — CurseForge
+ *  installs execute in Prism, which parses CF dependencies ModCanvas can't. */
+export async function installModrinthMod(args: InstallModrinthArgs): Promise<any> {
+  return invoke<any>('install_modrinth_mod', { ...args })
 }
 
 export async function getPackIcon(path: string): Promise<string | null> {

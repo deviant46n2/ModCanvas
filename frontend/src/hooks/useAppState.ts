@@ -84,8 +84,6 @@ export function useAppState() {
       setIngestResult(null)
       setIngestError('')
       modState.resetModState()
-      modState.setSearchQuery('')
-      modState.setSearchResults([])
       configState.resetConfigState()
     }
   }
@@ -137,8 +135,6 @@ export function useAppState() {
     setIngestError('')
     projectState.closePack()
     modState.resetModState()
-    modState.setSearchQuery('')
-    modState.setSearchResults([])
     configState.resetConfigState()
   }
 
@@ -245,8 +241,7 @@ export function useAppState() {
       if (wasOpen) {
         closePack()
       } else {
-        modState.setSearchQuery('')
-        modState.setSearchResults([])
+        modState.resetModState()
       }
       setActiveTab('mods')
     }

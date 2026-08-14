@@ -1,9 +1,11 @@
-// Mod management hook: search, install/remove, metadata + dependency lookup,
-// and compatibility checks. Types live in `./useModState/types` and the pure
-// lookups in `./useModState/helpers`.
+// Mod management hook: install/remove, metadata + dependency lookup, and
+// compatibility checks (the search surface was deleted under PRISM-LEAN s54 —
+// browsing/installing new mods happens in Prism; the one-click Modrinth
+// installs that remain feed the compat panel and the wizard). Types live in
+// `./useModState/types` and the pure lookups in `./useModState/helpers`.
 
 import { useState, useMemo, useCallback } from 'react'
-import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, searchMods, addMod, removeMod, scanInstanceMods, installModFromSearch } from '../services/api'
+import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, addMod, removeMod, scanInstanceMods } from '../services/api'
 import { useToast } from '../components/ui/Toast'
 import { debounce } from '../core/utils/debounce'
 import type { Project } from './useProjectState'
@@ -14,12 +16,6 @@ import { useCompatInstall } from './useModState/compat-install'
 export type { ModDependency, ModMetadata, CompatibilityIssue, CompatibilityResult } from './useModState/types'
 
 export function useModState(selectedProject: Project | null) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [searchSources, setSearchSources] = useState<Array<'modrinth' | 'curseforge'>>(['modrinth', 'curseforge'])
-  // Modrinth category facet for the mod search ('' = all categories). Only
-  // Modrinth supports category facets; CurseForge results are unaffected.
-  const [searchCategory, setSearchCategory] = useState('')
   const [projectMods, setProjectMods] = useState<any[]>([])
   const [modFilter, setModFilter] = useState('')
   const [modFilterInput, setModFilterInput] = useState('')
@@ -28,8 +24,6 @@ export function useModState(selectedProject: Project | null) {
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
   const [compatResult, setCompatResult] = useState<CompatibilityResult | null>(null)
   const [isCheckingCompat, setIsCheckingCompat] = useState(false)
-  // Mod ids currently being downloaded/installed from search results.
-  const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
   const { showToast } = useToast()
 
   const debouncedSetModFilter = useCallback(
@@ -123,52 +117,6 @@ export function useModState(selectedProject: Project | null) {
     compatResult,
   )
 
-  async function addModToProject(mod: any) {
-    if (!selectedProject) return
-    const modId = mod.mod_id as string
-    const source: 'modrinth' | 'curseforge' =
-      mod.source === 'curseforge' || mod.source === 'modrinth'
-        ? mod.source
-        // Backend stamps `source` on every search result, so this fallback is
-        // defensive only; the first selected source is the deterministic pick.
-        : (searchSources[0] ?? 'modrinth')
-    setInstallingIds(prev => new Set(prev).add(modId))
-    try {
-      const installed = await installModFromSearch({
-        projectId: selectedProject.id,
-        source,
-        modId,
-        slug: mod.slug,
-        name: mod.name,
-        author: mod.author,
-        description: mod.description,
-        version: mod.version,
-        icon: mod.icon ?? null,
-      })
-      showToast({
-        type: 'success',
-        title: `Installed ${installed.name || mod.name}`,
-        message: `Downloaded and added to ${selectedProject.name}`,
-      })
-      await loadProjectMods(selectedProject.id)
-    } catch (e: any) {
-      const msg = typeof e === 'string' ? e : e?.message || String(e)
-      console.error('[ModCanvas] Failed to install mod:', msg)
-      showToast({
-        type: 'error',
-        title: `Failed to install ${mod.name}`,
-        message: msg,
-        duration: 8000,
-      })
-    } finally {
-      setInstallingIds(prev => {
-        const next = new Set(prev)
-        next.delete(modId)
-        return next
-      })
-    }
-  }
-
   async function removeModFromProject(modId: string) {
     if (!selectedProject) return
     const row = projectMods.find((m) => m.mod_id === modId)
@@ -222,34 +170,6 @@ export function useModState(selectedProject: Project | null) {
     }
   }
 
-  async function handleSearchMods() {
-    if (!selectedProject || searchSources.length === 0) return
-    // A query OR a category is a valid search — browsing by category with an
-    // empty query is the "show me tech mods" flow, not a no-op.
-    if (!searchQuery && !searchCategory) return
-    try {
-      const results = await searchMods(
-        searchQuery,
-        selectedProject.mod_loader,
-        selectedProject.minecraft_version,
-        searchSources,
-        searchCategory ? [searchCategory] : [],
-      )
-      setSearchResults(results)
-    } catch (e) {
-      console.error('Failed to search mods:', e)
-    }
-  }
-
-  // Source toggles must visibly take effect: clear the stale results list so
-  // a toggle never leaves the previous search's results on screen pretending
-  // to be current (that made the toggles look dead/bouncing depending on
-  // whether the user happened to re-search before looking).
-  const handleSearchSourcesChange = useCallback((sources: Array<'modrinth' | 'curseforge'>) => {
-    setSearchSources(sources)
-    setSearchResults([])
-  }, [])
-
   function getMissingDependencies(modId: string) {
     return findMissingDependencies(modMetadata, projectMods, modId)
   }
@@ -259,8 +179,6 @@ export function useModState(selectedProject: Project | null) {
   }
 
   function resetModState() {
-    setSearchQuery('')
-    setSearchResults([])
     setModFilter('')
     setModFilterInput('')
     setModMetadata(new Map())
@@ -270,27 +188,20 @@ export function useModState(selectedProject: Project | null) {
 
   return {
     projectMods,
-    searchQuery, setSearchQuery,
-    searchResults, setSearchResults,
-    searchSources, setSearchSources: handleSearchSourcesChange,
-    searchCategory, setSearchCategory,
     modFilterInput, setModFilterInput,
     modMetadata,
     isLoadingMetadata,
     compatResult, setCompatResult,
     isCheckingCompat,
-    installingIds,
     debouncedSetModFilter,
     filteredMods,
     loadProjectMods,
     handleScanInstanceMods,
     loadModMetadata,
     handleCheckCompat,
-    addModToProject,
     ...compatInstall,
     removeModFromProject,
     toggleModEnabled,
-    handleSearchMods,
     getMissingDependencies,
     getModNameById,
     resetModState,

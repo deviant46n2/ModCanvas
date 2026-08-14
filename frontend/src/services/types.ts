@@ -63,10 +63,11 @@ export interface ModMetadata {
 }
 
 /** One-click install data for a missing dependency (Rust-owned, mirrors
- *  `CompatibilityInstall` in models.rs). Null on an issue means the dep
- *  could not be resolved at check time — no button, no blind install. */
+ *  `CompatibilityInstall` in models.rs). Modrinth-only since s54: the one-click
+ *  installer is keyless and Modrinth-only; CurseForge deps render without a
+ *  button (installs execute in Prism). Null on an issue means the dep could
+ *  not be resolved at check time — no button, no blind install. */
 export interface CompatibilityInstall {
-  source: 'modrinth' | 'curseforge'
   mod_id: string
   slug: string
   name: string
@@ -89,8 +90,10 @@ export interface CompatibilityResult {
 /** A curated mod the First-Pack wizard can offer (filtered by Rust to what
  *  the pack's loader/version actually supports; `ticked` is the default).
  *  `core` picks back a ModCanvas feature (quest book, recipe scripting) and
- *  render in their own section; `blocked_reason` shows a pick that cannot be
- *  installed (e.g. CurseForge without an API key) instead of hiding it. */
+ *  render in their own section; `blocked_reason` flags a pick whose metadata
+ *  could not be verified (fetch failure, version/loader mismatch) instead of
+ *  hiding it. Modrinth picks install in-app; CurseForge picks install through
+ *  Prism (the wizard guides that flow). */
 export interface CuratedMod {
   source: 'modrinth' | 'curseforge'
   mod_id: string

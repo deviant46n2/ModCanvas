@@ -2,16 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ModsTab, type ModsTabProps } from './ModsTab'
 
-vi.mock('react-window', () => ({
-  List: ({ rowComponent: Row, rowCount, rowProps }: any) => (
-    <div data-testid="virtual-list">
-      {Array.from({ length: rowCount }, (_, i) => (
-        <Row key={i} index={i} style={{}} {...rowProps} />
-      ))}
-    </div>
-  ),
-}))
-
 const mods = [
   { mod_id: 'a', slug: 'a', name: 'Alpha Mod', author: 'A', description: 'desc a', source: 'Modrinth', version: '1.0', enabled: true },
   { mod_id: 'b', slug: 'b', name: 'Beta Mod', author: 'B', description: 'desc b', source: 'CurseForge', version: '2.0', enabled: true },
@@ -33,22 +23,12 @@ function baseProps(overrides: Partial<ModsTabProps> = {}): ModsTabProps {
     onScanInstanceMods: vi.fn(),
     onLoadDependencies: vi.fn(),
     onCheckCompat: vi.fn(),
-    searchQuery: '',
-    onSearchQueryChange: vi.fn(),
-    onSearchMods: vi.fn(),
-    searchResults: [],
-    onAddMod: vi.fn(),
     onToggleMod: vi.fn().mockResolvedValue(undefined),
     onRemoveMod: vi.fn(),
     modMetadata: new Map(),
     projectModsForDeps: mods,
     getMissingDependencies: () => [],
     getModNameById: (id: string) => id,
-    searchSources: ['modrinth'],
-    onSearchSourcesChange: vi.fn(),
-    searchCategory: '',
-    onSearchCategoryChange: vi.fn(),
-    installingIds: new Set(),
     onInstallMissing: vi.fn(),
     installingMissing: new Set(),
     onInstallAllMissing: vi.fn(),
@@ -112,30 +92,12 @@ describe('ModsTab', () => {
     expect(onToggleMod).toHaveBeenCalledWith(mods[2])
   })
 
-  it('renders source toggles reflecting the selection', () => {
-    render(<ModsTab {...baseProps({ searchSources: ['modrinth', 'curseforge'] })} />)
-    expect(screen.getByRole('checkbox', { name: 'Search Modrinth' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Search CurseForge' })).toBeChecked()
-  })
-
-  it('disables search and shows a hint when no source is selected', () => {
-    render(<ModsTab {...baseProps({ searchSources: [] })} />)
-    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
-    expect(screen.getByText('Select at least one source to search.')).toBeInTheDocument()
-  })
-
-  it('search button is enabled once at least one source is selected', () => {
-    render(<ModsTab {...baseProps({ searchSources: ['modrinth'] })} />)
-    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
-    expect(screen.queryByText('Select at least one source to search.')).toBeNull()
-  })
-
   const installableIssue = {
     severity: 'Warning',
     message: "'Alpha Mod' requires 'MissingLib' which is not in the project",
     affected_mods: ['a', 'missinglib'],
     affected_mod_names: ['Alpha Mod', 'MissingLib'],
-    install: { source: 'modrinth' as const, mod_id: 'missinglib', slug: 'missinglib', name: 'MissingLib' },
+    install: { mod_id: 'missinglib', slug: 'missinglib', name: 'MissingLib' },
   }
 
   it('compat panel renders an Install button on a resolvable missing dep and fires it', () => {

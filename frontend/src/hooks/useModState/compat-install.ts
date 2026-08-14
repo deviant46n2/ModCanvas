@@ -4,7 +4,7 @@
 // can disable buttons; the caller supplies the side-effect seams.
 
 import { useState } from 'react'
-import { installModFromSearch } from '../../services/api'
+import { installModrinthMod } from '../../services/api'
 import type { CompatibilityInstall, CompatibilityResult } from '../../services/types'
 import type { Project } from '../useProjectState'
 import type { Toast } from '../../components/ui/Toast'
@@ -31,16 +31,12 @@ export function useCompatInstall(
     if (!seams.selectedProject) return false
     setInstallingMissing((prev) => new Set(prev).add(install.mod_id))
     try {
-      const installed = await installModFromSearch({
+      const installed = await installModrinthMod({
         projectId: seams.selectedProject.id,
-        source: install.source,
         modId: install.mod_id,
         slug: install.slug,
         name: install.name,
-        author: '',
-        description: '',
         version: undefined,
-        icon: null,
       })
       seams.showToast({
         type: 'success',

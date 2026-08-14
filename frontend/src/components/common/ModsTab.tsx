@@ -1,9 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
-import { List } from 'react-window'
-import { ModRow, SearchResultRow, type SearchResultRowExtraProps } from './rows'
-import { CategorySelect, CategorySourceHint } from './CategorySelect'
-import { SourceToggles, type ModSource } from './SourceToggles'
+import { ModRow } from './rows'
 import { ModsTabCompatPanel } from './ModsTabCompatPanel'
 import { openPrismForProject } from '../../services/project'
 import type {
@@ -44,22 +41,12 @@ export interface ModsTabProps {
   onScanInstanceMods: () => void
   onLoadDependencies: () => void
   onCheckCompat: () => void
-  searchQuery: string
-  onSearchQueryChange: (q: string) => void
-  onSearchMods: () => void
-  searchResults: ModMetadata[]
-  onAddMod: (mod: any) => Promise<void>
   onToggleMod: (mod: any) => Promise<void>
   onRemoveMod: (modId: string) => Promise<void>
   modMetadata: Map<string, ModMetadata>
   projectModsForDeps: any[]
   getMissingDependencies: (modId: string) => Array<{ mod_id: string; dependency_type: string }>
   getModNameById: (modId: string) => string
-  searchSources: ModSource[]
-  onSearchSourcesChange: (sources: ModSource[]) => void
-  searchCategory: string
-  onSearchCategoryChange: (category: string) => void
-  installingIds: Set<string>
   /** One-click install of a missing dependency shown in the compat panel. */
   onInstallMissing: (install: CompatibilityInstall) => Promise<void>
   /** Mod ids currently being installed from the compat panel. */
@@ -67,8 +54,6 @@ export interface ModsTabProps {
   /** Install every missing dependency the check resolved, in one pass. */
   onInstallAllMissing: () => Promise<void>
 }
-
-const SEARCH_ROW_HEIGHT = 48
 
 export function ModsTab(props: ModsTabProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -111,17 +96,6 @@ export function ModsTab(props: ModsTabProps) {
     }
     clearSelection()
   }, [props.filteredMods, selectedIds, props.onToggleMod, clearSelection])
-
-  const handleSearchMods = () => {
-    props.onSearchMods()
-  }
-
-  const canSearch = props.searchSources.length > 0
-  const searchPlaceholder = !canSearch
-    ? 'Select a source to search'
-    : props.searchSources.length === 1
-      ? `Search mods on ${props.searchSources[0] === 'modrinth' ? 'Modrinth' : 'CurseForge'}...`
-      : 'Search mods...'
 
   return (
     <ErrorBoundary>
@@ -226,54 +200,6 @@ export function ModsTab(props: ModsTabProps) {
                 getModNameById={props.getModNameById}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="mods-section">
-          <div className="section-header">
-            <h3>Add Mods</h3>
-            <SourceToggles sources={props.searchSources} onChange={props.onSearchSourcesChange} />
-          </div>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder={searchPlaceholder}
-              value={props.searchQuery}
-              onChange={(e) => props.onSearchQueryChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && canSearch && props.onSearchMods()}
-              aria-label={canSearch ? 'Search mods' : 'Select a source to search'}
-              disabled={!canSearch}
-            />
-            <CategorySelect
-              value={props.searchCategory}
-              onChange={props.onSearchCategoryChange}
-              disabled={!canSearch}
-            />
-            <button onClick={handleSearchMods} aria-label="Search" disabled={!canSearch}>
-              Search
-            </button>
-          </div>
-          {!canSearch && (
-            <div className="search-empty-hint" role="status">
-              Select at least one source to search.
-            </div>
-          )}
-          <CategorySourceHint categoryActive={!!props.searchCategory} curseForgeActive={props.searchSources.includes('curseforge')} />
-          <div className="search-results">
-            {props.searchResults.length > 0 && (
-              <List<SearchResultRowExtraProps>
-                style={{ height: '100%', width: '100%' }}
-                rowComponent={SearchResultRow}
-                rowCount={props.searchResults.length}
-                rowHeight={SEARCH_ROW_HEIGHT}
-                rowProps={{
-                  searchResults: props.searchResults,
-                  projectMods: props.projectModsForDeps,
-                  addModToProject: props.onAddMod,
-                  installingIds: props.installingIds,
-                }}
               />
             )}
           </div>

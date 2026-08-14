@@ -17,7 +17,6 @@ interface ModMetadata {
   documentation_url: string | null
   icon: string | null
   source: 'modrinth' | 'curseforge'
-  mismatch?: string | null
 }
 
 interface ModDependency {
@@ -180,65 +179,6 @@ export function ConfigFileRow({
       >
         <div className="config-file-name">{file.name}</div>
         <div className="config-file-meta">{file.format} &bull; {formatFileSize(file.size)}</div>
-      </div>
-    </div>
-  )
-}
-
-export interface SearchResultRowExtraProps {
-  searchResults: ModMetadata[]
-  projectMods: any[]
-  addModToProject: (mod: any) => Promise<void>
-  installingIds: Set<string>
-}
-
-export function SearchResultRow({
-  index,
-  style,
-  searchResults,
-  projectMods,
-  addModToProject,
-  installingIds,
-}: RowComponentProps<SearchResultRowExtraProps>) {
-  const mod = searchResults[index]
-  const isAdded = projectMods.some(m => m.mod_id === mod.mod_id)
-  const isInstalling = installingIds.has(mod.mod_id)
-  return (
-    <div style={style} className="mod-row-wrap">
-      <div className={`mod-row ${isAdded || isInstalling ? 'disabled' : ''}`}>
-        <ModThumb icon={mod.icon ?? null} name={mod.name} />
-        <div className="mod-row-main">
-          <div className="mod-row-title">
-            <span className="mod-row-name">{mod.name}</span>
-            {mod.author && <span className="mod-row-author">{mod.author}</span>}
-          </div>
-          <div className="mod-row-desc">{mod.description}</div>
-        </div>
-        <div className="mod-row-meta">
-          <span className={`source-badge ${mod.source}`}>{mod.source}</span>
-          {mod.downloads > 0 && <span className="mod-row-chip">{mod.downloads.toLocaleString()} dl</span>}
-          {mod.mismatch && (
-            <span className="mod-row-warn mod-row-warn-text" title={mod.mismatch}>
-              diff version
-            </span>
-          )}
-          {mod.categories?.length > 0 && (
-            <span className="mod-row-chip mod-row-cats" title={mod.categories.join(', ')}>
-              {mod.categories.slice(0, 2).join(', ')}
-            </span>
-          )}
-        </div>
-        <div className="mod-row-actions">
-          <button
-            className={`btn-add ${isAdded || isInstalling || !!mod.mismatch ? 'added' : ''}`}
-            onClick={() => !isAdded && !isInstalling && !mod.mismatch && addModToProject(mod)}
-            disabled={isAdded || isInstalling || !!mod.mismatch}
-            title={mod.mismatch || undefined}
-            aria-label={isAdded ? `${mod.name} already added` : isInstalling ? `Installing ${mod.name}` : mod.mismatch ? `${mod.name} unavailable: ${mod.mismatch}` : `Add ${mod.name}`}
-          >
-            {isInstalling ? 'Installing...' : isAdded ? 'Added' : mod.mismatch ? 'Unavailable' : '+ Add'}
-          </button>
-        </div>
       </div>
     </div>
   )
