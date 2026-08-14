@@ -2,9 +2,34 @@
 //! missing/incompatible dependencies, and warn about unsupported loaders and
 //! oversized packs.
 
+use std::collections::HashSet;
+
 use crate::models::{CompatibilityInstall, ModLoader, ModMetadata};
 
 use crate::mod_intelligence::ModIntelligence;
+
+/// The installed rows' id namespace (jar-derived mod ids) never equals the
+/// registry dependency namespace (numeric Modrinth project ids / re-keyed CF
+/// ids), so a dep counts as satisfied when its row id, or the identity of its
+/// resolved metadata (slug/mod_id), is among the installed identities.
+/// Live fix (s54): one-click KubeJS installed Rhino and the "requires Rhino"
+/// issue stayed — the row said "rhino" while the dep reference said
+/// "4028181". Two id systems, one installed reality.
+fn dep_is_satisfied(
+    dep_mod_id: &str,
+    installed_identities: &HashSet<String>,
+    dep_metadata: Option<&ModMetadata>,
+) -> bool {
+    if installed_identities.contains(dep_mod_id) {
+        return true;
+    }
+    match dep_metadata {
+        Some(m) => {
+            installed_identities.contains(&m.slug) || installed_identities.contains(&m.mod_id)
+        }
+        None => false,
+    }
+}
 
 /// Derive the one-click install payload for a resolved dependency. Only
 /// Modrinth-resolved deps get a payload — the one-click installer is
@@ -47,6 +72,15 @@ impl ModIntelligence {
         let mut mod_ids_set = std::collections::HashSet::new();
         for m in mods.iter() {
             mod_ids_set.insert(m.mod_id.clone());
+        }
+
+        // A mod is installed if its row id OR its resolved metadata identity
+        // (slug / mod_id) is present — the row and dependency id systems never
+        // match directly (s54 live fix).
+        let mut installed_identities = mod_ids_set.clone();
+        for meta in &metadata_list {
+            installed_identities.insert(meta.mod_id.clone());
+            installed_identities.insert(meta.slug.clone());
         }
 
         let mut metadata_map = std::collections::HashMap::new();
@@ -106,7 +140,11 @@ impl ModIntelligence {
                     .unwrap_or(&dep.mod_id);
                 match dep.dependency_type {
                     DependencyType::Required => {
-                        if !mod_ids_set.contains(&dep.mod_id) {
+                        if !dep_is_satisfied(
+                            &dep.mod_id,
+                            &installed_identities,
+                            metadata_map.get(&dep.mod_id),
+                        ) {
                             let dep_name_resolved = metadata_map.get(&dep.mod_id)
                                 .map(|m| m.name.clone())
                                 .unwrap_or(dep.mod_id.clone());
@@ -124,7 +162,11 @@ impl ModIntelligence {
                         }
                     }
                     DependencyType::Incompatible => {
-                        if mod_ids_set.contains(&dep.mod_id) {
+                        if dep_is_satisfied(
+                            &dep.mod_id,
+                            &installed_identities,
+                            metadata_map.get(&dep.mod_id),
+                        ) {
                             let dep_name_resolved = metadata_map.get(&dep.mod_id)
                                 .map(|m| m.name.clone())
                                 .unwrap_or(dep.mod_id.clone());
