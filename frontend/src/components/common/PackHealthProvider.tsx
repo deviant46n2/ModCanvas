@@ -42,6 +42,7 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
   const questGraph = usePackHealthStore((s) => s.questGraph)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
+  const depIssues = usePackHealthStore((s) => s.depIssues)
   const recipes = useRecipeStore((s) => s.recipes)
   const behaviors = useBehaviorStore((s) => s.behaviors)
 
@@ -62,6 +63,7 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
       hasCoverImage,
       packLoaded,
       installedMods,
+      depIssues,
     }),
   )
 
@@ -77,11 +79,12 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
           hasCoverImage,
           packLoaded,
           installedMods,
+          depIssues,
         }),
       )
     }, 300)
     return () => clearTimeout(t)
-  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods])
+  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues])
 
   const value = { report }
 

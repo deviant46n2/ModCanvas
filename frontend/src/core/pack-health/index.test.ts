@@ -143,6 +143,23 @@ describe('analyzePackHealth', () => {
     expect(report.optionalCount).toBe(0)
   })
 
+  it('missing required deps surface as a persistent warning but NEVER gate (s55 ruling)', () => {
+    const report = analyzePackHealth({
+      ...baseInput,
+      installedMods: ['ftb-quests-neoforge-2101.1.30.jar', 'kubejs-neoforge-2101.6.1.jar'],
+      depIssues: [
+        { severity: 'Warning', message: "'KubeJS' requires 'Rhino' which is not in the project", affected_mods: ['kubejs', 'rhino'], affected_mod_names: ['KubeJS', 'Rhino'], install: { mod_id: 'rhino', slug: 'rhino', name: 'Rhino' } },
+      ],
+    })
+    // The dep warning is present in the Mods section…
+    const modsItems = report.sections.find((s) => s.key === 'mods')!.items
+    expect(modsItems.some((i) => i.id.startsWith('mods.dep-missing'))).toBe(true)
+    // …but the user may not want to install a mod right now — Launch stays open.
+    expect(report.go).toBe(true)
+    expect(report.blockingCount).toBe(0)
+    expect(report.recommendedCount).toBeGreaterThanOrEqual(1)
+  })
+
   it('populates registry stats', () => {
     const report = analyzePackHealth({ ...baseInput, itemRegistry: bigRegistry(), questGraph: makeGraph({}) })
     expect(report.stats.indexedItems).toBeGreaterThanOrEqual(MIN_TRUSTED_REGISTRY_ITEMS)

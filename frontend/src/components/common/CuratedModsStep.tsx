@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
-import { openPrismForProject } from '../../services/project'
+import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import type { CompatibilityInstall, CompatibilityIssue, CuratedMod } from '../../services/types'
 import type { Project } from '../../services/types'
 import { CuratedModRow } from './CuratedModRow'
@@ -19,13 +19,14 @@ interface CuratedModsStepProps {
   /** Re-run the load pipeline when the wizard continues, so the green check
    * sees whatever Prism installed. */
   onRefresh: () => Promise<void>
-  onContinue: () => void
+  /** Advance. `true` = a CurseForge pick is in the list, so the wizard must
+   * route to the Prism install guide step before the green check. */
+  onContinue: (needsPrismGuide: boolean) => void
 }
 
 export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsStepProps) {
   const [mods, setMods] = useState<CuratedMod[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [opening, setOpening] = useState(false)
   const [installing, setInstalling] = useState<Set<string>>(new Set())
   const [installed, setInstalled] = useState<Set<string>>(new Set())
   // Missing required deps (the compat check's issues, s54-A: the step closes
@@ -33,6 +34,13 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
   // the fix appears here, not in a hidden tab).
   const [depIssues, setDepIssues] = useState<CompatibilityIssue[]>([])
   const [installingDep, setInstallingDep] = useState<Set<string>>(new Set())
+  // Continue auto-installs the ticked Modrinth picks (keyless API — the
+  // honest auto-install; s55: users expected "continue" to install the picks,
+  // and the step previously required clicking every row). CF picks are
+  // excluded — the guide step owns them. Unticked picks (opt-ins like
+  // Controllable) install via their row button only.
+  const [autoInstalling, setAutoInstalling] = useState(false)
+  const [autoProgress, setAutoProgress] = useState<{ name: string; done: number; total: number } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -66,6 +74,9 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
     try {
       const result = await checkCompatibility(project.id)
       setDepIssues(result.issues)
+      // Feed the health report's persistent (non-blocking) dep warnings
+      // (s55 ruling: warn, don't gate).
+      usePackHealthStore.getState().setDepIssues(result.issues)
     } catch {
       /* same degrade-to-no-claim rule */
     }
@@ -120,33 +131,56 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
     }
   }
 
-  async function handleOpenPrism() {
-    if (opening) return
-    setOpening(true)
-    setError(null)
-    try {
-      await openPrismForProject(project.id)
-    } catch (e: any) {
-      setError(typeof e === 'string' ? e : e?.message || String(e))
-    } finally {
-      setOpening(false)
-    }
-  }
-
   async function handleContinue() {
+    setAutoInstalling(true)
+    const failures: string[] = []
+    try {
+      for (const mod of autoInstallTargets) {
+        try {
+          setAutoProgress({ name: mod.name, done: 0, total: autoInstallTargets.length })
+          await installModrinthMod({
+            projectId: project.id,
+            modId: mod.mod_id,
+            slug: mod.slug,
+            name: mod.name,
+            description: mod.description,
+          })
+          setInstalled((prev) => new Set(prev).add(mod.mod_id))
+        } catch (e: any) {
+          failures.push(`${mod.name}: ${typeof e === 'string' ? e : e?.message || String(e)}`)
+        }
+        setAutoProgress((p) => (p ? { ...p, done: p.done + 1 } : p))
+      }
+      // The picks' own deps may now be missing — close the loop (s54-A).
+      await refreshDepCheck()
+    } finally {
+      setAutoInstalling(false)
+      setAutoProgress(null)
+    }
+    if (failures.length > 0) {
+      setError(`Couldn't install some mods — retry them below:\n${failures.join('\n')}`)
+    }
     try {
       await onRefresh()
     } catch {
       /* a failed refresh degrades to a shorter green check, not a dead end */
     }
-    onContinue()
+    onContinue(needsPrismGuide)
   }
 
-  const coreMods = mods?.filter((m) => m.core) ?? []
-  const funMods = mods?.filter((m) => !m.core) ?? []
-  const manualLinks = mods?.filter((m) => m.page_url) ?? []
-  // FTB Quests is the only CurseForge pick (CF-only) — it needs the Prism
-  // guide; everything else installs in-app.
+  const coreMods = mods?.filter((m) => m.core && m.source !== 'curseforge') ?? []
+  const funMods = mods?.filter((m) => !m.core && m.source !== 'curseforge') ?? []
+  // The ticked Modrinth picks continue auto-installs (s55). CurseForge picks
+  // are excluded (the guide step owns them); unticked picks are opt-ins.
+  const autoInstallTargets =
+    mods?.filter((m) => m.source === 'modrinth' && m.ticked && !installed.has(m.mod_id)) ?? []
+  // FTB Quests is the only CurseForge pick (CF-only) — it installs through
+  // Prism, and the wizard routes to a dedicated guide step for it (s55: the
+  // old inline box + "Open Prism to install these" button misled users into
+  // thinking Prism installs everything; the Modrinth picks install in-app).
+  // CF picks are NOT rendered as rows here (s55): a non-actionable row in an
+  // action list is a broken affordance — the guide step owns that mod. The
+  // flag below still routes the wizard there.
   const needsPrismGuide = mods?.some((m) => m.source === 'curseforge') ?? false
 
   return (
@@ -156,24 +190,19 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
         the first two — without them your quest book and recipes stay invisible
         in-game. The rest go great with any pack. Everything below is
         pre-filtered to your version and loader.
+        {needsPrismGuide && (
+          <span>
+            {' '}
+            <strong>FTB Quests</strong> — the quest book mod — comes in the
+            next step: you'll install it in Prism, and we'll show you exactly
+            how.
+          </span>
+        )}
       </div>
 
       {error && (
         <div className="launch-error" style={{ marginBottom: 10, padding: 10 }}>
-          <div style={{ fontSize: 13, marginBottom: 6 }}>{error}</div>
-          {manualLinks.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              Install the mods manually from their project pages:
-              {manualLinks.map((m) => (
-                <div key={m.slug} style={{ marginTop: 4 }}>
-                  <a href={m.page_url!} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>
-                    {m.name}
-                  </a>{' '}
-                  — download the jar and drop it into the pack's mods folder.
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ fontSize: 13 }}>{error}</div>
         </div>
       )}
 
@@ -195,31 +224,6 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
           installed={installed.has(mod.mod_id)}
         />
       ))}
-
-      {needsPrismGuide && (
-        <div
-          style={{
-            fontSize: 12, color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border-default)', borderRadius: 8,
-            padding: '10px 12px', margin: '8px 0',
-          }}
-        >
-          <strong style={{ color: 'var(--color-text-primary)' }}>FTB Quests installs in Prism</strong>
-          {' — '}it's CurseForge-only, and ModCanvas's one-click install can't
-          reach CurseForge (Prism carries its own access and also installs the
-          mods FTB Quests needs to run):
-          <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-            <li>Open Prism (the button below), click your instance, then <strong>Mods → Download Mods</strong>.</li>
-            <li>Search <strong>FTB Quests</strong> and click <strong>Install</strong>.</li>
-            <li>
-              When Prism asks about <strong>FTB Library</strong>, <strong>FTB Teams</strong>, and{' '}
-              <strong>Architectury</strong> — install those too. They're required;
-              without them the quest book won't load in-game.
-            </li>
-            <li>Back here, hit <strong>Continue</strong> — the check will see what Prism installed.</li>
-          </ol>
-        </div>
-      )}
 
       {funMods.length > 0 && (
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', margin: '10px 0 6px' }}>
@@ -265,28 +269,30 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
         </div>
       )}
 
-      <div style={{ marginTop: 14 }}>
-        <button
-          className="btn-primary"
-          onClick={handleOpenPrism}
-          disabled={opening || mods === null}
-        >
-          {opening ? 'Opening Prism…' : 'Open Prism to install these'}
-        </button>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
-          Prism handles version matching and dependencies — it installs everything
-          FTB Quests needs automatically. When you're done, continue below.
-        </div>
-      </div>
-
       <div className="modal-actions" style={{ marginTop: 16 }}>
-        <button className="btn-secondary" onClick={onContinue}>
+        <button
+          className="btn-secondary"
+          onClick={() => onContinue(needsPrismGuide)}
+          disabled={autoInstalling}
+        >
           Skip
         </button>
-        <button className="btn-primary" onClick={handleContinue}>
-          Continue
+        <button className="btn-primary" onClick={handleContinue} disabled={autoInstalling}>
+          {autoInstalling ? 'Installing…' : 'Continue'}
         </button>
       </div>
+      {autoInstalling && autoProgress && (
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+          Installing {autoProgress.name}… ({Math.min(autoProgress.done + 1, autoProgress.total)} of{' '}
+          {autoProgress.total})
+        </div>
+      )}
+      {!autoInstalling && (
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 8 }}>
+          Continue installs the mods above (the next step covers FTB Quests),
+          then checks your pack.
+        </div>
+      )}
     </div>
   )
 }

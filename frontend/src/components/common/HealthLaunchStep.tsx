@@ -30,6 +30,7 @@ export function HealthLaunchStep({ project, packLoaded, launchable, installedMod
   const questGraph = usePackHealthStore((s) => s.questGraph)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
   const hasCoverImage = usePackHealthStore((s) => s.hasCoverImage)
+  const depIssues = usePackHealthStore((s) => s.depIssues)
   const recipes = useRecipeStore((s) => s.recipes)
   const behaviors = useBehaviorStore((s) => s.behaviors)
   const [launching, setLaunching] = useState(false)
@@ -51,8 +52,9 @@ export function HealthLaunchStep({ project, packLoaded, launchable, installedMod
         hasCoverImage,
         packLoaded,
         installedMods,
+        depIssues,
       }),
-    [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods],
+    [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues],
   )
 
   const blockingItems = report.sections.flatMap((s) => s.items).filter((i) => i.severity === 'blocking')

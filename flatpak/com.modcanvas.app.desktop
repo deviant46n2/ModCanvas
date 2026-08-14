@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ModCanvas
+Comment=Minecraft modpack workbench
+Exec=modcanvas
+Icon=com.modcanvas.app
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+StartupNotify=true

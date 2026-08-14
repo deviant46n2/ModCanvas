@@ -110,7 +110,9 @@ impl PrismLauncherDriver {
         cmd.args(args);
 
         // Set environment for Flatpak sandbox isolation if applicable
-        if cfg!(target_os = "linux") && binary == "flatpak" {
+        // (flatpak-spawn --host also forwards display vars, explicit passthrough
+        // is belt-and-suspenders for the host app + flatpak-Prism case)
+        if cfg!(target_os = "linux") && (binary == "flatpak" || binary == "flatpak-spawn") {
             cmd.env("PULSE_SERVER", std::env::var("PULSE_SERVER").unwrap_or_default());
             // Pass through Wayland/X11 display
             if let Ok(display) = std::env::var("DISPLAY") {
@@ -150,16 +152,10 @@ impl PrismLauncherDriver {
 /// CLI arguments to focus Prism on an instance, for either binary form.
 /// Pure + tested so the flatpak form can't regress.
 fn show_instance_args(binary: &str, instance_name: &str) -> Vec<String> {
-    if binary == "flatpak" {
-        vec![
-            "run".into(),
-            "org.prismlauncher.PrismLauncher".into(),
-            "--show".into(),
-            instance_name.into(),
-        ]
-    } else {
-        vec!["--show".into(), instance_name.into()]
-    }
+    let mut args = prism_invoke_prefix(binary);
+    args.push("--show".into());
+    args.push(instance_name.into());
+    args
 }
 
 impl Default for PrismLauncherDriver {
@@ -171,14 +167,10 @@ impl Default for PrismLauncherDriver {
 impl LauncherDriver for PrismLauncherDriver {
     fn default_instance_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
+        let binary = self.binary_name();
 
         if let Some(home) = dirs_next::home_dir() {
-            // Native / AppImage (Linux) — preferred
-            roots.push(home.join(".local/share/PrismLauncher/instances"));
-            // Flatpak (Linux) — fallback
-            roots.push(
-                home.join(".var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances"),
-            );
+            roots.extend(home_instance_roots(binary, &home));
         }
 
         if let Some(data_local) = dirs_next::data_local_dir() {
@@ -190,8 +182,12 @@ impl LauncherDriver for PrismLauncherDriver {
     }
 
     fn binary_name(&self) -> &str {
+        // Sandboxed (flatpak) app first: host binaries are unreachable, the
+        // only escape is flatpak-spawn --host.
+        if running_inside_sandbox() {
+            "flatpak-spawn"
         // Prefer native install over Flatpak
-        if which_prismlauncher() {
+        } else if which_prismlauncher() {
             "prismlauncher"
         } else if cfg!(target_os = "linux") && is_flatpak_installed() {
             "flatpak"
@@ -201,16 +197,10 @@ impl LauncherDriver for PrismLauncherDriver {
     }
 
     fn launch_args(&self, instance_name: &str) -> Vec<String> {
-        if self.binary_name() == "flatpak" {
-            vec![
-                "run".into(),
-                "org.prismlauncher.PrismLauncher".into(),
-                "--launch".into(),
-                instance_name.into(),
-            ]
-        } else {
-            vec!["--launch".into(), instance_name.into()]
-        }
+        let mut args = prism_invoke_prefix(self.binary_name());
+        args.push("--launch".into());
+        args.push(instance_name.into());
+        args
     }
 
     fn spawn_launch(
@@ -220,6 +210,25 @@ impl LauncherDriver for PrismLauncherDriver {
     ) -> Result<Child, String> {
         let args = self.launch_args(instance_name);
         self.spawn_prism(&args, working_dir)
+    }
+}
+
+/// Home-relative instance roots in creation-priority order for a binary form.
+/// The FIRST root is where new instances are created — it MUST match the
+/// Prism the driver will actually spawn, because Prism installs are walled
+/// gardens: the flatpak Prism cannot see the native root (its manifest grants
+/// only its own sandbox home). Creating into the native root while spawning
+/// flatpak Prism makes the new instance invisible (s55 live: an instance the
+/// app created vanished from the flatpak Prism the user actually runs).
+/// Pure + tested so the ordering can't regress across the binary forms.
+fn home_instance_roots(binary: &str, home: &std::path::Path) -> Vec<PathBuf> {
+    let native = home.join(".local/share/PrismLauncher/instances");
+    let flatpak = home
+        .join(".var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances");
+    if binary == "flatpak" || binary == "flatpak-spawn" {
+        vec![flatpak, native]
+    } else {
+        vec![native, flatpak]
     }
 }
 
@@ -233,6 +242,33 @@ fn is_flatpak_installed() -> bool {
                 .contains("org.prismlauncher.PrismLauncher")
         })
         .unwrap_or(false)
+}
+
+/// Detect whether ModCanvas ITSELF runs inside a flatpak sandbox.
+/// When sandboxed, host binaries (`prismlauncher`, `flatpak`) are unreachable;
+/// the driver must escape via `flatpak-spawn --host` (requires the
+/// org.freedesktop.Flatpak talk-name in the manifest). Markers verified
+/// inside the sandbox (s55): `container=flatpak` + `FLATPAK_ID` are set.
+fn running_inside_sandbox() -> bool {
+    std::env::var("container").is_ok() && std::env::var("FLATPAK_ID").is_ok()
+}
+
+/// Invocation prefix for reaching Prism, per binary form:
+/// - native: `prismlauncher` directly (no prefix)
+/// - host app + flatpak Prism: `flatpak run org.prismlauncher.PrismLauncher`
+/// - sandboxed app: `flatpak-spawn --host flatpak run …` (escapes the sandbox,
+///   then invokes the host's flatpak CLI)
+fn prism_invoke_prefix(binary: &str) -> Vec<String> {
+    match binary {
+        "flatpak" => vec!["run".into(), "org.prismlauncher.PrismLauncher".into()],
+        "flatpak-spawn" => vec![
+            "--host".into(),
+            "flatpak".into(),
+            "run".into(),
+            "org.prismlauncher.PrismLauncher".into(),
+        ],
+        _ => Vec::new(),
+    }
 }
 
 /// Check if native `prismlauncher` binary is available in PATH.
@@ -309,5 +345,56 @@ mod tests {
                 "MyPack",
             ]
         );
+    }
+
+    #[test]
+    fn test_show_instance_args_sandboxed_app() {
+        // App running INSIDE a flatpak sandbox (s55): host binaries are
+        // unreachable; escape via `flatpak-spawn --host flatpak run …`.
+        let sandbox = show_instance_args("flatpak-spawn", "MyPack");
+        assert_eq!(
+            sandbox,
+            vec![
+                "--host",
+                "flatpak",
+                "run",
+                "org.prismlauncher.PrismLauncher",
+                "--show",
+                "MyPack",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_invoke_prefix_forms() {
+        assert_eq!(prism_invoke_prefix("prismlauncher"), Vec::<String>::new());
+        assert_eq!(
+            prism_invoke_prefix("flatpak"),
+            vec!["run", "org.prismlauncher.PrismLauncher"]
+        );
+        assert_eq!(
+            prism_invoke_prefix("flatpak-spawn"),
+            vec!["--host", "flatpak", "run", "org.prismlauncher.PrismLauncher"]
+        );
+    }
+
+    #[test]
+    fn test_home_root_priority_matches_binary_form() {
+        let home = std::path::PathBuf::from("/home/test");
+        let native_root = home.join(".local/share/PrismLauncher/instances");
+        let flatpak_root = home
+            .join(".var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances");
+
+        // Native form: native root is the primary (creation) root.
+        let native = home_instance_roots("prismlauncher", &home);
+        assert_eq!(native[0], native_root);
+        assert_eq!(native[1], flatpak_root);
+
+        // Flatpak forms: the flatpak root is primary — the walled-garden rule.
+        for form in ["flatpak", "flatpak-spawn"] {
+            let roots = home_instance_roots(form, &home);
+            assert_eq!(roots[0], flatpak_root, "{form} must create into the flatpak root");
+            assert_eq!(roots[1], native_root);
+        }
     }
 }

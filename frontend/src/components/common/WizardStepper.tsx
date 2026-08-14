@@ -6,6 +6,7 @@ import {
 import type { CreateProjectInput, Project } from '../../services/types'
 import { CuratedModsStep } from './CuratedModsStep'
 import { HealthLaunchStep } from './HealthLaunchStep'
+import { PrismGuideStep } from './PrismGuideStep'
 
 export type { CreateProjectInput } from '../../services/types'
 
@@ -37,7 +38,8 @@ interface WizardStepperProps {
 const STEP_LABELS: Record<number, string> = {
   1: 'name your pack',
   2: 'some mods to start',
-  3: 'green check',
+  3: 'install FTB Quests in Prism',
+  4: 'green check',
 }
 
 /**
@@ -67,6 +69,9 @@ export function WizardStepper({
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<Project | null>(null)
+  // True once the curated step reports a CurseForge pick (FTB Quests): the
+  // wizard inserts the Prism install-guide step before the green check (s55).
+  const [needsPrism, setNeedsPrism] = useState(false)
 
   // The wizard stays mounted (returns null when hidden), so every open MUST
   // reset to a fresh session — otherwise the next pick reopens at the stale
@@ -79,6 +84,7 @@ export function WizardStepper({
     setCreating(false)
     setError(null)
     setProject(null)
+    setNeedsPrism(false)
   }, [show])
 
   async function handleCreate() {
@@ -120,11 +126,19 @@ export function WizardStepper({
   if (!show) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      // Post-create steps are a deliberate flow (s55): an accidental
+      // outside-click must not kill it mid-way — the student's live wall:
+      // "clicking out of the wizard to scan instance mods closes the wizard".
+      // Step 1 keeps the dismissible overlay (pre-creation, nothing to lose);
+      // steps 2+ close only via the explicit Cancel button.
+      onClick={step === 1 ? onClose : undefined}
+    >
       <div className="modal" style={{ width: 560, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
         <h2>New Pack</h2>
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-          Step {step} of {postCreate ? 3 : 1} — {STEP_LABELS[step]}
+          Step {step} of {postCreate ? (needsPrism ? 4 : 3) : 1} — {STEP_LABELS[step]}
         </div>
 
         {error && (
@@ -156,11 +170,22 @@ export function WizardStepper({
           <CuratedModsStep
             project={project}
             onRefresh={onRefresh}
-            onContinue={() => setStep(3)}
+            onContinue={(needsPrismGuide) => {
+              setNeedsPrism(needsPrismGuide)
+              setStep(needsPrismGuide ? 3 : 4)
+            }}
           />
         )}
 
         {step === 3 && project && (
+          <PrismGuideStep
+            project={project}
+            onRefresh={onRefresh}
+            onContinue={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && project && (
           <HealthLaunchStep
             project={project}
             packLoaded={packLoaded}
@@ -171,7 +196,9 @@ export function WizardStepper({
         )}
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onClose} disabled={creating}>Cancel</button>
+          <button className="btn-secondary" onClick={onClose} disabled={creating}>
+            {step === 1 ? 'Cancel' : 'Cancel (pack stays open)'}
+          </button>
           {step === 1 && (
             <button className="btn-primary" onClick={handleCreate} disabled={creating || !name.trim()}>
               {creating ? 'Creating…' : 'Create & continue'}

@@ -12,11 +12,12 @@
 import type { Recipe } from '../recipe/recipe-store'
 import type { ItemRegistryEntry, QuestGraphData } from '../../services/quest-types'
 import type { Behavior } from '../behavior/behavior-store'
+import type { CompatibilityIssue } from '../../services/types'
 import { checkQuestStructure, checkQuestItemRefs, questItemCoverage } from './checks/quests'
 import { computeTopology } from './checks/topology'
 import { checkRecipes } from './checks/recipes'
 import { checkBehaviors, behaviorItemCoverage } from './checks/behaviors'
-import { checkCoreMods } from './checks/mods'
+import { checkCoreMods, checkMissingDeps } from './checks/mods'
 import { checkPack, type PackCoverageMeta } from './checks/pack'
 import type { HealthItem, HealthSection, HealthSectionKey, PackHealthReport } from './types'
 
@@ -32,6 +33,10 @@ export interface PackHealthInput {
    *  Feeds the core-mod gate (s53): ModCanvas's editors depend on FTB Quests
    *  + KubeJS, and "ready to test" must not bless a pack without them. */
   installedMods: string[] | null
+  /** Missing required deps from the last compat check (s55 ruling): a
+   *  persistent, NON-blocking warning — the user may not want to install a
+   *  mod right now, and that's their call. */
+  depIssues?: CompatibilityIssue[]
 }
 
 export interface PackHealthStats {
@@ -168,7 +173,7 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
   }
 
   const recipes = checkRecipes(input.recipes ?? [])
-  const mods = checkCoreMods(input.installedMods)
+  const mods = [...checkCoreMods(input.installedMods), ...checkMissingDeps(input.depIssues ?? [])]
   const pack = checkPack({
     meta: input.packMeta,
     hasCoverImage: input.hasCoverImage,

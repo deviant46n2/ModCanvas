@@ -51,14 +51,22 @@ missing Modrinth dependencies install in-app.
   **The curated step closes its own dep loop (s54-A):** after a Modrinth
   install it runs the compat check and offers the pick's missing required
   deps (e.g. KubeJS → Rhino) with the same one-click, inline — the fix
-  appears where the friction happened. (Dep-gating the wizard's green check
-  is booked — roadmap §0 row 7.)
+  appears where the friction happened. Missing required deps also surface as
+  a **persistent, non-blocking warning** in Pack Health (s55 ruling: warn,
+  never gate — the user may not want to install a mod right now; the wizard's
+  green check stays launchable; the core-mod gate for ModCanvas's OWN deps
+  remains blocking).
 - **FTB Quests installs in Prism** — the one CurseForge core pick. The
-  wizard's curated step renders a step-by-step guide (Prism → Mods → Download
-  Mods → search FTB Quests → Install, and accept **FTB Library**, **FTB
-  Teams**, **Architectury** — all required), and the core-mod gate finding
-  carries the same fix copy. ModCanvas cannot download FTB Quests itself
-  (CF-only, keyless path impossible) and cannot see its deps — Prism can.
+  wizard routes to a **dedicated install-guide step** (`PrismGuideStep.tsx`,
+  s55: no longer an inline box — the user must walk the real Prism flow, no
+  Skip on the step) with the exact walkthrough: Open Prism → select the pack's
+  instance → **Edit** (opens the side panel) → **Mods** → **Download Mods** →
+  switch the source to **CurseForge** (the dialog defaults to Modrinth; FTB
+  Quests is CF-only) → search FTB Quests → Install, and accept **FTB
+  Library**, **FTB Teams**, **Architectury** — all required. The core-mod
+  gate finding carries the same fix copy. ModCanvas cannot download FTB
+  Quests itself (CF-only, keyless path impossible) and cannot see its deps —
+  Prism can.
 - **The core-mod gate (s53)** — Pack Health's **Mods** section
   (`core/pack-health/checks/mods.ts`) verifies ModCanvas's own dependencies
   (FTB Quests + KubeJS) against the scanned mods/ jar names riding the ingest
@@ -144,10 +152,14 @@ never stays flagged as missing (and never gets a duplicate install offer).
 
 - `frontend/src/components/common/ModsTab.tsx` — grid, filter input, selection
   state, bulk bar, compatibility panel, **Add mods in Prism** handoff.
-- `frontend/src/components/common/CuratedModsStep.tsx` — wizard step 4:
-  curated list with **one-click Install on Modrinth picks**, the **FTB Quests
-  installs in Prism** guide (three deps named), **Open Prism to install
-  these** handoff, and manual-link fallback for non-instance packs.
+- `frontend/src/components/common/CuratedModsStep.tsx` — wizard step 2:
+  curated list with **one-click Install on Modrinth picks** and inline dep
+  loop; signals the wizard when a CurseForge pick needs the Prism guide
+  (s55: the misleading "Open Prism to install these" button was removed —
+  Modrinth picks install in-app, only FTB Quests needs Prism).
+- `frontend/src/components/common/PrismGuideStep.tsx` — wizard step 3
+  (conditional): the dedicated FTB Quests Prism install guide (exact steps
+  above), its own Open Prism button, manual-link fallback, **no Skip**.
 - `frontend/src/hooks/useModState.ts` — installed-mod state, compat check +
   the compat panel's one-click installs (`useCompatInstall`).
 - `frontend/src/services/mods.ts` — `installModrinthMod`, `listCuratedMods`,

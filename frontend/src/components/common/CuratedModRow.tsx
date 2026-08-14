@@ -1,9 +1,9 @@
-// One curated-mod row in the wizard's step 4. PRISM-LEAN (s54): Modrinth picks
-// install in-app with one click (keyless — the honest one-click); CurseForge
-// picks (FTB Quests) install through Prism, so their rows carry the project
-// page link and the step-level Prism guide instead of a button the app can't
-// back. `blocked_reason` renders as a warning so a pick whose metadata
-// couldn't be verified is never silently absent (s37).
+// One curated-mod row in the wizard's curated step (step 2). PRISM-LEAN
+// (s54/s55): Modrinth picks install in-app with one click (keyless — the
+// honest one-click); CurseForge picks (FTB Quests) are NOT rendered as rows
+// (s55 — the dedicated Prism guide step owns them), so rows here always carry
+// an install button or nothing. `blocked_reason` renders as a warning so a
+// pick whose metadata couldn't be verified is never silently absent (s37).
 
 import type { CuratedMod } from '../../services/types'
 

@@ -3,8 +3,10 @@ use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
-/// Locate the built companion jar in the repo, mirroring deploy's search.
-/// Returns `None` when no jar has been built yet (or the loader is unsupported).
+/// Locate the built companion jar: bundled app resources first (distribution —
+/// the flatpak manifest installs it to /app/share/modcanvas/companion/), then
+/// the repo build output (dev). Returns `None` when no jar has been built yet
+/// (or the loader is unsupported).
 pub fn resolve_companion_source_jar(loader: &str) -> Option<PathBuf> {
     let loader_lower = loader.to_lowercase();
     let companion_dirs: &[&str] = match loader_lower.as_str() {
@@ -12,7 +14,24 @@ pub fn resolve_companion_source_jar(loader: &str) -> Option<PathBuf> {
         _ => return None,
     };
 
+    // Bundled resource (distribution). Resolved relative to the exe so the
+    // same lookup works for any bundle layout. s55: the lookup previously
+    // only knew dev-machine paths (CARGO_MANIFEST_DIR + a hardcoded
+    // /home/deviant/...), so a sandboxed build — or ANY foreign machine,
+    // including the friend's AppImage — could never deploy the companion.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let bundled = exe_dir
+                .join("../share/modcanvas/companion/workbench-companion-1.0.0.jar");
+            if bundled.exists() {
+                return Some(bundled);
+            }
+        }
+    }
+
     let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    // DEV-ONLY fallback (machine-specific path; NOT a distribution path —
+    // the bundled lookup above is what ships).
     let fallback_root = PathBuf::from("/home/deviant/Projects/ModCanvas");
 
     for dir in companion_dirs {

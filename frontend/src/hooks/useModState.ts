@@ -8,6 +8,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { getProjectMods, getProjectModMetadata, getDepNames, checkCompatibility, addMod, removeMod, scanInstanceMods } from '../services/api'
 import { useToast } from '../components/ui/Toast'
 import { debounce } from '../core/utils/debounce'
+import { usePackHealthStore } from '../core/pack-health/pack-health-store'
 import type { Project } from './useProjectState'
 import type { CompatibilityResult } from '../services/types'
 import { filterMods, findMissingDependencies, resolveModName } from './useModState/helpers'
@@ -98,6 +99,10 @@ export function useModState(selectedProject: Project | null) {
     try {
       const result = await checkCompatibility(selectedProject.id)
       setCompatResult(result)
+      // The health report's persistent (non-blocking) dep warnings read from
+      // this store (s55 ruling: warn, don't gate — the user may not want to
+      // install a mod right now).
+      usePackHealthStore.getState().setDepIssues(result.issues)
     } catch (e) {
       console.error('Failed to check compatibility:', e)
     } finally {

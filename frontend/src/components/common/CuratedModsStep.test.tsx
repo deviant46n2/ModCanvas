@@ -8,12 +8,7 @@ vi.mock('../../services/mods', () => ({
   checkCompatibility: vi.fn(),
 }))
 
-vi.mock('../../services/project', () => ({
-  openPrismForProject: vi.fn(),
-}))
-
 import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
-import { openPrismForProject } from '../../services/project'
 
 const project = {
   id: 'p1',
@@ -36,7 +31,6 @@ beforeEach(() => {
     { source: 'modrinth', mod_id: 'jei', slug: 'jei', name: 'Just Enough Items', description: 'See recipes.', ticked: true, core: false, blocked_reason: null, page_url: null },
     { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null, page_url: null },
   ])
-  vi.mocked(openPrismForProject).mockResolvedValue(undefined)
   vi.mocked(installModrinthMod).mockResolvedValue({})
   vi.mocked(checkCompatibility).mockResolvedValue({ compatible: true, issues: [], warnings: [] })
 })
@@ -62,20 +56,31 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
     expect(screen.getByText('Controllable')).toBeInTheDocument()
   })
 
-  it('Modrinth picks get a one-click Install; CurseForge picks get the Prism guide instead', async () => {
+  it('CurseForge picks are NOT rendered as rows — the guide step owns them; continue still routes there', async () => {
     vi.mocked(listCuratedMods).mockResolvedValue([
       { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
       { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: null },
     ])
-    renderStep()
+    const props = renderStep()
     await screen.findByText('KubeJS')
-    expect(screen.getByRole('button', { name: 'Install KubeJS' })).toBeInTheDocument()
-    // CF pick has no in-app install button — the app can't back a CF download.
-    expect(screen.queryByRole('button', { name: /install ftb quests/i })).toBeNull()
-    expect(screen.getByText(/FTB Quests installs in Prism/i)).toBeInTheDocument()
-    expect(screen.getByText('FTB Library')).toBeInTheDocument()
-    expect(screen.getByText('FTB Teams')).toBeInTheDocument()
-    expect(screen.getByText('Architectury')).toBeInTheDocument()
+    // The CF pick is not a row here (s55: non-actionable row in an action
+    // list = broken affordance); the header points to the next step instead.
+    expect(screen.queryByText('The quest book.')).toBeNull()
+    expect(screen.getByText(/quest book mod — comes in the next step/i)).toBeInTheDocument()
+    // The wizard is still routed to the Prism guide step.
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      expect(props.onContinue).toHaveBeenCalledWith(true)
+    })
+  })
+
+  it('continue without a CurseForge pick goes straight to the green check', async () => {
+    const props = renderStep()
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      expect(props.onContinue).toHaveBeenCalledWith(false)
+    })
   })
 
   it('one-click installs a Modrinth pick in-app and marks it installed', async () => {
@@ -148,63 +153,82 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
 
   it('renders blocked_reason on a pick whose metadata could not be verified', async () => {
     vi.mocked(listCuratedMods).mockResolvedValue([
-      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: 'CurseForge metadata fetch failed', page_url: null },
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: 'Modrinth metadata fetch failed', page_url: null },
     ])
     renderStep()
-    await screen.findAllByText('FTB Quests')
-    expect(screen.getByText('CurseForge metadata fetch failed')).toBeInTheDocument()
-  })
-
-  it('opens Prism focused on the project instance', async () => {
-    renderStep()
-    await screen.findByText('Just Enough Items')
-    fireEvent.click(screen.getByRole('button', { name: 'Open Prism to install these' }))
-    await waitFor(() => {
-      expect(openPrismForProject).toHaveBeenCalledWith('p1')
-    })
-  })
-
-  it('falls back to manual project-page links when the pack has no Prism instance', async () => {
-    vi.mocked(openPrismForProject).mockRejectedValue(
-      'This pack is not tied to a Prism instance — install its mods manually from the project pages instead.',
-    )
-    vi.mocked(listCuratedMods).mockResolvedValue([
-      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
-    ])
-    renderStep()
-    await screen.findAllByText('FTB Quests')
-    fireEvent.click(screen.getByRole('button', { name: 'Open Prism to install these' }))
-    const link = await screen.findByRole('link', { name: 'FTB Quests' })
-    expect(link).toHaveAttribute('href', 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests')
+    await screen.findByText('KubeJS')
+    expect(screen.getByText('Modrinth metadata fetch failed')).toBeInTheDocument()
   })
 
   it('shows the project page link on rows that have one', async () => {
     vi.mocked(listCuratedMods).mockResolvedValue([
-      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: 'https://www.curseforge.com/minecraft/mc-mods/ftb-quests' },
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: 'https://modrinth.com/mod/kubejs' },
     ])
     renderStep()
-    await screen.findAllByText('FTB Quests')
+    await screen.findByText('KubeJS')
     expect(screen.getByRole('link', { name: 'Project page' })).toHaveAttribute(
       'href',
-      'https://www.curseforge.com/minecraft/mc-mods/ftb-quests',
+      'https://modrinth.com/mod/kubejs',
     )
   })
 
-  it('continue refreshes the pack (picking up Prism-installed mods) then advances', async () => {
+  it('continue auto-installs the ticked Modrinth picks, skips unticked + CF, refreshes, then advances', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
+      { source: 'modrinth', mod_id: 'jei', slug: 'jei', name: 'Just Enough Items', description: 'See recipes.', ticked: true, core: false, blocked_reason: null, page_url: null },
+      { source: 'modrinth', mod_id: 'controllable', slug: 'controllable', name: 'Controllable', description: 'Controller.', ticked: false, core: false, blocked_reason: null, page_url: null },
+      { source: 'curseforge', mod_id: '289412', slug: 'ftb-quests', name: 'FTB Quests', description: 'The quest book.', ticked: true, core: true, blocked_reason: null, page_url: null },
+    ])
     const { onRefresh, onContinue } = renderStep()
     await screen.findByText('Just Enough Items')
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     await waitFor(() => {
+      // ticked Modrinth picks install automatically (keyless API);
+      // unticked opt-ins and CF picks do not.
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'jei' }))
+      expect(installModrinthMod).not.toHaveBeenCalledWith(expect.objectContaining({ modId: 'controllable' }))
+      expect(installModrinthMod).not.toHaveBeenCalledWith(expect.objectContaining({ modId: '289412' }))
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      expect(onContinue).toHaveBeenCalledTimes(1)
+      expect(onContinue).toHaveBeenCalledWith(true)
+    })
+  })
+
+  it('auto-install skips picks already installed via their row button', async () => {
+    const { onRefresh, onContinue } = renderStep()
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Install KubeJS' }))
+    await waitFor(() => {
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+    })
+    vi.mocked(installModrinthMod).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      expect(installModrinthMod).not.toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'jei' }))
       expect(onRefresh).toHaveBeenCalledTimes(1)
       expect(onContinue).toHaveBeenCalledTimes(1)
     })
   })
 
-  it('skip advances without refreshing', async () => {
+  it('an auto-install failure surfaces the error but still advances (the green check stays honest)', async () => {
+    vi.mocked(installModrinthMod)
+      .mockRejectedValueOnce('registry down')
+      .mockResolvedValue({})
+    const { onContinue } = renderStep()
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await screen.findByText(/couldn't install some mods/i)
+    expect(onContinue).toHaveBeenCalledTimes(1)
+  })
+
+  it('skip advances without installing or refreshing', async () => {
     const { onRefresh, onContinue } = renderStep()
     await screen.findByText('Just Enough Items')
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(installModrinthMod).not.toHaveBeenCalled()
     expect(onRefresh).not.toHaveBeenCalled()
-    expect(onContinue).toHaveBeenCalled()
+    expect(onContinue).toHaveBeenCalledWith(false)
   })
 })

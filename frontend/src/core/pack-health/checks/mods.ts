@@ -7,6 +7,7 @@
 // was scanned — the check stays silent rather than claiming absence.
 
 import type { HealthItem } from '../types'
+import type { CompatibilityIssue } from '../../../services/types'
 
 /** The curated core picks the app's own features depend on (curated.rs).
  *  `fix` is the beginner-facing install instruction — CF picks install in
@@ -50,4 +51,26 @@ export function checkCoreMods(installedMods: string[] | null): HealthItem[] {
     }
   }
   return items
+}
+
+/**
+ * Missing required deps from the compat check — a PERSISTENT, non-blocking
+ * warning (s55 ruling: the user may not want to install a mod right now, and
+ * that's their call). Distinct from `checkCoreMods` (ModCanvas's OWN editors'
+ * dependencies, blocking) — these are deps OF the installed mods (e.g. KubeJS
+ * → Rhino). The signal is the compat check's cached result (network-degrading
+ * to no-claim per the compat check's own rule); the install affordance lives
+ * in the Mods tab's compatibility panel.
+ */
+export function checkMissingDeps(depIssues: CompatibilityIssue[]): HealthItem[] {
+  return depIssues
+    .filter((issue) => issue.message && issue.affected_mod_names.length > 0)
+    .map((issue) => ({
+      id: `mods.dep-missing.${issue.affected_mod_names.join('+').toLowerCase().replace(/[^a-z0-9+]/g, '-')}`,
+      severity: 'recommended' as const,
+      message: issue.message,
+      detail: "Install it from the Mods tab's compatibility panel — one click, whenever you want. This won't block launching.",
+      copyText: `Pack Health: ${issue.message}`,
+      target: { section: 'mods' },
+    }))
 }
