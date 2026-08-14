@@ -2,7 +2,7 @@
 //! list is content. These lock the trust rule (empty support lists = unknown,
 //! not incompatible) so a registry hiccup never silently starves the wizard.
 
-use super::{blocked, cf_block_reason, filter_curated, CURATED, CuratedMod};
+use super::{blocked, cf_block_reason, filter_curated, version_compatible, CURATED, CuratedMod};
 use crate::models::{ModLoader, ModMetadata};
 
 fn meta(slug: &str, loaders: Vec<ModLoader>, versions: Vec<String>) -> ModMetadata {
@@ -82,18 +82,16 @@ fn ticked_defaults_survive_filtering() {
 }
 
 #[test]
-fn curseforge_pick_resolves_by_its_rekeyed_mod_id() {
-    // FTB Quests ships CurseForge-only; the batch path re-keys CF metadata
-    // to `curseforge:{id}`, which is exactly the pick's key.
-    let mut ftb = meta("ftb-quests", vec![ModLoader::NeoForge], vec!["1.21.1".into()]);
-    ftb.mod_id = "curseforge:289412".to_string();
-    let out = filter_curated(&[ftb], &ModLoader::NeoForge, "1.21.1");
-    let ftb = out.iter().find(|m| m.slug == "ftb-quests").expect("ftb quests resolves");
-    assert_eq!(ftb.source, "curseforge");
-    // The installer's CF branch parses a bare u64 — the payload must carry
-    // the STRIPPED id, never the re-keyed form (the "invalid CurseForge
-    // project id: curseforge:289412" install failure, s37 journey).
-    assert_eq!(ftb.mod_id, "289412");
+fn filter_tags_modrinth_picks_as_modrinth() {
+    // The CF pick (curseforge:289412) never flows through filter_curated —
+    // list_curated_mods excludes curseforge: keys from the Modrinth batch and
+    // resolves the CF pick separately (resolve_cf_pick). The pure filter only
+    // ever tags Modrinth picks, and the one-click installer is Modrinth-only.
+    let metadata = vec![meta("kubejs", vec![ModLoader::NeoForge], vec!["1.21.1".into()])];
+    let out = filter_curated(&metadata, &ModLoader::NeoForge, "1.21.1");
+    let kubejs = out.iter().find(|m| m.slug == "kubejs").unwrap();
+    assert_eq!(kubejs.source, "modrinth");
+    assert_eq!(kubejs.mod_id, "kubejs", "modrinth id is the slug, no re-keying");
 }
 
 #[test]
@@ -110,7 +108,8 @@ fn core_picks_keep_their_core_flag() {
 #[test]
 fn blocked_reason_is_added_by_the_command_not_the_filter() {
     // The pure filter never blocks — blocking is a command-level decision
-    // (missing CF key), so the filter's output stays installable-only.
+    // (failed fetch, version/loader mismatch), so the filter's output stays
+    // clean.
     let metadata = vec![meta("kubejs", vec![ModLoader::NeoForge], vec!["1.21.1".into()])];
     let out = filter_curated(&metadata, &ModLoader::NeoForge, "1.21.1");
     assert!(out.iter().all(|m| m.blocked_reason.is_none()));
@@ -131,14 +130,34 @@ fn cf_block_reason_maps_403_to_the_key_message() {
 #[test]
 fn blocked_picks_carry_the_manual_download_page() {
     // The FTB Quests pick declares its project page so the blocked box can
-    // link it — a user with a dead key can still grab the jar by hand (s48).
+    // link it — the manual jar-download fallback for users who skip Prism
+    // (s48 lineage). Installs always execute in Prism (s54); the page is the
+    // belt-and-suspenders path.
     let pick = CURATED.iter().find(|c| c.key == "curseforge:289412").unwrap();
-    let blocked_row = blocked(pick, "needs a CurseForge API key");
+    let blocked_row = blocked(pick, "metadata fetch failed");
     assert_eq!(
         blocked_row.page_url.as_deref(),
         Some("https://www.curseforge.com/minecraft/mc-mods/ftb-quests")
     );
-    // Modrinth picks don't declare a page — their installs don't block.
+    // Modrinth picks don't declare a page — they install in-app.
     let modrinth_pick = CURATED.iter().find(|c| c.key == "kubejs").unwrap();
     assert_eq!(blocked(modrinth_pick, "x").page_url, None);
+}
+
+#[test]
+fn version_compatible_exact_match() {
+    assert!(version_compatible("1.21.1", "1.21.1"));
+}
+
+#[test]
+fn version_compatible_major_prefix_covers_patch() {
+    assert!(version_compatible("1.21", "1.21.1"));
+    assert!(version_compatible("1.20", "1.20.5"));
+}
+
+#[test]
+fn version_compatible_reversed_or_unrelated_versions_are_not_compatible() {
+    assert!(!version_compatible("1.21.1", "1.21"));
+    assert!(!version_compatible("1.21", "1.20.1"));
+    assert!(!version_compatible("1.19", "1.21.1"));
 }

@@ -2,19 +2,18 @@ pub mod curseforge;
 pub mod curated;
 pub mod exports;
 pub mod ftb;
+pub mod install;
 pub mod loader_version;
 pub mod mrpack;
 pub mod packwiz;
-pub mod search;
-pub mod search_merge;
 
 pub use curseforge::*;
 pub use curated::*;
 pub use exports::*;
 pub use ftb::*;
+pub use install::*;
 pub use mrpack::*;
 pub use packwiz::*;
-pub use search::*;
 
 use tauri::State;
 use uuid::Uuid;

@@ -6,39 +6,22 @@ use crate::models::{CompatibilityInstall, ModLoader, ModMetadata};
 
 use crate::mod_intelligence::ModIntelligence;
 
-/// Derive the one-click install payload for a resolved dependency. The dep
-/// metadata must carry a registry source; unknown sources get no payload —
-/// an install button we cannot back with a downloader would be a lie. The
-/// `curseforge:` id prefix (metadata.rs re-keying) is stripped back to the
-/// numeric project id `install_mod_from_search` expects.
+/// Derive the one-click install payload for a resolved dependency. Only
+/// Modrinth-resolved deps get a payload — the one-click installer is
+/// Modrinth-only (PRISM-LEAN s54: CurseForge installs execute in Prism, which
+/// parses CF dependencies ModCanvas cannot see). Unknown sources get no
+/// payload — an install button we cannot back with a downloader would be a
+/// lie.
 pub fn install_payload_for(meta: &ModMetadata) -> Option<CompatibilityInstall> {
-    match meta.source.as_str() {
-        "modrinth" => Some(CompatibilityInstall {
-            source: "modrinth".to_string(),
-            // Modrinth metadata's mod_id IS its slug — the downloader accepts it.
-            mod_id: meta.mod_id.clone(),
-            slug: meta.slug.clone(),
-            name: meta.name.clone(),
-        }),
-        "curseforge" => {
-            let numeric = meta
-                .mod_id
-                .strip_prefix("curseforge:")
-                .map(str::to_string)
-                .unwrap_or_else(|| meta.mod_id.clone());
-            if numeric.parse::<u64>().is_ok() {
-                Some(CompatibilityInstall {
-                    source: "curseforge".to_string(),
-                    mod_id: numeric,
-                    slug: meta.slug.clone(),
-                    name: meta.name.clone(),
-                })
-            } else {
-                None
-            }
-        }
-        _ => None,
+    if meta.source != "modrinth" {
+        return None;
     }
+    Some(CompatibilityInstall {
+        // Modrinth metadata's mod_id IS its slug — the downloader accepts it.
+        mod_id: meta.mod_id.clone(),
+        slug: meta.slug.clone(),
+        name: meta.name.clone(),
+    })
 }
 
 impl ModIntelligence {

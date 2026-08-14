@@ -27,25 +27,16 @@ fn meta(source: &str, mod_id: &str) -> ModMetadata {
 #[test]
 fn modrinth_dep_carries_slug_as_install_id() {
     let payload = install_payload_for(&meta("modrinth", "sodium")).expect("modrinth resolves");
-    assert_eq!(payload.source, "modrinth");
     assert_eq!(payload.mod_id, "sodium");
     assert_eq!(payload.slug, "the-slug");
     assert_eq!(payload.name, "The Mod");
 }
 
 #[test]
-fn curseforge_dep_strips_the_id_prefix_for_the_downloader() {
-    // metadata.rs re-keys CF metadata to `curseforge:{id}`; the installer
-    // parses a bare u64, so the payload must carry the stripped form.
-    let payload = install_payload_for(&meta("curseforge", "curseforge:394468"))
-        .expect("curseforge resolves");
-    assert_eq!(payload.source, "curseforge");
-    assert_eq!(payload.mod_id, "394468");
-}
-
-#[test]
-fn curseforge_dep_without_numeric_id_gets_no_payload() {
-    // A CF mod whose id never resolved to a number cannot be installed by id.
+fn curseforge_dep_gets_no_payload() {
+    // PRISM-LEAN s54: the one-click installer is Modrinth-only. A CF dep must
+    // not offer a button the app can't back — it installs through Prism.
+    assert!(install_payload_for(&meta("curseforge", "curseforge:394468")).is_none());
     assert!(install_payload_for(&meta("curseforge", "not-a-number")).is_none());
 }
 

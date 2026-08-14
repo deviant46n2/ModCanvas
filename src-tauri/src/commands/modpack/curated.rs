@@ -10,8 +10,18 @@ use crate::db::Database;
 use crate::mod_intelligence::ModIntelligence;
 use crate::models::{ModLoader, ModMetadata};
 
-use super::search::version_compatible;
 use super::resolve_curseforge_api_key;
+
+/// True when an available MC version covers the requested one: exact match,
+/// or a major-version prefix (e.g. available "1.21" covers requested "1.21.1").
+/// Moved here from the deleted search command — the curated filter was its
+/// only surviving consumer, so one rule lives next to its one caller.
+pub(crate) fn version_compatible(available: &str, requested: &str) -> bool {
+    if available == requested {
+        return true;
+    }
+    requested.starts_with(available) && requested[available.len()..].starts_with('.')
+}
 
 /// A curated pick the wizard can install in one click.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -26,9 +36,9 @@ pub struct CuratedMod {
     /// A ModCanvas feature backs this pick (quest book, recipe scripting);
     /// the wizard renders core picks in their own section.
     pub core: bool,
-    /// When set, the pick is shown but cannot be installed (e.g. a
-    /// CurseForge pick without an API key). A core pick is never silently
-    /// absent — an actionable reason beats a mysterious gap.
+    /// When set, the pick is shown but flagged as unusable — a failed
+    /// metadata fetch or a version/loader mismatch. The reason is rendered as
+    /// a warning; CurseForge picks always install through Prism regardless.
     pub blocked_reason: Option<String>,
     /// Project page for manual download (the blocked box links it).
     pub page_url: Option<String>,
@@ -96,23 +106,14 @@ fn filter_curated(
             continue;
         }
         out.push(CuratedMod {
-            source: if pick.key.starts_with("curseforge:") {
-                "curseforge".to_string()
-            } else {
-                "modrinth".to_string()
-            },
-            // The installer's CF branch parses a bare u64 (search.rs) — the
-            // re-keyed `curseforge:{id}` form must be stripped here, exactly
-            // like compat.rs's install_payload_for does for the compat panel.
-            // One installer contract, both payloads speak it.
-            mod_id: if pick.key.starts_with("curseforge:") {
-                meta.mod_id
-                    .strip_prefix("curseforge:")
-                    .map(str::to_string)
-                    .unwrap_or_else(|| meta.mod_id.clone())
-            } else {
-                meta.mod_id.clone()
-            },
+            source: "modrinth".to_string(),
+            // The curseforge: prefix-stripping shape is gone with the search
+            // installer (s54): filter_curated only ever sees Modrinth batch
+            // metadata (curseforge: keys are excluded from modrinth_keys and
+            // resolved separately in resolve_cf_pick), and the one-click
+            // installer is Modrinth-only — a CF pick's id is never consumed
+            // for a download.
+            mod_id: meta.mod_id.clone(),
             slug: meta.slug.clone(),
             name: meta.name.clone(),
             description: pick.description.to_string(),
@@ -221,8 +222,9 @@ async fn resolve_cf_pick(
             }
             CuratedMod {
                 source: "curseforge".to_string(),
-                // The installer's CF branch parses a bare u64 — the metadata
-                // already carries the bare numeric id (curseforge.rs).
+                // Display/identity only (s54): CurseForge picks always install
+                // through Prism — there is no in-app CF installer anymore, so
+                // no installer-shaped id is required.
                 mod_id: meta.mod_id.clone(),
                 slug: meta.slug.clone(),
                 name: meta.name.clone(),

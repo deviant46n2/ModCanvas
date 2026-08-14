@@ -182,12 +182,12 @@ pub struct CompatibilityResult {
 }
 
 /// Everything the frontend needs to install a missing dependency in one
-/// click: the downloader source plus the identity `install_mod_from_search`
-/// resolves the version for. `None` on an issue means the dep could not be
-/// resolved at check time — no button, no blind install.
+/// click. Modrinth-only since s54: the one-click installer is keyless and
+/// Modrinth-only; CurseForge deps render without a button (installs execute
+/// in Prism). `None` on an issue means the dep could not be resolved at check
+/// time — no button, no blind install.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompatibilityInstall {
-    pub source: String,
     pub mod_id: String,
     pub slug: String,
     pub name: String,

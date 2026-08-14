@@ -169,8 +169,8 @@ impl ModIntelligence {
 
 /// "project e" / "ProjectE" / "project_e" -> "projecte". CF slugs are
 /// lowercase alphanumeric (hyphens are part of the slug itself, not spaces).
-/// Shared with the cross-source merge (commands/modpack/search_merge.rs) so
-/// the exact-match lift uses the same normalization as the slug fallback.
+/// One normalization rule for the slug fallback; the import resolution path
+/// re-exports it (mod.rs) so both query shapes agree.
 pub(crate) fn normalize_slug(query: &str) -> String {
     query
         .chars()
