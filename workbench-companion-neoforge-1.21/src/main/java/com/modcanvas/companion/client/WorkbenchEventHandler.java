@@ -122,15 +122,35 @@ public class WorkbenchEventHandler {
             if (item == null) continue;
             JsonObject entry = new JsonObject();
             entry.addProperty("id", key.toString());
-            // 1.21.1: Item.getName(ItemStack) is the display-name Component;
-            // an EMPTY stack is fine for registry items (no NBT-dependent name).
-            entry.addProperty("name", item.getName(ItemStack.EMPTY).getString());
+            // 1.21.1: Item.getName(ItemStack) is the display-name Component. We
+            // pass EMPTY because a registry item should have a stable, non-NBT
+            // name — but that is an ASSUMPTION, not a guarantee (s63, ATM10SKY
+            // crash): ExtendedAE's ItemInfinityCell.getName() NPEs on an empty
+            // stack because its AEKey wrapper is null, and the throw propagates
+            // up through the client tick and kills the game. A registry dump is
+            // best-effort: a pathological modded item must never take down the
+            // whole client, so resolve the name defensively and fall back to
+            // the id path if the mod's own code throws.
+            entry.addProperty("name", safeItemName(item, key));
             items.add(entry);
         }
         JsonObject payload = new JsonObject();
         payload.add("items", items);
         WorkbenchCompanionClient.sendEvent("ITEM_REGISTRY_RESULT", payload);
         LOGGER.info("[WorkbenchEventHandler] Sent item registry ({} items)", items.size());
+    }
+
+    /** Best-effort display name for a registry item. Modded items occasionally
+     *  throw from getName() on an empty stack (item-specific state they assume
+     *  is present); the registry dump must survive those items intact, so any
+     *  throw degrades to the item's id path instead of crashing the client. */
+    private static String safeItemName(Item item, ResourceLocation key) {
+        try {
+            return item.getName(ItemStack.EMPTY).getString();
+        } catch (Throwable t) {
+            LOGGER.warn("[WorkbenchEventHandler] Item {} threw in getName(): {}", key, t.toString());
+            return key.getPath();
+        }
     }
 
     private static void handleQuestReload(WorkbenchCompanionClient.WorkbenchEvent event) {
