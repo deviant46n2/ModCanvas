@@ -13,10 +13,12 @@ interface PackHealthState {
   itemRegistry: ItemRegistryEntry[] | null
   hasCoverImage: boolean
   /** Missing required deps from the last compat check (s55 ruling): a
-   *  PERSISTENT, non-blocking warning in the health report — the user may
-   *  legitimately not want to install a mod right now. The store is the
-   *  materialized home; every compat-check site (Mods tab, wizard) pushes
-   *  its result here so the report is a pure function of cached state. */
+   *  PERSISTENT, non-blocking warning in the health report for deps of
+   *  user-chosen mods — the user may legitimately not want to install a mod
+   *  right now. Deps of CORE mods (e.g. KubeJS → Rhino) are the core gate's
+   *  lane (s56). The store is the materialized home; every compat-check site
+   *  (Mods tab, wizard) pushes its result here so the report is a pure
+   *  function of cached state. */
   depIssues: CompatibilityIssue[]
   setQuestState: (graph: QuestGraphData | null, items: ItemRegistryEntry[] | null) => void
   setItemRegistry: (items: ItemRegistryEntry[] | null) => void

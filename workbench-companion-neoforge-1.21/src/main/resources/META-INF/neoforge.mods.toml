@@ -23,3 +23,15 @@ updateJSONURL="https://github.com/modcanvas/workbench-companion/releases/latest/
     versionRange="[1.21.1,1.21.2)"
     ordering="NONE"
     side="BOTH"
+# Soft dependency (s56): FTB Quests is optional at runtime — texture capture
+# and KubeJS reloads work without it; quest reloads degrade to the command
+# fallback. The direct-API bridge (FtbQuestsReloadBridge) checks isLoaded()
+# before touching any FTB class, so absence is safe. There is deliberately NO
+# compile-time FTB jar (All Rights Reserved — vendoring would distribute FTB's
+# code; the bridge is reflective for the same reason isQuestBookOpen is).
+[[dependencies.workbench_companion]]
+    modId="ftbquests"
+    mandatory=false
+    versionRange="[2101.1.0,)"
+    ordering="NONE"
+    side="BOTH"

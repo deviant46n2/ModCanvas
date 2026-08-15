@@ -46,9 +46,13 @@ describe('analyzePackHealth', () => {
   it('blocks on missing core mods when the mods dir was scanned', () => {
     const report = analyzePackHealth({ ...baseInput, installedMods: ['workbench-companion-1.0.0.jar'] })
     expect(report.go).toBe(false)
-    expect(report.blockingCount).toBe(2)
+    expect(report.blockingCount).toBe(3)
     const modsItems = report.sections.find((s) => s.key === 'mods')!.items
-    expect(modsItems.map((i) => i.id)).toEqual(['mods.core-missing.ftb-quests', 'mods.core-missing.kubejs'])
+    expect(modsItems.map((i) => i.id)).toEqual([
+      'mods.core-missing.ftb-quests',
+      'mods.core-missing.kubejs',
+      'mods.core-missing.rhino',
+    ])
   })
 
   it('flags behavior missing-item findings as recommended when the registry is trusted', () => {
@@ -143,12 +147,12 @@ describe('analyzePackHealth', () => {
     expect(report.optionalCount).toBe(0)
   })
 
-  it('missing required deps surface as a persistent warning but NEVER gate (s55 ruling)', () => {
+  it('missing required deps of USER-CHOSEN mods surface as a persistent warning but NEVER gate (s55 ruling)', () => {
     const report = analyzePackHealth({
       ...baseInput,
-      installedMods: ['ftb-quests-neoforge-2101.1.30.jar', 'kubejs-neoforge-2101.6.1.jar'],
+      installedMods: ['ftb-quests-neoforge-2101.1.30.jar', 'kubejs-neoforge-2101.6.1.jar', 'rhino-2101.2.7-build.81.jar'],
       depIssues: [
-        { severity: 'Warning', message: "'KubeJS' requires 'Rhino' which is not in the project", affected_mods: ['kubejs', 'rhino'], affected_mod_names: ['KubeJS', 'Rhino'], install: { mod_id: 'rhino', slug: 'rhino', name: 'Rhino' } },
+        { severity: 'Warning', message: "'Jade' requires 'JadeAddonsLib' which is not in the project", affected_mods: ['jade', 'jadeaddonslib'], affected_mod_names: ['Jade', 'JadeAddonsLib'], install: { mod_id: 'jadeaddonslib', slug: 'jadeaddonslib', name: 'JadeAddonsLib' } },
       ],
     })
     // The dep warning is present in the Mods section…
@@ -158,6 +162,23 @@ describe('analyzePackHealth', () => {
     expect(report.go).toBe(true)
     expect(report.blockingCount).toBe(0)
     expect(report.recommendedCount).toBeGreaterThanOrEqual(1)
+  })
+
+  it('GATES when a CORE mod is missing its required dep (s56 ruling: Rhino is load-bearing for KubeJS)', () => {
+    const report = analyzePackHealth({
+      ...baseInput,
+      installedMods: ['ftb-quests-neoforge-2101.1.30.jar', 'kubejs-neoforge-2101.6.1.jar'],
+      depIssues: [
+        { severity: 'Warning', message: "'KubeJS' requires 'Rhino' which is not in the project", affected_mods: ['kubejs', 'rhino'], affected_mod_names: ['KubeJS', 'Rhino'], install: { mod_id: 'rhino', slug: 'rhino', name: 'Rhino' } },
+      ],
+    })
+    expect(report.go).toBe(false)
+    expect(report.blockingCount).toBe(1)
+    const modsItems = report.sections.find((s) => s.key === 'mods')!.items
+    // The blocking core finding owns the signal; the dep warning is deduped
+    // out of the recommended lane (one fact, one row).
+    expect(modsItems.map((i) => i.id)).toEqual(['mods.core-missing.rhino'])
+    expect(modsItems.some((i) => i.id.startsWith('mods.dep-missing'))).toBe(false)
   })
 
   it('populates registry stats', () => {

@@ -114,7 +114,23 @@ public class WorkbenchEventHandler {
             LOGGER.info("[WorkbenchEventHandler] Quest book was open — closed for reload");
         }
 
-        sendCommand("ftbquests reload");
+        // Direct FTB API reload (s56): the /ftbquests reload command is
+        // permission-gated on 2101.1.31+ to PLAYER sources (console dispatch,
+        // the s43 fix, no longer passes; a non-op player fails too). The
+        // companion is a server-side mod — it calls ServerQuestFile.load()
+        // directly, on the server thread, via the reflective bridge (no FTB
+        // compile deps). If FTB is absent or the bridge fails, no claim is
+        // made; the app's evidence gate reports FAIL honestly.
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server != null) {
+            server.execute(() -> FtbQuestsReloadBridge.reloadQuests(server));
+        } else if (mc.player != null && mc.player.connection != null) {
+            // Multiplayer / no integrated server: the bridge cannot reach the
+            // server-side quest file — fall back to the player's connection
+            // (permission-gated on the remote server, as before s56).
+            mc.player.connection.sendCommand("ftbquests reload");
+            LOGGER.info("[WorkbenchEventHandler] Dispatched client-side: /ftbquests reload");
+        }
         if (questBookOpen) {
             // Reopen AFTER the reload fully lands: the reload command runs
             // synchronously on the server thread, so a chained server.execute
@@ -266,12 +282,15 @@ public class WorkbenchEventHandler {
     /**
      * Dispatch a server-side reload command. Preferred path: the integrated
      * server's own command source — a console source has op level 4, so
-     * permission gates like FTB's {@code hasEditorPermission} (op 2 or FTB
-     * editor permission) pass without the user enabling edit mode (workaround
-     * #9 no longer applies to this path). Fallback: the player's connection
-     * (multiplayer / no integrated server). Runs on the server thread via
-     * {@code server.execute(...)} — never call the dispatcher from the client
-     * tick thread.
+     * permission gates that accept console pass without the user enabling
+     * edit mode (workaround #9 no longer applies to this path). NOTE (s56):
+     * FTB Quests 2101.1.31+ tightened its gate to PLAYER sources, so quest
+     * reloads no longer use this path — they go through
+     * {@link FtbQuestsReloadBridge} instead. This remains the path for KubeJS
+     * and CraftTweaker reloads (their gates accept console). Fallback: the
+     * player's connection (multiplayer / no integrated server). Runs on the
+     * server thread via {@code server.execute(...)} — never call the
+     * dispatcher from the client tick thread.
      */
     private static void sendCommand(String command) {
         Minecraft mc = Minecraft.getInstance();

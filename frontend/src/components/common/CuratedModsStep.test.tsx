@@ -40,6 +40,7 @@ function renderStep(over = {}) {
     project,
     onRefresh: vi.fn().mockResolvedValue(undefined),
     onContinue: vi.fn(),
+    installedMods: [],
     ...over,
   }
   render(<CuratedModsStep {...props} />)
@@ -209,6 +210,56 @@ describe('CuratedModsStep (PRISM-LEAN)', () => {
       expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'jei' }))
       expect(onRefresh).toHaveBeenCalledTimes(1)
       expect(onContinue).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('gate auto-install (s56): a required mod with a Modrinth slug missing from the scan installs automatically on Continue', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
+    ])
+    const { onRefresh, onContinue } = renderStep({ installedMods: ['workbench-companion-1.0.0.jar'] })
+    await screen.findByText('KubeJS')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      // KubeJS installs as a ticked pick; Rhino is NOT a pick — the gate list
+      // drives its install (slug present, scan doesn't show it).
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'rhino' }))
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      expect(onContinue).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('gate auto-install skips a required mod already present in the scan', async () => {
+    const { onContinue } = renderStep({ installedMods: ['kubejs-neoforge-2101.6.1.jar', 'rhino-2101.2.7-build.81.jar'] })
+    await screen.findByText('Just Enough Items')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      // Rhino is in the scan — the gate loop has nothing to install. (KubeJS
+      // still installs as a ticked pick in this fixture; that's the pick loop,
+      // not the gate loop.)
+      expect(installModrinthMod).not.toHaveBeenCalledWith(expect.objectContaining({ modId: 'rhino' }))
+      expect(onContinue).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('gate auto-install skips a required mod the user is already installing as a pick (no double install)', async () => {
+    vi.mocked(listCuratedMods).mockResolvedValue([
+      { source: 'modrinth', mod_id: 'kubejs', slug: 'kubejs', name: 'KubeJS', description: 'Recipe scripting.', ticked: true, core: true, blocked_reason: null, page_url: null },
+    ])
+    renderStep()
+    await screen.findByText('KubeJS')
+    fireEvent.click(screen.getByRole('button', { name: 'Install KubeJS' }))
+    await waitFor(() => {
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+    })
+    vi.mocked(installModrinthMod).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      // KubeJS is both a pick and a gate entry — installed as a pick, the
+      // gate loop must not install it again (pickIds exclusion).
+      expect(installModrinthMod).not.toHaveBeenCalledWith(expect.objectContaining({ modId: 'kubejs' }))
+      expect(installModrinthMod).toHaveBeenCalledWith(expect.objectContaining({ modId: 'rhino' }))
     })
   })
 

@@ -31,11 +31,13 @@ export interface PackHealthInput {
   packLoaded: boolean
   /** Scanned mods/ jar names from the ingest (null = no mods dir = unknown).
    *  Feeds the core-mod gate (s53): ModCanvas's editors depend on FTB Quests
-   *  + KubeJS, and "ready to test" must not bless a pack without them. */
+   *  + KubeJS (and KubeJS's load-bearing dep Rhino, s56), and "ready to test"
+   *  must not bless a pack without them. */
   installedMods: string[] | null
   /** Missing required deps from the last compat check (s55 ruling): a
-   *  persistent, NON-blocking warning — the user may not want to install a
-   *  mod right now, and that's their call. */
+   *  persistent, NON-blocking warning for deps of user-chosen mods — the user
+   *  may not want to install a mod right now, and that's their call. Deps of
+   *  CORE mods (e.g. KubeJS → Rhino) are the core gate's lane (s56). */
   depIssues?: CompatibilityIssue[]
 }
 
@@ -173,7 +175,14 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
   }
 
   const recipes = checkRecipes(input.recipes ?? [])
-  const mods = [...checkCoreMods(input.installedMods), ...checkMissingDeps(input.depIssues ?? [])]
+  const mods = [
+    ...checkCoreMods(input.installedMods),
+    // installedMods conditions the dedup (s56): dep issues for missing CORE
+    // mods (e.g. KubeJS → Rhino) are duplicates of the blocking gate and drop
+    // out of the warning lane — but only when the scan actually proved the
+    // core mod missing. No scan → gate silent (Trust Rule) → dep warning stays.
+    ...checkMissingDeps(input.depIssues ?? [], input.installedMods),
+  ]
   const pack = checkPack({
     meta: input.packMeta,
     hasCoverImage: input.hasCoverImage,

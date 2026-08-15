@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
+import { CORE_MOD_PATTERNS } from '../../core/pack-health/checks/mods'
 import type { CompatibilityInstall, CompatibilityIssue, CuratedMod } from '../../services/types'
 import type { Project } from '../../services/types'
 import { CuratedModRow } from './CuratedModRow'
@@ -17,14 +18,18 @@ import { CuratedModRow } from './CuratedModRow'
 interface CuratedModsStepProps {
   project: Project
   /** Re-run the load pipeline when the wizard continues, so the green check
-   * sees whatever Prism installed. */
+   *  sees whatever Prism installed. */
   onRefresh: () => Promise<void>
   /** Advance. `true` = a CurseForge pick is in the list, so the wizard must
-   * route to the Prism install guide step before the green check. */
+   *  route to the Prism install guide step before the green check. */
   onContinue: (needsPrismGuide: boolean) => void
+  /** Scanned mods/ jar names (ingest result). Feeds the gate auto-install
+   *  (s56): a required mod with a `modrinthSlug` that the scan doesn't show
+   *  gets installed automatically — the gate list is the source of truth. */
+  installedMods: string[] | null
 }
 
-export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsStepProps) {
+export function CuratedModsStep({ project, onRefresh, onContinue, installedMods }: CuratedModsStepProps) {
   const [mods, setMods] = useState<CuratedMod[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [installing, setInstalling] = useState<Set<string>>(new Set())
@@ -134,10 +139,28 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
   async function handleContinue() {
     setAutoInstalling(true)
     const failures: string[] = []
+    // Required mods with a Modrinth slug that the scan doesn't show yet —
+    // they install automatically (s56). The gate list is the source of
+    // truth: a future required mod is one row with a slug, no wizard edits.
+    // CF-only required mods (FTB Quests) have no slug — the Prism guide step
+    // owns them.
+    const scannedNames = (installedMods ?? []).map((n) => n.toLowerCase())
+    // The picks loop installs these — the gate loop must not double-install
+    // a mod that is both a ticked pick and a gate entry (KubeJS).
+    const pickIds = new Set(autoInstallTargets.map((m) => m.mod_id))
+    const gateAutoTargets = CORE_MOD_PATTERNS.filter(
+      (core) =>
+        core.modrinthSlug &&
+        !pickIds.has(core.modrinthSlug) &&
+        !scannedNames.some((n) => core.pattern.test(n)) &&
+        !installed.has(core.modrinthSlug),
+    )
+    const autoTargets = autoInstallTargets
+    const total = autoTargets.length + gateAutoTargets.length
     try {
-      for (const mod of autoInstallTargets) {
+      for (const mod of autoTargets) {
         try {
-          setAutoProgress({ name: mod.name, done: 0, total: autoInstallTargets.length })
+          setAutoProgress({ name: mod.name, done: autoTargets.indexOf(mod), total })
           await installModrinthMod({
             projectId: project.id,
             modId: mod.mod_id,
@@ -149,7 +172,21 @@ export function CuratedModsStep({ project, onRefresh, onContinue }: CuratedModsS
         } catch (e: any) {
           failures.push(`${mod.name}: ${typeof e === 'string' ? e : e?.message || String(e)}`)
         }
-        setAutoProgress((p) => (p ? { ...p, done: p.done + 1 } : p))
+      }
+      for (const core of gateAutoTargets) {
+        try {
+          setAutoProgress({ name: core.name, done: autoTargets.length + gateAutoTargets.indexOf(core), total })
+          await installModrinthMod({
+            projectId: project.id,
+            modId: core.modrinthSlug!,
+            slug: core.modrinthSlug!,
+            name: core.name,
+            description: core.copy,
+          })
+          setInstalled((prev) => new Set(prev).add(core.modrinthSlug!))
+        } catch (e: any) {
+          failures.push(`${core.name}: ${typeof e === 'string' ? e : e?.message || String(e)}`)
+        }
       }
       // The picks' own deps may now be missing — close the loop (s54-A).
       await refreshDepCheck()

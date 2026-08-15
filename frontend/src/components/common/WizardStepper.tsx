@@ -170,6 +170,7 @@ export function WizardStepper({
           <CuratedModsStep
             project={project}
             onRefresh={onRefresh}
+            installedMods={installedMods}
             onContinue={(needsPrismGuide) => {
               setNeedsPrism(needsPrismGuide)
               setStep(needsPrismGuide ? 3 : 4)

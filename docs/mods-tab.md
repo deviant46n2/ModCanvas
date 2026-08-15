@@ -51,11 +51,20 @@ missing Modrinth dependencies install in-app.
   **The curated step closes its own dep loop (s54-A):** after a Modrinth
   install it runs the compat check and offers the pick's missing required
   deps (e.g. KubeJS → Rhino) with the same one-click, inline — the fix
-  appears where the friction happened. Missing required deps also surface as
-  a **persistent, non-blocking warning** in Pack Health (s55 ruling: warn,
-  never gate — the user may not want to install a mod right now; the wizard's
-  green check stays launchable; the core-mod gate for ModCanvas's OWN deps
-  remains blocking).
+  appears where the friction happened. Missing required deps of user-chosen
+  mods also surface as a **persistent, non-blocking warning** in Pack Health
+  (s55 ruling: warn, never gate — the user may not want to install a mod
+  right now; the wizard's green check stays launchable). Carve-out (s56):
+  required deps of CORE mods (KubeJS → Rhino) are the core gate's lane —
+  they gate, because NeoForge refuses to boot without them (s56 live
+  failure: `kubejs requires rhino`).
+- **Required mods auto-install (s56)** — the core gate list
+  (`CORE_MOD_PATTERNS`) is the single source of truth for required mods, and
+  each entry carries its install path: a `modrinthSlug` (auto-install via the
+  keyless one-click on wizard Continue — KubeJS, Rhino) or no slug (manual
+  via the Prism guide — FTB Quests, the CF wall). A future required mod is
+  one row with a slug, no wizard edits. The gate's green-check blocking
+  stays as the safety net for packs that drift outside the wizard.
 - **FTB Quests installs in Prism** — the one CurseForge core pick. The
   wizard routes to a **dedicated install-guide step** (`PrismGuideStep.tsx`,
   s55: no longer an inline box — the user must walk the real Prism flow, no
@@ -67,15 +76,22 @@ missing Modrinth dependencies install in-app.
   gate finding carries the same fix copy. ModCanvas cannot download FTB
   Quests itself (CF-only, keyless path impossible) and cannot see its deps —
   Prism can.
-- **The core-mod gate (s53)** — Pack Health's **Mods** section
+- **The core-mod gate (s53, extended s56)** — Pack Health's **Mods** section
   (`core/pack-health/checks/mods.ts`) verifies ModCanvas's own dependencies
-  (FTB Quests + KubeJS) against the scanned mods/ jar names riding the ingest
-  result (`IngestResult.mods`, null when the mods dir doesn't exist — no claim,
+  against the scanned mods/ jar names riding the ingest result
+  (`IngestResult.mods`, null when the mods dir doesn't exist — no claim,
   Trust Rule). Missing core mods are **blocking**, and the wizard's green check
   disables Launch until they land. The gate makes the handoff *verified*: a
   skipped Prism install can no longer produce a "ready to test" pack whose
   quest book never appears in-game. Each finding's detail now carries the
-  exact fix (s54): the FTB Quests one names the three deps.
+  exact fix (s54): the FTB Quests one names the three deps. **Rhino joined the
+  gate (s56)** because KubeJS requires it — its `neoforge.mods.toml` declares
+  rhino as a required dep, and NeoForge refuses to boot without it. A core
+  mod's load-bearing dep is core: the gate is the closure of core mods over
+  their required deps, and the warning lane (s55) keeps deps of user-chosen
+  mods. Dep issues for missing core mods are deduped out of the warning lane
+  (blocking owns the fact) — but only when the scan proved the core mod
+  missing; no scan → gate silent → the dep warning survives.
 - **Scan Instance Mods** — re-scans the instance `mods/` folder and records
   what's there, so Prism-installed mods are tracked without re-import.
 
