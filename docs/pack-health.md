@@ -25,12 +25,25 @@ message for bug reports and Discord.
 
 ### Item-existence findings are recommended, never blocking
 
-The quest editor's item registry is a best-effort **jar/lang scan** of the
-instance, plus **KubeJS item registrations** (`indexer_kubejs.rs` parses
-`event.create`/`event.register` in startup/server scripts). It cannot prove an
-item is absent: data-driven/registry-content items and packs without a vanilla
-jar still leave gaps. Calling a released pack "blocking" over a scan gap would
-violate the Trust Rule (§4), so:
+The quest editor's item registry is **companion-authoritative (s59)**: the
+game's own `BuiltInRegistries.ITEM` dump (`save_item_registry_cmd`,
+`src-tauri/src/indexer/mod.rs:135`) is persisted to the per-instance cache
+(`source=companion`, cache v4), and `scan_instance_items` serves that cache or
+nothing (`mod.rs:83-87` — cache-or-empty). The legacy lang-key scan and KubeJS
+script parse (`indexer_kubejs.rs`) are **parked** — lang keys lie (potion
+effect floods, banner pattern keys, FTB GUI keys: 1087/2411 entries on the
+monster pack were fake). Trust semantics are now versioned:
+
+- **Companion connected / cache populated:** the registry IS the game's
+  registered items — absence is provable, not guessed.
+- **Before the first companion connect (offline first run):** the registry is
+  **empty by design** (blank-first-run is the agreed UX). The degraded-registry
+  guard (`pack-health/index.ts` `registryDegraded`, 100-item floor) suppresses
+  item-existence findings entirely — an empty registry must never become a
+  false "all items missing" storm.
+
+Calling a released pack "blocking" over a registry gap would violate the Trust
+Rule (§4), so:
 
 - Item-reference findings are always `recommended` with a "could be a
   custom/KubeJS item" caveat.

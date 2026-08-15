@@ -450,7 +450,11 @@ to, appears-in, required-by, gated-by). Should ModCanvas build one?
 There is **no unified model** — and yet the pieces of one are already scattered through the
 codebase as *indexes*:
 
-- **Item registry** — `scan_instance_items_cmd` (`indexer/mod.rs:148`) → per-mod items.
+- **Item registry** — `scan_instance_items_cmd` (`indexer/mod.rs:147`) → per-mod items.
+  **Companion-authoritative since s59:** the game's `BuiltInRegistries.ITEM` dump
+  (`save_item_registry_cmd`, cache v4) is the source; `scan_instance_items` is
+  cache-or-empty. The legacy lang-key scan is parked (see pack-health.md "Item-existence
+  findings" for trust semantics).
   **UI-label filtering hardened (s44):** lang keys like `item.canUse.unknown`, `item.modifiers.*`,
   and the no-path labels (`item.color`, `item.disabled`) are vanilla UI strings, not items —
   the pre-s44 parser emitted `canUse:unknown` (mod_id `canUse`) into the registry (caught by the

@@ -131,6 +131,18 @@
   {
    "commit": "aff5c18",
    "reason": "s52 audit rulings batch (sync layer removal, adapter fix) — doc-covered by the following governance commit 9d6f97f: roadmap §14.3 core/sync note rewritten to the unwired reality, §0 directed queue records the adapter fix, AGENTS.md posture section. Cross-commit coverage, judged 2026-08-13"
+  },
+  {
+   "commit": "b40a9eb",
+   "reason": "version-scoped vanilla jar discovery + engine-upgradeable items — doc-covered by the FOLLOWING commit of the same arc (06dab0b): engine-renders.md 'Vanilla jar discovery is version-scoped (s58)' (find_vanilla_jars = single source of truth, shared across texture index / item registry / engine renders). Cross-commit coverage within the s57-s58 texture arc, judged 2026-08-15 doc-sync pass"
+  },
+  {
+   "commit": "18ea860",
+   "reason": "item-picker sort by display name + icon-picker 200-cap removal — doc-covered by component inline docs: icon-picker.tsx:20-44 explains registry-first sourcing, the s60 cap removal and why it is safe (batched materialization at 500, modal scrolls), and the fallback path's retained cap. AGENTS.md doc-sync rule counts component inline docs (precedent: 1828b09). quest-editor.md:829 references the picker; inline comment is the doc, judged 2026-08-15 doc-sync pass"
+  },
+  {
+   "commit": "bc5b6fc",
+   "reason": "companion-authoritative item registry (BuiltInRegistries.ITEM dump, cache v4, cache-or-empty scan) — docs written in the s61 doc-sync pass: pack-health.md 'Item-existence findings' rewritten to the companion-authoritative trust semantics (connected=provable absence, pre-first-launch=empty+degraded guard), roadmap §7.2 item-registry row gains the s59 source note. Cross-commit coverage, judged 2026-08-15 doc-sync pass"
   }
  ]
 }
