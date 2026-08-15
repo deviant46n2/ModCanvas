@@ -22,41 +22,17 @@ pub(super) fn jars_under(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// Locate the vanilla client jar for this instance. Prefers a jar matching the
-/// instance's Minecraft version (from `version.json`), falling back to the
-/// sorted set of candidate jars.
+/// Locate the vanilla client jar for this instance. Delegates to the shared
+/// `indexer::vanilla::find_vanilla_jars` — the single source of truth for
+/// launcher layouts (Prism/MultiMC `libraries/net/minecraft/client/` via
+/// ancestor walk, vanilla `versions/`, `~/.minecraft/versions/`, root
+/// `minecraft.jar`). The ancestor walk is OS-agnostic: the launcher-relative
+/// layout is identical on Linux, Windows and macOS (s57 — the texture index
+/// previously had its own copy that only knew `versions/` + `~/.ftba`, so a
+/// Prism instance's vanilla layer came back empty and every vanilla item
+/// texture was missing from the index).
 pub(super) fn vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
-    let candidates = {
-        let mut jars = jars_under(&instance_path.join("versions"));
-        if let Ok(home) = std::env::var("HOME") {
-            jars.extend(jars_under(&Path::new(&home).join(".ftba").join("bin").join("versions")));
-        }
-        jars.sort();
-        jars
-    };
-    if candidates.is_empty() {
-        return candidates;
-    }
-    let mc_version = fs::read_to_string(instance_path.join("version.json"))
-        .ok()
-        .and_then(|txt| txt.find("\"id\"").map(|i| {
-            let after = &txt[i + 5..];
-            let start = after.find('"').map(|s| s + 1).unwrap_or(0);
-            let rest = &after[start..];
-            rest.find('"').map(|e| rest[..e].to_string()).unwrap_or_default()
-        }))
-        .filter(|v| !v.is_empty());
-    if let Some(ver) = mc_version {
-        let matched: Vec<PathBuf> = candidates
-            .iter()
-            .filter(|p| p.to_string_lossy().contains(&format!("/{}/", ver)))
-            .cloned()
-            .collect();
-        if !matched.is_empty() {
-            return matched;
-        }
-    }
-    candidates
+    crate::indexer::find_vanilla_jars(instance_path)
 }
 
 /// Resource pack load order from `options.txt` (last listed = highest

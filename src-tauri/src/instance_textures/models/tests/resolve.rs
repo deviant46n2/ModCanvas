@@ -66,6 +66,25 @@ fn item_parent_block_model() {
             ),
         ],
     );
+    // Vanilla cube_all model WITH elements, so the parent chain bakes —
+    // hermetic: previously this test relied on a real vanilla jar being
+    // found via the host's ~/.ftba layout, which made it non-hermetic (s57).
+    // Written in ONE pass (appending to a zip corrupts it).
+    let vdir = instance.join("versions").join("1.21.1");
+    fs::create_dir_all(&vdir).unwrap();
+    write_jar_entries(
+        &vdir.join("1.21.1.jar"),
+        &[
+            (
+                "assets/minecraft/models/block/cube.json",
+                br##"{"textures":{"particle":"#all"},"elements":[{"from":[0,0,0],"to":[16,16,16]}]}"##,
+            ),
+            (
+                "assets/minecraft/models/block/cube_all.json",
+                br##"{"parent":"minecraft:block/cube","textures":{"all":"#all"}}"##,
+            ),
+        ],
+    );
 
     let idx = scan_instance_textures(&instance);
     // cube_all → cube (vanilla, via the shared jar) carries elements, so the

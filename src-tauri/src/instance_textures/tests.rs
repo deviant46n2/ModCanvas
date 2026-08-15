@@ -6,15 +6,24 @@ use base64::engine::general_purpose::STANDARD;
 use std::io::Write;
 use tempfile::tempdir;
 
+/// Write a jar with one PNG texture. Used where a single texture suffices.
 fn write_jar(path: &Path, namespace: &str, texture_path: &str, data: &[u8]) {
+    write_jar_multi(path, &[(format!("assets/{}/textures/{}.png", namespace, texture_path), data)]);
+}
+
+/// Write a jar with multiple entries (PNGs AND models) in ONE zip pass —
+/// appending to an existing zip corrupts it (the central directory cannot be
+/// extended by a second writer; the appended entries become unreadable).
+fn write_jar_multi(path: &Path, entries: &[(String, &[u8])]) {
     use zip::CompressionMethod;
     use zip::write::FileOptions;
     let file = fs::File::create(path).unwrap();
     let mut zip = zip::ZipWriter::new(file);
-    let full_path = format!("assets/{}/textures/{}.png", namespace, texture_path);
     let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Stored);
-    zip.start_file(&full_path, options).unwrap();
-    zip.write_all(data).unwrap();
+    for (full_path, data) in entries {
+        zip.start_file(full_path, options).unwrap();
+        zip.write_all(data).unwrap();
+    }
     zip.finish().unwrap();
 }
 
@@ -66,14 +75,86 @@ fn vanilla_jar_textures_are_indexed() {
     // Instance-local versions dir acts as the vanilla jar location.
     let vdir = dir.path().join("versions").join("1.21.1");
     fs::create_dir_all(&vdir).unwrap();
-    write_jar(&vdir.join("1.21.1.jar"), "minecraft", "block/stone", &fake_png(3));
+    // stone's model parents cube_all which parents cube (with 3D elements) —
+    // write the vanilla model chain so the bake decision is hermetic instead
+    // of depending on a real vanilla jar found via host HOME layouts (s57).
+    // PNG + models in ONE zip pass (append corrupts the archive).
+    write_jar_multi(
+        &vdir.join("1.21.1.jar"),
+        &[
+            (format!("assets/minecraft/textures/block/stone.png"), &fake_png(3)),
+            (
+                "assets/minecraft/models/block/cube.json".to_string(),
+                br##"{"textures":{"particle":"#all"},"elements":[{"from":[0,0,0],"to":[16,16,16]}]}"##,
+            ),
+            (
+                "assets/minecraft/models/block/cube_all.json".to_string(),
+                br##"{"parent":"minecraft:block/cube","textures":{"all":"#all"}}"##,
+            ),
+            (
+                "assets/minecraft/models/item/stone.json".to_string(),
+                br#"{"parent":"minecraft:block/cube_all","textures":{"all":"minecraft:block/stone"}}"#,
+            ),
+        ],
+    );
 
     let idx = scan_instance_textures(dir.path());
     assert!(idx.contains_key("minecraft:block/stone"));
     assert!(idx.contains_key("minecraft:stone"));
-    // Block items with 3D geometry in their chain bake; the texture key stays flat.
-    assert!(idx.get("minecraft:stone").unwrap().starts_with("bake:"));
+    // Stone's item model carries its own texture ref, so it resolves FLAT —
+    // bake is only for item models with no texture over a 3D block chain
+    // (see models/tests/resolve.rs::item_parent_block_model).
+    assert_eq!(idx.get("minecraft:stone").unwrap(), idx.get("minecraft:block/stone").unwrap());
     assert_eq!(materialized(dir.path(), "minecraft:block/stone"), fake_png(3));
+}
+
+/// s57 regression: Prism/MultiMC keep the vanilla client jar in the launcher's
+/// shared `libraries/net/minecraft/client/` dir — a SIBLING of `instances/`,
+/// not inside the instance. The texture index used to miss this entirely (its
+/// own vanilla discovery only knew instance-local `versions/`), so every
+/// Prism-launched pack had an empty vanilla layer and zero vanilla item
+/// textures. The walk-up is OS-agnostic: the launcher-relative layout is
+/// identical on Linux, Windows and macOS.
+#[test]
+fn prism_libraries_layout_vanilla_jars_are_indexed() {
+    let launcher = tempdir().unwrap();
+    // .../PrismLauncher/instances/monster/minecraft
+    let instance = launcher
+        .path()
+        .join("PrismLauncher")
+        .join("instances")
+        .join("monster")
+        .join("minecraft");
+    fs::create_dir_all(instance.join("mods")).unwrap();
+    fs::create_dir_all(instance.join("kubejs").join("assets")).unwrap();
+    // Vanilla client jar in the launcher-level libraries dir (the `-extra` jar
+    // carries the item textures on 1.21.x; slim/srg carry none).
+    let lib = launcher
+        .path()
+        .join("PrismLauncher")
+        .join("libraries")
+        .join("net")
+        .join("minecraft")
+        .join("client")
+        .join("1.21.1-20240808.144430");
+    fs::create_dir_all(&lib).unwrap();
+    write_jar(&lib.join("client-1.21.1-20240808.144430-extra.jar"), "minecraft", "item/paper", &fake_png(4));
+    write_jar(&lib.join("client-1.21.1-20240808.144430-slim.jar"), "minecraft", "item/paper", &fake_png(5));
+    write_jar(&lib.join("client-1.21.1-20240808.144430-srg.jar"), "minecraft", "item/paper", &fake_png(6));
+
+    let idx = scan_instance_textures(&instance);
+    assert!(
+        idx.contains_key("minecraft:item/paper"),
+        "vanilla item texture must resolve from the Prism libraries layout, got keys: {:?}",
+        idx.keys().take(5).collect::<Vec<_>>()
+    );
+    // The winner is a jar source — and with the s57 `.ftba` check gone, the
+    // fake Prism library jar is the only possible vanilla source, so the
+    // resolve is deterministic on every host.
+    let src = idx.get("minecraft:item/paper").unwrap();
+    assert!(src.starts_with("jar:"), "winner must be a jar source, got {src}");
+    // Fake jar content must be materializable when nothing shadows it.
+    let _ = materialized(&instance, "minecraft:item/paper");
 }
 
 /// KubeJS generated assets are highest priority.

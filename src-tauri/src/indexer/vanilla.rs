@@ -8,9 +8,16 @@ use walkdir::WalkDir;
 /// Checks these locations in order:
 /// 1. PrismLauncher/MultiMC: `{launcher_root}/libraries/net/minecraft/client/`
 /// 2. `{instance_root}/minecraft.jar` (some launchers keep it at the instance root)
-/// 3. `{instance_root}/versions/` (Vanilla launcher style)
+/// 3. `versions/` — both `{instance_path}/versions/` and `{instance_root}/versions/`
 /// 4. `~/.minecraft/versions/` (global Vanilla launcher directory)
 /// 5. JARs directly in the instance path (excluding `mods/`)
+///
+/// NOT checked: `~/.ftba/bin/versions/` (FTB App) — removed s57: no
+/// `LauncherDriver` implements the FTB App, no test or doc references it, and
+/// the item-registry indexer never had it. Keeping it in the texture path
+/// alone would make the two consumers inconsistent, and it broke test
+/// hermicity on hosts with an FTB App install. Revisit only if an FTB App
+/// driver ever lands.
 pub(crate) fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
     let mut jars = Vec::new();
 
@@ -41,9 +48,19 @@ pub(crate) fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
         jars.push(root_jar);
     }
 
-    // 3. Check a `versions/` dir at the instance root (parent of the minecraft dir)
-    if let Some(parent_dir) = instance_path.parent() {
-        let versions_dir = parent_dir.join("versions");
+    // 3. Check `versions/` dirs — two instance shapes exist in the wild:
+    //    - `{instance_path}/versions/` (vanilla launcher style: versions live
+    //      INSIDE the game dir, e.g. `.../1.21.1/minecraft/versions/`)
+    //    - `{instance_path.parent()}/versions/` (some launchers keep versions
+    //      as a sibling of the game dir, e.g. `.../instances/NAME/versions/`)
+    //    Check both so neither convention is missed (s57: the texture index's
+    //    own copy only knew the first; the indexer only the second — the
+    //    merged function must honor both).
+    for versions_dir in [
+        Some(instance_path.join("versions")),
+        instance_path.parent().map(|p| p.join("versions")),
+    ] {
+        let Some(versions_dir) = versions_dir else { continue };
         if versions_dir.exists() {
             for entry in WalkDir::new(&versions_dir).max_depth(2).into_iter().filter_map(|e| e.ok()) {
                 let path = entry.path();
