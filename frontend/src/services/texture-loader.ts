@@ -10,6 +10,7 @@ export { isUsableTextureValue, keyPathOf, buildTexturePathIndex, findTextureKeys
 export type { TexturePathIndex } from './texture-loader/targets'
 export { subscribeMaterialized, subscribeNotFound, getMaterialized, getPendingTextureCount, isTextureLoading, subscribeLoadingChange, requestMaterialize, prefetchAllChapterTextures, textureDisplayUrl } from './texture-loader/materialize'
 export { subscribeBakedKeys, getBakedTextureCount, __resetBakedKeys, isBakedTexture, getBakedTextureKeys, unmarkBakedKeys, markBakedKeys, registerBakedKeysFromIndex } from './texture-loader/baked'
+export { subscribeUpgradeableKeys, getUpgradeableTextureKeys, __resetUpgradeableKeys, registerUpgradeableKeys } from './texture-loader/upgradeable'
 
 /**
  * True when a key exists in the texture index but is not displayable yet

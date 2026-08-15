@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-const CACHE_VERSION: u32 = 8;
+const CACHE_VERSION: u32 = 9;
 
 mod cache;
 mod index;
@@ -13,9 +13,9 @@ mod tags;
 
 pub(crate) use cache::dirs_cache_dir;
 pub(crate) use index::build_animation_index;
+pub(crate) use index::build_engine_upgrade_set;
 pub use index::scan_instance_textures;
 pub use materialize::resolve_texture_urls;
-
 #[tauri::command]
 pub async fn scan_instance_textures_cmd(
     instance_path: String,
@@ -28,6 +28,24 @@ pub async fn scan_instance_textures_cmd(
     })
     .await
     .map_err(|e| format!("Texture scan task failed: {e}"))?
+}
+
+/// Item ids (`ns:id`) that resolve FLAT offline but whose model chain reaches
+/// 3D block geometry — the companion's engine render should replace the flat
+/// stand-in when connected (s58). Rides the same disk cache as the texture
+/// index, so this is cheap after the first scan.
+#[tauri::command]
+pub async fn scan_engine_upgrade_cmd(
+    instance_path: String,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::Path::new(&instance_path);
+        let mut set: Vec<String> = build_engine_upgrade_set(path).iter().cloned().collect();
+        set.sort();
+        Ok(set)
+    })
+    .await
+    .map_err(|e| format!("Engine-upgrade scan task failed: {e}"))?
 }
 
 /// Delete stale per-instance cache files (texture/items/engine-render/ingest)

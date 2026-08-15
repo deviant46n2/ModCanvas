@@ -2,7 +2,7 @@
 //! key → descriptor map, backed by an on-disk cache validated against layer
 //! metadata. Animation `.mcmeta` metadata is merged in the same pass.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -27,6 +27,11 @@ static ANIM_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashMap<String, String>>>>>
 /// Populated by the cache-miss scan.
 static MODEL_MEMO: OnceLock<Mutex<HashMap<String, Arc<models::Models>>>> = OnceLock::new();
 
+/// Same-purpose memo for the per-instance engine-upgradeable set (item ids
+/// that resolve flat but chain to 3D block geometry). Kept separate so batch
+/// materialization never re-scans for it.
+static UPGRADE_MEMO: OnceLock<Mutex<HashMap<String, Arc<HashSet<String>>>>> = OnceLock::new();
+
 fn memo_cache() -> &'static Mutex<HashMap<String, Arc<HashMap<String, String>>>> {
     INDEX_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -39,10 +44,14 @@ fn model_memo_cache() -> &'static Mutex<HashMap<String, Arc<models::Models>>> {
     MODEL_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn upgrade_memo_cache() -> &'static Mutex<HashMap<String, Arc<HashSet<String>>>> {
+    UPGRADE_MEMO.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 pub fn scan_instance_textures(instance_path: &Path) -> HashMap<String, String> {
     // Always validate the on-disk cache (jar/kubejs changes must be picked up);
     // memoize afterwards so batch materialization reuses the same index.
-    let (by_id, _) = build_index_maps(instance_path);
+    let (by_id, _, _) = build_index_maps(instance_path);
     let arc = Arc::new(by_id);
     let key = instance_path.to_string_lossy().to_string();
     if let Ok(mut g) = memo_cache().lock() {
@@ -59,7 +68,7 @@ pub(super) fn compact_index(instance_path: &Path) -> Arc<HashMap<String, String>
     if let Some(arc) = memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
         return arc;
     }
-    let (by_id, _) = build_index_maps(instance_path);
+    let (by_id, _, _) = build_index_maps(instance_path);
     let arc = Arc::new(by_id);
     if let Ok(mut g) = memo_cache().lock() {
         g.insert(key, arc.clone());
@@ -98,7 +107,7 @@ pub fn build_animation_index(instance_path: &Path) -> Arc<HashMap<String, String
     if let Some(arc) = anim_memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
         return arc;
     }
-    let (_, animations) = build_index_maps(instance_path);
+    let (_, animations, _) = build_index_maps(instance_path);
     let arc = Arc::new(animations);
     if let Ok(mut g) = anim_memo_cache().lock() {
         g.insert(key, arc.clone());
@@ -106,10 +115,27 @@ pub fn build_animation_index(instance_path: &Path) -> Arc<HashMap<String, String
     arc
 }
 
-/// Build (texture index, animation metadata map) for an instance in one scan.
-/// The two share the same on-disk cache file and layer validation, so they are
-/// always produced from the same archive state.
-fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<String, String>) {
+/// Per-instance engine-upgradeable item id set: items that resolve FLAT
+/// offline but whose model chain reaches 3D block geometry — the companion's
+/// engine render should replace the flat stand-in when connected (s58).
+pub fn build_engine_upgrade_set(instance_path: &Path) -> Arc<HashSet<String>> {
+    let key = instance_path.to_string_lossy().to_string();
+    if let Some(arc) = upgrade_memo_cache().lock().ok().and_then(|g| g.get(&key).cloned()) {
+        return arc;
+    }
+    let (_, _, upgradeable) = build_index_maps(instance_path);
+    let arc = Arc::new(upgradeable);
+    if let Ok(mut g) = upgrade_memo_cache().lock() {
+        g.insert(key, arc.clone());
+    }
+    arc
+}
+
+/// Build (texture index, animation metadata map, engine-upgradeable id set)
+/// for an instance in one scan. The three share the same on-disk cache file
+/// and layer validation, so they are always produced from the same archive
+/// state.
+fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<String, String>, HashSet<String>) {
     let mut layers: Vec<Vec<CachedFile>> = Vec::new();
 
     let vanilla: Vec<PathBuf> = vanilla_jars(instance_path);
@@ -169,7 +195,8 @@ fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<S
         if let Ok(data) = fs::read_to_string(&cp) {
             if let Ok(cached) = serde_json::from_str::<InstanceTextureCache>(&data) {
                 if cached.version == CACHE_VERSION && cached.layers == layers {
-                    return (cached.by_id, cached.animations);
+                    let upgradeable: HashSet<String> = cached.engine_upgrade.iter().cloned().collect();
+                    return (cached.by_id, cached.animations, upgradeable);
                 }
             }
         }
@@ -205,7 +232,8 @@ fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<S
     // Block/3D items resolve to `bake:` descriptors that signal the companion
     // engine-render pipeline (they are never materialized offline).
     let models = models_for(instance_path);
-    for (key, url) in models.resolve_bare_keys(&out) {
+    let (resolved, upgradeable) = models.resolve_bare_keys(&out);
+    for (key, url) in resolved {
         out.insert(key, url);
     }
 
@@ -214,16 +242,20 @@ fn build_index_maps(instance_path: &Path) -> (HashMap<String, String>, HashMap<S
     // PNG, so layer priority is respected automatically).
     let animations = attach_animations(&out, &mcmeta);
 
+    let mut upgrade_vec: Vec<String> = upgradeable.iter().cloned().collect();
+    upgrade_vec.sort();
+
     let cache = InstanceTextureCache {
         version: CACHE_VERSION,
         layers,
         by_id: out.clone(),
+        engine_upgrade: upgrade_vec,
         animations: animations.clone(),
     };
     if let Ok(data) = serde_json::to_string(&cache) {
         let _ = crate::path_safety::atomic_write_str(&cp, &data);
     }
-    (out, animations)
+    (out, animations, upgradeable)
 }
 
 /// For each indexed texture key, look up the adjacent `.mcmeta` animation file

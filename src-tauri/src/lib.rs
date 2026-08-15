@@ -219,6 +219,7 @@ pub fn run() {
             crate::ingest::commands::get_texture_files,
             crate::instance_textures::scan_instance_textures_cmd,
             crate::instance_textures::scan_instance_animations_cmd,
+            crate::instance_textures::scan_engine_upgrade_cmd,
             crate::instance_textures::resolve_item_tags_cmd,
             crate::instance_textures::list_item_tags_cmd,
             crate::ftb_theme::get_quest_theme_background,

@@ -104,3 +104,44 @@ describe('withItemTextures (engine renders onto the item registry)', () => {
     expect(withItemTextures(items, {})).toBe(items);
   });
 });
+
+describe('s58 upgradeable gate (flat inject must never block the engine render)', () => {
+  // plan.ts excludes engine-upgradeable keys from the materialized inject, so
+  // the index keeps their bare descriptor and the engine render can clobber it
+  // via mergeIndex. Without the gate, the flat URL would enter the index and
+  // s26's no-clobber rule would keep stone flat forever.
+  const upgradeableFilter = (inject: Record<string, string>, upgradeable: Set<string>) =>
+    Object.fromEntries(Object.entries(inject).filter(([k]) => !upgradeable.has(k)));
+
+  it('engine render replaces the descriptor for an upgradeable key (stone)', () => {
+    const idx = { 'minecraft:stone': 'minecraft:block/stone' }; // bare descriptor
+    const inject = { 'minecraft:stone': BRIGHT }; // flat materialized URL
+    const filtered = upgradeableFilter(inject, new Set(['minecraft:stone']));
+    // Gate: flat URL excluded from the index.
+    const afterPlan = mergeIndexUpgradeOnly(idx, filtered);
+    expect(afterPlan['minecraft:stone']).toBe('minecraft:block/stone');
+    // Engine render lands — clobbers the descriptor freely.
+    const afterRender = mergeIndex(afterPlan, { 'minecraft:stone': DARK });
+    expect(afterRender['minecraft:stone']).toBe(DARK);
+  });
+
+  it('WITHOUT the gate the flat URL would block the 3D render (the s26 trap)', () => {
+    const idx = { 'minecraft:stone': 'minecraft:block/stone' };
+    // Ungated: flat URL enters the index...
+    const afterPlan = mergeIndexUpgradeOnly(idx, { 'minecraft:stone': BRIGHT });
+    expect(afterPlan['minecraft:stone']).toBe(BRIGHT);
+    // ...and s26 refuses to clobber it with the render.
+    const afterRender = mergeIndex(afterPlan, { 'minecraft:stone': DARK });
+    expect(afterRender['minecraft:stone']).toBe(BRIGHT);
+  });
+
+  it('non-upgradeable flat items keep the s26 protection', () => {
+    const idx = { 'minecraft:iron_ingot': DESCRIPTOR };
+    const filtered = upgradeableFilter({ 'minecraft:iron_ingot': BRIGHT }, new Set(['minecraft:stone']));
+    const afterPlan = mergeIndexUpgradeOnly(idx, filtered);
+    expect(afterPlan['minecraft:iron_ingot']).toBe(BRIGHT);
+    // A stray engine render of a flat item stays darker — s26 holds.
+    const afterRender = mergeIndex(afterPlan, { 'minecraft:iron_ingot': DARK });
+    expect(afterRender['minecraft:iron_ingot']).toBe(BRIGHT);
+  });
+});

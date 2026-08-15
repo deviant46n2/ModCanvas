@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { scanInstanceTextures, scanInstanceAnimations } from '../services/api'
-import { registerBakedKeysFromIndex } from '../services/texture-loader'
+import { scanInstanceTextures, scanInstanceAnimations, scanEngineUpgrade } from '../services/api'
+import { registerBakedKeysFromIndex, registerUpgradeableKeys } from '../services/texture-loader'
 
 export function useInstanceTextures(projectPath: string) {
   const [textureIndex, setTextureIndex] = useState<Record<string, string>>({})
@@ -19,6 +19,15 @@ export function useInstanceTextures(projectPath: string) {
       })
       .catch((e) => console.error('Failed to load texture index:', e))
       .finally(() => { if (!cancelled) setLoading(false) })
+
+    // Engine-upgradeable ids ride the same disk cache as the texture index,
+    // so this second scan is cheap. Registered for the engine-render queue so
+    // flat-but-3D items get real icons when the companion connects (s58).
+    scanEngineUpgrade(projectPath)
+      .then((keys) => {
+        if (!cancelled && keys && keys.length > 0) registerUpgradeableKeys(keys)
+      })
+      .catch(() => { /* enhancement — flat fallback remains */ })
 
     // Animation metadata rides the same disk cache as the texture index, so a
     // second scan is cheap; it lets the crafting grid's icons animate.

@@ -4,9 +4,9 @@
 
 import { useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { IngestResult, ItemRegistryEntry } from '../../services/quest-types'
-import { registerBakedKeysFromIndex } from '../../services/texture-loader'
+import { registerBakedKeysFromIndex, registerUpgradeableKeys } from '../../services/texture-loader'
 import { registerModItems } from '../../services/smart-filter-mods'
-import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations } from '../../services/recipes'
+import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, scanEngineUpgrade } from '../../services/recipes'
 import { mergeIndexNoDowngrade } from '../../services/texture-merge'
 
 export function useIngestSync(opts: {
@@ -47,6 +47,9 @@ export function useScanSync(opts: {
       if (cancelled || !idx || Object.keys(idx).length === 0) return
       registerBakedKeysFromIndex(idx)
       setTextureIndex(prev => mergeIndexNoDowngrade(prev, idx))
+    }).catch(() => {})
+    scanEngineUpgrade(instancePath).then((keys) => {
+      if (!cancelled && keys && keys.length > 0) registerUpgradeableKeys(keys)
     }).catch(() => {})
     scanInstanceAnimations(instancePath).then((map) => {
       if (cancelled || !map || Object.keys(map).length === 0) return

@@ -213,6 +213,51 @@ instance's jar signature** (name/size/mtime of `mods/*.jar` + vanilla jars).
 On load, a signature mismatch discards the cache, so icons are re-rendered only
 after a real pack change; otherwise every subsequent load is instant from disk.
 
+### Vanilla jar discovery is version-scoped (s58)
+
+The vanilla client jar is found by `indexer/vanilla.rs::find_vanilla_jars`
+(the single source of truth for launcher layouts, shared by the texture index,
+the item-registry indexer, engine renders and runtime textures). The shared
+Prism/MultiMC `libraries/net/minecraft/client/` dir holds a jar for EVERY
+version installed on the machine — an instance's vanilla layer must only ever
+contain ITS OWN version's jar, or a 1.20.1 jar silently resolves wrong
+models/textures into a 1.21.1 pack.
+
+The instance's MC version comes from `mmc-pack.json` (the `net.minecraft`
+component's `version` field — the authoritative Prism source, the same file
+the launcher reads to launch), with a `version.json` (`id` field) fallback for
+vanilla-launcher layouts. Selection rules:
+
+- **Shared `libraries/net/minecraft/client/`**: only jars in a `{version}-…`
+  dir matching the resolved version are accepted. The `-extra` jar is the only
+  form carrying assets (slim/srg have none).
+- **`~/.minecraft/versions/`** (machine-global): only the `{version}/` dir
+  matching the resolved version.
+- **No resolvable version** (hand-made instance, no metadata): the
+  machine-global sources contribute NOTHING — never serve wrong data (s58
+  ruling). Instance-local sources (root `minecraft.jar`, in-instance
+  `versions/`) are scoped by construction and always kept.
+
+Locked by `tests/vanilla.rs`: `prism_libraries_do_not_mix_versions` (two
+version dirs + mmc-pack.json → only the matching jar selected) and
+`prism_shared_libraries_skipped_without_resolvable_version`.
+
+### Engine-upgradeable items: flat offline, 3D when connected (s58)
+
+`bake:` descriptors are for items with no offline source. A second class —
+items whose model carries its OWN texture (resolves flat offline) but chains
+to 3D block geometry (renders 3D in-game) — is tracked as **engine-upgradeable**:
+`index::build_engine_upgrade_set` (new cache field `engine_upgrade`; the
+instance-textures cache version was bumped to 9 for the new shape). The frontend registers these (`texture-loader/upgradeable.ts`) and queues
+them to the engine when the companion connects (`useUpgradeableQueue`), like
+baked keys — but they keep materializing flat offline, so the game is an
+enhancement, not a requirement. The plan-inject gate
+(`useQuestAssetPipeline/plan.ts`) excludes upgradeable keys from the flat
+materialized URL so the engine render can replace the descriptor (s26 stays
+intact for genuinely-flat items). Common in modded packs (item model with
+`textures` over `block/cube_all`); vanilla block items rarely hit it because
+their item models carry no texture and already bake.
+
 ## Runtime texture extraction (non-item gaps)
 
 Item icons are handled by engine-render above. **Non-item** textures — quest

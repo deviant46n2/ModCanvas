@@ -7,6 +7,7 @@ import type { QuestGraphData, QuestNodeData } from '../../services/quest-types'
 import {
   requestMaterialize,
   buildTexturePathIndex,
+  getUpgradeableTextureKeys,
 } from '../../services/texture-loader'
 import { requestResolveTags } from '../../services/smart-filter-tags'
 import { queueEngineRendersPriority } from '../../services/engine-render'
@@ -34,7 +35,18 @@ export function useMaterializationPlan(opts: {
     if (Object.keys(plan.inject).length > 0) {
       // Upgrade-only: injects are materialized data URLs for keys whose index
       // value is still a descriptor; never clobber an engine-rendered value.
-      setTextureIndex(prev => mergeIndexUpgradeOnly(prev, plan.inject))
+      // s58: engine-upgradeable keys are EXCLUDED from the inject — their flat
+      // materialized URL must not enter the index, or the engine render would
+      // be blocked by the s26 no-clobber rule. They render flat via the
+      // getMaterialized fallback instead, and the engine render replaces the
+      // descriptor when it lands.
+      const upgradeable = new Set(getUpgradeableTextureKeys())
+      const filtered = Object.fromEntries(
+        Object.entries(plan.inject).filter(([k]) => !upgradeable.has(k)),
+      )
+      if (Object.keys(filtered).length > 0) {
+        setTextureIndex(prev => mergeIndexUpgradeOnly(prev, filtered))
+      }
     }
     if (plan.toFetch.size > 0) {
       requestMaterialize([...plan.toFetch], instancePath)

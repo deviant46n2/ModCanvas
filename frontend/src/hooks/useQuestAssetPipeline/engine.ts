@@ -12,6 +12,8 @@ import {
   getBakedTextureCount,
   getBakedTextureKeys,
   unmarkBakedKeys,
+  subscribeUpgradeableKeys,
+  getUpgradeableTextureKeys,
 } from '../../services/texture-loader'
 import {
   initEngineRenderListener,
@@ -182,5 +184,31 @@ export function useBakedQueue(opts: { wsConnected?: boolean; instancePath: strin
     // Fires on both mark (scan/ingest register bake: keys) and unmark (engine
     // render replaces them); the queuedBakedRef guard keeps this idempotent.
     return subscribeBakedKeys(offerBaked)
+  }, [wsConnected, instancePath])
+}
+
+export function useUpgradeableQueue(opts: { wsConnected?: boolean; instancePath: string }) {
+  const { wsConnected, instancePath } = opts
+  // Engine-upgradeable keys (flat offline, 3D in-game) are offered to the
+  // engine like baked keys, but they remain materializable flat — the render
+  // is an enhancement that replaces the stand-in, not a requirement (s58).
+  // Same once-per-registration guard as useBakedQueue.
+  const queuedUpgradeRef = useRef<{ instance: string | null; keys: Set<string> }>({
+    instance: null,
+    keys: new Set(),
+  })
+  useEffect(() => {
+    if (!wsConnected) return
+    if (queuedUpgradeRef.current.instance !== instancePath) {
+      queuedUpgradeRef.current = { instance: instancePath, keys: new Set() }
+    }
+    const offerUpgradeable = () => {
+      const pending = getUpgradeableTextureKeys().filter((k) => !queuedUpgradeRef.current.keys.has(k))
+      if (pending.length === 0) return
+      for (const k of pending) queuedUpgradeRef.current.keys.add(k)
+      queueEngineRenders(pending)
+    }
+    offerUpgradeable()
+    return subscribeUpgradeableKeys(offerUpgradeable)
   }, [wsConnected, instancePath])
 }

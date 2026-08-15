@@ -52,6 +52,13 @@ export async function scanInstanceTextures(instancePath: string): Promise<Record
   return invoke<Record<string, string>>('scan_instance_textures_cmd', { instancePath })
 }
 
+/** Item ids that resolve flat offline but whose model chain reaches 3D block
+ *  geometry — the companion's engine render should replace the flat stand-in
+ *  when connected (s58). */
+export async function scanEngineUpgrade(instancePath: string): Promise<string[]> {
+  return invoke<string[]>('scan_engine_upgrade_cmd', { instancePath })
+}
+
 export async function scanInstanceAnimations(instancePath: string): Promise<Record<string, string>> {
   return invoke<Record<string, string>>('scan_instance_animations_cmd', { instancePath })
 }

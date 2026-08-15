@@ -22,6 +22,10 @@ pub struct InstanceTextureCache {
     pub version: u32,
     pub layers: Vec<Vec<CachedFile>>,
     pub by_id: HashMap<String, String>,
+    /// Item ids (`ns:id`) that resolve FLAT offline but whose model chain
+    /// reaches 3D block geometry — the companion's engine render should
+    /// replace the flat stand-in when connected (s58). Never image bytes.
+    pub engine_upgrade: Vec<String>,
     /// Texture key → raw `.mcmeta` JSON for textures that carry Minecraft
     /// animation metadata (`<texture>.png.mcmeta`). Keyed with the exact same
     /// key forms as `by_id` so lookups are mirror-image.

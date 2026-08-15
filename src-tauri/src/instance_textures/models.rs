@@ -43,15 +43,6 @@ enum Resolved {
     Bake(String),
 }
 
-impl Resolved {
-    fn into_index_value(self) -> String {
-        match self {
-            Resolved::Texture(url) => url,
-            Resolved::Bake(model) => format!("bake:{}", model),
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct Models {
     item: HashMap<(String, String), Value>,
@@ -81,8 +72,16 @@ impl Models {
     /// by the PNG scan. `bake:<ns>:<kind>/<path>` descriptors are not
     /// materialized offline — they flag items that need a real in-game render
     /// by the companion mod (engine-render pipeline).
-    pub fn resolve_bare_keys(&self, by_id: &HashMap<String, String>) -> HashMap<String, String> {
+    ///
+    /// The second return value is the set of items that resolved FLAT but
+    /// whose model chain reaches 3D block geometry (e.g. `minecraft:stone` →
+    /// block/cube_all → block/cube with elements). In-game these render 3D;
+    /// the flat descriptor is only an offline stand-in. The frontend marks
+    /// them engine-upgradeable so the companion's real render replaces the
+    /// flat icon when connected (s58).
+    pub fn resolve_bare_keys(&self, by_id: &HashMap<String, String>) -> (HashMap<String, String>, HashSet<String>) {
         let mut out: HashMap<String, String> = HashMap::new();
+        let mut upgradeable: HashSet<String> = HashSet::new();
         let mut ids: Vec<&(String, String)> = self.item.keys().collect();
         ids.sort();
         for (ns, id) in ids {
@@ -91,10 +90,26 @@ impl Models {
             }
             let mut seen: HashSet<(u8, String, String)> = HashSet::new();
             if let Some(resolved) = self.resolve_item(ns, id, by_id, &mut seen, 0) {
-                out.insert(format!("{}:{}", ns, id), resolved.into_index_value());
+                let key = format!("{}:{}", ns, id);
+                match resolved {
+                    Resolved::Texture(url) => {
+                        out.insert(key.clone(), url);
+                        // Flat offline, but the chain reaches 3D block geometry
+                        // (chain_has_elements walks across item→block parents).
+                        // The item renders 3D in-game; engine-upgrade it when
+                        // the companion is connected instead of keeping the
+                        // flat face forever.
+                        if self.chain_has_elements("item", ns, id) {
+                            upgradeable.insert(key);
+                        }
+                    }
+                    Resolved::Bake(model) => {
+                        out.insert(key, format!("bake:{}", model));
+                    }
+                }
             }
         }
-        out
+        (out, upgradeable)
     }
 
     /// Parse the stored model JSON for a (kind, ns, path) model id.

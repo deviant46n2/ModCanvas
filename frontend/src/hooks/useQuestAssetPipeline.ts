@@ -14,6 +14,7 @@ import {
   useEngineQueue,
   useNotFoundEngineQueue,
   useBakedQueue,
+  useUpgradeableQueue,
 } from './useQuestAssetPipeline/engine'
 import {
   useRuntimeTextureRequest,
@@ -58,6 +59,7 @@ export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
   useEngineQueue({ wsConnected, items, textureIndex })
   useNotFoundEngineQueue({ wsConnected })
   useBakedQueue({ wsConnected, instancePath })
+  useUpgradeableQueue({ wsConnected, instancePath })
   useScanSync({ instancePath, setTextureIndex, setAnimations })
   useMaterializationActivity({ setTextureTick, setTexturesLoading, setTexturesRemaining })
   useThemeBackground({ instancePath, activeChapter, textureIndex, textureTick, setQuestBackgroundUrl })

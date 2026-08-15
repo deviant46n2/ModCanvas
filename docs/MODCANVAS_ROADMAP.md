@@ -52,7 +52,13 @@ yet" — not as a build list.**
 - Runtime hot-swap expansion (quest+kubejs reloads are live; config/CraftTweaker stay disabled with written reasons)
 - AI features
 - Major architectural rewrites
-- Additional rendering infrastructure
+- Additional rendering infrastructure — **PARTIALLY REACTIVATED (s58)**: the
+  engine-upgradeable item pipeline (items that resolve flat offline but whose
+  model chain reaches 3D block geometry are rendered 3D by the companion when
+  connected, flat stays the offline fallback). Scope: the existing
+  engine-render pipeline gains a second feeder class; no new renderer, no
+  full-capture sweep, no companion changes. The rest of this item (other
+  rendering infrastructure) stays deferred.
 - Additional maintainer tooling
 
 Deferred is not forgotten; it is deliberate. See `docs/CRITICAL_PRODUCT_AUDIT.md`
