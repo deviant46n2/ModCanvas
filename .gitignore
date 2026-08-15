@@ -19,6 +19,9 @@ workbench-companion-archived/*/run/
 workbench-companion-archived/*/out/
 *.jar.backup
 
+# Flatpak release bundles — build artifacts, regenerable from .flatpak-builder/cache
+*.flatpak
+
 # Private tutor state (learner profile + curriculum) — never commit
 .tutor/
 backups/

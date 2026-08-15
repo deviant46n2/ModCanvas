@@ -15,6 +15,15 @@ command: modcanvas
 # flatpak-builder-tools, build via `tauri build -- -b deb`) — that is a
 # separate artifact, deliberately NOT built yet (same logic as the AppImage
 # DMABUF re-bake: the local artifact is test-shaped, not publish-shaped).
+#
+# Distributable bundle (friend-trial shape, s61): export from the wrap repo
+# after a verified wrap + install:
+#   flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+#     .flatpak-builder/cache modcanvas-<ver>.flatpak com.modcanvas.app master
+# Then VERIFY: `flatpak install --user <bundle>` must say "already installed"
+# (proves bundle commit == installed commit; a stale wrap would offer an
+# update instead). Tag the source line first (`git tag v0.1.0`, s48: known-good
+# master tip → tag; the tag is the source of truth, the bundle is regenerable).
 
 finish-args:
   # Display
