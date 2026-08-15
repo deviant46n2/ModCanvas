@@ -10,16 +10,19 @@ import com.mojang.blaze3d.vertex.VertexSorting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -43,6 +46,84 @@ final class ItemIconDrawer {
      *  by their baked normals against the Light0/Light1 uniforms; the manual
      *  shade table was removed (dead code). */
 
+    /** s61 PARITY FIX: render a BuiltInModel (custom-renderer) item by porting
+     *  the game's own BEWLR dispatch (ItemRenderer.renderItem, NeoForge
+     *  1.21.1): IClientItemExtensions.of(stack).getCustomRenderer()
+     *  .renderByItem(stack, GUI, pose, bufferSource, light, overlay). This is
+     *  what draws banners/shulkers/beds/chests/skulls and modded custom
+     *  renderers — the raw-quads path cannot (their getQuads is empty). Must
+     *  be called on the render thread with the capture FBO + projection bound
+     *  (the same state the baked path sets before drawing), and the buffer
+     *  source MUST be flushed to actually emit into the FBO. */
+    private static void renderCustomModel(ItemRenderer itemRenderer, ItemStack stack, BakedModel model,
+                                          int size, float farPlane) {
+        Minecraft mc = Minecraft.getInstance();
+        int light = 0xF000F0;
+        int overlay = net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
+
+        try {
+            // Mirror the game's renderItem GUI pose (ItemIconPose.build
+            // philosophy): apply the model's GUI display transform, center the
+            // box, uniform-scale to fit. BEWLR models are authored at 0..1
+            // block scale (a banner/shulker/bed/chest is one unit), centered at
+            // the model base after the game's translate(-0.5). We cannot
+            // measure-bounds-fit like the baked path (BuiltInModel has no
+            // quads), so use the fixed block-scale factor the baked path's
+            // 0.9F-margin implies for a 1-unit model. Uniform scale keeps the
+            // normal matrix sane (s25: non-uniform scale collapses normals).
+            PoseStack pose = new PoseStack();
+            float s = size * 0.9F; // 1-unit block filling the cell, 10% margin
+            pose.translate(size / 2.0F, size / 2.0F, 150.0F);
+            pose.scale(s, s, s);
+            pose.translate(-0.5F, -0.5F, 0.0F);
+            model.getTransforms().getTransform(ItemDisplayContext.GUI).apply(false, pose);
+            // Use the SAME buffer-source pattern the game uses (1.21.1):
+            // immediate() backed by a ByteBufferBuilder we own and flush with
+            // endBatch() so the submitted vertices emit into our bound FBO.
+            MultiBufferSource.BufferSource bufferSource =
+                MultiBufferSource.immediate(new com.mojang.blaze3d.vertex.ByteBufferBuilder(256));
+            var blockEntityRenderer = itemRenderer.getBlockEntityRenderer();
+            // Mirror the game's GUI item texture state BEFORE renderByItem —
+            // otherwise BEWLR shaders sample garbage light/overlay and render
+            // solid black (the s21 "solid black until Sampler1/2 bound" bug).
+            // BEWLR renderers bind their OWN material/shader per RenderType,
+            // so unit 0's atlas is theirs; but units 1 (overlay) and 2
+            // (lightmap) are GLOBAL state read by every item shader, exactly
+            // as the baked path sets them up below.
+            RenderSystem.setShaderTexture(0, mc.getModelManager().getAtlas(InventoryMenu.BLOCK_ATLAS).getId());
+            mc.gameRenderer.lightTexture().turnOnLightLayer();       // unit 2 (lightmap)
+            mc.gameRenderer.overlayTexture().setupOverlayColor();    // unit 1 (overlay)
+            var mvStack2 = RenderSystem.getModelViewStack();
+            // Assert projection (same as baked path) BEFORE the render works.
+            RenderSystem.setProjectionMatrix(
+                new Matrix4f().setOrtho(0.0F, size, size, 0.0F, 1000.0F, farPlane),
+                VertexSorting.ORTHOGRAPHIC_Z
+            );
+            mvStack2.pushMatrix();
+            try {
+                mvStack2.translation(0.0F, 0.0F, 10000.0F - farPlane);
+                RenderSystem.applyModelViewMatrix();
+                blockEntityRenderer.renderByItem(stack, ItemDisplayContext.GUI, pose, bufferSource, light, overlay);
+                bufferSource.endBatch();
+            } finally {
+                // Teardown mirrors the baked path: restore the game's model-view
+                // and lightmap/overlay units so the next frame is unaffected.
+                mvStack2.popMatrix();
+                RenderSystem.applyModelViewMatrix();
+                GL30.glActiveTexture(GL30.GL_TEXTURE1);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                GL30.glActiveTexture(GL30.GL_TEXTURE2);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                GL30.glActiveTexture(GL30.GL_TEXTURE0);
+                mc.gameRenderer.lightTexture().turnOffLightLayer();
+                mc.gameRenderer.overlayTexture().teardownOverlayColor();
+            }
+        } catch (Throwable t) {
+            ItemIconRenderer.LOGGER.error("[ItemIconDrawer] renderByItem failed for {}",
+                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()), t);
+        }
+    }
+
     /** Render an item stack by drawing its baked quads directly (no
      *  GuiGraphics/buffer source). Direct Tesselator + shader-apply +
      *  drawWithShader is the only draw path that works in this offscreen
@@ -57,6 +138,23 @@ final class ItemIconDrawer {
         ItemRenderer itemRenderer = mc.getItemRenderer();
         BakedModel model = itemRenderer.getModel(stack, null, null, 0);
         if (model == null) {
+            return;
+        }
+
+        // s61 PARITY FIX (fidelity arc): a BuiltInModel (banner/shulker/bed/
+        // chest/head/skull/conduit/shield/decorated pot + any modded custom
+        // renderer) has NO baked quads in getQuads — its visual is produced by
+        // the game's BlockEntityWithoutLevelRenderer dispatch. ItemRenderer.java
+        // (NeoForge 1.21.1, decompiled) gates on `model.isCustomRenderer()`:
+        //   if (!model.isCustomRenderer()) -> renderModelLists(getQuads)
+        //   else                          -> IClientItemExtensions.of(stack)
+        //                                   .getCustomRenderer().renderByItem(...)
+        // We must mirror that exactly: the raw-quads path below cannot render
+        // BuiltInModel items (they blank). Port the game's BEWLR branch so the
+        // icon capture renders EVERY item id the game can — modded textures
+        // included, since mods hook the same IClientItemExtensions.
+        if (model.isCustomRenderer()) {
+            renderCustomModel(itemRenderer, stack, model, size, farPlane);
             return;
         }
 
