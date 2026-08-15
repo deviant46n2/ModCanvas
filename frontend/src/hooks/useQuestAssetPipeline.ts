@@ -25,6 +25,7 @@ import {
   useThemeBackground,
 } from './useQuestAssetPipeline/activity'
 import { useMaterializationPlan } from './useQuestAssetPipeline/plan'
+import { useCompanionRegistrySync } from './useQuestAssetPipeline/registry'
 
 interface UseQuestAssetPipelineOptions {
   instancePath: string
@@ -54,6 +55,7 @@ export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
   useIngestSync({ ingestResult, kubejsNamespace, setIngestIndex, setTextureIndex, setItems })
   useBakedCountSync({ setBakedCount })
   useEngineRenderSync({ instancePath, wsConnected, setTextureIndex, setItems })
+  useCompanionRegistrySync({ wsConnected, instancePath, textureIndex, setItems })
   useRuntimeTextureRequest({ wsConnected, graph, projectId })
   useRuntimeTextureSync({ instancePath, setTextureIndex })
   useEngineQueue({ wsConnected, items, textureIndex })

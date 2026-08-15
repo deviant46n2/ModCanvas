@@ -101,6 +101,16 @@ export async function scanInstanceItems(instancePath: string, kubejsNamespace?: 
   return invoke<ItemRegistryEntry[]>('scan_instance_items_cmd', { instancePath, kubejsNamespace })
 }
 
+/** Persist the companion's authoritative item registry dump to the
+ *  per-instance cache (s59). Offline sessions after the first launch read the
+ *  cached registry via `scanInstanceItems`. */
+export async function saveItemRegistry(
+  instancePath: string,
+  items: ItemRegistryEntry[],
+): Promise<void> {
+  return invoke('save_item_registry_cmd', { instancePath, items })
+}
+
 /** Local item-tag catalog (id + expanded member count) for the Tags tab. */
 export async function listItemTags(instancePath: string): Promise<ItemTagInfo[]> {
   return invoke<ItemTagInfo[]>('list_item_tags_cmd', { instancePath })

@@ -5,7 +5,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +45,12 @@ public class WorkbenchEventHandler {
         if (event.eventType.equals("EXTRACT_TEXTURES_REQUEST")) {
             // ResourceManager lookup + PNG encode does not need a world/player.
             AssetExporter.extract(event);
+            return;
+        }
+
+        if (event.eventType.equals("ITEM_REGISTRY_REQUEST")) {
+            // The item registry is populated at mod-load; no world/player needed.
+            handleItemRegistryRequest();
             return;
         }
 
@@ -96,6 +106,31 @@ public class WorkbenchEventHandler {
 
         ItemRenderQueue.enqueue(items, requestId, size);
         LOGGER.info("[WorkbenchEventHandler] Queued {} items for engine rendering", items.size());
+    }
+
+    /** Dump the game's authoritative item registry (BuiltInRegistries.ITEM) to
+     * the app. The app replaces its lang-key-scanned registry with this list —
+     * lang keys lie (item.potion.effect.* floods, banner pattern keys); the
+     * game registry has exactly the real items. Runs on the client tick thread
+     * via the pendingEvents queue, so registries are guaranteed frozen (the
+     * companion's init() fires at FMLClientSetupEvent, mid-mod-load — a naive
+     * connect-time push could dump a half-populated registry). */
+    private static void handleItemRegistryRequest() {
+        JsonArray items = new JsonArray();
+        for (ResourceLocation key : BuiltInRegistries.ITEM.keySet()) {
+            Item item = BuiltInRegistries.ITEM.get(key);
+            if (item == null) continue;
+            JsonObject entry = new JsonObject();
+            entry.addProperty("id", key.toString());
+            // 1.21.1: Item.getName(ItemStack) is the display-name Component;
+            // an EMPTY stack is fine for registry items (no NBT-dependent name).
+            entry.addProperty("name", item.getName(ItemStack.EMPTY).getString());
+            items.add(entry);
+        }
+        JsonObject payload = new JsonObject();
+        payload.add("items", items);
+        WorkbenchCompanionClient.sendEvent("ITEM_REGISTRY_RESULT", payload);
+        LOGGER.info("[WorkbenchEventHandler] Sent item registry ({} items)", items.size());
     }
 
     private static void handleQuestReload(WorkbenchCompanionClient.WorkbenchEvent event) {

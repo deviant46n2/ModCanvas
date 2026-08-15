@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::indexer_kubejs::{collect_kubejs_scripts, parse_kubejs_item_registrations, KubejsItemRegistration};
+use crate::indexer_kubejs::collect_kubejs_scripts;
 
 mod cache;
 mod jar;
@@ -12,8 +11,6 @@ mod kubejs;
 mod vanilla;
 
 use cache::{get_jar_meta, load_cache, save_cache, JarMeta};
-use jar::{find_texture_for_item, resolve_texture_from_model, scan_jar_for_items_and_textures};
-use kubejs::{namespace_kubejs_id, resolve_kubejs_texture};
 pub(crate) use vanilla::find_vanilla_jars;
 
 #[cfg(test)]
@@ -73,75 +70,77 @@ pub fn scan_instance_items(instance_path: &Path, kubejs_namespace: &str) -> Resu
         return Ok(Vec::new());
     }
 
+    // 4. The item registry is now COMPANION-AUTHORITATIVE (s59): the game's
+    //    BuiltInRegistries.ITEM dump (via `save_item_registry_cmd`) is the
+    //    source of truth — lang keys lie (potion.effect.* floods, banner
+    //    pattern keys, FTB GUI keys; 1087/2411 entries on the monster pack
+    //    were fake). The cache is served as-is when present; before the first
+    //    companion connect there is no cache and the registry is empty
+    //    (blank-first-run is the agreed UX — Pack Health's registryDegraded
+    //    guard keeps that from becoming a false "all items missing" storm).
+    //    The legacy lang-key scan path is PARKED (see git history / handoff
+    //    s59): deleting it is a separate evidence-backed pass.
     if let Some(cached) = load_cache(instance_path, &current_jars, &current_kubejs) {
         return Ok(cached);
     }
 
-    // 4. Scan all JARs for items, textures, and model files
-    let mut all_items: Vec<ItemRegistryEntry> = Vec::new();
-    let mut all_textures: HashMap<String, String> = HashMap::new();
-    let mut all_model_textures: HashMap<String, Vec<String>> = HashMap::new();
-    let mut seen_ids = std::collections::HashSet::new();
+    Ok(Vec::new())
+}
 
-    for (jar_path, _) in &current_jars {
-        match scan_jar_for_items_and_textures(jar_path) {
-            Ok((jar_lang_items, jar_textures, jar_model_textures)) => {
-                all_textures.extend(jar_textures);
-                for (item_id, model_refs) in jar_model_textures {
-                    all_model_textures.entry(item_id).or_default().extend(model_refs);
+/// Persist the companion's authoritative item registry (BuiltInRegistries.ITEM
+/// dump) to the per-instance cache. The frontend calls this when
+/// `ITEM_REGISTRY_RESULT` lands; offline sessions after the first launch read
+/// the cached registry via `scan_instance_items`.
+pub fn save_item_registry(
+    instance_path: &Path,
+    items: Vec<ItemRegistryEntry>,
+) -> Result<(), String> {
+    // Same jar/kubejs metadata collection as the scan path, so the cache
+    // validates on later loads and invalidates when the pack changes (a
+    // changed pack needs a game relaunch anyway — mods load at startup — and
+    // the next connect re-dumps the real registry).
+    let mods_dir = instance_path.join("mods");
+    let mut all_jars: Vec<PathBuf> = Vec::new();
+    if mods_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&mods_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().map_or(false, |ext| ext == "jar") {
+                    all_jars.push(path);
                 }
-                for (item_id, name, mod_id) in jar_lang_items {
-                    if seen_ids.insert(item_id.clone()) {
-                        let texture_data_url = find_texture_for_item(&item_id, &all_textures)
-                            .and_then(|k| all_textures.get(&k))
-                            .cloned()
-                            .or_else(|| resolve_texture_from_model(&item_id, &all_model_textures, &all_textures));
-                        all_items.push(ItemRegistryEntry {
-                            id: item_id,
-                            name,
-                            mod_id,
-                            texture_data_url,
-                        });
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("[Indexer] Failed to scan jar {}: {}", jar_path.display(), e);
             }
         }
     }
-
-    // 5. Scan KubeJS scripts for item registrations (`event.create`/`register`).
-    //    Bare ids are namespaced with the adapter-provided default namespace;
-    //    `.texture()` refs resolve against the jar texture map when possible.
-    for (script_path, _) in &current_kubejs {
-        let Ok(content) = fs::read_to_string(script_path) else { continue };
-        for reg in parse_kubejs_item_registrations(&content) {
-            let KubejsItemRegistration { id, display_name, texture } = reg;
-            let full_id = namespace_kubejs_id(&id, kubejs_namespace);
-            if !seen_ids.insert(full_id.clone()) {
-                continue;
-            }
-            let name = display_name.unwrap_or_else(|| {
-                full_id.split_once(':').map(|(_, p)| p.to_string()).unwrap_or_else(|| full_id.clone())
-            });
-            let texture_data_url = texture.as_ref().and_then(|t| {
-                resolve_kubejs_texture(t, &full_id, kubejs_namespace, &all_textures)
-            });
-            all_items.push(ItemRegistryEntry {
-                id: full_id,
-                name,
-                mod_id: "kubejs".to_string(),
-                texture_data_url,
-            });
+    for jar in find_vanilla_jars(instance_path) {
+        if !all_jars.iter().any(|p| fs::canonicalize(p).ok() == fs::canonicalize(&jar).ok()) {
+            all_jars.push(jar);
         }
     }
+    let current_jars: Vec<(PathBuf, JarMeta)> = all_jars.iter()
+        .filter_map(|p| get_jar_meta(p).map(|meta| (p.clone(), meta)))
+        .collect();
+    let current_kubejs = collect_kubejs_scripts(instance_path);
 
-    all_items.sort_by(|a, b| a.mod_id.cmp(&b.mod_id).then(a.id.cmp(&b.id)));
-    save_cache(instance_path, &current_jars, &current_kubejs, &all_items);
-    eprintln!("[Indexer] Indexed {} items from {} jars for {}", all_items.len(), current_jars.len(), instance_path.display());
+    // Canonical order for display: mod_id, then id — the same sort the lang
+    // scan applied. The game registry comes in registration order, which reads
+    // as random in the item browser ("blocks have no sense of organization").
+    let mut sorted = items;
+    sorted.sort_by(|a, b| a.mod_id.cmp(&b.mod_id).then(a.id.cmp(&b.id)));
 
-    Ok(all_items)
+    save_cache(instance_path, &current_jars, &current_kubejs, &sorted, "companion");
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_item_registry_cmd(
+    instance_path: String,
+    items: Vec<ItemRegistryEntry>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        save_item_registry(Path::new(&instance_path), items)
+    })
+    .await
+    .map_err(|e| format!("Item registry save task failed: {e}"))?
 }
 
 #[tauri::command]

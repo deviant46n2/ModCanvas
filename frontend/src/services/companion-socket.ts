@@ -112,3 +112,14 @@ export function onCompanionEvent(cb: EventSubscriber): () => void {
   eventSubs.add(cb)
   return () => eventSubs.delete(cb)
 }
+
+/** Ask the companion to dump its authoritative item registry
+ *  (BuiltInRegistries.ITEM). Sent when the bridge connects (s59): the game
+ *  registry replaces the lang-key-scanned list, which lies (effect-variant
+ *  floods, banner pattern keys). */
+export function requestItemRegistry(): void {
+  sendFrame({
+    event: 'ITEM_REGISTRY_REQUEST',
+    timestamp: Math.floor(Date.now() / 1000),
+  })
+}

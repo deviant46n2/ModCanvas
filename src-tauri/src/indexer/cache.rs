@@ -14,7 +14,10 @@ use super::ItemRegistryEntry;
 /// v3: `texture_data_url` now holds `jar:<abs>!<zip>` descriptors, not base64
 /// data URLs (AGENTS.md enumeration-only scans) — old caches would serve the
 /// banned format, so a bump forces one rescan.
-const ITEM_CACHE_VERSION: u32 = 3;
+/// v4: registry is now companion-authoritative (s59). The cache may carry
+/// either a companion dump (`source: "companion"`) or the legacy lang-key
+/// scan (`source: "scan"`); old v3 caches hold lang-key junk and are dropped.
+const ITEM_CACHE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct JarMeta {
@@ -26,9 +29,17 @@ pub(super) struct JarMeta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ItemIndexerCache {
     version: u32,
+    /// Where the item list came from: `companion` (authoritative game dump,
+    /// s59) or `scan` (legacy lang-key scan, pre-first-launch fallback).
+    #[serde(default = "default_source")]
+    source: String,
     jars: Vec<JarMeta>,
     kubejs: Vec<KubejsScriptMeta>,
     items: Vec<ItemRegistryEntry>,
+}
+
+fn default_source() -> String {
+    "scan".to_string()
 }
 
 fn dirs_cache_dir() -> Option<PathBuf> {
@@ -113,7 +124,7 @@ pub(super) fn load_cache(
         return None;
     }
 
-    eprintln!("[Indexer] Cache hit: {} items for {}", cached.items.len(), instance_path.display());
+    eprintln!("[Indexer] Cache hit: {} items (source {}) for {}", cached.items.len(), cached.source, instance_path.display());
     Some(cached.items)
 }
 
@@ -122,11 +133,13 @@ pub(super) fn save_cache(
     current_jars: &[(PathBuf, JarMeta)],
     current_kubejs: &[(PathBuf, KubejsScriptMeta)],
     items: &[ItemRegistryEntry],
+    source: &str,
 ) {
     let jars: Vec<JarMeta> = current_jars.iter().map(|(_, meta)| meta.clone()).collect();
     let kubejs: Vec<KubejsScriptMeta> = current_kubejs.iter().map(|(_, meta)| meta.clone()).collect();
     let cache = ItemIndexerCache {
         version: ITEM_CACHE_VERSION,
+        source: source.to_string(),
         jars,
         kubejs,
         items: items.to_vec(),
@@ -134,6 +147,6 @@ pub(super) fn save_cache(
     let cp = cache_path(instance_path);
     if let Ok(data) = serde_json::to_string(&cache) {
         let _ = fs::write(&cp, &data);
-        eprintln!("[Indexer] Cache saved: {} items for {}", items.len(), instance_path.display());
+        eprintln!("[Indexer] Cache saved (source {}): {} items for {}", source, items.len(), instance_path.display());
     }
 }

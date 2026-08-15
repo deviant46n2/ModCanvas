@@ -1,10 +1,18 @@
 use super::*;
+use std::collections::HashMap;
 use std::io::Write;
 use tempfile::tempdir;
 use zip::write::FileOptions;
 use zip::CompressionMethod;
 
-use super::jar::parse_lang_for_items;
+// Direct imports of the PARKED lang-scan machinery (s59): scan_instance_items
+// no longer calls these — the registry is companion-authoritative. The unit
+// tests keep locking their behavior until the deletion pass removes them with
+// the code (handoff s59; deletion is evidence-backed, not in this session).
+use super::jar::{
+    find_texture_for_item, parse_lang_for_items, resolve_texture_from_model,
+    scan_jar_for_items_and_textures,
+};
 
 pub(super) fn create_test_jar(path: &Path, namespace: &str, textures: &[&str], lang_data: Option<&str>) {
     create_test_jar_with_models(path, namespace, textures, lang_data, &[])
@@ -241,17 +249,17 @@ fn test_find_vanilla_jar_at_instance_root() {
         Some(r#"{"item.somemod.ingot_copper": "Copper Ingot"}"#),
     );
 
+    // The root jar is still DISCOVERED (the texture index's layer scan and the
+    // registry cache's jar metadata both rely on find_vanilla_jars)...
+    let found = find_vanilla_jars(dir.path());
+    assert!(
+        found.iter().any(|p| p.file_name().map_or(false, |n| n == "minecraft.jar")),
+        "root minecraft.jar should be discovered"
+    );
+
+    // ...but the item REGISTRY is companion-authoritative (s59): no companion
+    // dump has been saved yet, so scan_instance_items returns EMPTY — the
+    // lang-key scan is parked and must not leak vanilla/mod lang items here.
     let items = scan_instance_items(dir.path(), "kubejs").unwrap();
-
-    // Should contain vanilla items from root jar AND mod items from mods/
-    let diamond = items.iter().find(|i| i.id == "minecraft:diamond");
-    assert!(diamond.is_some(), "Vanilla diamond should be found");
-    assert_eq!(diamond.unwrap().name, "Diamond");
-
-    let stone = items.iter().find(|i| i.id == "minecraft:stone");
-    assert!(stone.is_some(), "Vanilla stone should be found");
-    assert_eq!(stone.unwrap().name, "Stone");
-
-    let copper = items.iter().find(|i| i.id == "somemod:ingot_copper");
-    assert!(copper.is_some(), "Mod item should be found");
+    assert!(items.is_empty(), "no companion data yet → empty registry");
 }

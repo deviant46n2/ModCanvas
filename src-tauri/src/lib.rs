@@ -215,6 +215,7 @@ pub fn run() {
             crate::recipe_disable::comment_out_recipe_call,
             crate::recipe_disable::uncomment_recipe_call,
             crate::indexer::scan_instance_items_cmd,
+            crate::indexer::save_item_registry_cmd,
             crate::ingest::commands::ingest_active_instance_cmd,
             crate::ingest::commands::get_texture_files,
             crate::instance_textures::scan_instance_textures_cmd,

@@ -28,6 +28,15 @@ pub mod events {
     /// companion -> ModCanvas: base64 PNG data URLs keyed by full resource
     /// location (payload: `requestId`, `textures: {ns:textures/path.png: url}`).
     pub const EXTRACT_TEXTURES_RESULT: &str = "EXTRACT_TEXTURES_RESULT";
+    /// ModCanvas -> companion: dump the game's authoritative item registry
+    /// (BuiltInRegistries.ITEM). Replaces the app's lang-key-scanned registry
+    /// — lang keys lie (effect-variant floods, banner pattern keys); the game
+    /// registry has exactly the real items (no payload).
+    pub const ITEM_REGISTRY_REQUEST: &str = "ITEM_REGISTRY_REQUEST";
+    /// companion -> ModCanvas: the authoritative item list (payload:
+    /// `items: [{id, name}]`). The app caches it to disk so offline sessions
+    /// after the first launch keep a real registry.
+    pub const ITEM_REGISTRY_RESULT: &str = "ITEM_REGISTRY_RESULT";
     /// Server -> app peer: companion bridge state changed.
     /// payload: `ConnectionStatus` (camelCase).
     pub const CONNECTION_STATUS: &str = "CONNECTION_STATUS";
