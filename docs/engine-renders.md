@@ -88,8 +88,15 @@ when the queue drains.
   main menu too; only reload commands require a player).
 
 Known limits: items whose models never bake (e.g. broken wall-model JSONs in
-some packs) fail permanently and are dropped after the retry cap; models with
-no baked quads at all (custom-renderer blocks) render blank. Rendered icons
+some packs) fail permanently and are dropped after the retry cap. Custom-renderer
+items — models with no baked quads at all (`BuiltInModel`, e.g. banner/bed/
+shulker/chest/head/skull/conduit/shield/trident/pot, plus any modded custom
+renderer) — are now rendered via the game's own BEWLR dispatch: `ItemIconDrawer`
+branches on `model.isCustomRenderer()` and calls
+`IClientItemExtensions.of(stack).getCustomRenderer().renderByItem(...)` into a
+flushed `MultiBufferSource` (s61 parity fix, `df80d31`). Prior to that fix these
+rendered blank (empty `getQuads` → skipped); the s60 "63 blank composite icons"
+histogram is resolved. Rendered icons
 magnify a 16px sprite to ~58px with mip-0 bilinear sampling — fidelity is
 close to the game's GUI but not pixel-identical; supersampling (render at 2x,
 downscale) is a pending sharpness fix beyond bilinear magnification.
