@@ -6,6 +6,7 @@ import { useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { IngestResult, ItemRegistryEntry } from '../../services/quest-types'
 import { registerBakedKeysFromIndex, registerUpgradeableKeys } from '../../services/texture-loader'
 import { registerModItems } from '../../services/smart-filter-mods'
+import { sortRegistryByName } from '../../services/item-registry'
 import { scanInstanceItems, scanInstanceTextures, scanInstanceAnimations, scanEngineUpgrade } from '../../services/recipes'
 import { mergeIndexNoDowngrade } from '../../services/texture-merge'
 
@@ -27,8 +28,12 @@ export function useIngestSync(opts: {
     }
     if (ingestResult?.active_instance) {
       scanInstanceItems(ingestResult.active_instance, kubejsNamespace).then((registry) => {
-        setItems(registry);
-        registerModItems(registry);
+        // s60: same name sort as the companion-sync path — the disk cache is
+        // persisted mod_id→id (Rust sort at persist), so a cold start would
+        // otherwise show a different order than a companion-connected session.
+        const sorted = sortRegistryByName(registry);
+        setItems(sorted);
+        registerModItems(sorted);
       }).catch((e) => console.error('[QuestBookEditor] Failed to scan instance items:', e));
     }
   }, [ingestResult, kubejsNamespace, setIngestIndex, setItems, setTextureIndex])

@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
+import type { ItemRegistryEntry } from '../../services/quest-types'
 import { isUsableTextureValue, textureDisplayUrl, requestMaterialize } from '../../services/texture-loader'
+import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { AnimatedSprite } from './AnimatedSprite'
 
 interface IconPickerProps {
@@ -15,24 +17,64 @@ interface IconPickerProps {
   scheduleAutoSave: () => void
 }
 
+/**
+ * Icon picker for quest/chapter/book icons. Lists the ITEM REGISTRY (s59: the
+ * companion's authoritative BuiltInRegistries.ITEM dump) — real items, sorted
+ * by name, with real display names. The old behavior listed raw texture-index
+ * keys (14k of them, first 200, unordered): potions/banners/arrows existed but
+ * were buried in a random key dump — "no sense of organization". The registry
+ * is empty before the first companion connect, so the picker falls back to
+ * texture keys then rather than showing nothing.
+ */
 export function IconPicker({ open, target, textureIndex, graph, instancePath, onGraphChange, onClose, scheduleAutoSave }: IconPickerProps) {
   const [search, setSearch] = useState('')
+  const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
 
-  const filteredIcons = useMemo(() => {
-    if (!textureIndex) return []
-    const entries = Object.entries(textureIndex)
-    if (!search) return entries.slice(0, 200)
+  const items = itemRegistry ?? []
+
+  // Registry-first: real items sorted by display name. Empty registry (pre
+  // first launch) falls back to raw texture-index keys so the picker is never
+  // dead — the old behavior, but filtered to item-like paths only.
+  //
+  // s60: NO 200-item cap on the registry path — with 1347 real items the cap
+  // truncated the alphabet at "B" (banners/beds/potions unreachable). The
+  // modal body scrolls (ftb-popup-body: max-height 60vh), and materialization
+  // is batched at 500 by the loader, so an uncapped grid is safe. The cap
+  // survives only on the texture-key FALLBACK: that path can still see the
+  // full ~14k key wall pre-first-launch, which is what the cap was built for.
+  const filtered = useMemo(() => {
     const s = search.toLowerCase()
+    if (items.length > 0) {
+      const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name))
+      if (!search) return sorted
+      return sorted.filter((it) => it.name.toLowerCase().includes(s) || it.id.toLowerCase().includes(s))
+    }
+    // Fallback: raw texture keys, item-like paths only (no gui/, shapes/,
+    // entity/ noise), matching the old picker's contract when no game has
+    // connected yet.
+    const entries = Object.entries(textureIndex)
+      .filter(([key]) => !key.includes('gui/') && !key.includes('shapes/') && !key.includes('entity/'))
+    if (!search) return entries.slice(0, 200)
     return entries.filter(([key]) => key.toLowerCase().includes(s)).slice(0, 200)
-  }, [textureIndex, search])
+  }, [items, textureIndex, search])
 
+  // Materialize any non-displayable sources for the visible entries. Registry
+  // items resolve through the texture index by id (`minecraft:potion` →
+  // jar descriptor → data URL); texture-key entries resolve directly.
   useEffect(() => {
-    if (!open || !instancePath || filteredIcons.length === 0) return
-    const pending = filteredIcons
-      .filter(([, dataUrl]) => !isUsableTextureValue(dataUrl))
-      .map(([key]) => key)
-    if (pending.length > 0) requestMaterialize(pending, instancePath)
-  }, [open, instancePath, filteredIcons])
+    if (!open || !instancePath || filtered.length === 0) return
+    const keys: string[] = []
+    for (const entry of filtered) {
+      if (items.length > 0) {
+        const id = (entry as ItemRegistryEntry).id
+        if (!textureDisplayUrl(textureIndex, id) && !isUsableTextureValue(id)) keys.push(id)
+      } else {
+        const [key] = entry as [string, string]
+        if (!isUsableTextureValue((entry as [string, string])[1])) keys.push(key)
+      }
+    }
+    if (keys.length > 0) requestMaterialize(keys, instancePath)
+  }, [open, instancePath, filtered, items.length, textureIndex])
 
   const selectIcon = useCallback((itemId: string) => {
     if (!target || !graph) return
@@ -73,23 +115,28 @@ export function IconPicker({ open, target, textureIndex, graph, instancePath, on
         <div className="ftb-popup-body">
           <input
             type="text"
-            placeholder="Search textures..."
+            placeholder={items.length > 0 ? 'Search items...' : 'Search textures...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #313244', background: '#181825', color: '#cdd6f4', fontSize: '13px', marginBottom: '12px', boxSizing: 'border-box' }}
           />
           <div className="icon-picker-grid">
-            {filteredIcons.map(([itemId, dataUrl]) => (
-              <button
-                key={itemId}
-                className="icon-picker-item"
-                onClick={() => selectIcon(itemId)}
-                style={{ aspectRatio: '1/1', padding: '8px', minHeight: 0 }}
-              >
-                <AnimatedSprite url={textureDisplayUrl(textureIndex, itemId) || dataUrl} textureKey={itemId} width={40} height={40} alt="" imageRendering="pixelated" className="icon-picker-img" />
-                <span className="icon-picker-label">{itemId}</span>
-              </button>
-            ))}
+            {filtered.map((entry) => {
+              const item = items.length > 0 ? entry as ItemRegistryEntry : null
+              const key = item ? item.id : (entry as [string, string])[0]
+              const fallback = item ? undefined : (entry as [string, string])[1]
+              return (
+                <button
+                  key={key}
+                  className="icon-picker-item"
+                  onClick={() => selectIcon(key)}
+                  style={{ aspectRatio: '1/1', padding: '8px', minHeight: 0 }}
+                >
+                  <AnimatedSprite url={textureDisplayUrl(textureIndex, key) || fallback || ''} textureKey={key} width={40} height={40} alt="" imageRendering="pixelated" className="icon-picker-img" />
+                  <span className="icon-picker-label">{item ? item.name : key}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>

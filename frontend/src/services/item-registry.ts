@@ -13,6 +13,13 @@ export function parseItemQuery(query: string): { modFilter?: string; textSearch:
   return { modFilter, textSearch: remaining.toLowerCase() }
 }
 
+/** Sort registry entries by display name for browsing (s60: the item browser
+ *  rendered the live feed in game registration order — white_banner first,
+ *  potions/beds buried; name order matches the icon picker's own render sort). */
+export function sortRegistryByName(items: ItemRegistryEntry[]): ItemRegistryEntry[] {
+  return [...items].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 /** Filter the instance item registry by a browser query. */
 export function filterRegistryItems(
   items: ItemRegistryEntry[],

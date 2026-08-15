@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseItemQuery, filterRegistryItems } from './item-registry'
+import { parseItemQuery, filterRegistryItems, sortRegistryByName } from './item-registry'
 import type { ItemRegistryEntry } from './quest-types'
 
 function entry(id: string, mod_id = '', name = ''): ItemRegistryEntry {
@@ -41,5 +41,31 @@ describe('filterRegistryItems', () => {
 
   it('returns everything for an empty query', () => {
     expect(filterRegistryItems(items, '')).toHaveLength(3)
+  })
+})
+
+describe('sortRegistryByName (s60)', () => {
+  it('sorts by display name, not registration order', () => {
+    const registry = [
+      entry('minecraft:white_banner', 'minecraft', 'White Banner'),
+      entry('minecraft:potion', 'minecraft', 'Potion'),
+      entry('minecraft:acacia_boat', 'minecraft', 'Acacia Boat'),
+    ]
+    expect(sortRegistryByName(registry).map((i) => i.id)).toEqual([
+      'minecraft:acacia_boat',
+      'minecraft:potion',
+      'minecraft:white_banner',
+    ])
+  })
+
+  it('does not mutate the input and is stable on equal names', () => {
+    const a = entry('minecraft:stone', 'minecraft', 'Stone')
+    const b = entry('minecraft:granite', 'minecraft', 'Stone')
+    const input = [b, a]
+    const out = sortRegistryByName(input)
+    expect(input.map((i) => i.id)).toEqual(['minecraft:granite', 'minecraft:stone'])
+    // stable: equal display names keep input order
+    expect(out.map((i) => i.id)).toEqual(['minecraft:granite', 'minecraft:stone'])
+    expect(out).not.toBe(input)
   })
 })
