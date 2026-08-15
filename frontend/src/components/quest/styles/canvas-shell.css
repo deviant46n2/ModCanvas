@@ -110,8 +110,13 @@
 .quest-canvas-backdrop {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center;
+  /* The FTB theme `background:` property is a WINDOW-space image: the game
+     stretches it to fill the full GUI rect (FTBQuestsTheme.drawGui →
+     renderIcon(BACKGROUND, x, y, w, h) with the whole-screen rect). Reproduce
+     that with a non-uniform stretch, NOT `cover` — cover preserves aspect
+     ratio and crops, so a backdrop whose aspect differs from the window loses
+     content the game would show (s62, clean-room FTBQuestsTheme.java:24-27). */
+  background-size: 100% 100%;
   background-repeat: no-repeat;
   pointer-events: none;
   z-index: 0;
