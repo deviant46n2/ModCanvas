@@ -167,11 +167,19 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     setEdges(newEdges)
   }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, lockedById, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
 
+  // Re-frame the canvas to fit the whole chapter on OPEN/switch. Keyed on the
+  // active chapter (not node count): the old `nodes.length` trigger failed to
+  // re-fit when two chapters happened to share a quest count, leaving the
+  // viewport wherever the previous chapter left it ("zoomed into a corner").
+  // The fit effect runs after the nodes-build effect in the same commit, so it
+  // frames the freshly-built chapter. A ref guards one fit per chapter.
+  const lastFramedChapter = useRef<string | null>(null)
   useEffect(() => {
-    if (nodes.length > 0) {
-      setTimeout(() => fitView({ duration: 300, padding: 0.15 }), 100)
+    if (activeChapter !== null && activeChapter !== lastFramedChapter.current && filteredNodeIds.size > 0) {
+      lastFramedChapter.current = activeChapter
+      setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 100)
     }
-  }, [nodes.length, fitView])
+  }, [activeChapter, filteredNodeIds, fitView])
 
   // Node-hover highlighting. The hovered quest's fan takes the in-game
   // requires/required-for hues and marches at the fast speed; every other edge
