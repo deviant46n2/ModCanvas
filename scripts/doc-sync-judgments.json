@@ -143,6 +143,10 @@
   {
    "commit": "bc5b6fc",
    "reason": "companion-authoritative item registry (BuiltInRegistries.ITEM dump, cache v4, cache-or-empty scan) — docs written in the s61 doc-sync pass: pack-health.md 'Item-existence findings' rewritten to the companion-authoritative trust semantics (connected=provable absence, pre-first-launch=empty+degraded guard), roadmap §7.2 item-registry row gains the s59 source note. Cross-commit coverage, judged 2026-08-15 doc-sync pass"
+  },
+  {
+   "commit": "df80d31",
+   "reason": "companion item-icon parity fix (render BuiltInModel/BEWLR items via renderByItem) — doc-covered by the FOLLOWING commit f071e3b: engine-renders.md 'Known limits' section rewritten from 'custom-renderer blocks render blank' to the BEWLR reality (isCustomRenderer branch + renderByItem into a flushed MultiBufferSource, s60 blank-composite histogram resolved). Same-pass cross-commit coverage, judged 2026-08-15 tooling-update pass. This commit also motivated the doc-sync coverage extension to workbench-companion-neoforge-1.21/src (it would otherwise have stayed invisible)"
   }
  ]
 }

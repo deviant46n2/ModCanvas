@@ -38,6 +38,17 @@ export const DEFAULT_RULES = {
       path: 'src-tauri/target/release/modcanvas',
       sourcePaths: ['src-tauri/src', 'frontend/src'],
     },
+    {
+      // The companion mod is a separate artifact (a game jar) with its own
+      // rebuild+deploy loop (AGENTS.md). The app binaries above cannot see it,
+      // so a stale companion jar silently serves old render/registry behavior
+      // (s61: the `stale-binary` coverage gap let an old bundled jar ship and
+      // the parity fix never load until re-wrapped). Source = companion Java;
+      // binary = the built jar.
+      name: 'companion',
+      path: 'workbench-companion-neoforge-1.21/build/libs/workbench-companion-1.0.0.jar',
+      sourcePaths: ['workbench-companion-neoforge-1.21/src'],
+    },
   ],
   adapterDirs: ['frontend/src/adapters'],
   docSync: {

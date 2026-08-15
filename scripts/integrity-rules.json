@@ -81,7 +81,8 @@
   "docSync": {
     "codePaths": [
       "src-tauri/src",
-      "frontend/src"
+      "frontend/src",
+      "workbench-companion-neoforge-1.21/src"
     ],
     "docPaths": [
       "docs",
