@@ -59,11 +59,18 @@ Each file is written to `<project>/config/ftbquests/quests/<rel>` through:
 2. **No comments in template SNBT.** The sidecar comment machinery is for the
    app's own exports; template content stays plain to keep diffs clean.
 3. **Vanilla ids only.** Template content must work on every served version
-   without adapter gating (no data components, no version-specific fields).
-4. **Self-authored text only** — the no-bundling rule (AGENTS.md §6) is
-   untouched: templates never contain image bytes or game-derived assets.
-5. **Numeric suffixes matter** (`1L`, `0.5d`) — the SNBT serializer and the
-   game both require them; see AGENTS.md "Stringified NBT".
+    without adapter gating (no data components, no version-specific fields).
+4. **Icons are compound, never bare strings.** Every `icon` field must use the
+    1.21 Data Components compound form (`icon = { id = "minecraft:chest" }`),
+    the exact form the exporter emits and the game's own save uses. A bare
+    string (`icon = "minecraft:chest"`) parses but renders no icon in-game —
+    a scaffolded pack shows icon-less quests until the first save rewrites
+    them. Locked by `template_icon_fields_are_never_bare_strings` (the s45
+    item-lock's sibling).
+5. **Self-authored text only** — the no-bundling rule (AGENTS.md §6) is
+    untouched: templates never contain image bytes or game-derived assets.
+6. **Numeric suffixes matter** (`1L`, `0.5d`) — the SNBT serializer and the
+    game both require them; see AGENTS.md "Stringified NBT".
 
 ## Adding a template
 

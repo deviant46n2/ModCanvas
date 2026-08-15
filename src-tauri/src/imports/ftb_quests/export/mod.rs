@@ -17,7 +17,7 @@ mod task;
 pub use ids::{is_valid_ftb_id, rebase_invalid_ids};
 
 pub(crate) use helpers::ce;
-use chapter::{build_flat_chapters_quests, build_subdirs_chapter_map};
+use chapter::{build_flat_chapters_quests, build_subdirs_chapter_map, cleanup_flat_layout};
 use helpers::{chapter_images_to_snbt, sanitize_filename};
 use quest::quest_to_snbt;
 use book::{write_book_snbt, write_reward_tables_snbt};
@@ -279,16 +279,9 @@ pub fn export_ftb_quests_snbt_for_layout(
             .map_err(|e| anyhow::anyhow!("{e}"))?;
     }
 
-    // Flat cleanup: remove the subdirs chapter folders this exporter used to
-    // write alongside the flat files (they are duplicates of the same book).
-    if let Ok(entries) = std::fs::read_dir(&quests_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.is_dir() && p.join("chapter.snbt").exists() {
-                std::fs::remove_dir_all(&p).map_err(|e| anyhow::anyhow!("{e}"))?;
-            }
-        }
-    }
+    // Flat cleanup: remove stale subdirs folders and ghost flat chapter files
+    // (see cleanup_flat_layout) so the game never loads a duplicate book.
+    cleanup_flat_layout(&quests_dir, &chapters_dir, &graph)?;
     }
 
     write_reward_tables_snbt(&graph, &quests_dir, effective_sidecar)?;

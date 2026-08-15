@@ -5,6 +5,67 @@ use crate::quest::*;
 use tempfile;
 
 #[test]
+fn export_removes_stale_flat_chapter_files_not_in_graph() {
+    use crate::imports::ftb_quests::FtBQuestsLayout;
+    // s56 ghost-chapter regression: an orphaned chapters/*.snbt whose chapter
+    // id left the graph (a duplicated chapter deleted in the editor after its
+    // export) was never removed — the game loads EVERY file in chapters/, so
+    // the pack showed a duplicate, unnamed tab in-game. Export must prune
+    // flat chapter files whose id is not in the current graph.
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+    std::fs::write(chapters_dir.join("current.snbt"), r#"{
+    id = "ch1"
+    filename = "current"
+    title = "Current Chapter"
+    quests = [
+        { id = "q1", x = 0.0d, y = 0.0d, title = "Start", tasks = [{ id = "t1", type = "checkmark", title = "Begin" }] }
+    ]
+}"#).unwrap();
+
+    let result = import_ftb_quests(tmp.path()).unwrap();
+    assert_eq!(result.graph.chapters.len(), 1, "graph has exactly one chapter");
+
+    // Simulate the stale state: an orphan file from an earlier graph state
+    // whose chapter id ("ghost") is NOT in the graph.
+    let export_dir = tempfile::tempdir().unwrap();
+    let out_chapters = export_dir.path().join("config").join("ftbquests").join("quests").join("chapters");
+    std::fs::create_dir_all(&out_chapters).unwrap();
+    std::fs::write(out_chapters.join("ghost.snbt"), r#"{
+    id = "69E448609A5ADE4D"
+    filename = "ghost"
+    title = "Your First Pack"
+    quests = [
+        { id = "0855B1F3991D2B10", x = 0.0d, y = 0.0d, title = "Meet Your Workbench", tasks = [{ id = "t1", type = "checkmark", title = "Begin" }] }
+    ]
+}"#).unwrap();
+
+    export_ftb_quests_snbt_for_layout(&result.graph, export_dir.path(), &result.sidecar, Some(FtBQuestsLayout::FlatChapters)).unwrap();
+
+    let remaining: Vec<String> = std::fs::read_dir(&out_chapters)
+        .map(|e| e.flatten().filter(|p| p.path().extension().map_or(false, |x| x == "snbt"))
+            .map(|p| p.file_name().to_string_lossy().to_string()).collect())
+        .unwrap_or_default();
+    assert!(
+        !remaining.iter().any(|f| f.contains("ghost")),
+        "stale ghost chapter file must be pruned, remaining: {:?}",
+        remaining
+    );
+    // Exactly one file remains and it carries the current chapter's id — the
+    // exporter writes the surviving chapter under its own derived filename.
+    assert_eq!(remaining.len(), 1, "only the current chapter survives, remaining: {:?}", remaining);
+    let survivor = std::fs::read_to_string(out_chapters.join(&remaining[0])).unwrap();
+    assert!(
+        survivor.contains("ch1"),
+        "surviving file must be the current chapter (id ch1), got: {}",
+        survivor
+    );
+}
+
+#[test]
 fn chapter_metadata_fields_roundtrip() {
     let tmp = tempfile::tempdir().unwrap();
     let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");

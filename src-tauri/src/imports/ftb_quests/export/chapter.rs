@@ -1,6 +1,7 @@
 use crate::imports::snbt::{SnbtValue, CommentedSnbt};
 use crate::quest::*;
 use std::collections::HashMap;
+use std::path::Path;
 
 use super::helpers::{ce, chapter_images_to_snbt};
 use super::quest::quest_to_snbt;
@@ -108,4 +109,50 @@ pub(super) fn build_flat_chapters_quests<'a>(
     } else {
         vec![]
     }
+}
+
+/// Post-write cleanup for the FlatChapters layout. Two kinds of stale
+/// artifacts must not survive an export:
+///
+/// 1. Subdirs chapter folders this exporter used to write alongside the flat
+///    files (duplicates of the same book).
+/// 2. Stale flat chapter FILES whose chapter id is not in the graph. Every
+///    current chapter was written before this runs, so any remaining file
+///    with a parseable id that is not a current chapter is an orphan — a
+///    chapter deleted/duplicated in the editor since its last export. The
+///    game loads EVERY file in chapters/, so an orphan shows up in-game as a
+///    duplicate, unnamed tab (s56: the lowercased `your_first_pack.snbt`
+///    ghost chapter). Conservative: only files with a parseable id that is
+///    demonstrably not a current chapter are removed; unparseable or foreign
+///    files are left alone (same rule as the subdirs cleanup).
+pub(super) fn cleanup_flat_layout(quests_dir: &Path, chapters_dir: &Path, graph: &QuestGraph) -> anyhow::Result<()> {
+    if let Ok(entries) = std::fs::read_dir(quests_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() && p.join("chapter.snbt").exists() {
+                std::fs::remove_dir_all(&p).map_err(|e| anyhow::anyhow!("{e}"))?;
+            }
+        }
+    }
+
+    let current_chapter_ids: std::collections::HashSet<String> =
+        graph.chapters.iter().map(|c| c.id.clone()).collect();
+    if let Ok(entries) = std::fs::read_dir(chapters_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.extension().and_then(|e| e.to_str()) != Some("snbt") {
+                continue;
+            }
+            let content = std::fs::read_to_string(&p).unwrap_or_default();
+            let file_id = crate::imports::snbt::parse_snbt(&content)
+                .ok()
+                .and_then(|v| v.get_str("id").map(|s| s.to_string()))
+                .unwrap_or_default();
+            if !file_id.is_empty() && !current_chapter_ids.contains(&file_id) {
+                std::fs::remove_file(&p).map_err(|e| anyhow::anyhow!("{e}"))?;
+                eprintln!("[ModCanvas] Removed stale duplicate chapter file {:?}", p);
+            }
+        }
+    }
+    Ok(())
 }

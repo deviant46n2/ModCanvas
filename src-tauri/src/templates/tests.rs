@@ -138,6 +138,36 @@ fn template_item_fields_are_never_bare_strings() {
     }
 }
 
+/// s52-class regression lock (TEMPLATE-ICON-BARE-STRING): every `icon` field
+/// in every template must use the 1.21 Data Components compound form
+/// (`icon = { id = "minecraft:chest" }`), NEVER a bare string
+/// (`icon = "minecraft:chest"`). The exporter emits the compound form
+/// (helpers.rs icon_to_snbt) and the game's own save rewrites icons as
+/// compounds; a bare string parses but renders no icon in-game — a scaffolded
+/// pack shows icon-less quests until the first save rewrites them. The
+/// template must stay in the SAME form the exporter emits so template and
+/// exporter can never drift.
+#[test]
+fn template_icon_fields_are_never_bare_strings() {
+    for tpl in TEMPLATES {
+        for (rel, contents) in tpl.files {
+            if !rel.ends_with(".snbt") {
+                continue;
+            }
+            // A bare `icon = "..."` — the pre-1.20.5 form. The compound form
+            // `icon = { id = ... }` must survive this check untouched.
+            let bare = contents.lines().filter(|l| l.trim().starts_with("icon = \""));
+            let bare_lines: Vec<String> = bare.map(|l| l.trim().to_string()).collect();
+            assert!(
+                bare_lines.is_empty(),
+                "template {} has bare-string icon fields (render nothing in-game on 1.21.x): {:?}",
+                rel,
+                bare_lines
+            );
+        }
+    }
+}
+
 #[test]
 fn scaffolded_pack_survives_edit_and_reexport() {
     for template_id in ["intro", "ide-tour"] {
