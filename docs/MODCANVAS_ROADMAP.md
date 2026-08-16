@@ -1225,7 +1225,7 @@ Conventions:
 - **Class:** Expand (§13 P1-PARITY open items).
 - **Scope:** theme-file fidelity (`ftb_quests_theme.txt` parse → edge/panel/checkmark
   rendering — the biggest rendering gap); book icon picker (**DONE s67**); import/export
-  hardening (layout choice, `min_width`/
+  hardening (layout choice — **DEFERRED s67, trigger: version support**, `min_width`/
   `invisible` alias unification — **DONE s67**, quest `tags` — **DONE s67**); description
   editor (**resolved s67: editor + multi-page DONE, inline images a phantom — see Status**).
 - **Complexity:** Medium–High (theme-file fidelity is the hard one). **Risk:** in-game
@@ -1268,9 +1268,14 @@ Conventions:
   in both layouts — the model field existed but the pipeline never touched it. Round-trip
   locked in the same test. `chapter_groups.snbt` verified **DONE** (parse + export +
   per-chapter `group` key + `chapter_groups_roundtrip_through_export`) — roadmap line was
-  stale, no work needed. Remaining in this item: `layout choice` (graph-layout override UI
-  already exists via `export_ftb_quests_snbt_for_layout`; verify the roadmap's exact
-  meaning before building).
+  stale, no work needed. **`layout choice` DEFERRED with tripwire (s67 ruling):** a
+  user-facing layout picker for a 1.21.x-only product is a footgun — the game only reads
+  FlatChapters (`layout_for_version`, jar-verified s42; a Subdirs pack loads 0 chapters),
+  and the production export already forces the version-correct layout
+  (`commands/modpack/ftb.rs:26-39`). The version boundary is the correct chooser; no UI.
+  TRIPWIRE: when ADDITIONAL Minecraft version support lands (pre-1.21, which CAN read
+  Subdirs), revisit — layout choice becomes a real decision there, and the editor would
+  need a read-only layout indicator plus, possibly, an override. Until then, parked.
 - **Status (s67 description editor ruling):** the description EDITOR **DONE** — textarea
   (`quest-detail-panels.tsx`), inline tile editing (`QuestTileBody.tsx`), round-trip to the
   SNBT `description` line list (opaque strings, `parse_description` joins / export splits).
