@@ -1232,6 +1232,20 @@ Conventions:
   pixel parity is only verifiable in-game — use the existing screenshot-measure discipline.
 - **Completion criteria:** each open §13 P1-PARITY item flips to ✅/🟢 with a doc-synced
   note; re-audit the parity rows against the tree.
+- **Status (s66 ruling):** theme-file fidelity is **RE-SCOPED to approximation, not
+  pixel parity.** Evidence: the editor's hardcoded palette (`edge-state.ts:26-33`) matches
+  the default theme exactly; the one re-themed test pack (ATM10SKY
+  `kubejs/assets/ftbquests/ftb_quests_theme.txt`) re-themes `background` (already handled
+  s64, window-space tile/stretch + vertex tint) and the panel surfaces — NOT the
+  dependency-line colors, quest state colors, or `widget_border`. So no tested pack
+  diverges on the line palette today. The dependency-line parse is **PARKED with a
+  tripwire**: if a real pack re-themes `dependency_line_*` and the editor's edges look
+  wrong, THAT is the trigger to build it (parse the five colors → drive `EDGE_STATE_COLORS`
+  with fallback — ~30 lines Rust + service, no rendering change). Checkmark icons stay
+  parked: they are texture keys, needing runtime materialization (the no-bundling rule's
+  domain) — a texture-pipeline lift, not a theme parse. Remaining active items: book icon
+  picker / book default quest size / save-as-file; import/export hardening; description
+  editor.
 
 #### P1-HYGIENE — Second hygiene pass
 
