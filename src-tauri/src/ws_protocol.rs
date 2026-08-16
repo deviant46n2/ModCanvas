@@ -89,7 +89,7 @@ impl ModEvent {
 /// Bridge state reported to the app peer. `connected`/`client_count` count
 /// companion (and unidentified) peers only — the app's own socket never makes
 /// the bridge look connected.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionStatus {
     pub connected: bool,

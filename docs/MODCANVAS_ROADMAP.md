@@ -1249,10 +1249,16 @@ Conventions:
 
 #### P1-HYGIENE — Second hygiene pass
 
-- **Class:** Harden. **Scope:** ws_ipc **live-socket-path** integration tests (the hub's
-  routing/classification pure functions already have 16 unit tests in `ws_ipc/tests.rs` —
-  s52; the remaining gap is broadcast-counting / connection-lifecycle / emit-status);
-  300-line splits where the split improves the design
+- **Class:** Harden. **Scope:** ws_ipc **live-socket-path** tests — **DONE (s66):** the
+  hub's fan-out/lifecycle seams were extracted as pure registry operations
+  (`register_client` / `set_client_role` / `broadcast_recipient_count` /
+  `status_from_registry`, ws_ipc.rs) and the real methods now delegate to them;
+  9 tests lock broadcast counting (app/tool excluded), status derivation (unidentified
+  counts as connected — the stale-jar pill contract), handshake role mutation, and the
+  port report — no listener or AppHandle needed (25 ws_ipc tests total, 473 Rust).
+  Remaining: a true end-to-end socket test would need a Tauri test harness — parked
+  with reason; the pure seams cover the decision logic. 300-line splits where the split
+  improves the design
   (never for its own sake); HOCON parser arm or drop the docs claim.
 - **Complexity:** Medium (WebSocket framing + role
   routing; start with routing/classification pure-function tests, `ws_protocol.rs`
@@ -1595,7 +1601,7 @@ Evaluated against the code and the research, each with the reasoning:
 | 6 | **CI green ≠ local green** | Integrity gate is the source of truth; CI is a second witness | Low |
 | 7 | **Template content quality** | Coherency-over-ownership default ("probably a bad pack" is a win); templates editable and visible | Low |
 | 8 | **300-line debt growth** | Integrity gate already seeds; splits where the split improves the design | Low |
-| 9 | **ws_ipc reliability** (security-sensitive hub; unit tests landed s52, live-socket path still untested) | P1-HYGIENE test investment; classify/routing pure functions landed (16 tests, s52); live-socket-path tests next | Medium |
+| 9 | **ws_ipc reliability** (security-sensitive hub) | P1-HYGIENE: classify/routing pure functions (16 tests, s52) + fan-out/lifecycle pure seams (9 tests, s66) landed; true end-to-end socket test parked (needs Tauri harness) | Medium |
 | 10 | **Scope creep from exciting features** | This roadmap's P-order is binding: nothing ships ahead of the wedge; future/Investigate list is explicit | — |
 | 11 | **CF/Modrinth API drift** (search shapes, version fields — the s33 class) | Live-API probes in the test loop; tolerance per-source; slug fallback pattern extended | Medium |
 | 12 | **Curated-mod / config-recommendation maintenance burden** | Keep files tiny, community-extensible, doc'd as maintained artifacts | Low |

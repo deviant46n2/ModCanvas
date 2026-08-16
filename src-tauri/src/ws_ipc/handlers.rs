@@ -38,14 +38,7 @@ pub(super) async fn handle_connection(
 
     {
         let mut clients = clients.write().await;
-        clients.insert(
-            client_id.clone(),
-            WsClient {
-                id: client_id.clone(),
-                sender: tx.clone(),
-                role: ClientRole::Unidentified,
-            },
-        );
+        super::register_client(&mut clients, client_id.clone(), tx.clone());
     }
 
     // Announce the new peer so app peers update the connection pill.

@@ -38,6 +38,62 @@ struct WsClient {
     role: ClientRole,
 }
 
+// --- Pure registry operations (no sockets, no Tauri) -------------------------
+//
+// The fan-out decisions below are pure functions over the client registry, so
+// the live-socket path (broadcast counting, status derivation, handshake role
+// mutation) can be locked without a listener or an AppHandle. The real
+// methods delegate to these; tests exercise the same code the hub runs.
+
+/// Register a peer at the Unidentified role (the pre-handshake state). This is
+/// the connection-lifecycle entry point: a new socket always starts unknown,
+/// then CLIENT_INFO classifies it.
+fn register_client(
+    clients: &mut HashMap<String, WsClient>,
+    id: String,
+    sender: mpsc::UnboundedSender<Message>,
+) {
+    clients.insert(
+        id.clone(),
+        WsClient {
+            id,
+            sender,
+            role: ClientRole::Unidentified,
+        },
+    );
+}
+
+/// Apply a CLIENT_INFO classification to a registered peer. The role mutation
+/// is the handshake side effect of routing; tests lock that a peer's stored
+/// role actually changes (and that an unknown id is a silent no-op).
+fn set_client_role(clients: &mut HashMap<String, WsClient>, id: &str, role: ClientRole) {
+    if let Some(client) = clients.get_mut(id) {
+        client.role = role;
+    }
+}
+
+/// Count the peers a broadcast reaches: companions + unidentified (stale
+/// companions are treated as companions until they identify). App and tool
+/// peers never receive commands.
+fn broadcast_recipient_count(clients: &HashMap<String, WsClient>) -> usize {
+    clients
+        .values()
+        .filter(|c| routing::is_broadcast_target(c.role))
+        .count()
+}
+
+/// Derive the bridge status from the registry. `connected`/`client_count`
+/// count companion + unidentified peers only — the app's own socket and tool
+/// peers never make the bridge look connected.
+fn status_from_registry(clients: &HashMap<String, WsClient>, port: u16) -> ConnectionStatus {
+    let companion_clients = broadcast_recipient_count(clients);
+    ConnectionStatus {
+        connected: companion_clients > 0,
+        client_count: companion_clients,
+        port,
+    }
+}
+
 /// WebSocket message hub for the companion bridge.
 ///
 /// Peers are classified by their CLIENT_INFO frame: the app's frontend
@@ -140,10 +196,9 @@ impl WsIpcServer {
         let message = Message::Text(json.into());
 
         let clients = self.clients.read().await;
-        let mut count = 0;
+        let count = broadcast_recipient_count(&clients);
         for client in clients.values() {
             if routing::is_broadcast_target(client.role) {
-                count += 1;
                 if client.sender.send(message.clone()).is_err() {
                     debug!("Failed to send to client (may be disconnected)");
                 }
@@ -170,15 +225,7 @@ impl WsIpcServer {
     pub async fn get_status(&self) -> ConnectionStatus {
         let clients = self.clients.read().await;
         let port = *self.port.read().await;
-        let companion_clients = clients
-            .values()
-            .filter(|c| routing::is_broadcast_target(c.role))
-            .count();
-        ConnectionStatus {
-            connected: companion_clients > 0,
-            client_count: companion_clients,
-            port,
-        }
+        status_from_registry(&clients, port)
     }
 
     async fn emit_status(&self) {

@@ -1,14 +1,121 @@
-//! Unit tests for the WS IPC hub's pure routing/parsing seams (`routing`).
-//!
-//! These lock the handshake/forward/broadcast decision rules and the
-//! malformed-frame drop behavior without needing a live WebSocket listener.
+//! Unit tests for the WS IPC hub's pure routing/parsing seams (`routing`)
+//! and the pure registry operations (broadcast counting, status derivation,
+//! handshake role mutation) that the live-socket path runs on.
 
-use crate::ws_protocol::{events, ClientRole};
+use std::collections::HashMap;
+
+use crate::ws_protocol::{events, ClientRole, ConnectionStatus};
 use serde_json::json;
+use tokio::sync::mpsc;
 
 use super::routing::{
     is_app_target, is_broadcast_target, parse_frame, route_decision, FrameAction,
 };
+use super::{
+    broadcast_recipient_count, register_client, set_client_role, status_from_registry, WsClient,
+};
+
+/// Build a registry with one peer per role, each with a real (unused) channel.
+fn registry_with_roles(roles: &[ClientRole]) -> HashMap<String, WsClient> {
+    let mut clients = HashMap::new();
+    for (i, role) in roles.iter().enumerate() {
+        let id = format!("peer-{}", i);
+        let (sender, _rx) = mpsc::unbounded_channel();
+        let client = WsClient {
+            id: id.clone(),
+            sender,
+            role: *role,
+        };
+        clients.insert(id, client);
+    }
+    clients
+}
+
+#[test]
+fn broadcast_count_includes_companions_and_unidentified_only() {
+    let clients = registry_with_roles(&[
+        ClientRole::App,
+        ClientRole::Companion,
+        ClientRole::Unidentified,
+        ClientRole::Tool,
+        ClientRole::Companion,
+    ]);
+    // App and tool never receive commands; the two companions + the
+    // unidentified (stale-jar) peer do.
+    assert_eq!(broadcast_recipient_count(&clients), 3);
+}
+
+#[test]
+fn broadcast_count_empty_registry_is_zero() {
+    let clients = HashMap::new();
+    assert_eq!(broadcast_recipient_count(&clients), 0);
+}
+
+#[test]
+fn broadcast_count_app_and_tool_only_is_zero() {
+    let clients = registry_with_roles(&[ClientRole::App, ClientRole::Tool]);
+    assert_eq!(broadcast_recipient_count(&clients), 0);
+}
+
+#[test]
+fn status_is_connected_only_when_broadcast_targets_exist() {
+    let app_only = registry_with_roles(&[ClientRole::App]);
+    assert_eq!(
+        status_from_registry(&app_only, 9876),
+        ConnectionStatus { connected: false, client_count: 0, port: 9876 }
+    );
+
+    let with_companion = registry_with_roles(&[ClientRole::App, ClientRole::Companion]);
+    assert_eq!(
+        status_from_registry(&with_companion, 9876),
+        ConnectionStatus { connected: true, client_count: 1, port: 9876 }
+    );
+}
+
+#[test]
+fn status_counts_unidentified_as_connected() {
+    // A stale companion jar (never sent CLIENT_INFO) still makes the bridge
+    // look connected — that is the pill contract.
+    let clients = registry_with_roles(&[ClientRole::Unidentified]);
+    assert_eq!(
+        status_from_registry(&clients, 1234),
+        ConnectionStatus { connected: true, client_count: 1, port: 1234 }
+    );
+}
+
+#[test]
+fn status_port_is_reported() {
+    let clients = registry_with_roles(&[ClientRole::Companion]);
+    assert_eq!(status_from_registry(&clients, 9999).port, 9999);
+}
+
+#[test]
+fn register_client_starts_unidentified() {
+    let mut clients = HashMap::new();
+    let (sender, _rx) = mpsc::unbounded_channel();
+    register_client(&mut clients, "peer-a".into(), sender);
+    let client = clients.get("peer-a").expect("registered");
+    assert_eq!(client.role, ClientRole::Unidentified);
+    assert_eq!(client.id, "peer-a");
+}
+
+#[test]
+fn set_client_role_classifies_registered_peer() {
+    let mut clients = registry_with_roles(&[ClientRole::Unidentified]);
+    set_client_role(&mut clients, "peer-0", ClientRole::Companion);
+    assert_eq!(clients.get("peer-0").map(|c| c.role), Some(ClientRole::Companion));
+    // The status view follows the handshake.
+    let status = status_from_registry(&clients, 9876);
+    assert_eq!(status.client_count, 1);
+}
+
+#[test]
+fn set_client_role_unknown_id_is_noop() {
+    let mut clients = registry_with_roles(&[ClientRole::Unidentified]);
+    set_client_role(&mut clients, "no-such-peer", ClientRole::Companion);
+    assert_eq!(clients.len(), 1);
+    assert_eq!(clients.get("peer-0").map(|c| c.role), Some(ClientRole::Unidentified));
+}
 
 #[test]
 fn client_info_from_app_is_handshake_app() {
