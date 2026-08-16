@@ -51,7 +51,12 @@ pub(crate) fn find_vanilla_jars(instance_path: &Path) -> Vec<PathBuf> {
                     if fname.ends_with(".jar") && fname.contains("client") && !fname.contains("slim") {
                         // Only the instance's own version: dirs are named
                         // `{version}-{timestamp}` (e.g. 1.21.1-20240808.144430).
-                        if path.to_string_lossy().contains(&format!("/{ver}-")) {
+                        // Compare the PARENT DIR NAME, not a stringified path
+                        // with a hardcoded '/' — on Windows the separator is
+                        // '\' and `/{ver}-` never matches (s65 CI finding:
+                        // vanilla jar discovery silently returned nothing).
+                        let parent_dir = path.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy());
+                        if parent_dir.as_deref().is_some_and(|d| d.contains(&format!("{ver}-"))) {
                             jars.push(path.to_path_buf());
                         }
                     }

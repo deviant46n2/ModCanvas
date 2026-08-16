@@ -2,7 +2,7 @@
 // plus the config-root resolvers. Split from path_safety.rs so the module stays
 // within the 300-line ceiling.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Config base directory: `~/.config/modcanvas/mirrored_configs`. The previously
 /// used temp mirror (`{temp_dir}/modcanvas_configs`) is deprecated in favor of
@@ -24,8 +24,29 @@ pub fn project_config_root(project_path: &str) -> PathBuf {
 /// - Relative paths that escape via `../`
 /// - Symlinks that point outside `root`
 fn validate_in_root(root: &Path, path: &str, require_exists: bool) -> Result<PathBuf, String> {
-    // Resolve relative inputs against the root; absolute paths are used as-is.
+    // Lexical `..` check FIRST (s65 CI finding): the Win32 path parser
+    // collapses `\x\..\` before the filesystem sees it, so a root like
+    // `<tmp>/ok/../..` RESOLVES (and exists()) on Windows while the OS stat
+    // fails on Linux. An existence-based guard is platform-dependent —
+    // reject ParentDir components lexically so the scope is enforced the
+    // same way on every OS. (Test: never_creates_file_outside_project_root
+    // failed on Windows because the write silently escaped the project root.)
+    let has_parent_dir = |p: &Path| p.components().any(|c| matches!(c, Component::ParentDir));
+    if has_parent_dir(root) {
+        return Err(format!(
+            "Access denied: root path contains '..': '{}'",
+            root.display()
+        ));
+    }
     let user_path = PathBuf::from(path);
+    if has_parent_dir(&user_path) {
+        return Err(format!(
+            "Access denied: path contains '..': '{}'",
+            user_path.display()
+        ));
+    }
+
+    // Resolve relative inputs against the root; absolute paths are used as-is.
     let candidate = if user_path.is_absolute() {
         user_path
     } else {
@@ -156,7 +177,11 @@ mod tests {
 
         let validated = validate_project_write(&root, "test.toml").unwrap();
         assert!(config_dir.exists(), "validate_project_write should create config/");
-        assert_eq!(validated, config_dir.join("test.toml"));
+        // validate_in_root returns CANONICALIZED paths; on Windows canonicalize
+        // emits a `\\?\` prefix + expanded 8.3 names the raw join lacks (s65 CI
+        // finding) — canonicalize the expected side before comparing.
+        let expected = config_dir.canonicalize().unwrap().join("test.toml");
+        assert_eq!(validated, expected);
     }
 
     #[test]
@@ -217,7 +242,15 @@ mod tests {
         let root = tmp.path().to_string_lossy().to_string();
 
         let validated = validate_project_write(&root, "sub/dir/nested.toml").unwrap();
-        assert_eq!(validated, project_config_root(&root).join("sub").join("dir").join("nested.toml"));
+        // Canonicalized expected side — see test_project_write_creates_config_root
+        // for the Windows form-mismatch note (s65).
+        let expected = project_config_root(&root)
+            .canonicalize()
+            .unwrap()
+            .join("sub")
+            .join("dir")
+            .join("nested.toml");
+        assert_eq!(validated, expected);
     }
 
     #[test]
@@ -229,22 +262,30 @@ mod tests {
         // (root-scoped), never validate_project_write (config-scoped).
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
+        let root_canon = root.canonicalize().unwrap();
         std::fs::create_dir_all(root.join("kubejs").join("server_scripts")).unwrap();
 
         let kubejs = validate_under_root(root, "kubejs/server_scripts/modcanvas_recipes.js").unwrap();
-        assert_eq!(kubejs, root.join("kubejs").join("server_scripts").join("modcanvas_recipes.js"));
+        let kubejs_expected = root_canon
+            .join("kubejs")
+            .join("server_scripts")
+            .join("modcanvas_recipes.js");
+        assert_eq!(kubejs, kubejs_expected);
         assert!(
-            kubejs.starts_with(root),
+            kubejs.starts_with(&root_canon),
             "script must resolve inside the project root, not config/: {kubejs:?}"
         );
 
         let ct = validate_under_root(root, "scripts/modcanvas_crafttweaker.zs").unwrap();
-        assert_eq!(ct, root.join("scripts").join("modcanvas_crafttweaker.zs"));
-        assert!(ct.starts_with(root));
+        assert_eq!(ct, root_canon.join("scripts").join("modcanvas_crafttweaker.zs"));
+        assert!(ct.starts_with(&root_canon));
 
         // The config-scoped validator is the WRONG tool for scripts — it
         // silently redirects them under config/.
         let wrong = validate_project_write(root.to_str().unwrap(), "kubejs/server_scripts/modcanvas_recipes.js").unwrap();
-        assert!(wrong.starts_with(root.join("config")), "config-scoped validator must not be used for scripts");
+        assert!(
+            wrong.starts_with(&root_canon.join("config")),
+            "config-scoped validator must not be used for scripts"
+        );
     }
 }

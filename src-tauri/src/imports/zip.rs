@@ -28,7 +28,10 @@ pub fn create_mrpack_zip(source: &Path, dest: &Path) -> anyhow::Result<()> {
         let path = entry.path();
         if path.is_file() {
             let relative = path.strip_prefix(source)?;
-            let name = relative.to_string_lossy().to_string();
+            // ZIP entry names are spec'd to forward slashes on every OS;
+            // to_string_lossy() emits '\' on Windows (s65 CI finding — same
+            // class as curseforge/export.rs).
+            let name = relative.to_string_lossy().replace('\\', "/");
             zip.start_file(name, options)?;
             let mut f = std::fs::File::open(path)?;
             std::io::copy(&mut f, &mut zip)?;

@@ -61,6 +61,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)] // /proc is Linux-only; the Windows WMI/NtQuery seam is documented, not built (s65)
     fn proc_liveness_finds_self_cmdline() {
         // The test runner's own cmdline contains its binary path; we can't
         // know a dir that matches it, but we CAN verify the scan is
@@ -76,6 +77,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)] // /proc is Linux-only; the Windows WMI/NtQuery seam is documented, not built (s65)
     fn proc_liveness_matches_a_real_substring_of_own_cmdline() {
         // The running test binary's cmdline is /proc/<pid>/cmdline; the first
         // argument (argv[0]) is the binary path. A dir that prefixes that

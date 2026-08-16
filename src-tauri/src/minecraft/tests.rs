@@ -148,7 +148,16 @@ fn list_instances_derives_running_from_liveness_not_stored_status() {
     let game_dir = pack_a.game_dir.clone();
     // The game process carries the instance ROOT in its cmdline, never the
     // /minecraft subdir (measured 2026-08-08). The fake marks the root.
-    let root = game_dir.strip_suffix("/minecraft").unwrap();
+    // Separator-agnostic: strip the final component, not a literal "/minecraft"
+    // (which never matches a Windows "\minecraft" — s65 CI finding).
+    let game_path = std::path::Path::new(&game_dir);
+    let root = match game_path.file_name().and_then(|n| n.to_str()) {
+        Some("minecraft") => game_path
+            .parent()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| game_dir.clone()),
+        _ => game_dir.clone(),
+    };
 
     // The wrapper exits but the GAME process stays alive (the s19 bug):
     // stored status says Stopped, liveness says running. Derivation must
@@ -157,7 +166,7 @@ fn list_instances_derives_running_from_liveness_not_stored_status() {
     let inst = instances.iter_mut().find(|i| i.name == "Pack A").unwrap();
     inst.status = InstanceStatus::Stopped; // the lying wrapper-exit write
     drop(instances);
-    liveness.set_running(root);
+    liveness.set_running(&root);
 
     let running = manager.list_instances();
     let pack_a_running = running.iter().find(|i| i.name == "Pack A").unwrap();

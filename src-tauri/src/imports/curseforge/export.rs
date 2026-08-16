@@ -147,7 +147,10 @@ impl CurseForgeExporter {
             let entry = entry?;
             if entry.path().is_file() {
                 let relative = entry.path().strip_prefix(&overrides_dir)?;
-                let name = format!("overrides/{}", relative.to_string_lossy());
+                // ZIP entry names are spec'd to forward slashes on every OS;
+                // to_string_lossy() emits '\' on Windows (s65 CI finding —
+                // by_name("overrides/mods/...") lookups broke on Windows).
+                let name = format!("overrides/{}", relative.to_string_lossy().replace('\\', "/"));
                 zip.start_file(name, options)?;
                 let mut f = std::fs::File::open(entry.path())?;
                 std::io::copy(&mut f, &mut zip)?;

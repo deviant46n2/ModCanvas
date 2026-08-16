@@ -30,10 +30,14 @@ pub fn sanitize_zip_entry_path(entry_path: &str) -> Result<String, String> {
     }
 
     // Normalize: collect only Normal components (skip RootDir, ParentDir, CurDir)
-    let mut normalized = PathBuf::new();
+    // and join with '/' EXPLICITLY — ZIP entry names are spec'd to forward
+    // slashes on every OS. PathBuf::to_string_lossy() would emit '\' on
+    // Windows (s65 CI finding: sanitize returned foo\bar.txt, breaking
+    // by_name() lookups and producing spec-violating archives).
+    let mut parts: Vec<std::ffi::OsString> = Vec::new();
     for component in path.components() {
         match component {
-            Component::Normal(c) => normalized.push(c),
+            Component::Normal(c) => parts.push(c.to_os_string()),
             Component::CurDir => { /* skip `.` */ }
             Component::ParentDir => {
                 return Err(format!(
@@ -48,23 +52,23 @@ pub fn sanitize_zip_entry_path(entry_path: &str) -> Result<String, String> {
         }
     }
 
-    // Verify the normalized path is still relative and doesn't escape
-    if normalized.is_absolute() {
+    if parts.is_empty() {
+        return Err("Zip entry path resolves to empty".to_string());
+    }
+
+    // Verify no `..` survived normalization (defense in depth)
+    let joined = parts
+        .iter()
+        .map(|p| p.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/");
+    if joined.split('/').any(|part| part == "..") {
         return Err(format!(
-            "Zip entry path resolved to absolute: '{entry_path}'"
+            "Zip entry path contains '..' traversal: '{entry_path}'"
         ));
     }
 
-    // Double-check no `..` survived normalization
-    for component in normalized.components() {
-        if matches!(component, Component::ParentDir) {
-            return Err(format!(
-                "Zip entry path contains '..' traversal: '{entry_path}'"
-            ));
-        }
-    }
-
-    Ok(normalized.to_string_lossy().to_string())
+    Ok(joined)
 }
 
 pub fn sanitize_project_name(name: &str) -> Result<String, String> {
@@ -200,7 +204,12 @@ mod tests {
         let path = quest_graph_path(&root).unwrap();
         assert!(path.ends_with(".modcanvas/quests.json"));
         assert!(path.parent().unwrap().is_dir(), "state dir should be created");
-        assert!(path.starts_with(tmp.path()));
+        // Compare against the CANONICALIZED tmp root: state_file_path returns
+        // canonical paths, and on Windows canonicalize emits a `\\?\` prefix +
+        // expanded 8.3 names (RUNNER~1 -> runneradmin) that the raw tempdir
+        // path lacks (s65 CI finding).
+        let tmp_canon = tmp.path().canonicalize().unwrap();
+        assert!(path.starts_with(tmp_canon));
     }
 
     #[test]
@@ -218,7 +227,8 @@ mod tests {
 
         atomic_write_str(&path, "{\"nodes\":[]}").unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"nodes\":[]}");
-        assert!(path.starts_with(tmp.path()));
+        let tmp_canon = tmp.path().canonicalize().unwrap();
+        assert!(path.starts_with(tmp_canon));
     }
 
     #[test]
@@ -229,7 +239,8 @@ mod tests {
         let path = state_file_path(&root, "behaviors.json").unwrap();
         assert!(path.ends_with(".modcanvas/behaviors.json"));
         assert!(path.parent().unwrap().is_dir(), "state dir should be created");
-        assert!(path.starts_with(tmp.path()));
+        let tmp_canon = tmp.path().canonicalize().unwrap();
+        assert!(path.starts_with(tmp_canon));
 
         // Two calls return the same path — deterministic.
         assert_eq!(state_file_path(&root, "behaviors.json").unwrap(), path);
