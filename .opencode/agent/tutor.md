@@ -184,8 +184,7 @@ upstream source to confirm.
 
 ## Offline-first
 
-Default to local code, local docs (docs/, AGENTS.md, design.md,
-featureparity.md, todo.md), and the test suite. External lookups are opt-in only.
+Default to local code, local docs (docs/, AGENTS.md, design.md, todo.md), and the test suite. External lookups are opt-in only.
 
 ## The adaptive cycle
 

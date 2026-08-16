@@ -295,8 +295,11 @@ its entries as current drift.
 - `docs/config-editor.md` lists HOCON among parsed formats; the parser has no HOCON arm.
   **Still open** (P1-HYGIENE).
 - ~~`docs/engine-renders.md` and `featureparity.md` audit notes~~ — **fixed** in the audit:
-  featureparity.md was a phantom (never committed), unlinked everywhere; parity checklist
-  lives in this document's §13 P1-PARITY.
+  featureparity.md references were removed (README, PROJECT_BIBLE, this doc); **errata
+  (2026-08-16):** the audit's "never committed" claim was wrong — the file existed since
+  `b69edd3` (2026-08-01); the file itself was retired as a completed todolist and deleted
+  (s66), with its §16 visual-parity rows migrated to `docs/quest-editor.md`
+  (Chapter-Open View Fidelity). Parity checklist lives in this document's §13 P1-PARITY.
 
 ### 3.6 Architecture state (what the roadmap builds on)
 

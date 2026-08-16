@@ -904,3 +904,51 @@ frequent operations:
 
 All of the above is pure UI on the existing graph model — no new IPC or file
 format changes.
+
+# Quest Editor — Chapter-Open View Fidelity (s64, clean-room from FTB Quests v2101.1.31 + FTB-Library v2101.1.35)
+
+The editor's chapter-open view now matches the game's. Semantics are clean-roomed
+from the exact jars in the test instance (maven.ftb.dev 404'd; GitHub tags
+v2101.1.31 / v2101.1.35 worked). This section supersedes the old `featureparity.md`
+§16 rows (file retired 2026-08-16 as a completed todolist).
+
+## Background (theme)
+
+The game draws `ThemeProperties.BACKGROUND` **window-space across the full
+screen rect** (`FTBQuestsTheme.drawGui`) — never `cover`/CSS-fit. `ImageIcon.draw`
+(FTB-Library) semantics:
+
+- `tile_size` present → **repeat** the texture at that pixel size; absent →
+  **stretch**.
+- `color=` is a **vertex tint** (RGB multiply + alpha modulate) applied to the
+  texture — an overlay would white-wash it.
+- Resolution order: chapter background → global fallback.
+- Default theme: `background_squares.png` tiled 64px + `#DCFFFFFF` from the
+  shipped `ftb_quests_theme.txt`.
+
+`ftb_theme.rs` parses `color` + `tile_size` into a `ThemeBackground`
+(`background_for`; 5 tests); `core/quest/theme-color.ts` (`argbHexToRgba`) is the
+pure ARGB→RGBA conversion; the frontend renders via
+`useThemeBackground` → `CanvasArea` backdrop (tile/stretch + tint + 1px panel
+frame `#1B1D1E`, the game's `hollow_rectangle` widget_border).
+
+Remaining hardcoded (not theme-driven): the panel frame (default
+`widget_border` only), other panel/checkmark selectors, `quest_spacing`,
+`pinned_quest_size`, `full_screen_quest` — see roadmap §13 P1-PARITY.
+
+## Viewport framing
+
+- **Default zoom matches the game**: zoom 16 → 28px/unit (`QuestScreen.java:60`,
+  pitch = `zoom*(3/2+spacing/4)`).
+- **Chapter opens centered** on its content bounds (`QuestPanel.resetScroll`),
+  not fitView-stretched.
+- **guiScale**: the whole default view (canvas zoom + background tiles) scales
+  by the instance's real `guiScale` from `options.txt` (1–4, auto/missing → 1;
+  `get_game_gui_scale` command). Verified: editor == game at guiScale 1;
+  matches a guiScale-3 instance (student's eyes, s64).
+
+Parked game-fidelity follow-ups (written reasons in the s64 handoff):
+persisted-viewport restore on reopen (`restorePersistedScreenData` — default
+centering is the safer tool default), chapter autofocus `scrollTo` (wizard packs
+set none), wheel-zoom clamp 4–28 with center preservation (ReactFlow's free zoom
+is an editor affordance).
