@@ -151,11 +151,20 @@ impl InstanceManager {
             // that game_dir points at. Measured on a live game 2026-08-08:
             // the only instance-specific marker is the root path. Strip the
             // minecraft suffix so the scan matches what the process shows.
-            let root = inst
-                .game_dir
-                .strip_suffix("/minecraft")
-                .unwrap_or(&inst.game_dir);
-            if self.liveness.is_running(root) {
+            // Separator-agnostic (s65): strip_suffix("/minecraft") never
+            // matches a Windows "\minecraft" — the query would look for the
+            // unstripped game_dir and liveness would always say Stopped.
+            let root = {
+                let game = std::path::Path::new(&inst.game_dir);
+                match game.file_name().and_then(|n| n.to_str()) {
+                    Some("minecraft") => game
+                        .parent()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| inst.game_dir.clone()),
+                    _ => inst.game_dir.clone(),
+                }
+            };
+            if self.liveness.is_running(&root) {
                 inst.status = InstanceStatus::Running;
             } else if inst.status == InstanceStatus::Running {
                 inst.status = InstanceStatus::Stopped;
