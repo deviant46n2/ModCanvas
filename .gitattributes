@@ -1,0 +1,13 @@
+# Byte-stable checkouts across platforms (s65 CI finding):
+# the integrity suite parses file CONTENT (frontmatter, doc anchors,
+# line counts); CRLF checkouts on Windows silently broke regexes
+# anchored to bare \n. Pin LF for everything the suite reads.
+* text=auto eol=lf
+
+# Locked binary-ish formats — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jar binary
+*.zip binary
+*.woff2 binary

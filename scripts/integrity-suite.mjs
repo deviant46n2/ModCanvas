@@ -126,9 +126,12 @@ export function checkSuiteSelf(rules, root) {
 
 function frontmatter(text) {
   const out = {}
-  const m = text.match(/^---\n([\s\S]*?)\n---/)
+  // CRLF-tolerant: Windows checkouts (git autocrlf, no .gitattributes) carry
+  // \r\n; ^---\n with bare \n silently failed the whole parse and every
+  // command's frontmatter read as missing (s65 CI suite-self violations).
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!m) return out
-  for (const line of m[1].split('\n')) {
+  for (const line of m[1].split(/\r?\n/)) {
     const kv = line.match(/^([\w-]+):\s*(.*)$/)
     if (kv) out[kv[1]] = kv[2]
   }

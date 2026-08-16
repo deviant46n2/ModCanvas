@@ -90,7 +90,12 @@ export function checkLineLimit(rules, root) {
     for (const file of walk(join(root, dir))) {
       const lines = lineCount(file)
       if (lines <= rules.lineLimit) continue
-      const rel = relative(root, file)
+      // Normalize to '/' separators: allowlist paths are stored with forward
+      // slashes, and relative() emits '\' on Windows — a raw comparison
+      // silently misses ACCEPTED/PARKED entries and flags them as violations
+      // (s65 CI: hero.png/logo.png violated on the Windows runner, clean on
+      // Linux — the allowlist never matched).
+      const rel = relative(root, file).split('\\').join('/')
       const entry = rules.allowlists['line-limit'].find((a) => a.path === rel)
       if (entry) {
         // kind: "accepted" = an intentional decision, not debt — zero
@@ -121,7 +126,9 @@ export function checkAssetBundle(rules, root) {
   for (const dir of rules.assetDirs) {
     for (const file of walk(join(root, dir))) {
       if (!RASTER.test(file)) continue
-      const rel = relative(root, file)
+      // Normalize to '/' separators — see checkLineLimit (s65 CI finding:
+      // allowlist ACCEPTED entries never matched on Windows).
+      const rel = relative(root, file).split('\\').join('/')
       const entry = allow.find((a) => a.path === rel)
       if (entry) {
         if (entry.kind === 'accepted') accepted.push({ path: rel, reason: entry.reason })
