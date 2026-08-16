@@ -1257,6 +1257,20 @@ Conventions:
   written reason. **"Save-as-file" resolved as NOT A SETTING**: in the jar it is an in-game
   context-menu action (`saveLocally()`), already covered by the app's Save/export. Both
   resolutions recorded in quest-editor.md + bible §8.2.
+- **Status (s67 import/export hardening):** alias unification **DONE** — FTB's canonical
+  keys are `min_width`, `invisible`, and `invisible_until_tasks` (verified in the jar's
+  `Quest.writeData`); import now accepts both canonical + legacy app-emitted aliases
+  (`min_window_width`, `invisible_until_completed`, `invisible_until_x_tasks`), export
+  emits ONLY canonical keys (the old subdirs `invisible_until_completed` branch wrote a key
+  the game ignores — invisible quests would have shown in-game; fixed). Locked by
+  `alias_keys_roundtrip_with_ftb_canonical_names`. Quest `tags` (a string list on every
+  quest object, `QuestObjectBase.getList("tags")`) now imports (SNBT + JSON5) and exports
+  in both layouts — the model field existed but the pipeline never touched it. Round-trip
+  locked in the same test. `chapter_groups.snbt` verified **DONE** (parse + export +
+  per-chapter `group` key + `chapter_groups_roundtrip_through_export`) — roadmap line was
+  stale, no work needed. Remaining in this item: `layout choice` (graph-layout override UI
+  already exists via `export_ftb_quests_snbt_for_layout`; verify the roadmap's exact
+  meaning before building).
 
 #### P1-HYGIENE — Second hygiene pass
 

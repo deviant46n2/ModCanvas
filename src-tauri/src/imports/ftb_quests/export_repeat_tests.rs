@@ -121,3 +121,84 @@ fn repeat_fields_export_uses_ftb_canonical_keys() {
     assert!(!exported.contains("repeat_max_delay"), "no legacy repeat_max_delay emitted");
     assert!(!exported.contains("repeatability"), "no legacy repeatability emitted");
 }
+
+#[test]
+fn alias_keys_roundtrip_with_ftb_canonical_names() {
+    // s67 alias unification: FTB writes `min_width`, `invisible`, and
+    // `invisible_until_tasks` (verified in the jar's Quest.writeData). The
+    // import accepts the legacy app-emitted keys too; the export emits only
+    // the canonical names. tags (a string list on every quest object) must
+    // round-trip in both layouts.
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+
+    std::fs::write(chapters_dir.join("alias.snbt"), r#"{
+    id = "ch_alias"
+    filename = "alias"
+    title = "alias"
+    quests = [
+        {
+            id = "q_legacy_keys"
+            title = "Legacy Keys"
+            min_window_width: 150
+            invisible_until_completed: 1b
+            invisible_until_x_tasks: 3
+            dependencies = []
+        }
+        {
+            id = "q_canonical"
+            title = "Canonical Keys"
+            min_width: 200
+            invisible: 1b
+            invisible_until_tasks: 5
+            tags: ["main", "hidden"]
+            dependencies = []
+        }
+    ]
+}"#).unwrap();
+
+    let import_result = import_ftb_quests(tmp.path()).unwrap();
+    let graph = import_result.graph;
+
+    let ql = graph.nodes.iter().find(|n| n.id == "q_legacy_keys").expect("legacy-key quest imported");
+    assert_eq!(ql.min_window_width, 150, "legacy min_window_width accepted");
+    assert!(ql.invisible_until_completed, "legacy invisible_until_completed accepted");
+    assert_eq!(ql.invisible_until_x_tasks, 3, "legacy invisible_until_x_tasks accepted");
+    assert!(ql.tags.is_empty(), "no tags on legacy quest");
+
+    let qc = graph.nodes.iter().find(|n| n.id == "q_canonical").expect("canonical quest imported");
+    assert_eq!(qc.min_window_width, 200, "canonical min_width parsed");
+    assert!(qc.invisible_until_completed, "canonical invisible parsed");
+    assert_eq!(qc.invisible_until_x_tasks, 5, "canonical invisible_until_tasks parsed");
+    assert_eq!(qc.tags, vec!["main".to_string(), "hidden".to_string()], "tags parsed");
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
+    let exported = std::fs::read_to_string(
+        export_dir.path().join("config").join("ftbquests").join("quests").join("chapters").join("alias.snbt")
+    ).unwrap();
+
+    // Export emits ONLY canonical keys, no legacy aliases.
+    assert!(exported.contains("min_width: 150"), "legacy min_window_width promoted to min_width");
+    assert!(!exported.contains("min_window_width"), "no legacy min_window_width emitted");
+    assert!(exported.contains("invisible: 1b"), "invisible emitted in both layouts");
+    assert!(!exported.contains("invisible_until_completed"), "no legacy invisible_until_completed emitted");
+    assert!(exported.contains("invisible_until_tasks: 3"), "legacy x_tasks promoted to invisible_until_tasks");
+    assert!(!exported.contains("invisible_until_x_tasks"), "no legacy invisible_until_x_tasks emitted");
+    assert!(exported.contains("tags: [ \"main\", \"hidden\" ]"), "tags emitted");
+
+    // Round-trip: canonical output re-imports to the same values.
+    let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
+    let ql2 = graph2.nodes.iter().find(|n| n.id == "q_legacy_keys").expect("legacy quest re-imported");
+    assert_eq!(ql2.min_window_width, 150, "min_width survived round-trip");
+    assert!(ql2.invisible_until_completed, "invisible survived round-trip");
+    assert_eq!(ql2.invisible_until_x_tasks, 3, "invisible_until_tasks survived round-trip");
+    let qc2 = graph2.nodes.iter().find(|n| n.id == "q_canonical").expect("canonical quest re-imported");
+    assert_eq!(qc2.min_window_width, 200, "min_width survived round-trip (canonical quest)");
+    assert!(qc2.invisible_until_completed, "invisible survived round-trip (canonical quest)");
+    assert_eq!(qc2.invisible_until_x_tasks, 5, "invisible_until_tasks survived round-trip (canonical quest)");
+    assert_eq!(qc2.tags, vec!["main".to_string(), "hidden".to_string()], "tags survived round-trip");
+}

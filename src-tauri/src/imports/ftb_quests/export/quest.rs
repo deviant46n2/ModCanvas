@@ -67,6 +67,14 @@ pub(super) fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_c
         }
     }
 
+    // Tags: FTB stores them on every quest object (QuestObjectBase.getList("tags")).
+    if !node.tags.is_empty() {
+        let tag_values: Vec<SnbtValue> = node.tags.iter()
+            .map(|t| SnbtValue::String(t.clone()))
+            .collect();
+        m.insert("tags".to_string(), ce(SnbtValue::List(tag_values)));
+    }
+
     if !node.color.is_empty() {
         if let Some(c) = parse_hex_color(&node.color) {
             m.insert("color".to_string(), ce(SnbtValue::Int(c)));
@@ -144,11 +152,9 @@ pub(super) fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_c
     }
 
     if node.invisible_until_completed {
-        if flat_chapters {
-            m.insert("invisible".to_string(), ce(SnbtValue::Byte(1)));
-        } else {
-            m.insert("invisible_until_completed".to_string(), ce(SnbtValue::Byte(1)));
-        }
+        // FTB's canonical key is `invisible` in BOTH layouts (verified in the
+        // jar's writeData — `invisible_until_completed` appears nowhere).
+        m.insert("invisible".to_string(), ce(SnbtValue::Byte(1)));
     }
 
     // Add dependencies from edges
@@ -162,7 +168,8 @@ pub(super) fn quest_to_snbt(node: &QuestNode, deps: Option<&Vec<String>>, flat_c
     }
 
     if node.invisible_until_x_tasks > 0 {
-        m.insert("invisible_until_x_tasks".to_string(), ce(SnbtValue::Int(node.invisible_until_x_tasks)));
+        // FTB's canonical key is `invisible_until_tasks` (both layouts).
+        m.insert("invisible_until_tasks".to_string(), ce(SnbtValue::Int(node.invisible_until_x_tasks)));
     }
 
     if node.hide_text_until_completed {

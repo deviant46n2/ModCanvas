@@ -613,6 +613,31 @@ under a **Settings** divider in the single scrollable column
   `per_quest_repeat_and_visibility_fields_roundtrip` and
   `repeat_fields_export_uses_ftb_canonical_keys` in `export_tests.rs`.
 
+### Alias unification + quest tags (s67)
+
+FTB's canonical keys, verified in the shipped jar's `Quest.writeData`, are
+`min_width`, `invisible`, and `invisible_until_tasks`. The import accepts
+BOTH the canonical names and the legacy app-emitted aliases
+(`min_window_width`, `invisible_until_completed`, `invisible_until_x_tasks`);
+the export emits ONLY the canonical names. The old subdirs-export branch that
+wrote `invisible_until_completed` is fixed: the game never reads that key, so
+invisible quests exported via the subdirs layout would have rendered visible
+in-game.
+
+- `min_width` ↔ `min_window_width` — `import/quest.rs` reads `min_width` first,
+  falls back to `min_window_width`; `export/quest.rs` writes `min_width`.
+- `invisible_until_tasks` ↔ `invisible_until_x_tasks` — same alias pattern.
+- `invisible` — export writes `invisible: 1b` in BOTH layouts (previously flat
+  only). Import accepts `invisible_until_completed` OR `invisible`.
+- **Quest tags** — FTB stores `tags` as a string list on every quest object
+  (`QuestObjectBase.getList("tags")`, ListTag of strings). The model field
+  (`QuestNode.tags`) existed but the pipeline never touched it; now parsed in
+  `import/quest.rs` (SNBT) + `import/json5.rs` and written by
+  `export/quest.rs` (both layouts, inline `[ "a", "b" ]` list form).
+- Locked by `alias_keys_roundtrip_with_ftb_canonical_names` in
+  `export_repeat_tests.rs`: legacy + canonical input both round-trip, and the
+  exported text asserts no legacy keys are emitted.
+
 ## Milestones (diamond quests)
 
 FTB Quests has no "achievement" entity, so a milestone IS a quest with an

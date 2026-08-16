@@ -120,11 +120,17 @@ pub(super) fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep
     let disable_completion_toast = m.get_bool("disable_completion_toast").unwrap_or(false);
     let ignore_reward_blocking = m.get_bool("ignore_reward_blocking").unwrap_or(false);
     let disable_jei_recipe = m.get_bool("disable_jei_recipe").unwrap_or(false) || m.get_bool("default_quest_disable_jei").unwrap_or(false);
-    let min_window_width = m.get_i64("min_window_width").unwrap_or(0) as i32;
+    // FTB writes the quest's minimum window width as `min_width`; accept the
+    // legacy `min_window_width` key the app once emitted (alias unification).
+    let min_window_width = m.get_i64("min_width").or_else(|| m.get_i64("min_window_width")).unwrap_or(0) as i32;
     let hide_details_until_startable = m.get_bool("hide_details_until_startable").unwrap_or(false);
     let hide_text_until_completed = m.get_bool("hide_text_until_completed").unwrap_or(false);
     let invisible_until_completed = m.get_bool("invisible_until_completed").unwrap_or(false) || m.get_bool("invisible").unwrap_or(false);
-    let invisible_until_x_tasks = m.get_i64("invisible_until_x_tasks").unwrap_or(0) as i32;
+    // FTB writes `invisible_until_tasks`; accept the legacy `invisible_until_x_tasks`.
+    let invisible_until_x_tasks = m.get_i64("invisible_until_tasks").or_else(|| m.get_i64("invisible_until_x_tasks")).unwrap_or(0) as i32;
+    let tags = m.get_list("tags").map(|list| {
+        list.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+    }).unwrap_or_default();
     let hide_dependency_lines = m.get_bool("hide_dependency_lines").unwrap_or(default_hide_dep_lines);
     let hide_dependent_lines = m.get_bool("hide_dependent_lines").unwrap_or(false);
     let min_required_dependencies = m.get_i64("min_required_dependencies").unwrap_or(0) as i32;
@@ -236,7 +242,7 @@ pub(super) fn parse_snbt_quest(m: &SnbtValue, chapter_id: &str, default_hide_dep
         quest_background,
         shape: QuestShape::from_string(&shape),
         icon_scaling,
-        tags: Vec::new(),
+        tags,
         progression_mode: QuestProgressionMode::from_string(&progression_mode),
         sequential_tasks,
         disable_completion_toast,

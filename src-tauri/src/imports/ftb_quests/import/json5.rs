@@ -29,6 +29,11 @@ pub(super) fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, 
     let max_completable_dependents = m.get("max_completable_dependents").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
     let invisible_until_completed = m.get("invisible").and_then(|v| v.as_bool()).unwrap_or(false);
     let invisible_until_x_tasks = m.get("invisible_until_tasks").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    // FTB writes `min_width`; accept the legacy `min_window_width` key too.
+    let min_window_width = m.get("min_width").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let tags = m.get("tags").and_then(|v| v.as_array()).map(|arr| {
+        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+    }).unwrap_or_default();
     let min_required_dependencies = m.get("min_required_dependencies").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
     let dependency_requirement = m.get("dependency_requirement").and_then(|v| v.as_str()).unwrap_or("default").to_string();
     let hide_details_until_startable = m.get("hide_details_until_startable").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -109,6 +114,8 @@ pub(super) fn parse_json5_quest(m: &serde_json::Map<String, serde_json::Value>, 
         max_completable_dependents,
         invisible_until_completed,
         invisible_until_x_tasks,
+        min_window_width,
+        tags,
         min_required_dependencies,
         dependency_requirement: parsed_dependency_requirement,
         hide_details_until_startable,
