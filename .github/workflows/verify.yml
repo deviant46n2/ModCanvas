@@ -92,10 +92,10 @@ jobs:
         run: pnpm build
         working-directory: frontend
 
-      - name: Integrity gate (Linux: all sections)
+      - name: "Integrity gate (Linux: all sections)"
         if: matrix.os == 'ubuntu-latest'
         run: pnpm integrity
 
-      - name: Integrity gate (Windows: all but build-smoke — it spawns `sh`)
+      - name: "Integrity gate (Windows: all but build-smoke, which spawns sh)"
         if: matrix.os == 'windows-latest'
         run: node scripts/integrity-check.mjs --skip=build-smoke
