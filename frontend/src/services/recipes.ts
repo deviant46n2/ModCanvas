@@ -72,11 +72,27 @@ export async function pruneCaches(
   return invoke<number>('prune_caches_cmd', { instancePaths, modsDirs })
 }
 
+/** A theme `background` property as parsed by the backend: the texture key
+ *  plus the game's render options (ftb_theme.rs `ThemeBackground`). `color`
+ *  is `#AARRGGBB`; `tileSize` absent = stretch to the pane, present = tile. */
+export interface ThemeBackgroundSpec {
+  key: string
+  color?: string | null
+  tileSize?: number | null
+}
+
 export async function getQuestThemeBackground(
   instancePath: string,
   chapterId: string,
-): Promise<string | null> {
-  return invoke<string | null>('get_quest_theme_background', { instancePath, chapterId })
+): Promise<ThemeBackgroundSpec | null> {
+  return invoke<ThemeBackgroundSpec | null>('get_quest_theme_background', { instancePath, chapterId })
+}
+
+/** The instance's `guiScale` from its `options.txt` (1 when absent/auto).
+ *  The editor scales its default chapter-open view by this so the tool
+ *  matches the player's actual game look (ftb_theme.rs read_game_gui_scale). */
+export async function getGameGuiScale(instancePath: string): Promise<number> {
+  return invoke<number>('get_game_gui_scale', { instancePath })
 }
 
 export async function logDebug(message: string): Promise<void> {

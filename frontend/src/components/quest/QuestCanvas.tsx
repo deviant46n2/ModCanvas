@@ -11,6 +11,7 @@ import type { ProgressState } from '../../core/quest/progress';
 import type { ToolbarAPI } from './import-export';
 import { isMilestoneShape } from '../../core/quest/quest-shapes';
 import { useQuestCanvasModel } from './useQuestCanvasModel';
+import type { ResolvedThemeBackground } from '../../hooks/useQuestAssetPipeline/activity';
 import { useChapterDisplayState } from './useChapterDisplayState';
 import { useQuestCanvasKeyboard } from './useQuestCanvasKeyboard';
 import { useQuestCanvasInteractions } from './useQuestCanvasInteractions';
@@ -45,7 +46,10 @@ interface QuestCanvasProps {
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
   textureIndex?: Record<string, string>;
-  questBackgroundUrl?: string | null;
+  questBackground?: ResolvedThemeBackground | null;
+  /** The instance's guiScale (options.txt, default 1). The chapter-open view
+   *  and background tiles scale by it to match the player's actual game. */
+  guiScale?: number;
   simMode?: boolean;
   setSimMode?: (on: boolean) => void;
   simProgress?: ProgressState;
@@ -86,7 +90,8 @@ function QuestCanvasInner({
   selectedNodeId: _selectedNodeId,
   setSelectedNodeId,
   textureIndex,
-  questBackgroundUrl,
+  questBackground,
+  guiScale = 1,
   simMode = false,
   setSimMode,
   simProgress = {},
@@ -107,7 +112,7 @@ function QuestCanvasInner({
   const [searchQuery, setSearchQuery] = useState('');
   const [milestoneOnly, setMilestoneOnly] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, setCenter } = useReactFlow();
   const { zoom } = useViewport();
   const paneRef = useRef<HTMLDivElement | null>(null);
   useQuestViewportApi({ toolbarApiRef, paneRef, screenToFlowPosition, fitView });
@@ -118,7 +123,7 @@ function QuestCanvasInner({
     setHoveredNodeId,
   } = useQuestCanvasModel({
     questGraph, chapters, activeChapter, textureIndex, selectedIds, simMode,
-    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, fitView,
+    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, guiScale, setCenter,
   });
 
   const { clipboardRef, copySelected, pasteClipboard, alignSelected, distributeSelected } =
@@ -231,7 +236,8 @@ function QuestCanvasInner({
         onCompleteAll={onCompleteAll} onResetAll={onResetAll}
       />
       <CanvasArea
-        questBackgroundUrl={questBackgroundUrl}
+        questBackground={questBackground}
+        guiScale={guiScale}
         connectMode={connectMode} onExitConnect={() => setConnectMode(false)}
         onToggleConnect={handleToggleConnect}
         decorEditMode={decorEditMode}

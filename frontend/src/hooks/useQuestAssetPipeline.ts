@@ -23,6 +23,8 @@ import {
 import {
   useMaterializationActivity,
   useThemeBackground,
+  useGuiScale,
+  type ResolvedThemeBackground,
 } from './useQuestAssetPipeline/activity'
 import { useMaterializationPlan } from './useQuestAssetPipeline/plan'
 import { useCompanionRegistrySync } from './useQuestAssetPipeline/registry'
@@ -48,7 +50,8 @@ export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
   const [texturesLoading, setTexturesLoading] = useState(false)
   const [texturesRemaining, setTexturesRemaining] = useState(0)
   const [bakedCount, setBakedCount] = useState(() => getBakedTextureCount())
-  const [questBackgroundUrl, setQuestBackgroundUrl] = useState<string | null>(null)
+  const [questBackground, setQuestBackground] = useState<ResolvedThemeBackground | null>(null)
+  const [guiScale, setGuiScale] = useState(1)
   const [items, setItems] = useState<ItemRegistryEntry[]>([])
 
   usePrefetchTextures({ packLoaded, graph, projectId, instancePath })
@@ -64,7 +67,8 @@ export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
   useUpgradeableQueue({ wsConnected, instancePath })
   useScanSync({ instancePath, setTextureIndex, setAnimations })
   useMaterializationActivity({ setTextureTick, setTexturesLoading, setTexturesRemaining })
-  useThemeBackground({ instancePath, activeChapter, textureIndex, textureTick, setQuestBackgroundUrl })
+  useThemeBackground({ instancePath, activeChapter, textureIndex, textureTick, setQuestBackground })
+  useGuiScale(instancePath, setGuiScale)
   useMaterializationPlan({ graph, activeChapter, selectedNode, textureIndex, textureTick, ingestIndex, instancePath, wsConnected, setTextureIndex })
 
   return {
@@ -73,7 +77,8 @@ export function useQuestAssetPipeline(options: UseQuestAssetPipelineOptions) {
     texturesLoading,
     texturesRemaining,
     bakedCount,
-    questBackgroundUrl,
+questBackground,
+    guiScale,
     items,
   }
 }

@@ -105,14 +105,15 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
+  /* The game's quest panel frame: `panel: hollow_rectangle:{{widget_border}}`
+     with widget_border = #1B1D1E (ftb_quests_theme.txt). Always drawn,
+     background or not. */
+  border: 1px solid #1b1d1e;
 }
 
 .quest-canvas-backdrop {
   position: absolute;
   inset: 0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   pointer-events: none;
   z-index: 0;
 }

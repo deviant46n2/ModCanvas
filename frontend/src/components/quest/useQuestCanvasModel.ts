@@ -8,7 +8,8 @@ import { resolveEdgeState, edgeStyleForState } from '../../core/quest/edge-state
 import { computeVisibility, isLocked, type ProgressState } from '../../core/quest/progress';
 import { searchQuestNodes } from '../../core/quest/search';
 import { isMilestoneShape } from '../../core/quest/quest-shapes';
-import { buildCanvasNodes, buildCanvasEdges, chapterDefaultShapes } from './quest-canvas-model'
+import { buildCanvasNodes, buildCanvasEdges, chapterDefaultShapes, GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
+import { questSizeToPixels } from './quest-form-constants'
 
 interface UseQuestCanvasModelArgs {
   questGraph: QuestGraphData
@@ -22,13 +23,17 @@ interface UseQuestCanvasModelArgs {
   milestoneOnly: boolean
   renameNonce: { nodeId: string; n: number } | null
   onUpdateNode: (nodeId: string, data: Partial<QuestNodeData>) => void
-  fitView: (options?: { duration?: number; padding?: number; maxZoom?: number; nodes?: Array<{ id: string }> }) => void
+  /** The instance's guiScale (options.txt, default 1). The chapter-open zoom
+   *  scales by it so the editor matches the player's actual game look. */
+  guiScale: number
+  /** ReactFlow instance helper: center the viewport on a flow point at `zoom`. */
+  setCenter: (x: number, y: number, options?: { zoom?: number }) => Promise<boolean> | void
 }
 
 export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
   const {
     questGraph, chapters, activeChapter, textureIndex, selectedIds, simMode,
-    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, fitView,
+    simProgress, searchQuery, milestoneOnly, renameNonce, onUpdateNode, guiScale, setCenter,
   } = args
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -167,19 +172,40 @@ export function useQuestCanvasModel(args: UseQuestCanvasModelArgs) {
     setEdges(newEdges)
   }, [questGraph.nodes, filteredEdges, filteredNodeIds, textureIndex, cycleEdges, selectedIds, simMode, simProgress, simStatusById, lockedById, searchActive, searchMatchIds, milestoneOnly, milestoneMatchIds, renameNonce, onUpdateNode, iconRefreshTick, setNodes, setEdges])
 
-  // Re-frame the canvas to fit the whole chapter on OPEN/switch. Keyed on the
-  // active chapter (not node count): the old `nodes.length` trigger failed to
-  // re-fit when two chapters happened to share a quest count, leaving the
-  // viewport wherever the previous chapter left it ("zoomed into a corner").
-  // The fit effect runs after the nodes-build effect in the same commit, so it
-  // frames the freshly-built chapter. A ref guards one fit per chapter.
+  // Open/switch framing: mirror the in-game quest book, which does NOT
+  // fit-to-content — it opens every chapter at a fixed default scale (28px per
+  // quest-unit: zoom 16 → bs+bp = 16*1.5 + 16*1.0/4) and centers the content
+  // (QuestPanel.resetScroll, QuestScreen default zoom 16). fitView stretched
+  // small chapters to fill the pane, rendering their cells orders of magnitude
+  // bigger than the game (the s63 "10x zoomed in" bug). Instead, center the
+  // chapter's node bounds at zoom 28/42 = 2/3 so 1 quest-unit maps to the same
+  // 28px the game uses on screen. Bounds are computed from the raw graph so the
+  // effect is correct on the render where activeChapter changes (the built
+  // `nodes` state lags one commit behind here). A ref guards one frame per open.
   const lastFramedChapter = useRef<string | null>(null)
   useEffect(() => {
-    if (activeChapter !== null && activeChapter !== lastFramedChapter.current && filteredNodeIds.size > 0) {
-      lastFramedChapter.current = activeChapter
-      setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 100)
+    if (activeChapter === null || activeChapter === lastFramedChapter.current) return
+    const chapterNodes = questGraph.nodes.filter((n: QuestNodeData) => n.chapter_id === activeChapter)
+    if (chapterNodes.length === 0) return
+    lastFramedChapter.current = activeChapter
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const n of chapterNodes) {
+      const size = questSizeToPixels(n.size, NODE_BASE_PX)
+      const cx = n.position.x * GRID_SCALE
+      const cy = n.position.y * GRID_SCALE
+      minX = Math.min(minX, cx - size.width / 2)
+      minY = Math.min(minY, cy - size.height / 2)
+      maxX = Math.max(maxX, cx + size.width / 2)
+      maxY = Math.max(maxY, cy + size.height / 2)
     }
-  }, [activeChapter, filteredNodeIds, fitView])
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    // 28/42 = 2/3: the game's default cell scale (28px/unit) at the editor's
+    // GRID_SCALE of 42px/unit. Delayed a tick so ReactFlow has laid out nodes.
+    // ×guiScale matches the game's own guiScale (options.txt): the game
+    // renders 28px/unit at scale 1, scaled up by its GUI scale (s64).
+    setTimeout(() => setCenter(centerX, centerY, { zoom: (28 / GRID_SCALE) * guiScale }), 100)
+  }, [activeChapter, questGraph.nodes, setCenter, guiScale])
 
   // Node-hover highlighting. The hovered quest's fan takes the in-game
   // requires/required-for hues and marches at the fast speed; every other edge

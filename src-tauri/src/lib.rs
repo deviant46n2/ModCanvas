@@ -224,6 +224,7 @@ pub fn run() {
             crate::instance_textures::resolve_item_tags_cmd,
             crate::instance_textures::list_item_tags_cmd,
             crate::ftb_theme::get_quest_theme_background,
+            crate::ftb_theme::get_game_gui_scale,
             crate::engine_renders::get_engine_renders_cmd,
             crate::engine_renders::save_engine_renders_cmd,
             crate::runtime_textures::get_runtime_textures_cmd,

@@ -26,9 +26,14 @@ import { AddQuestOverlay } from './AddQuestOverlay'
 import { defaultDecorationImage } from './decoration-picker'
 import { GRID_SCALE, NODE_BASE_PX } from './quest-canvas-model'
 import { XIcon } from '../ui/icons'
+import { argbAlpha } from '../../core/quest/theme-color'
+import type { ResolvedThemeBackground } from '../../hooks/useQuestAssetPipeline/activity'
 
 interface CanvasAreaProps {
-  questBackgroundUrl?: string | null
+  questBackground?: ResolvedThemeBackground | null
+  /** The instance's guiScale (options.txt, default 1) — background tiles
+   *  scale by it to match the player's actual game look. */
+  guiScale?: number
   connectMode: boolean
   onToggleConnect: () => void
   onExitConnect: () => void
@@ -95,7 +100,7 @@ interface CanvasAreaProps {
 }
 
 export function CanvasArea({
-  questBackgroundUrl, connectMode, onExitConnect, onToggleConnect, decorEditMode, textureIndex,
+  questBackground, guiScale = 1, connectMode, onExitConnect, onToggleConnect, decorEditMode, textureIndex,
   activeChapterImages,
   zoom,
   nodes, edges, onNodesChange, onEdgesChange,
@@ -114,11 +119,27 @@ export function CanvasArea({
   paneRef, gridScale,
 }: CanvasAreaProps) {
   return (
-    <div ref={paneRef} className={`quest-canvas-wrapper${questBackgroundUrl ? ' has-backdrop' : ''}${connectMode ? ' connect-mode' : ''}`}>
-      {questBackgroundUrl && (
+    <div ref={paneRef} className={`quest-canvas-wrapper${questBackground ? ' has-backdrop' : ''}${connectMode ? ' connect-mode' : ''}`}>
+      {questBackground && (
         <div
           className="quest-canvas-backdrop"
-          style={{ backgroundImage: `url(${questBackgroundUrl})` }}
+          style={{
+            backgroundImage: `url(${questBackground.url})`,
+            // Game semantics (FTB Library ImageIcon.draw, v2101.1.35):
+            // tile_size present → REPEAT at that size; absent → STRETCH to
+            // the rect. The game never covers/crops.
+            backgroundSize: questBackground.tileSize
+              ? // The game tiles at tile_size GUI px, scaled by its guiScale
+                // (options.txt) — the editor matches the player's actual look.
+                `${questBackground.tileSize * guiScale}px ${questBackground.tileSize * guiScale}px`
+              : '100% 100%',
+            backgroundRepeat: questBackground.tileSize ? 'repeat' : 'no-repeat',
+            // `color=` is a VERTEX TINT, not an overlay: RGB multiplies the
+            // texture (identity for the white default), alpha modulates its
+            // opacity over the dark pane base. CSS approximates with opacity
+            // (non-white tints would hue-shift; none seen in real themes).
+            opacity: questBackground.color ? (argbAlpha(questBackground.color) ?? 1) : 1,
+          }}
         />
       )}
       {connectMode && (

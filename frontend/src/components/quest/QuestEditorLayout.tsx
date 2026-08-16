@@ -10,6 +10,7 @@ import type { ItemRegistryEntry, ItemTagInfo } from '../../services/quest-types'
 import type { ProgressState } from '../../core/quest/progress'
 import type { ToolbarAPI } from './import-export'
 import { QuestCanvas } from './QuestCanvas'
+import type { ResolvedThemeBackground } from '../../hooks/useQuestAssetPipeline/activity'
 import { ChapterTree } from './ChapterTree'
 import { QuestDetailModal } from './QuestDetailModal'
 import { ChapterSettings } from './ChapterSettings'
@@ -45,7 +46,8 @@ interface QuestEditorLayoutProps {
   items: ItemRegistryEntry[]
   tags: ItemTagInfo[]
   getPickerTextureUrl: (itemId: string) => string | null
-  questBackgroundUrl: string | null
+  questBackground: ResolvedThemeBackground | null
+  guiScale: number
   texturesLoading: boolean
   texturesRemaining: number
   collapsedGroups: Record<string, boolean>
@@ -201,7 +203,8 @@ export function QuestEditorLayout(props: QuestEditorLayoutProps) {
             onUpdateChapterImages={props.onUpdateChapterImages}
             selectedNodeId={props.selectedNodeId}
             setSelectedNodeId={props.setSelectedNodeId}
-            questBackgroundUrl={props.questBackgroundUrl}
+            questBackground={props.questBackground}
+            guiScale={props.guiScale}
             simMode={props.simMode}
             setSimMode={props.setSimMode}
             simProgress={props.simProgress}

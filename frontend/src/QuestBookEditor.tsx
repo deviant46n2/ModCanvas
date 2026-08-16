@@ -147,7 +147,7 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
 
   const selectedNode = selectedNodeId ? graph?.nodes.find(n => n.id === selectedNodeId) : null
 
-  const { textureIndex, animations, texturesLoading, texturesRemaining, bakedCount, questBackgroundUrl, items } =
+  const { textureIndex, animations, texturesLoading, texturesRemaining, bakedCount, questBackground, guiScale, items } =
     useQuestAssetPipeline({ instancePath, ingestResult, kubejsNamespace, wsConnected, graph, activeChapter, selectedNode, packLoaded, projectId })
 
   // Item/tag catalog for the shared JEI-style picker: items come from the
@@ -261,7 +261,8 @@ export default function QuestBookEditor({ projectId, projectPath, minecraftVersi
       items={items}
       tags={tagCatalog}
       getPickerTextureUrl={getPickerTextureUrl}
-      questBackgroundUrl={questBackgroundUrl}
+      questBackground={questBackground}
+      guiScale={guiScale}
       texturesLoading={texturesLoading}
       texturesRemaining={texturesRemaining}
       collapsedGroups={collapsedGroups}
