@@ -869,6 +869,17 @@ frequent operations:
   title/subtitle are inline text inputs with the section content flowing
   below. The footer is **Done / Cancel / Delete Quest** (plus Complete/Reset
   in Simulate mode) — the old verb–noun "Save Quest" label is gone.
+- **Description format (s67):** FTB's quest `description` is a list of opaque
+  string lines (`description: [ "line1", "line2" ]` in SNBT; the in-game
+  editor's "page break" button just inserts a newline). The repo's round-trip
+  is line-preserving: `parse_description` (import/helpers.rs) joins lines
+  with `\n`, `export/quest.rs` splits back per line — markup inside lines
+  (JSON chat-component lines, `[link]`-style content, hex-id quest
+  references, URLs) passes through untouched. FTB has NO inline-image
+  capability in quest descriptions (verified in the shipped jar: no image key
+  on `Quest`, description renders as a plain `TextField`); images live only at
+  the chapter level (`ChapterImage`). The exotic-line round-trip is untested —
+  tripwire: lock it when the description surface is next touched.
 - **Tasks and rewards are per-type editors.** Each objective/reward type
   renders only its own fields, dispatched through a registry
   (`objective-editors.tsx` / `reward-editors.tsx`): switching the type

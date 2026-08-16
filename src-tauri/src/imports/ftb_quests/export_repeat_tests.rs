@@ -202,3 +202,60 @@ fn alias_keys_roundtrip_with_ftb_canonical_names() {
     assert_eq!(qc2.invisible_until_x_tasks, 5, "invisible_until_tasks survived round-trip (canonical quest)");
     assert_eq!(qc2.tags, vec!["main".to_string(), "hidden".to_string()], "tags survived round-trip");
 }
+
+#[test]
+fn exotic_description_lines_roundtrip_verbatim() {
+    // FTB descriptions are opaque string lines: JSON chat components, links,
+    // and hex-id quest references pass through the round-trip untouched
+    // (the parser treats lines as strings; the editor renders them).
+    let tmp = tempfile::tempdir().unwrap();
+    let quests_dir = tmp.path().join("config").join("ftbquests").join("quests");
+    let chapters_dir = quests_dir.join("chapters");
+    std::fs::create_dir_all(&chapters_dir).unwrap();
+    std::fs::write(quests_dir.join("data.snbt"), "{version: 13}").unwrap();
+
+    let exotic_desc = [
+        r#"{"text":"Green text","color":"green"}"#,
+        "[Click here](https://example.com/guide)",
+        "See quest {4e0f7c2a3b8d4e1f} for details",
+        "Plain line with §lbold§r formatting codes",
+    ].join("\n");
+
+    std::fs::write(chapters_dir.join("desc.snbt"), format!(r#"{{
+    id = "ch_desc"
+    filename = "desc"
+    title = "desc"
+    quests = [
+        {{
+            id = "q_desc"
+            title = "Exotic Description"
+            description = [
+                "{{\"text\":\"Green text\",\"color\":\"green\"}}"
+                "[Click here](https://example.com/guide)"
+                "See quest {{4e0f7c2a3b8d4e1f}} for details"
+                "Plain line with §lbold§r formatting codes"
+            ]
+            dependencies = []
+        }}
+    ]
+}}"#)).unwrap();
+
+    let import_result = import_ftb_quests(tmp.path()).unwrap();
+    let graph = import_result.graph;
+    let q = graph.nodes.iter().find(|n| n.id == "q_desc").expect("exotic-desc quest imported");
+    assert_eq!(q.description, exotic_desc, "exotic description lines imported verbatim");
+
+    let export_dir = tempfile::tempdir().unwrap();
+    export_ftb_quests_snbt(&graph, export_dir.path(), &import_result.sidecar).unwrap();
+    let exported = std::fs::read_to_string(
+        export_dir.path().join("config").join("ftbquests").join("quests").join("chapters").join("desc.snbt")
+    ).unwrap();
+    assert!(exported.contains(r#"\"text\":\"Green text\",\"color\":\"green\""#), "JSON-component line preserved (escaped quotes in SNBT string)");
+    assert!(exported.contains("[Click here](https://example.com/guide)"), "link line preserved");
+    assert!(exported.contains("{4e0f7c2a3b8d4e1f}"), "hex-id reference preserved");
+    assert!(exported.contains("§lbold§r"), "formatting codes preserved");
+
+    let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
+    let q2 = graph2.nodes.iter().find(|n| n.id == "q_desc").expect("exotic-desc quest re-imported");
+    assert_eq!(q2.description, exotic_desc, "exotic description lines survived round-trip verbatim");
+}

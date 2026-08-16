@@ -1226,8 +1226,8 @@ Conventions:
 - **Scope:** theme-file fidelity (`ftb_quests_theme.txt` parse → edge/panel/checkmark
   rendering — the biggest rendering gap); book icon picker (**DONE s67**); import/export
   hardening (layout choice, `min_width`/
-  `invisible` alias unification, `chapter_groups.snbt`, quest `tags`); multi-page + inline
-  image description editor.
+  `invisible` alias unification — **DONE s67**, quest `tags` — **DONE s67**); description
+  editor (**resolved s67: editor + multi-page DONE, inline images a phantom — see Status**).
 - **Complexity:** Medium–High (theme-file fidelity is the hard one). **Risk:** in-game
   pixel parity is only verifiable in-game — use the existing screenshot-measure discipline.
 - **Completion criteria:** each open §13 P1-PARITY item flips to ✅/🟢 with a doc-synced
@@ -1271,6 +1271,20 @@ Conventions:
   stale, no work needed. Remaining in this item: `layout choice` (graph-layout override UI
   already exists via `export_ftb_quests_snbt_for_layout`; verify the roadmap's exact
   meaning before building).
+- **Status (s67 description editor ruling):** the description EDITOR **DONE** — textarea
+  (`quest-detail-panels.tsx`), inline tile editing (`QuestTileBody.tsx`), round-trip to the
+  SNBT `description` line list (opaque strings, `parse_description` joins / export splits).
+  "Multi-page" **DONE in the format sense**: FTB's description IS a line list and its own
+  editor's "page break" button inserts a newline. "Inline images" **PARKED as a PHANTOM**:
+  verified in the shipped jar that quest descriptions have NO image capability — no image
+  key on `Quest`, the description renders as a plain `TextField`, and the only `{image`
+  reference in the codebase is a legacy editor detection string that no class renders.
+  FTB's real description features are line-based formatting (bold/italic/underline/
+  strikethrough), JSON chat-component lines ("convert JSON"), and clickable links (quest
+  refs by hex id + URLs) — the repo's opaque-string round-trip passes these through
+  untouched, now LOCKED by `exotic_description_lines_roundtrip_verbatim` (JSON-component
+  line with escaped quotes, `[link]` URL line, hex-id reference, `§` formatting codes all
+  survive import→export→re-import verbatim). Item **✅ closed**.
 
 #### P1-HYGIENE — Second hygiene pass
 

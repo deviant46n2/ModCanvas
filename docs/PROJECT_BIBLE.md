@@ -200,7 +200,7 @@ The MVP's job is to build the **guided wrapper** that hides the power that alrea
 
 - Pack Health progression topology (bottlenecks, walls, chain lengths) — pure graph math, truthful.
 - Import/export hardening (layout choice, `min_width`/`invisible` alias unification, `chapter_groups.snbt`, quest `tags`).
-- Description editor: multi-page + inline images.
+- Description editor: **DONE s67** — the editor surface + line-list round-trip exist; "inline images" was a phantom (FTB quest descriptions have no image capability — verified in the jar; chapter images are the only image surface, already implemented).
 - Theme-file fidelity (`ftb_quests_theme.txt` parsing → edge/panel/checkmark rendering).
 - Remaining book-level settings: book icon picker (DONE s67 — FTB `icon: { id }` compound, wired import/export + picker; save-as-file was an in-game action already covered by Save).
 - Rest of the 1.21.1 loader matrix (Forge, Fabric).
