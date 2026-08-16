@@ -183,6 +183,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_project_read_rejects_symlink_escape() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().to_string_lossy().to_string();

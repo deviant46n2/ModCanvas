@@ -738,6 +738,16 @@ the launch/capture leg (step 6) is exactly the surface hotswap reshapes (reload 
 loop, reload-vs-restart honesty), so the full fresh-eyes pass runs once, against the final
 shape, instead of twice. **Tripwire:** run the full 6-step pass in the P2-HOTSWAP landing
 review, before any further P0/P2 item is declared done.
+**RESOLVED-IN-PART (s65 ruling):** the tripwire's fresh-eyes launch/capture leg was
+delivered by the friend trial (s54) — wizard one-click → KubeJS → inline Rhino install →
+issue clears, FTB Quests via Prism, game launch with the companion; it surfaced 3 real
+bugs the unit suite could not see. The remaining gap is a *readability* pass on the
+tutorial quests themselves (ide-tour 20-quest + intro 6-quest — never read end-to-end
+in-app by a user; the oldest open UNVERIFIED claim, s49) — no game needed, no tester
+needed, the maintainer walks it in-app once. **No further external testers booked (s65):**
+the friend trial proved fresh-eyes finds real bugs, so the app hardens internally first —
+the CI verification matrix (s65) is the testing ramp — before more humans see it. The
+full 6-step fresh-eyes completion remains open with that written reason; not scheduled.
 
 ### 9.4 Beginner Mode (P0-BEGINNER)
 
@@ -1086,9 +1096,18 @@ Conventions:
   verify. Rolled into P2-HOTSWAP below.
 - **Status (s44):** the rolled-in half shipped through the hotswap arc — pre-launch
   companion-version detection (`get_project_companion_status`, s4c) and never-silent-failure
-  launch messaging (Prism-refusal signature, workaround #8, s44). The parked
-  materialize-step's tripwire (P2-HOTSWAP landing) has FIRED; the step itself remains open —
-  scope it or re-park with a fresh reason in a future pass.
+  launch messaging (Prism-refusal signature, workaround #8, s44).
+- **KILLED (s65 ruling) — the materialize-step spec is dead, not parked.** Written reason,
+  three structural facts: (1) the wizard has no post-launch step anymore — s49 reshaped it
+  into a thin commit point (name → auto-create instance → curated picks → green check +
+  Launch), so the step's home no longer exists; (2) its payoffs are already surfaced
+  elsewhere — the "mods write configs on first launch" empty states (s42) and the
+  Beginner-Mode banner in the quest editor (s53); (3) its verification half is the hotswap
+  loop's job — `get_project_companion_status`, never-silent launch messaging (s44), the
+  pin→broadcast→verify reload loop. The s42 park premise ("build the machinery once, reuse
+  for both") was spent on the hotswap arc; the reuse was never wired to a wizard step. A
+  parked item implies a future home; this step has none. Killed rather than re-parked so
+  the doc stops showing an "open step" where no step has a home.
 
 #### P0-DISTRIB — Distribution, CI, release pipeline
 
