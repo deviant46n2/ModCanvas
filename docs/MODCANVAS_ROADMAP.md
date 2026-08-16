@@ -32,7 +32,7 @@ strategic space, including things deliberately NOT being built yet.
 |---|---|---|---|
 | 1 | **Pack Health: wire the `target` jump-to-quest** | **DONE (s52)** — jump button on quest findings with a nodeId (undefined reward table, missing item, cycles, unreachable quests) selects + centers the quest in the editor, switching chapters as needed. Two tests lock the wiring. See `docs/CRITICAL_PRODUCT_AUDIT.md` finding #8. | Every quest finding carries `target: {section, nodeId}` (types.ts:16-19) — populated, never read. The "what can I do about it" link is modeled and unwired; wiring it takes the panel from "what's wrong" to "go fix it" (audit finding #8). Do not claim the jump exists until it does. |
 | 2 | **Beginner Mode redesign** | **STRIP SHIPPED (s53)** — product call ruled s52: the mode becomes a coach, not just a hiding switch. First iteration: the hint strip (4-step wedge journey, real-signal states, never claims quest completion). See `docs/beginner-mode.md`. Remainder parked with written reasons: the driver (quest editor → tab wiring, the §9.5 rat's-nest) and the §9.4 preset forms. | The mode gates 2 of 7 editors (code-hiding only). The goal is NOT merely hiding advanced controls — evaluate whether the product's workflow is actually understandable to a first-time modpack creator (audit finding #11). Product call first; implementation after. |
-| 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (453 Rust + 697 FE tests) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
+| 3 | **Real-pack fixture testing** | DEFERRED TO NEXT MILESTONE | The unit/integration suite is strong (464 Rust + 751 FE + 101 tool tests, s66) but realistic end-to-end validation against actual modpacks is the next major confidence layer (audit finding #12 — golden-artifact fixture suite). |
 | 4 | **Companion/Java test investment** | DEFERRED WITH WRITTEN REASON | `companion-socket.ts` (frame parsing, reconnect backoff) and the Java companion have zero tests. Deferred because it is medium-cost, lower-value than the fixture; revisit after fixtures land (audit finding #13). Not forgotten debt — a written deferral. |
 | 5 | **PRISM-LEAN (s53)** — mod EXECUTION moves to Prism Launcher | **CHUNK 1 DONE (s53)** — handoff shipped: `open_prism_instance` (`prismlauncher --show <instanceId>`), wizard curated step = curated list + "Open Prism to install these" (manual-link fallback for non-instance packs), Mods tab "Add mods in Prism" button. Docs: `docs/mods-tab.md`. | ModCanvas curates + diagnoses; Prism executes (version matching + dependency resolution — verified: FTB Quests in Prism pulls Library/Teams/Architecury; ModCanvas's own search cannot surface CF mods: `searchFilter=ftb` → 50 irrelevant hits, zero FTB mods, live-verified 2026-08-13). Student ruling; rationale: delegate risky high-surface execution to battle-tested software. |
 | 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | **DONE (s54)** — search surface deleted: `search_mods` / `install_mod_from_search` (renamed `install_modrinth_mod`, Modrinth-only) / `search_merge.rs` / orphaned CF download fns / Mods-tab search UI / SearchResultRow / CategorySelect / SourceToggles (4 test files deleted, 2 edited, s52 evidence pattern). **Refined on ruling:** the one-click Modrinth installer was KEPT (wizard curated picks + compat panel) — keyless and loop-closing; CF installs (FTB Quests) go to Prism with explicit guide copy naming the three required deps (wizard step + core-mod gate finding). CF-key use for installs is dead everywhere. Docs: `docs/mods-tab.md`. | See row 5 for the ruling rationale. The refinement (s54): the s53 kill-list overreached on the compat one-click — Modrinth's API is keyless, so an app-diagnosed missing dep can be repaired in-app honestly; CF deps stay invisible (`CurseForgeFileInfo` parses none), so FTB Quests always installs through Prism. |
@@ -249,26 +249,26 @@ Verified against the code. Each entry needs a **prune-or-park-with-written-reaso
    supported combo (1.21.1/NeoForge).
 8. **300-line rule violations** — **mostly paid down by splits since s34** (measured s52):
    the largest frontend file is now `recipe-store.ts` 294, `useModState.ts` 298; all seven
-   files cited in the s34 roster are under 300 (`texture-loader.ts` 31 — now a facade over
-   `texture-loader/`, `quest-types.ts` 8, `useQuestAssetPipeline.ts` 75, `checks/quests.ts`
-   28, `config-editor.tsx` 184). Rust: `recipes/mod.rs` 101, `quest_config.rs` 67,
-   `path_safety.rs` 237, `db.rs` 123, `modrinth.rs` 84, `analysis.rs` 131;
-   `scriptgen/kubejs.rs`/`crafttweaker.rs` are now directories. Run `pnpm integrity` for the
-   current roster; the gate remains the source of truth.
-9. **`ws_ipc.rs` was 404 lines with zero tests** — **now tested (s52 measurement):** the hub
-   is 213 lines with `ws_ipc/tests.rs` (143 lines, 16 test fns: handshake arms, routing
-   predicates, frame parsing). `quest/analysis.rs` (131 lines) still has zero tests, and
-   `db.rs` has 3 (`db/tests.rs`). The WebSocket hub is the most security- and
-   reliability-sensitive surface in the app; the remaining gap is the live-socket path
-   (no broadcast-counting / connection-lifecycle / emit-status integration test).
-   (Companion Java has no tests by design — in-game verified only, `engine-renders.md:272-278`.)
-10. **`quest/analysis.rs` — dead-end command** — `analyze_quest_graph` is registered
-    (`lib.rs:191`), wrapped in a service (`services/quest.ts:13`), and **called by no
-    frontend consumer** (grep s52: zero callers outside the wrapper). Zero tests. The
-    structural analysis it performs overlaps the frontend's `analyzePackHealth`
-    (`core/validation/quest-validator.ts` cycle detection). Not harmful, but it is a
-    dead-end IPC surface: either wire a consumer or prune the command. Ownership boundary
-    (Rust vs TS health) should be stated, not drifted (§10.5).
+files cited in the s34 roster are under 300 (`texture-loader.ts` 31 — now a facade over
+    `texture-loader/`, `quest-types.ts` 8, `useQuestAssetPipeline.ts` 75, `checks/quests.ts`
+    28, `config-editor.tsx` 184). Rust: `recipes/mod.rs` 101, `quest_config.rs` 67,
+    `path_safety.rs` 237, `db.rs` 123, `modrinth.rs` 84 (corrected s66: `analysis.rs` was
+    pruned in the s52 audit, `aff5c18`);
+    `scriptgen/kubejs.rs`/`crafttweaker.rs` are now directories. Run `pnpm integrity` for the
+    current roster; the gate remains the source of truth.
+ 9. **`ws_ipc.rs` was 404 lines with zero tests** — **now tested (s52 measurement):** the hub
+    is 213 lines with `ws_ipc/tests.rs` (143 lines, 16 test fns: handshake arms, routing
+    predicates, frame parsing). `db.rs` has 5 tests (`db/tests.rs`, s66 count). The WebSocket
+    hub is the most security- and
+    reliability-sensitive surface in the app; the remaining gap is the live-socket path
+    (no broadcast-counting / connection-lifecycle / emit-status integration test).
+    (Companion Java has no tests by design — in-game verified only, `engine-renders.md:272-278`.)
+ 10. **`quest/analysis.rs` — PRUNED (s52 audit, `aff5c18`)** — the dead-end
+     `analyze_quest_graph` command (registered, zero consumers, zero tests) was pruned with
+     the `QuestAnalysis` struct and the frontend wrapper (`services/quest-types/analysis.ts`).
+     The structural analysis it performed overlapped the frontend's `analyzePackHealth`
+     (`core/validation/quest-validator.ts` cycle detection); ownership was resolved by
+     removal (§10.5) — health stays frontend-only until a check needs Rust-held data.
 
 ### 3.5 Documented-vs-code mismatches to correct in the docs
 
@@ -277,8 +277,8 @@ The 2026-08-13 **critical product audit** (`docs/CRITICAL_PRODUCT_AUDIT.md` +
 the tree and corrected the stale rows directly (hot-swap freeze myth, CF
 export "bug" that was already fixed, the 300-line roster, ws_ipc test
 status) — see the audit's findings ledger. Remaining OPEN rulings (dead
-`core/sync/` layer, dead-end `analyze_quest_graph`, protocol dead items,
-Beginner Mode scope) live in that ledger, not here.
+ `core/sync/` layer — PRUNED `aff5c18`, protocol dead items,
+ Beginner Mode scope) live in that ledger, not here.
 
 All items in this list were fixed by the 2026-08-13 docs audit (`docs/audit-2026-08-13.md`),
 except where noted. The list is kept for the record of what the audit found; do not treat
@@ -868,13 +868,14 @@ are real costs the Bible already names (`PROJECT_BIBLE.md:244`). Revisit only af
 
 ### 10.5 Ownership boundary: Rust vs TS
 
-Today, health is 100% frontend TS; Rust has only `analyze_quest_graph`
-(`quest/analysis.rs:20`) which the frontend doesn't call, and cycle detection in
-`core/validation/quest-validator.ts`. **Decision:** keep health in the frontend for
+Today, health is 100% frontend TS; Rust holds no health analysis (the dead-end
+`analyze_quest_graph` / `quest/analysis.rs` was pruned in the s52 audit, `aff5c18`);
+cycle detection lives in `core/validation/quest-validator.ts`. **Decision:** keep health
+in the frontend for
 Tier-1/2 (it consumes frontend-side editor state — that's where the data lives), and move
 analysis into Rust **only when a check needs data the frontend doesn't hold** (e.g. deep
 SNBT/script parsing for behavior validation). State this boundary in the docs so the
-duplication risk (`quest/analysis.rs` vs `core/pack-health/checks/quests.ts`) is a decision,
+duplication risk is a decision,
 not drift.
 
 ---
@@ -1234,13 +1235,14 @@ Conventions:
 
 #### P1-HYGIENE — Second hygiene pass
 
-- **Class:** Harden. **Scope:** ws_ipc unit/integration tests (the zero-test hub —
-  highest-value test gap in the repo); 300-line splits where the split improves the design
-  (never for its own sake); HOCON parser arm or drop the docs claim; `quest/analysis.rs`
-  boundary decision (§10.5).
-- **Complexity:** Medium (ws_ipc testing is genuinely hard — WebSocket framing + role
+- **Class:** Harden. **Scope:** ws_ipc **live-socket-path** integration tests (the hub's
+  routing/classification pure functions already have 16 unit tests in `ws_ipc/tests.rs` —
+  s52; the remaining gap is broadcast-counting / connection-lifecycle / emit-status);
+  300-line splits where the split improves the design
+  (never for its own sake); HOCON parser arm or drop the docs claim.
+- **Complexity:** Medium (WebSocket framing + role
   routing; start with routing/classification pure-function tests, `ws_protocol.rs`
-  classify_client_info is the natural unit).
+  classify_client_info is the natural unit — this half is DONE, s52).
 - **Completion criteria:** ws_ipc routing covered; integrity gate green with fewer seeded
   entries than at audit.
 
@@ -1579,7 +1581,7 @@ Evaluated against the code and the research, each with the reasoning:
 | 6 | **CI green ≠ local green** | Integrity gate is the source of truth; CI is a second witness | Low |
 | 7 | **Template content quality** | Coherency-over-ownership default ("probably a bad pack" is a win); templates editable and visible | Low |
 | 8 | **300-line debt growth** | Integrity gate already seeds; splits where the split improves the design | Low |
-| 9 | **ws_ipc reliability** (zero tests, security-sensitive hub) | P1-HYGIENE test investment; classify/routing pure functions first | Medium |
+| 9 | **ws_ipc reliability** (security-sensitive hub; unit tests landed s52, live-socket path still untested) | P1-HYGIENE test investment; classify/routing pure functions landed (16 tests, s52); live-socket-path tests next | Medium |
 | 10 | **Scope creep from exciting features** | This roadmap's P-order is binding: nothing ships ahead of the wedge; future/Investigate list is explicit | — |
 | 11 | **CF/Modrinth API drift** (search shapes, version fields — the s33 class) | Live-API probes in the test loop; tolerance per-source; slug fallback pattern extended | Medium |
 | 12 | **Curated-mod / config-recommendation maintenance burden** | Keep files tiny, community-extensible, doc'd as maintained artifacts | Low |
