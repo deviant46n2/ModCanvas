@@ -216,6 +216,12 @@ at the moments they exist for** — that is the point of having built them:
   decision is reviewable, never a free pass; CANDIDATES need maintainer judgment.
   `pnpm health` states known-debt explicitly, so a sub-100 score can only mean
   accepted decisions or actual debt — never an unexplained number.
+  **CI (s65):** the `.github/workflows/verify.yml` matrix (ubuntu + windows)
+  runs the suite on every push — CI is a SECOND WITNESS; the integrity gate
+  stays the source of truth (roadmap risk #6). Platform rule: build-smoke
+  spawns `sh` (Linux-only), so the Windows job runs
+  `node scripts/integrity-check.mjs --skip=build-smoke` and builds the
+  frontend as its own step.
 - **Before claiming any fix or feature works:** `/verify-build` — rebuild →
   deploy → restart → observe, each step graded on EVIDENCE (mtime, md5,
   process start, fresh log). A claim without evidence for all four steps is

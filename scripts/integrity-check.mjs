@@ -30,6 +30,11 @@
 //   node scripts/integrity-check.mjs            # all sections; exit 1 on violations
 //   node scripts/integrity-check.mjs --seed     # snapshot current tree into rules as parked
 //   node scripts/integrity-check.mjs line-limit # one section
+//   node scripts/integrity-check.mjs line-limit asset-bundle   # several sections
+//   node scripts/integrity-check.mjs --skip=build-smoke        # all except named
+//   node scripts/integrity-check.mjs --skip=build-smoke,suite-self  # comma-separated
+//   # --skip exists for platform-aware runs (build-smoke spawns `sh`, Linux-only);
+//   # unknown section names error loudly (exit 2) — no silent partial runs.
 // Tests: node --test scripts/integrity-check.test.mjs
 //
 // Exit codes: 0 clean, 1 violations, 2 error (bad cwd, git failure).
@@ -43,6 +48,7 @@ import { checkDiffHygiene, checkAdapterMatrix, checkDocSync } from './integrity-
 import { checkDocAnchors } from './integrity-doc.mjs'
 import { checkSuiteSelf } from './integrity-suite.mjs'
 import { checkBuildSmoke } from './integrity-build.mjs'
+import { selectSections, parseArgs } from './integrity-select.mjs'
 
 const RASTER = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
 
@@ -250,7 +256,7 @@ export function seedRules(rulesPath, rules, root) {
 
 // --- main ----------------------------------------------------------------
 
-export function runAllSections(rules, root, names) {
+export function runAllSections(rules, root, names = [], skip = []) {
   const sections = [
     { name: 'line-limit', run: () => checkLineLimit(rules, root) },
     { name: 'asset-bundle', run: () => checkAssetBundle(rules, root) },
@@ -262,17 +268,11 @@ export function runAllSections(rules, root, names) {
     { name: 'build-smoke', run: () => checkBuildSmoke(rules, root) },
     { name: 'suite-self', run: () => checkSuiteSelf(rules, root) },
   ]
-  const selected = names ? sections.filter((s) => names.includes(s.name)) : sections
-  if (selected.length === 0) {
-    throw new Error(
-      `integrity-check: unknown section "${names}" (line-limit|asset-bundle|stale-binary|diff-hygiene|adapter-matrix|doc-sync|doc-anchors|build-smoke|suite-self)`,
-    )
-  }
-  return selected.map((s) => ({ name: s.name, ...s.run() }))
+  return selectSections(sections, names, skip).map((s) => ({ name: s.name, ...s.run() }))
 }
 
 function main() {
-  const [arg] = process.argv.slice(2)
+  const { seed, names, skip } = parseArgs(process.argv.slice(2))
   const root = process.cwd()
   if (!existsSync(join(root, 'src-tauri', 'src'))) {
     console.error('integrity-check: run from the repo root (no src-tauri/src here)')
@@ -280,13 +280,13 @@ function main() {
   }
   const rules = loadRules()
 
-  if (arg === '--seed') {
+  if (seed) {
     seedRules(RULES_PATH, rules, root)
     console.log(`seeded ${RULES_PATH}`)
   }
 
   try {
-    const results = arg && arg !== '--seed' ? runAllSections(rules, root, [arg]) : runAllSections(rules, root)
+    const results = runAllSections(rules, root, names, skip)
     process.exit(report(results) > 0 ? 1 : 0)
   } catch (e) {
     console.error(`integrity-check: ${e.message}`)

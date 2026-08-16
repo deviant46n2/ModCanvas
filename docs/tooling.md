@@ -15,10 +15,16 @@ lift-out seam if a second project ever wants the tool.
 node scripts/integrity-check.mjs            # all sections; exit 1 on violations
 node scripts/integrity-check.mjs --seed     # snapshot current tree into rules as parked debt
 node scripts/integrity-check.mjs <section>  # one section
+node scripts/integrity-check.mjs line-limit asset-bundle  # several sections
+node scripts/integrity-check.mjs --skip=build-smoke       # all except named (comma-listable)
 node --test scripts/integrity-check.test.mjs # engine tests (12)
 `pnpm integrity` / `pnpm test:tools`   # same, via the root package.json
 `pnpm backup`                          # state backup + expiry audit
 ```
+`--skip=` exists for platform-aware runs (s65 CI matrix): build-smoke spawns
+`sh`, which is Linux-only, so the Windows job runs all sections except it.
+Selection semantics live in `scripts/integrity-select.mjs` (pure, tested) —
+unknown names error loudly (exit 2), never a silent partial run.
 The backup is also automated: a systemd user timer. Source of truth is
 `scripts/systemd/modcanvas-backup.{service,timer}`; the installed units in
 `~/.config/systemd/user/` are symlinks to the repo copies (install/reinstall:

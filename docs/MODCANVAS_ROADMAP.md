@@ -1103,13 +1103,23 @@ Conventions:
 - **Completion criteria:** a tagged commit produces downloadable artifacts; CI is the
   gatekeeper for the repo's "green" claim; a fresh machine can run the suite from
   `git clone`.
-- **PARKED (s42, written reason):** deferred until the hotswap arc ships. No CI is not
-  blocking anything local — the integrity gate is the repo's local truth and it runs
-  everywhere; releasing artifacts mid-arc invites users before the flagship feature lands.
-  **Tripwire:** revisit when P2-HOTSWAP lands or when a second machine needs the suite
-  from a clone (then CI is the gatekeeper it claims to be).
-  **TRIPWIRE FIRED (s44):** P2-HOTSWAP has landed — this park is due for revisit: scope CI
-  as a real item or re-park with a fresh written reason.
+- **SCOPED (s65 ruling) — CI verification matrix only.** The s42/s44 parks are closed: the
+  tripwire fired and the ruling is SCOPE, not re-park. Rationale: the codebase claims
+  Windows support (AGENTS.md EBUSY two-tier pipeline, roadmap risk #5) with zero
+  observations behind it — the matrix closes that honesty gap. Scope: `ubuntu-latest` +
+  `windows-latest` runners running `cargo test` + `pnpm test` + `pnpm lint` + `pnpm
+  integrity`; the integrity gate is platform-coupled in one section — build-smoke
+  spawns `sh -c` (integrity-build.mjs:58), so it runs on the Linux job only and the
+  Windows job runs the remaining sections (section selection exists on the CLI) plus
+  its own `tsc -b && vite build`. Done = first Windows run green, or red with its
+  platform findings triaged
+  (EBUSY, path separators, NTFS-vs-ext4 semantics are the unverified claims). Testing
+  only — a Windows release is explicitly gated on the matrix existing first
+  (distribution follows verification).
+- **RELEASE-ARTIFACT HALF — SEPARATED (s65):** CD (a tagged commit producing downloadable
+  artifacts) is a distinct item, not part of the CI ruling. Future order, ruled
+  separately: Flathub (real channel, real cost) → AUR (cheap, source-build, aspirational)
+  → Windows artifacts (gated on the matrix).
 
 #### P0-HYGIENE-1 — Dead code & lying UI
 
