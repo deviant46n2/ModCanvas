@@ -35,6 +35,12 @@ pub(crate) fn write_book_snbt(graph: &QuestGraph, quests_dir: &Path, effective_s
     };
     data_map.insert("default_autoclaim_rewards".to_string(), ce(SnbtValue::String(autoclaim)));
     data_map.insert("default_quest_shape".to_string(), ce(SnbtValue::String(graph.default_quest_shape.to_string())));
+    if !graph.book_icon.is_empty() {
+        // Book icon: FTB stores it as an ItemStack compound `icon: { id: "..." }`
+        // (QuestObjectBase.rawIcon); the editor keeps just the item id.
+        let icon_map = HashMap::from([("id".to_string(), ce(SnbtValue::String(graph.book_icon.clone())))]);
+        data_map.insert("icon".to_string(), ce(SnbtValue::Compound(icon_map)));
+    }
     data_map.insert("progression_mode".to_string(), ce(SnbtValue::String(graph.book_progression_mode.to_string())));
     data_map.insert("grid_scale".to_string(), ce(SnbtValue::Double(graph.grid_scale)));
     data_map.insert("detection_delay".to_string(), ce(SnbtValue::Int(graph.detection_delay)));

@@ -76,8 +76,6 @@ pub struct QuestGraph {
     #[serde(default)]
     pub layout: String,
     #[serde(default)]
-    pub default_quest_size: QuestSize,
-    #[serde(default)]
     pub default_quest_shape: QuestShape,
     /// FTB quest grid snap scale (`grid_scale` from data.snbt). Positions snap to
     /// multiples of `grid_scale × minSize`; default 0.5 matches in-game.
@@ -167,7 +165,6 @@ impl QuestGraph {
             book_background_image: String::new(),
             quest_color: String::new(),
             layout: String::new(),
-            default_quest_size: QuestSize::default(),
             default_quest_shape: QuestShape::Default,
             grid_scale: 0.5,
             default_reward_team: false,

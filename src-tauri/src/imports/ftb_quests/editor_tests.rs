@@ -35,7 +35,7 @@ fn editor_only_fields_roundtrip_through_json() {
 
 #[test]
 fn editor_only_fields_default_when_absent() {
-    let json = r#"{"id":"g","project_id":"p","name":"","description":"","nodes":[],"edges":[{"id":"e1","source":"a","target":"b","label":null,"edge_type":"prerequisite","inverted":false}],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_size":{"width":24,"height":24},"default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#;
+    let json = r#"{"id":"g","project_id":"p","name":"","description":"","nodes":[],"edges":[{"id":"e1","source":"a","target":"b","label":null,"edge_type":"prerequisite","inverted":false}],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#;
     let graph: QuestGraph = serde_json::from_str(json).unwrap();
     assert!(graph.edges[0].bezier.is_none());
     assert!(graph.edge_color.is_none());

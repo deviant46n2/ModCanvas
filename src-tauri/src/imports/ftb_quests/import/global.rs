@@ -53,6 +53,13 @@ pub(super) fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, 
             if let Some(shape) = snbt.get_str("default_quest_shape") {
                 graph.default_quest_shape = QuestShape::from_string(shape);
             }
+            // Book icon: FTB stores it as an ItemStack compound `icon: { id: "..." }`
+            // (QuestObjectBase.rawIcon). The editor keeps just the item id.
+            if let Some(map) = snbt.get_compound("icon") {
+                if let Some(id) = map.get_str("id") {
+                    graph.book_icon = id.to_string();
+                }
+            }
             if let Some(mode) = snbt.get_str("progression_mode") {
                 graph.book_progression_mode = QuestProgressionMode::from_string(mode);
             }
@@ -139,6 +146,11 @@ pub(super) fn parse_global_settings(quests_dir: &Path, format: FtBQuestsFormat, 
                 .or_else(|_| serde_json::from_str(&content))?;
             if let Some(shape) = val.get("default_quest_shape").and_then(|v| v.as_str()) {
                 graph.default_quest_shape = QuestShape::from_string(shape);
+            }
+            if let Some(obj) = val.get("icon").and_then(|v| v.as_object()) {
+                if let Some(id) = obj.get("id").and_then(|v| v.as_str()) {
+                    graph.book_icon = id.to_string();
+                }
             }
             if let Some(mode) = val.get("progression_mode").and_then(|v| v.as_str()) {
                 graph.book_progression_mode = QuestProgressionMode::from_string(mode);

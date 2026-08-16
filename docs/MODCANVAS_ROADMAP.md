@@ -1224,8 +1224,8 @@ Conventions:
 
 - **Class:** Expand (§13 P1-PARITY open items).
 - **Scope:** theme-file fidelity (`ftb_quests_theme.txt` parse → edge/panel/checkmark
-  rendering — the biggest rendering gap); book icon picker / book
-  default quest size / save-as-file; import/export hardening (layout choice, `min_width`/
+  rendering — the biggest rendering gap); book icon picker (**DONE s67**); import/export
+  hardening (layout choice, `min_width`/
   `invisible` alias unification, `chapter_groups.snbt`, quest `tags`); multi-page + inline
   image description editor.
 - **Complexity:** Medium–High (theme-file fidelity is the hard one). **Risk:** in-game
@@ -1243,9 +1243,20 @@ Conventions:
   wrong, THAT is the trigger to build it (parse the five colors → drive `EDGE_STATE_COLORS`
   with fallback — ~30 lines Rust + service, no rendering change). Checkmark icons stay
   parked: they are texture keys, needing runtime materialization (the no-bundling rule's
-  domain) — a texture-pipeline lift, not a theme parse. Remaining active items: book icon
-  picker / book default quest size / save-as-file; import/export hardening; description
-  editor.
+  domain) — a texture-pipeline lift, not a theme parse. Remaining active items: import/export
+  hardening; description editor.
+- **Status (s67 ruling):** book icon picker **DONE** — FTB stores the book icon as an
+  ItemStack compound `icon: { id: "..." }` (verified in a real `data.snbt` + the shipped
+  jar's `QuestObjectBase.rawIcon`); import/global.rs now parses it (SNBT + JSON5), export/
+  book.rs writes it, and the Book Settings modal gained a "Pick Icon" button wired to the
+  shared `IconPicker` (`type: 'book'`). Round-trip locked in
+  `book_level_settings_roundtrip_through_export`. **"Book default quest size" resolved as a
+  PHANTOM and REMOVED**: the game has no book-level default size (`BaseQuestFile` has no
+  such field — only `Chapter.defaultQuestSize`, a scalar the chapter flow already
+  round-trips); the book-level model field/UI/passthrough were write-only, deleted with a
+  written reason. **"Save-as-file" resolved as NOT A SETTING**: in the jar it is an in-game
+  context-menu action (`saveLocally()`), already covered by the app's Save/export. Both
+  resolutions recorded in quest-editor.md + bible §8.2.
 
 #### P1-HYGIENE — Second hygiene pass
 

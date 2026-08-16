@@ -93,7 +93,6 @@ export function applyBookTheme(graph: QuestGraphData, preset: BookThemePreset): 
     ...graph,
     quest_color: preset.questColor,
     default_quest_shape: preset.defaultShape,
-    default_quest_size: { ...preset.defaultSize },
     edge_color: preset.edgeColor,
     edge_cycle_color: preset.cycleColor,
     active_theme: preset.id,

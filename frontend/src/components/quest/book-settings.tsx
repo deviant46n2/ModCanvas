@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { XIcon } from '../ui/icons'
 import type { QuestGraphData } from '../../services/api'
 import { SHAPES, PROGRESSION_MODES } from './quest-helpers'
+import { textureDisplayUrl } from '../../services/texture-loader'
 
 interface BookSettingsProps {
   open: boolean
@@ -12,6 +13,8 @@ interface BookSettingsProps {
   onClose: () => void
   onSave: () => void
   pickDir: () => Promise<string | null>
+  openIconPicker?: (target: { type: 'quest' | 'objective' | 'reward' | 'chapter' | 'book'; index?: number; nodeId?: string }) => void
+  textureIndex: Record<string, string>
 }
 
 export function BookSettings({
@@ -23,6 +26,8 @@ export function BookSettings({
   onClose,
   onSave,
   pickDir,
+  openIconPicker,
+  textureIndex,
 }: BookSettingsProps) {
   const [modsDirInput, setModsDirInput] = useState('')
 
@@ -68,14 +73,6 @@ export function BookSettings({
               </select>
             </div>
             <div className="ftb-popup-field">
-              <label>Default Quest Width</label>
-              <input type="number" value={graph.default_quest_size?.width || 24} onChange={(e) => onGraphChange({ ...graph, default_quest_size: { ...graph.default_quest_size, width: parseInt(e.target.value) || 24 } })} />
-            </div>
-            <div className="ftb-popup-field">
-              <label>Default Quest Height</label>
-              <input type="number" value={graph.default_quest_size?.height || 24} onChange={(e) => onGraphChange({ ...graph, default_quest_size: { ...graph.default_quest_size, height: parseInt(e.target.value) || 24 } })} />
-            </div>
-            <div className="ftb-popup-field">
               <label>Grid Scale (snap)</label>
               <input type="number" step="0.1" value={graph.grid_scale ?? 0.5} onChange={(e) => onGraphChange({ ...graph, grid_scale: parseFloat(e.target.value) || 0.5 })} />
             </div>
@@ -106,6 +103,42 @@ export function BookSettings({
           </div>
           <div className="ftb-popup-section">
             <div className="ftb-popup-section-title">Book Behavior (data.snbt)</div>
+            <div className="ftb-popup-field">
+              <label>Book Icon</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div
+                  style={{
+                    width: 40, height: 40, borderRadius: 4, border: '1px solid #313244',
+                    background: '#181825', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden', flexShrink: 0,
+                  }}
+                >
+                  {graph.book_icon && (
+                    <img
+                      src={textureDisplayUrl(textureIndex, graph.book_icon) || ''}
+                      alt={graph.book_icon}
+                      style={{ width: 32, height: 32, imageRendering: 'pixelated' }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  )}
+                </div>
+                <button
+                  className="ftb-popup-btn"
+                  onClick={() => openIconPicker?.({ type: 'book' })}
+                >
+                  {graph.book_icon ? 'Change Icon' : 'Pick Icon'}
+                </button>
+                {graph.book_icon && (
+                  <button
+                    className="ftb-popup-btn"
+                    onClick={() => onGraphChange({ ...graph, book_icon: '' })}
+                  >
+                    Clear
+                  </button>
+                )}
+                <span style={{ fontSize: 11, opacity: 0.6 }}>{graph.book_icon || 'No icon — FTB uses its default book icon'}</span>
+              </div>
+            </div>
             <label className="ftb-popup-checkbox">
               <input type="checkbox" checked={graph.show_lock_icons ?? true} onChange={(e) => onGraphChange({ ...graph, show_lock_icons: e.target.checked })} />
               <span>Show lock icons on locked quests</span>

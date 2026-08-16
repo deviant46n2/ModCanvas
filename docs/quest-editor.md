@@ -517,6 +517,20 @@ hardcoded (previously `export.rs` always wrote `default_reward_team: 0b`,
   `verify_on_load`, `default_quest_disable_jei`, and `loot_crate_no_drop`
   (`LootCrateNoDrop` — boss/monster/passive percentages). Helpers
   `EmergencyItem` and `LootCrateNoDrop` live in the same types file.
+- **Book icon (s67):** FTB stores the book's icon as an ItemStack compound
+  `icon: { id: "..." }` in `data.snbt` (`QuestObjectBase.rawIcon`). The editor
+  keeps just the item id in `QuestGraph.book_icon`. `import/global.rs` parses
+  the compound's `id` in both the SNBT and JSON5 arms; `export/book.rs` writes
+  the compound when `book_icon` is non-empty (absent = FTB's default book
+  icon). The picker is the shared `IconPicker` (`icon-picker.tsx`) opened with
+  `target: { type: 'book' }` from the Book Settings modal (`book-settings.tsx`
+  "Pick Icon" button); the preview resolves via the texture materializer.
+- **Book-level `default_quest_size` removed (s67):** the model field, the
+  Book Settings width/height inputs, and the toolbar/theme passthrough were
+  deleted as a phantom — FTB has no book-level default size (`BaseQuestFile`
+  has no such field); only `Chapter.defaultQuestSize` exists, a scalar
+  multiplier that the chapter-level flow already round-trips (see chapter
+  metadata section above). New chapters keep the hardcoded 24-unit default.
 - `src-tauri/src/imports/ftb_quests/import/global.rs` — `parse_global_settings` reads
   them from both `data.snbt` and `data.json5`.
 - `src-tauri/src/imports/ftb_quests/export/mod.rs` — `export_ftb_quests_snbt` writes

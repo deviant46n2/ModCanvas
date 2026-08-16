@@ -7,7 +7,6 @@ import type {
   QuestNodeData,
   QuestRewardData,
 } from './quest'
-import type { QuestSize } from './quest'
 
 export interface EdgeControlPoint {
   x: number
@@ -68,7 +67,6 @@ export interface QuestGraphData {
   book_icon: string
   book_background_image: string
   quest_color: string
-  default_quest_size: QuestSize
   default_quest_shape: string
   grid_scale: number
   default_reward_team?: boolean

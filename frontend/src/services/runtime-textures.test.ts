@@ -22,7 +22,6 @@ function graph(partial: Partial<QuestGraphData>): QuestGraphData {
     book_icon: '',
     book_background_image: '',
     quest_color: '',
-    default_quest_size: { width: 24, height: 24 },
     default_quest_shape: 'circle',
     grid_scale: 1,
     ...partial,

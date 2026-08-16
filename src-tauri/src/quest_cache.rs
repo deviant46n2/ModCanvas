@@ -141,7 +141,7 @@ mod tests {
         }
         crate::path_safety::atomic_write_str(
             &path,
-            r#"{"id":"g","project_id":"p","name":"Disk Book","description":"","nodes":[],"edges":[],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_size":{"width":24,"height":24},"default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#,
+            r#"{"id":"g","project_id":"p","name":"Disk Book","description":"","nodes":[],"edges":[],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#,
         )
         .unwrap();
 
@@ -165,7 +165,7 @@ mod tests {
         }
         crate::path_safety::atomic_write_str(
             &legacy,
-            r#"{"id":"g","project_id":"p","name":"Legacy Book","description":"","nodes":[],"edges":[],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_size":{"width":24,"height":24},"default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#,
+            r#"{"id":"g","project_id":"p","name":"Legacy Book","description":"","nodes":[],"edges":[],"reward_tables":[],"chapters":[],"chapter_groups":[],"book_progression_mode":"default","book_icon":"","book_background_image":"","quest_color":"","default_quest_shape":"default","grid_scale":0.5,"default_reward_team":false,"default_consume_items":false,"default_autoclaim_rewards":"disabled","detection_delay":20}"#,
         )
         .unwrap();
 

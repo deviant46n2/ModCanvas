@@ -202,7 +202,7 @@ The MVP's job is to build the **guided wrapper** that hides the power that alrea
 - Import/export hardening (layout choice, `min_width`/`invisible` alias unification, `chapter_groups.snbt`, quest `tags`).
 - Description editor: multi-page + inline images.
 - Theme-file fidelity (`ftb_quests_theme.txt` parsing → edge/panel/checkmark rendering).
-- Remaining book-level settings (emergency items, lock message, book icon picker, fallback locale, save-as-file).
+- Remaining book-level settings: book icon picker (DONE s67 — FTB `icon: { id }` compound, wired import/export + picker; save-as-file was an in-game action already covered by Save).
 - Rest of the 1.21.1 loader matrix (Forge, Fabric).
 - Newer stable MC versions as they stabilize. Older versions: stretch goals / contributor additions only.
 

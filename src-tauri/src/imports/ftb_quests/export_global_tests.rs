@@ -53,6 +53,9 @@ fn book_level_settings_roundtrip_through_export() {
         quests_dir.join("data.snbt"),
         r#"{
         version: 13
+        icon: {
+            id: "minecraft:stone"
+        }
         emergency_items: [
             {
                 count: 1
@@ -86,6 +89,7 @@ fn book_level_settings_roundtrip_through_export() {
     let import_result = import_ftb_quests(tmp.path()).unwrap();
     let graph = import_result.graph;
     assert_eq!(graph.emergency_items.len(), 2, "emergency items parsed");
+    assert_eq!(graph.book_icon, "minecraft:stone", "book icon id parsed from compound");
     assert_eq!(graph.emergency_items[0].id, "minecraft:grass_block");
     assert_eq!(graph.emergency_items[0].count, 1);
     assert_eq!(graph.emergency_items[1].count, 3);
@@ -109,6 +113,8 @@ fn book_level_settings_roundtrip_through_export() {
     let data_path = export_dir.path().join("config").join("ftbquests").join("quests").join("data.snbt");
     let content = std::fs::read_to_string(&data_path).expect("data.snbt written");
     assert!(content.contains("emergency_items_cooldown: 300"), "cooldown persisted");
+    assert!(content.contains("icon: {"), "book icon compound written");
+    assert!(content.contains("\"minecraft:stone\""), "book icon id persisted");
     assert!(content.contains("\"You must unlock this first\""), "lock message persisted");
     assert!(content.contains("show_lock_icons: 1b"), "show lock icons persisted");
     assert!(content.contains("\"en_us\""), "fallback locale persisted");
@@ -117,6 +123,7 @@ fn book_level_settings_roundtrip_through_export() {
 
     let graph2 = import_ftb_quests(export_dir.path()).unwrap().graph;
     assert_eq!(graph2.emergency_items.len(), 2, "emergency items survive round-trip");
+    assert_eq!(graph2.book_icon, "minecraft:stone", "book icon survives round-trip");
     assert_eq!(graph2.emergency_items[0].id, "minecraft:grass_block");
     assert_eq!(graph2.emergency_items[1].id, "enderio:grains_of_infinity");
     assert_eq!(graph2.emergency_items[1].count, 3);

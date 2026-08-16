@@ -133,6 +133,8 @@ export function ImportExportToolbar({
         onClose={() => setShowBookSettings(false)}
         onSave={saveNow}
         pickDir={pickDir}
+        openIconPicker={openIconPicker}
+        textureIndex={textureIndex}
       />
 
       <RewardTablesModal

@@ -148,7 +148,6 @@ export function useQuestToolbarActions({
       book_icon: graph.book_icon,
       book_background_image: graph.book_background_image,
       quest_color: graph.quest_color,
-      default_quest_size: graph.default_quest_size,
       default_quest_shape: graph.default_quest_shape,
     }
     const emptyIconNodes = updatedGraph.nodes.filter(n => !n.icon)
