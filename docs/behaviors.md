@@ -3,7 +3,7 @@
 Status: **s46** — the §11.1 MVP vocabulary is implemented end-to-end: 10
 triggers, 6 conditions, 8 actions, two backends (KubeJS + datapack), the
 full editor with a live compile preview and ItemBrowser picking, Pack Health
-integration, and 3 example behaviors in the wizard template. See
+integration, and 14 example behaviors in the wizard template. See
 `docs/MODCANVAS_ROADMAP.md` §11 for the full proposal and §13 P2-BEHAVIOR for
 status. The roadmap's model is binding: **a constrained Trigger → Conditions
 → Actions rule with a small curated action library, NOT a generic visual
@@ -215,15 +215,30 @@ registry, which Pack Health has no set for — checking it against the item
 registry would false-flag every valid entity id (documented, not silently
 skipped). Shared degraded-registry guard + coverage metric.
 
-## Template examples (s46)
+## Template examples (s46, expanded s70)
 
-The `ide-tour` template ships 3 example behaviors in
+The `ide-tour` template ships **14 example behaviors** in
 `.modcanvas/behaviors.json` (scaffolded as project-root private state via
-`TemplateMeta.state_files`, never under `config/`): a join-time starter kit
-(KubeJS), a zombie-kill reward with a random-chance condition + stage
-(KubeJS), and an advancement-chain reward (datapack) — demonstrating both
-backends per roadmap §11.3. Fidelity tests lock that they parse as valid IR
-and compile on their declared backends.
+`TemplateMeta.state_files`, never under `config/`): the minimal complete
+showcase — every trigger, every condition, and every action of the
+vocabulary appears at least once across the set, with both backends
+demonstrated (12 KubeJS + 2 datapack) per roadmap §11.3. Each example is a
+named, pack-shaped use case (starter kit, kill reward, heal-on-hurt,
+dimension-gated loot, stage progression, timed blessing, datapack chains) —
+the template is the **no-code showcase**: a beginner assembles a pack from
+what they can see exists. The 3 original examples (Starter Kit, Zombie
+Hunter, Story Reward) are kept verbatim as the first entries. Fidelity
+tests lock that they parse as valid IR, compile on their declared backends,
+and that the set keeps demonstrating the full vocabulary
+(`template_examples_cover_the_full_vocabulary` in `templates/tests_behaviors.rs`
+— the template sibling of the smoke-suite locks: when the vocabulary grows,
+the template must grow with it).
+
+The teaching side is deliberately parked (s70): the ide-tour chapter's
+quests do not name individual examples yet — the exhibits speak for
+themselves. Tripwire: when the guide chapter is next touched, the named
+examples get written in. The in-game verification of the vocabulary remains
+the smoke suite's job (`docs/behavior-smoke-test.md`), not the template's.
 
 ## Verification story
 
@@ -238,5 +253,9 @@ and compile on their declared backends.
   runtime-only surprises remain").
 - **In-game verification:** the `give` count form (`Item.of(id, count)`)
   was proven in a real game at s45. The s46 vocabulary's runtime behavior
-  (new triggers, conditions, actions, and the datapack advancement chain) is
-  the arc's final verification node.
+  (new triggers, conditions, actions, and the datapack advancement chain)
+  was the arc's final verification node — **COMPLETE (s70)** via the smoke
+  suite (`docs/behavior-smoke-test.md`) on a fresh instance: all 12
+  chat-observable behaviors fired, the negative control held, both datapack
+  chains granted their rewards. Run details in the roadmap §13 P2-BEHAVIOR
+  s70 status.

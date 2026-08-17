@@ -12,7 +12,7 @@ The registry ships two templates, both consumed by the four-card StartChooser
 | id | Name | What it scaffolds |
 |---|---|---|
 | `intro` | Intro — your first pack in minutes | One chapter, 6 quests: the core loop (workbench → add quest → task+reward → save → health) + a final **Shed the Guide** quest that teaches deleting the chapter. Lands in Beginner Mode. No behaviors state. |
-| `ide-tour` | IDE Tour — learn every tool | One chapter, 21 quests: the full feature walkthrough (quests, recipes, configs, behaviors, loot, mods, health, launch, export) + **Shed the Guide**. Pure tool teaching — no play chapter. Ships 3 example behaviors (both backends). |
+| `ide-tour` | IDE Tour — learn every tool | One chapter, 21 quests: the full feature walkthrough (quests, recipes, configs, behaviors, loot, mods, health, launch, export) + **Shed the Guide**. Pure tool teaching — no play chapter. Ships **14 example behaviors** — the minimal complete vocabulary showcase (every trigger/condition/action, both backends; see `docs/behaviors.md` "Template examples"). |
 
 Both end with **Shed the Guide** — a self-removing lesson: the last quest of a
 guided start teaches the user to delete the guide chapter, converging a guided

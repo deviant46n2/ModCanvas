@@ -1,36 +1,296 @@
 [
   {
     "id": "modcanvas:starter_kit",
-    "name": "Starter Kit — welcome gift",
+    "name": "Starter Kit \u2014 welcome gift",
     "backend": "kubejs",
-    "trigger": { "kind": "player_joins_game" },
+    "trigger": {
+      "kind": "player_joins_game"
+    },
     "conditions": [],
     "actions": [
-      { "kind": "give_item", "item": "minecraft:bread", "count": 8 },
-      { "kind": "message", "text": "Welcome! Your starter kit has arrived." }
+      {
+        "kind": "give_item",
+        "item": "minecraft:bread",
+        "count": 8
+      },
+      {
+        "kind": "message",
+        "text": "Welcome! Your starter kit has arrived."
+      }
     ]
   },
   {
     "id": "modcanvas:zombie_hunter",
-    "name": "Zombie Hunter — kill reward",
+    "name": "Zombie Hunter \u2014 kill reward",
     "backend": "kubejs",
-    "trigger": { "kind": "player_kills_entity", "entity": "minecraft:zombie" },
+    "trigger": {
+      "kind": "player_kills_entity",
+      "entity": "minecraft:zombie"
+    },
     "conditions": [
-      { "kind": "random_chance", "chance": 0.5 }
+      {
+        "kind": "random_chance",
+        "chance": 0.5
+      }
     ],
     "actions": [
-      { "kind": "give_item", "item": "minecraft:diamond", "count": 1 },
-      { "kind": "set_stage", "stage": "zombie_hunter" }
+      {
+        "kind": "give_item",
+        "item": "minecraft:diamond",
+        "count": 1
+      },
+      {
+        "kind": "set_stage",
+        "stage": "zombie_hunter"
+      }
     ]
   },
   {
     "id": "modcanvas:story_reward",
-    "name": "Story Reward — datapack chain",
+    "name": "Story Reward \u2014 datapack chain",
     "backend": "datapack",
-    "trigger": { "kind": "advancement_completed", "advancement": "minecraft:story/root" },
+    "trigger": {
+      "kind": "advancement_completed",
+      "advancement": "minecraft:story/root"
+    },
     "conditions": [],
     "actions": [
-      { "kind": "give_item", "item": "minecraft:apple", "count": 1 }
+      {
+        "kind": "give_item",
+        "item": "minecraft:apple",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:last_goodbye",
+    "name": "Last Goodbye \u2014 server wave",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "player_leaves_game"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "run_command",
+        "command": "say A player left the world"
+      },
+      {
+        "kind": "remove_item",
+        "item": "minecraft:bread"
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:last_stand",
+    "name": "Last Stand \u2014 heal when hurt",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "player_takes_damage"
+    },
+    "conditions": [
+      {
+        "kind": "health_below",
+        "health": 8
+      }
+    ],
+    "actions": [
+      {
+        "kind": "heal",
+        "amount": 4
+      },
+      {
+        "kind": "message",
+        "text": "Not today! You were healed."
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:hunters_code",
+    "name": "Hunter's Code \u2014 honor rules",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "player_kills_entity"
+    },
+    "conditions": [
+      {
+        "kind": "entity_type",
+        "entity": "minecraft:zombie"
+      },
+      {
+        "kind": "item_held",
+        "item": "minecraft:diamond"
+      }
+    ],
+    "actions": [
+      {
+        "kind": "message",
+        "text": "A worthy kill \u2014 the Code is satisfied."
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:nether_scout",
+    "name": "Nether Scout \u2014 dimension reward",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "player_kills_entity",
+      "entity": "minecraft:zombified_piglin"
+    },
+    "conditions": [
+      {
+        "kind": "dimension",
+        "dimension": "minecraft:the_nether"
+      }
+    ],
+    "actions": [
+      {
+        "kind": "give_item",
+        "item": "minecraft:gold_ingot",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:master_craft",
+    "name": "Master Craft \u2014 craft reward",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "item_crafted",
+      "item": "minecraft:crafting_table"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "give_item",
+        "item": "minecraft:stick",
+        "count": 2
+      },
+      {
+        "kind": "message",
+        "text": "A crafting table! The first step of every adventure."
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:crafting_bonus",
+    "name": "Crafting Bonus \u2014 datapack craft",
+    "backend": "datapack",
+    "trigger": {
+      "kind": "item_crafted",
+      "item": "minecraft:crafting_table"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "give_item",
+        "item": "minecraft:apple",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:scavenger",
+    "name": "Scavenger \u2014 gather threshold",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "item_picked_up",
+      "item": "minecraft:cobblestone"
+    },
+    "conditions": [
+      {
+        "kind": "item_in_inventory",
+        "item": "minecraft:cobblestone",
+        "min_count": 8
+      }
+    ],
+    "actions": [
+      {
+        "kind": "message",
+        "text": "Eight cobblestone gathered \u2014 good scavenging!"
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:campfire_blessing",
+    "name": "Campfire Blessing \u2014 place reaction",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "block_placed",
+      "block": "minecraft:campfire"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "message",
+        "text": "Cozy. The campfire warms the night."
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:lumberjack",
+    "name": "Lumberjack \u2014 replant trees",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "block_broken",
+      "block": "minecraft:oak_log"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "give_item",
+        "item": "minecraft:oak_sapling",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:adventure_reward",
+    "name": "Adventure Reward \u2014 journey begins",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "advancement_completed",
+      "advancement": "minecraft:adventure/root"
+    },
+    "conditions": [],
+    "actions": [
+      {
+        "kind": "teleport",
+        "x": 0.0,
+        "y": 80.0,
+        "z": 0.0,
+        "yaw": 0.0,
+        "pitch": 0.0
+      },
+      {
+        "kind": "spawn_entity",
+        "entity": "minecraft:chicken"
+      },
+      {
+        "kind": "message",
+        "text": "Adventure awaits \u2014 a companion joins you."
+      }
+    ]
+  },
+  {
+    "id": "modcanvas:wild_pulse",
+    "name": "Wild Pulse \u2014 timed blessing",
+    "backend": "kubejs",
+    "trigger": {
+      "kind": "timed_every",
+      "ticks": 1200
+    },
+    "conditions": [
+      {
+        "kind": "random_chance",
+        "chance": 0.25
+      }
+    ],
+    "actions": [
+      {
+        "kind": "message",
+        "text": "The wild pulses \u2014 you feel watched."
+      }
     ]
   }
 ]

@@ -200,7 +200,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | First-Pack wizard | `PROJECT_BIBLE.md:258` (§10.2) | **Implemented (P0-WIZARD chunks 1–3; s49 reshape).** Entry is a four-card `StartChooser` (intro / IDE tour / blank / load — user choice, never first-run detection). `WizardStepper.tsx`: name your pack (auto-creates a fresh Prism instance, MC 1.21.1 · NeoForge) → **curated mod picks** (backend-filtered, pre-ticked; execution hands off to Prism — s53 PRISM-LEAN) → **green check + Launch** (same report as the Health tab, `test_project`). The guided first quest moved OUT of the wizard to the live surface (s53 — see step 5 below). The chooser presets the template; blank starts skip the post-create steps and land straight in the IDE. `create_project` scaffolds template packages. Guided first quest lands with P0-MINIWIZ. |
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — entries: the quest editor's `✨ Add a quest` toolbar button (everyone) and the Beginner Mode live banner (s53, first companion connect per session). The external wizard handoff (`showGuidedQuest`) was removed with the wizard step (s53). Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
-| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
+| Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, **14 example behaviors** — minimal complete vocabulary showcase, both backends, s70) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Partially implemented (s65 ruling)** — CI verification matrix DONE: `.github/workflows/verify.yml` (ubuntu + windows) runs the suite on every push; the integrity gate stays the source of truth, CI is a second witness (roadmap risk #6). Release artifacts: still absent — local `pnpm build` only (P0-DISTRIB release-artifact half, separated s65). |
 | Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
@@ -433,7 +433,7 @@ ceiling.
 | Configs | flip a setting safely, find a setting | **~60%** — structured forms | ~85% | settings with no typed schema, cross-mod interdependencies | Medium (HOCON arm + schema heuristics + config recommendations) |
 | Mods | find, add, remove, enable/disable, compat-check | **~60% (s53 PRISM-LEAN)** — install/search DEPRECATED (Prism owns execution: versions + deps); ModCanvas keeps scan, tracking, remove/toggle, compat DIAGNOSIS + curated list | ~90% | chunk-2 deletion of the deprecated machinery; compat panel install buttons → Prism handoff | Low–Medium |
 | Progression | gating, ordering, bottlenecks, walls | **~50%** — per-quest fields + sim mode; no campaign surface | ~85% | progression-topology analytics (pure math), cross-chapter staging | Medium |
-| Behaviors | "when X, if Y, do Z" (commands, loot on kill, stage gating) | **~5%** — nothing authorable | ~65% | anything requiring custom logic beyond the action library | **High** (the hard no-code problem; §11) |
+| Behaviors | "when X, if Y, do Z" (commands, loot on kill, stage gating) | **~65% (s70)** — full §11.1 vocabulary: 10 triggers, 6 conditions, 8 actions, both backends (KubeJS + datapack), editor with live compile preview, in-game smoke-verified; 14 example behaviors in templates | ~80% | anything requiring custom logic beyond the action library; the teaching bridge ("add custom" — parked, revisit when users test the showcase) | **High** (the hard no-code problem; §11) |
 | Loot | table edits, drops, weighted tables | **~5%** — nothing | ~60% | deep loot-table composition (nested pools, conditions-in-JSON) | Medium–High |
 | Worldgen | ores, features, structures, biomes, dimensions | **~0%** | ~40% | anything beyond datapack-JSON scope | **Very High** (dimension/terrain is the deepest) |
 | Pack health | "is my pack sound before boot" | **~95%** of Tier-1 scope | Tier 2 topology pure math | runtime-only failures (never claimable offline) | Medium |
@@ -685,7 +685,8 @@ Per `PROJECT_BIBLE.md:258-269`, made concrete against today's code:
    `docs/templates.md`), and two templates ship with fidelity tests: `intro` (6-quest
    core loop + Shed the Guide, lands in Beginner Mode) and `ide-tour` (21-quest feature
    walkthrough with a 10-quest teaching spine + ten side branches + Shed the Guide;
-   health quest converges all content branches; 3 example behaviors). The four-card
+   health quest converges all content branches; 14 example behaviors — minimal
+    complete vocabulary showcase, s70). The four-card
    `StartChooser` (chunk 2/3) lets the user pick which to start with.
  4. **Curated mod picks (optional)** — a short "these go well together" list with defaults
     pre-checked. **Not** a 10k-item browser (Bible §10.2 step 4). Needs a small, maintained curation
@@ -1363,8 +1364,8 @@ Conventions:
 #### P2-BEHAVIOR — Behavior system MVP
 
 - **Class:** New (§11). Trigger→Conditions→Actions cards; Behavior IR (typed, private);
-  KubeJS + datapack compilers; Pack Index reference validation; 3 example behaviors in
-  wizard templates.
+  KubeJS + datapack compilers; Pack Index reference validation; 14 example behaviors in
+  wizard templates (minimal complete vocabulary showcase, s70).
 - **Dependencies:** P1-PACKINDEX (validation), stable `scriptgen/kubejs.rs`.
 - **Complexity:** High. **Risk:** generated-script correctness — the compiler must be
   covered by golden-output tests (input IR → expected script string), the same pattern as
@@ -1446,12 +1447,31 @@ Conventions:
   (`Backend` field, defaults kubejs — stored behaviors keep loading). **Editor:**
   per-kind cards for the whole vocabulary, backend selector, live compile preview
   labeled by backend, and **ItemBrowser picking** for give/remove (the chunk-3 scope
-  cut, paid — shared registry scan, never duplicated). **Templates:** 3 example
+  cut, paid — shared registry scan, never duplicated). **Templates:** 14 example
   behaviors shipped via `TemplateMeta.state_files` (project-root `.modcanvas/`, both
-  backends, roadmap §11.3). **Health:** give_item + remove_item checked;
+  backends, minimal complete vocabulary showcase, roadmap §11.3 — expanded 3 → 14 at
+  s70: every trigger/condition/action appears in the showcase, locked by
+  `template_examples_cover_the_full_vocabulary`; teaching side parked with a
+  tripwire). **Health:** give_item + remove_item checked;
   spawn_entity deliberately not (entity registry ≠ item registry, documented). 425
   Rust + 685 frontend green. REMAINING: in-game verification of the new vocabulary on
   a real instance (the arc's final node). Details: `docs/behaviors.md`.
+- **Status (s70): COMPLETE.** The in-game verification node is spent. The smoke suite
+  (`src-tauri/src/behavior/smoke_suite.json`, 15 behaviors, runbook
+  `docs/behavior-smoke-test.md`) ran on a FRESH instance (`test`, flatpak Prism root,
+  1.21.1 · NeoForge 21.1.248, KubeJS 2101.7.2, companion jar md5-verified current)
+  at s70: **all 12 chat-observable behaviors fired** (SMOKE-1..7, 9..11, 14, 15 —
+  including the four s46 gaps: crafted/placed/broken/item_held), **the negative
+  control SMOKE-8 never fired** (item_in_inventory guard held), and **both datapack
+  chains (12/13) granted their apples** (silent by design — `"display": null` in the
+  emitted advancement JSON; verified by inventory, artifacts validated at load:
+  "Validated 4 files in kubejs/data/"). Every trigger/condition/action variant now
+  proven at runtime on a real game. Same session: the template's example behaviors
+  expanded 3 → 14 (minimal complete vocabulary showcase — every
+  trigger/condition/action, both backends; fidelity locked by
+  `template_examples_cover_the_full_vocabulary` in `templates/tests_behaviors.rs`).
+  Teaching side (an "add custom" bridge toward hand-written KubeJS) deliberately
+  parked: revisit when users are testing the showcase.
 
 #### P2-CONFIG — Config recommendations
 

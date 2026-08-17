@@ -65,7 +65,9 @@ const TEMPLATES: &[TemplateMeta] = &[
         ],
         // Example behaviors ship with the template so a new pack demonstrates
         // the Behaviors tab (roadmap §11.3: "Loot-on-kill / advancement gating
-        // examples shipped in templates"). They are scaffolded as PRIVATE state
+        // examples shipped in templates"; expanded to the minimal complete
+        // vocabulary showcase at s70 — 14 examples covering every
+        // trigger/condition/action). They are scaffolded as PRIVATE state
         // (`.modcanvas/`), same as the app writes on save — the Behaviors tab
         // lists them on first open, and Save re-emits the artifacts.
         state_files: &[(
@@ -139,3 +141,5 @@ pub fn scaffold_template(project_root: &Path, template_id: &str) -> Result<(), S
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_behaviors;
