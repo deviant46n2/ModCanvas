@@ -1,12 +1,15 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
 import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { analyzePackHealth } from '../../core/pack-health'
 import type { PackHealthReport } from '../../core/pack-health/types'
+import { getPackIndex, invalidatePackIndex } from '../../services/pack-index'
+import type { PackIndex } from '../../services/pack-index'
 
 export interface PackHealthProviderProps {
   project: {
+    id: string
     name: string
     description: string
     author: string
@@ -53,6 +56,41 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
     packVersion: project.pack_version,
   }
 
+  // Pack Index for the availability check (P1-HEALTH-2). Two fetch paths:
+  //  1. mount / project change — load the memoized index for this project.
+  //  2. recipe SAVE (dirty true→false — scripts written to disk, `markClean`)
+  //     — invalidate + refetch so saved recipes show up (same freshness
+  //     contract as the palette's usageRefreshKey, at the provider level).
+  // Per-edit dirty flips (true) do NOT refetch (nothing is on disk yet).
+  // Failures degrade to null → the availability check is skipped, never
+  // fired as "no recipes".
+  const [packIndex, setPackIndex] = useState<PackIndex | null>(null)
+  const recipeDirty = useRecipeStore((s) => s.dirty)
+  const wasDirty = useRef(recipeDirty)
+
+  useEffect(() => {
+    let cancelled = false
+    getPackIndex(project.id)
+      .then((idx) => { if (!cancelled) setPackIndex(idx) })
+      .catch(() => { if (!cancelled) setPackIndex(null) })
+    return () => { cancelled = true }
+  }, [project.id])
+
+  useEffect(() => {
+    // Save transition detection: dirty went true → false means scripts were
+    // written to disk (markClean). Skip the initial mount (wasDirty starts
+    // as the current value) and the edit-start flip (dirty → true).
+    const saveLanded = wasDirty.current === true && recipeDirty === false
+    wasDirty.current = recipeDirty
+    if (!saveLanded) return
+    let cancelled = false
+    invalidatePackIndex(project.id)
+    getPackIndex(project.id)
+      .then((idx) => { if (!cancelled) setPackIndex(idx) })
+      .catch(() => { if (!cancelled) setPackIndex(null) })
+    return () => { cancelled = true }
+  }, [project.id, recipeDirty])
+
   const [report, setReport] = useState<PackHealthReport>(() =>
     analyzePackHealth({
       questGraph,
@@ -64,6 +102,7 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
       packLoaded,
       installedMods,
       depIssues,
+      packIndex,
     }),
   )
 
@@ -80,11 +119,12 @@ export function PackHealthProvider({ project, packLoaded, installedMods, childre
           packLoaded,
           installedMods,
           depIssues,
+          packIndex,
         }),
       )
     }, 300)
     return () => clearTimeout(t)
-  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues])
+  }, [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues, packIndex])
 
   const value = { report }
 

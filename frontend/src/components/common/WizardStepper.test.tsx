@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { invoke } from '@tauri-apps/api/core'
 import { WizardStepper, type CreateProjectInput } from './WizardStepper'
 
 vi.mock('../../services/instances', async (importOriginal) => {
@@ -56,6 +57,13 @@ describe('WizardStepper', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(resolveLoaderVersion).mockResolvedValue('21.1.248')
+    // The health step fetches the Pack Index on mount (P1-HEALTH-2).
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === 'get_pack_index') {
+        return Promise.resolve({ items: [], tags: [], references: [], dead_references: [], recipe_ids: [], recipe_outputs: [], quest_ids: [] })
+      }
+      return Promise.resolve(undefined)
+    })
     vi.mocked(createMcInstance).mockResolvedValue({
       id: 'i-new',
       name: 'My First Pack',

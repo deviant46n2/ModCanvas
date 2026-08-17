@@ -35,6 +35,16 @@ pub fn build_pack_index(
     // `ingredients`. Read both so shaped-recipe ingredients are indexed.
     let recipes = scan_pack_recipes(project_path);
     let recipe_ids: Vec<String> = recipes.iter().map(|d| d.id.clone()).collect();
+    // Distinct recipe OUTPUT ids — the craftability spine (P1-HEALTH-2
+    // availability). `references` confluates output + ingredient; consumers
+    // asking "can I craft X" read this list. Deduped, scan order (deterministic).
+    let mut recipe_outputs: Vec<String> = Vec::new();
+    for d in &recipes {
+        let out = d.recipe.output.item.clone();
+        if !recipe_outputs.contains(&out) {
+            recipe_outputs.push(out);
+        }
+    }
     let recipe_refs = recipe_item_references(recipes.iter().map(|d| {
         let mut ids = vec![d.recipe.output.item.clone()];
         if let Some(ing) = &d.recipe.ingredients {
@@ -80,6 +90,7 @@ pub fn build_pack_index(
     let mut index = PackIndex {
         items,
         recipe_ids,
+        recipe_outputs,
         quest_ids,
         references: recipe_refs
             .into_iter()

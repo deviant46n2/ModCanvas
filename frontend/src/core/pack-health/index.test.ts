@@ -186,4 +186,54 @@ describe('analyzePackHealth', () => {
     expect(report.stats.indexedItems).toBeGreaterThanOrEqual(MIN_TRUSTED_REGISTRY_ITEMS)
     expect(report.stats.itemCoverage).toBeNull() // no checkable refs
   })
+
+  it('surfaces availability findings when the pack index is present (P1-HEALTH-2)', () => {
+    const graph = makeGraph({
+      nodes: [
+        makeNode({
+          id: 'q-avail',
+          label: 'Crafting Quest',
+          objectives: [
+            makeObjective({ objective_type: 'item_crafting', target: 'minecraft:diamond_sword' }),
+          ],
+        }),
+      ],
+    })
+    const report = analyzePackHealth({
+      ...baseInput,
+      questGraph: graph,
+      itemRegistry: bigRegistry(),
+      packIndex: {
+        items: [],
+        tags: [],
+        references: [],
+        dead_references: [],
+        recipe_ids: ['minecraft:iron_ingot'],
+        recipe_outputs: ['minecraft:iron_ingot'],
+        quest_ids: ['q-avail'],
+      },
+    })
+    const questsItems = report.sections.find((s) => s.key === 'quests')!.items
+    expect(questsItems.some((i) => i.id === 'quest.no-recipe.q-avail.minecraft:diamond_sword')).toBe(true)
+    expect(questsItems.find((i) => i.id.startsWith('quest.no-recipe.'))!.severity).toBe('recommended')
+  })
+
+  it('skips availability findings entirely when the pack index is absent', () => {
+    const graph = makeGraph({
+      nodes: [
+        makeNode({
+          id: 'q-avail',
+          label: 'Crafting Quest',
+          objectives: [
+            makeObjective({ objective_type: 'item_crafting', target: 'minecraft:diamond_sword' }),
+          ],
+        }),
+      ],
+    })
+    // No packIndex in the input (null / failed fetch) — the check must not
+    // fire as if the pack had no recipes.
+    const report = analyzePackHealth({ ...baseInput, questGraph: graph, itemRegistry: bigRegistry() })
+    const questsItems = report.sections.find((s) => s.key === 'quests')!.items
+    expect(questsItems.some((i) => i.id.startsWith('quest.no-recipe.'))).toBe(false)
+  })
 })

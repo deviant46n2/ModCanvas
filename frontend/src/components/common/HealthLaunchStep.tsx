@@ -6,12 +6,14 @@
 // carries blocking findings and Launch is disabled — "ready to test" must not
 // bless a pack whose quest book cannot appear in-game.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
 import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { analyzePackHealth } from '../../core/pack-health'
 import { testProject } from '../../services/project'
+import { getPackIndex } from '../../services/pack-index'
+import type { PackIndex } from '../../services/pack-index'
 import type { Project } from '../../services/types'
 
 interface HealthLaunchStepProps {
@@ -35,6 +37,16 @@ export function HealthLaunchStep({ project, packLoaded, launchable, installedMod
   const behaviors = useBehaviorStore((s) => s.behaviors)
   const [launching, setLaunching] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
+  // Pack Index for the availability check (P1-HEALTH-2): the wizard step is
+  // a one-shot mount, so fetch once here (memoized). Null → check skipped.
+  const [packIndex, setPackIndex] = useState<PackIndex | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getPackIndex(project.id)
+      .then((idx) => { if (!cancelled) setPackIndex(idx) })
+      .catch(() => { if (!cancelled) setPackIndex(null) })
+    return () => { cancelled = true }
+  }, [project.id])
 
   const report = useMemo(
     () =>
@@ -53,8 +65,9 @@ export function HealthLaunchStep({ project, packLoaded, launchable, installedMod
         packLoaded,
         installedMods,
         depIssues,
+        packIndex,
       }),
-    [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues],
+    [questGraph, itemRegistry, recipes, behaviors, hasCoverImage, packLoaded, project, installedMods, depIssues, packIndex],
   )
 
   const blockingItems = report.sections.flatMap((s) => s.items).filter((i) => i.severity === 'blocking')

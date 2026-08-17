@@ -69,6 +69,7 @@ on-demand rescans, no I/O, no IPC on the fast path:
 | Recipes | existing `useRecipeStore` (the recipe editor's own store) |
 | Pack metadata | project record (passed to the provider) |
 | Cover image | one `get_pack_icon` call per load from `ProjectWorkspace` |
+| Pack Index (availability) | memoized `getPackIndex(projectId)` — fetched by `PackHealthProvider` + the wizard's `HealthLaunchStep`; refetched after a recipe save (dirty → clean) |
 
 - **Analysis** — `frontend/src/core/pack-health/` (pure TS, vitest-covered).
   `analyzePackHealth(input)` → `PackHealthReport`. Per-file checks:
@@ -77,6 +78,13 @@ on-demand rescans, no I/O, no IPC on the fast path:
     tables, empty chapters, unreachable quests) + `checkQuestItemRefs`
     (missing item refs, recommended) + `questItemCoverage` for the
     degraded-registry guard.
+  - `checks/quests/availability.ts` — **P1-HEALTH-2 uncompletable-quest
+    detection**: quest tasks that assert crafting (`item_crafting`, or
+    acquisition/retrieval marked `only_from_crafting`) whose item has no
+    recipe output in the Pack Index (`recipe_outputs`). Sharp scope (s68
+    ruling): plain acquisition tasks are never flagged — "no recipe" ≠
+    "unobtainable" (items can be mined/looted). Recommended, never blocking;
+    skipped entirely when the Pack Index is absent (null/failed fetch).
   - `checks/recipes.ts` — reuses `core/recipe/validation` so the health panel
     can never contradict the recipe editor's inline badges.
   - `checks/pack.ts` — pack info, cover image, zero chapters.
@@ -102,6 +110,13 @@ state); it never runs a scan of its own.
   Tags (`#…`), un-namespaced strings, and `not(...)` members of smart filters
   are skipped. If the pack's item registry has a gap, a quest may be flagged
   against a genuinely present item — a registry limitation, never a guess.
+- Availability (no-recipe) findings are **sharp-scoped**: only objectives that
+  assert crafting (`item_crafting`, `only_from_crafting` on
+  acquisition/retrieval) are checked. A plain acquisition task with no recipe
+  is never a finding — the item may be mined, looted, or obtained another way,
+  and the recipe scan (data/ + kubejs/ + scripts/) cannot prove absence (a mod
+  may register a recipe at runtime). Rewards and node-level `required_items`
+  carry no crafting assertion and are not checked.
 - Progression topology (Tier 2), mod-% / difficulty analytics (Tier 3), and
   any launch-ability judgment are out of scope by design (§9.3).
 
@@ -130,6 +145,8 @@ that flagged every quest item as missing. Fixed in `feat/pack-health`:
 
 - `frontend/src/core/pack-health/types.ts`, `index.ts`, `pack-health-store.ts`
 - `frontend/src/core/pack-health/checks/{quests,recipes,pack}.ts` (+ tests)
+- `frontend/src/core/pack-health/checks/quests/{structure,items,availability,shared}.ts` (+ tests)
+- `frontend/src/core/pack-health/checks/topology.ts` (+ tests)
 - `frontend/src/components/common/PackHealthProvider.tsx`,
   `PackHealthTab.tsx` (+ test)
 - `frontend/src/services/mods.ts` — `getPackIcon` wrapper

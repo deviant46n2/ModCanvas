@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { invoke } from '@tauri-apps/api/core'
 import { PackHealthProvider } from './PackHealthProvider'
 import { PackHealthTab } from './PackHealthTab'
 import type { HealthItem } from '../../core/pack-health/types'
@@ -9,7 +10,19 @@ import { useBehaviorStore } from '../../core/behavior/behavior-store'
 import { makeGraph, makeNode, makeObjective, makeChapter, makeReward } from '../../core/pack-health/test-fixtures'
 import { MIN_TRUSTED_REGISTRY_ITEMS } from '../../core/pack-health'
 
-const project = { name: 'Pack', description: 'Desc', author: 'Me', pack_version: '1.0.0' }
+const project = { id: 'p1', name: 'Pack', description: 'Desc', author: 'Me', pack_version: '1.0.0' }
+
+// The provider fetches the Pack Index on mount (P1-HEALTH-2 availability).
+// Stub the command with an empty index — no availability findings, the
+// existing tests are unaffected.
+beforeEach(() => {
+  vi.mocked(invoke).mockImplementation((cmd: string) => {
+    if (cmd === 'get_pack_index') {
+      return Promise.resolve({ items: [], tags: [], references: [], dead_references: [], recipe_ids: [], recipe_outputs: [], quest_ids: [] })
+    }
+    return Promise.resolve(undefined)
+  })
+})
 
 function renderHealth(packLoaded = true, onJumpToFinding?: (item: HealthItem) => void, installedMods: string[] | null = null) {
   return render(

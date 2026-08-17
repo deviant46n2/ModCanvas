@@ -34,6 +34,10 @@ export interface PackIndex {
   references: ItemReference[]
   dead_references: ReferenceFinding[]
   recipe_ids: string[]
+  /** Distinct item ids that appear as a recipe OUTPUT. The craftability spine
+   *  (P1-HEALTH-2 availability): `references` confluate output + ingredient,
+   *  so "can I craft X" reads this list, never the references. */
+  recipe_outputs: string[]
   quest_ids: string[]
 }
 

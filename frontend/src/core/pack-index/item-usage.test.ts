@@ -9,6 +9,7 @@ function index(references: PackIndex['references']): PackIndex {
     references,
     dead_references: [],
     recipe_ids: [],
+    recipe_outputs: [],
     quest_ids: [],
   }
 }

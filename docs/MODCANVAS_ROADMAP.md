@@ -1243,6 +1243,22 @@ Conventions:
   quest→item→recipe availability half is PARKED with a written reason: it needs the Pack
   Index consumer plumbing + the full objective model; the roadmap names it as the hard
   part, and the measurements here are provable from edges alone.
+- **Status (s68):** the availability half landed as `checks/quests/availability.ts`
+  (`checkQuestAvailability`) — the "uncompletable quest" detection. **SHARP SCOPE
+  (student ruling):** only objectives that ASSERT crafting are checked — `item_crafting`
+  tasks, or acquisition/retrieval tasks marked `only_from_crafting` (a real model field,
+  `objective.rs:33`, user-editable). Plain acquisition tasks (mine/loot obtainable) are
+  never flagged — "no recipe" ≠ "unobtainable", Trust Rule. Rewards and node-level
+  `required_items` are not checked (no craft assertion). **Craftability source:** the Pack
+  Index gained `recipe_outputs: Vec<String>` (distinct recipe output ids; `references`
+  conflate output+ingredient so consumers must read this field). Recommended severity,
+  never blocking (a mod may register a recipe at runtime — same Trust Rule as
+  item-existence). **Plumbing:** `PackHealthInput.packIndex` (optional; absent/null →
+  check skipped, never fired as "no recipes"); `PackHealthProvider` + the wizard's
+  `HealthLaunchStep` fetch the memoized index, and the provider refetches on recipe save
+  (dirty true→false transition) so saved recipes show up. 12 new FE tests (10 check + 2
+  analyzer wiring) + the Rust `recipe_outputs` leg locked in build_tests. **Completion
+  criterion met: topology + availability both deterministic and screenshotable.**
 
 #### P1-PARITY — Close the remaining FTB parity gaps
 

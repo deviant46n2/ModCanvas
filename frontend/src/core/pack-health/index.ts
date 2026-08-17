@@ -13,7 +13,8 @@ import type { Recipe } from '../recipe/recipe-store'
 import type { ItemRegistryEntry, QuestGraphData } from '../../services/quest-types'
 import type { Behavior } from '../behavior/behavior-store'
 import type { CompatibilityIssue } from '../../services/types'
-import { checkQuestStructure, checkQuestItemRefs, questItemCoverage } from './checks/quests'
+import type { PackIndex } from '../../services/pack-index'
+import { checkQuestStructure, checkQuestItemRefs, questItemCoverage, checkQuestAvailability } from './checks/quests'
 import { computeTopology } from './checks/topology'
 import { checkRecipes } from './checks/recipes'
 import { checkBehaviors, behaviorItemCoverage } from './checks/behaviors'
@@ -39,6 +40,10 @@ export interface PackHealthInput {
    *  may not want to install a mod right now, and that's their call. Deps of
    *  CORE mods (e.g. KubeJS → Rhino) are the core gate's lane (s56). */
   depIssues?: CompatibilityIssue[]
+  /** The materialized Pack Index (P1-HEALTH-2 availability). Null = not
+   *  loaded or failed → the availability check is skipped entirely (it must
+   *  never fire on "no index" as if the pack had no recipes). */
+  packIndex?: PackIndex | null
 }
 
 export interface PackHealthStats {
@@ -147,6 +152,13 @@ export function analyzePackHealth(input: PackHealthInput): PackHealthReport {  c
   if (input.questGraph) {
     quests.push(...checkQuestStructure(input.questGraph))
     quests.push(...topologyFindings(input.questGraph))
+    // Availability (P1-HEALTH-2): needs the Pack Index. Skipped entirely when
+    // the index is absent (null/failed) — never fired as if the pack had no
+    // recipes. Runs regardless of registry trust: it depends on the recipe
+    // scan, not the item registry.
+    if (input.packIndex) {
+      quests.push(...checkQuestAvailability(input.questGraph, new Set(input.packIndex.recipe_outputs)))
+    }
     coverage = questItemCoverage(input.questGraph, knownIds)
     if (!registryDegraded(knownIds, coverage)) {
       quests.push(...checkQuestItemRefs(input.questGraph, knownIds))

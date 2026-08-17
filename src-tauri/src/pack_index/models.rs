@@ -46,6 +46,12 @@ pub struct PackIndex {
     pub dead_references: Vec<ReferenceFinding>,
     /// Recipe ids indexed (`ns:name`).
     pub recipe_ids: Vec<String>,
+    /// Distinct item ids that appear as a recipe OUTPUT (`ns:path`). This is
+    /// the craftability spine for P1-HEALTH-2 availability: an item in this
+    /// list can be crafted from the pack's recipes; the `references` list
+    /// confluates output and ingredient, so consumers needing "can I make X"
+    /// must read this field, never infer from references.
+    pub recipe_outputs: Vec<String>,
     /// Quest node ids indexed (opaque graph ids).
     pub quest_ids: Vec<String>,
 }

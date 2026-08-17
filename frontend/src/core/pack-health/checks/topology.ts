@@ -4,10 +4,10 @@
 // check already lives in `checks/quests/structure.ts` (Tier 1); this module
 // adds the Tier-2 measurements only.
 //
-// Deliberately scoped: the quest→item→recipe "unreachable via satisfiable
-// tasks" half is PARKED with a written reason — it needs the Pack Index
-// consumer plumbing + the full objective model, and the roadmap names it as
-// the hard part; the measurements here are provable from edges alone.
+// The quest→item→recipe "unreachable via satisfiable tasks" half (the other
+// Tier-2 measurement) lives in `checks/quests/availability.ts` — it needs
+// the Pack Index's `recipe_outputs`, which this module deliberately does not
+// consume (edges-only measurements stay provable from the graph alone).
 //
 // Definitions (mirroring FTB dependency semantics):
 //   - dependency edges: prerequisite/optional edges; a quest is gated by its

@@ -112,6 +112,12 @@ fn pack_index_covers_all_input_legs() {
     assert!(index.references.iter().any(|r| r.source_kind == "recipe" && r.item_id == "minecraft:diamond"),
         "recipe ingredient reference present");
 
+    // Recipe outputs: the craftability spine — the output item, NOT the
+    // ingredient (availability consumers must not infer craftability from
+    // references, which conflate output + ingredient).
+    assert_eq!(index.recipe_outputs, vec!["minecraft:diamond_block".to_string()],
+        "recipe_outputs lists the output item only");
+
     // Tags: canonical #ns:path id + the member reference.
     assert!(index.tags.contains(&"#testmod:gems".to_string()), "tag id canonicalized with #");
     assert!(index.references.iter().any(|r| r.source_kind == "tag" && r.source_id == "testmod:gems" && r.item_id == "minecraft:diamond"),

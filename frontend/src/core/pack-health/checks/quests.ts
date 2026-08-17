@@ -20,9 +20,10 @@ import { checkQuestItemRefs } from './quests/items'
 export { normalizeItemReference, normalizeTableId } from './quests/shared'
 export { questItemCoverage, checkQuestItemRefs } from './quests/items'
 export { checkQuestStructure } from './quests/structure'
+export { checkQuestAvailability } from './quests/availability'
 
 /** All quest checks (structure + item refs). Convenience for tests and callers
- * that already know the registry is trustworthy. */
+ *  that already know the registry is trustworthy. */
 export function checkQuests(graph: QuestGraphData, knownIds: Set<string>): HealthItem[] {
   return [...checkQuestStructure(graph), ...checkQuestItemRefs(graph, knownIds)]
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { invoke } from '@tauri-apps/api/core'
 import { HealthLaunchStep } from './HealthLaunchStep'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { useRecipeStore } from '../../core/recipe/recipe-store'
@@ -25,6 +26,13 @@ const project = {
 beforeEach(() => {
   usePackHealthStore.setState({ questGraph: null, itemRegistry: null, hasCoverImage: true })
   useRecipeStore.setState({ recipes: [] })
+  // The step fetches the Pack Index on mount (P1-HEALTH-2 availability).
+  vi.mocked(invoke).mockImplementation((cmd: string) => {
+    if (cmd === 'get_pack_index') {
+      return Promise.resolve({ items: [], tags: [], references: [], dead_references: [], recipe_ids: [], recipe_outputs: [], quest_ids: [] })
+    }
+    return Promise.resolve(undefined)
+  })
 })
 
 describe('HealthLaunchStep', () => {
