@@ -5,6 +5,7 @@ import type { ItemRegistryEntry } from '../../services/quest-types'
 import { isUsableTextureValue, textureDisplayUrl, requestMaterialize } from '../../services/texture-loader'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
 import { getPackIndex } from '../../services/pack-index'
+import { itemUsageByItem, type ItemUsage } from '../../core/pack-index/item-usage'
 import { AnimatedSprite } from './AnimatedSprite'
 
 interface IconPickerProps {
@@ -30,28 +31,23 @@ interface IconPickerProps {
 export function IconPicker({ open, target, textureIndex, graph, instancePath, onGraphChange, onClose, scheduleAutoSave }: IconPickerProps) {
   const [search, setSearch] = useState('')
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [usageByItem, setUsageByItem] = useState<Map<string, { recipes: number; quests: number; tags: number }> | null>(null)
+  const [usageByItem, setUsageByItem] = useState<Map<string, ItemUsage> | null>(null)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
 
   // Pack Index "where is this used" footer (P1-PACKINDEX consumer): fetch the
   // derived index once per open, memoized per project by the service, and
   // build the reverse lookup. Failures degrade to no footer (the picker must
-  // never block on the index).
+  // never block on the index). Uses the SHARED itemUsageByItem so the icon
+  // picker and the recipe palette read the same deduped counts (s68: the
+  // inline count loop duplicated the recipe palette's logic and diverged on
+  // duplicate references — one count path, one truth).
   useEffect(() => {
     if (!open || !graph.project_id) return
     let cancelled = false
     getPackIndex(graph.project_id)
       .then((idx) => {
         if (cancelled) return
-        const usage = new Map<string, { recipes: number; quests: number; tags: number }>()
-        for (const ref of idx.references) {
-          const cur = usage.get(ref.item_id) ?? { recipes: 0, quests: 0, tags: 0 }
-          if (ref.source_kind === 'recipe') cur.recipes += 1
-          else if (ref.source_kind === 'quest') cur.quests += 1
-          else if (ref.source_kind === 'tag') cur.tags += 1
-          usage.set(ref.item_id, cur)
-        }
-        setUsageByItem(usage)
+        setUsageByItem(itemUsageByItem(idx))
       })
       .catch(() => { if (!cancelled) setUsageByItem(null) })
     return () => { cancelled = true }

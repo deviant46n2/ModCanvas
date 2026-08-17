@@ -1211,8 +1211,12 @@ Conventions:
   unit-tested). **Recipe-editor consumer shipped (s68):** the recipe palette's hover
   tooltip now shows the same "used in" footer (item → recipe/quest/tag counts) — the
   completion criterion's recipe-editor half. Reuses the same memoized `get_pack_index` +
-  the pure `itemUsageByItem`/`usageSummaryText` helpers (this consumer is the first
-  *tested* instance of the pattern; the icon picker still inlines its counting).
+  the pure `itemUsageByItem`/`usageSummaryText` helpers. **Counts are DISTINCT SOURCES
+  (s68 review catch, student):** the footer dedups references by (source_kind, source_id)
+  per item — a shaped recipe with the same item in two slots is ONE recipe, not two — and
+  the icon picker was refactored off its inline count loop onto the same shared helper so
+  both consumers can never diverge (one count path, one truth). The Rust index keeps
+  duplicate references by design (`invert.rs`); the dedup lives at the display layer.
   Freshness: the palette refetches (invalidate + re-fetch) when a save/disable/reload
   changes the pack on disk (`usageRefreshKey` bumped in `RecipeEditor.tsx`); failures
   degrade to no footer, never block. **Completion criterion met: "where is this used"

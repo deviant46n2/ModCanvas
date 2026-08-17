@@ -4,24 +4,42 @@
 
 import type { PackIndex } from '../../services/pack-index'
 
-/** Per-item usage counts grouped by source kind. */
+/** Per-item usage counts grouped by source kind. Counts DISTINCT SOURCES —
+ *  a shaped recipe listing an item in two slots is one recipe, not two
+ *  (deduped by source_kind + source_id; the index keeps duplicate references
+ *  by design, invert.rs). */
 export interface ItemUsage {
-  /** Number of recipes (output or ingredient) referencing the item. */
+  /** Number of DISTINCT recipes (output or ingredient) referencing the item. */
   recipes: number
-  /** Number of quests rewarding the item. */
+  /** Number of DISTINCT quests rewarding the item. */
   quests: number
-  /** Number of tags whose members include the item. */
+  /** Number of DISTINCT tags whose members include the item. */
   tags: number
 }
 
 /**
  * Build item → usage counts from the index references. References are typed
  * by source_kind (`recipe` / `quest` / `tag`); anything else is ignored.
- * Deterministic: same index → same map.
+ *
+ * Counts DISTINCT SOURCES, not references: a shaped recipe listing the same
+ * item in two key slots emits two references with the same source_id, but the
+ * user-facing truth is "used in one recipe" — the footer presents these as
+ * recipe/quest/tag counts, so references are deduped by (source_kind,
+ * source_id) per item. The Rust index keeps duplicates by design (invert.rs);
+ * the dedup lives at the display layer. Deterministic: same index → same map.
  */
 export function itemUsageByItem(index: PackIndex): Map<string, ItemUsage> {
   const out = new Map<string, ItemUsage>()
+  const seen = new Map<string, Set<string>>()
   for (const ref of index.references) {
+    const key = `${ref.source_kind}:${ref.source_id}`
+    let seenKeys = seen.get(ref.item_id)
+    if (!seenKeys) {
+      seenKeys = new Set()
+      seen.set(ref.item_id, seenKeys)
+    }
+    if (seenKeys.has(key)) continue
+    seenKeys.add(key)
     let usage = out.get(ref.item_id)
     if (!usage) {
       usage = { recipes: 0, quests: 0, tags: 0 }

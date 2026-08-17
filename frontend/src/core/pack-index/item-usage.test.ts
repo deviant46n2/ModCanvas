@@ -26,14 +26,36 @@ describe('itemUsageByItem', () => {
     expect(usage.get('minecraft:stick')).toEqual({ recipes: 1, quests: 0, tags: 0 })
   })
 
-  it('counts a duplicate recipe ingredient once per reference', () => {
+  it('counts one recipe once when the item appears in multiple slots', () => {
     // A shaped recipe lists the same item in two key slots → two references,
-    // two counts (the index keeps duplicates by design).
+    // ONE recipe. The index keeps duplicates by design (invert.rs); the
+    // display layer dedups by (source_kind, source_id) so the footer never
+    // says "2 recipes" for a single recipe (s68 review catch).
     const idx = index([
       { source_kind: 'recipe', source_id: 'minecraft:diamond_block', item_id: 'minecraft:diamond' },
       { source_kind: 'recipe', source_id: 'minecraft:diamond_block', item_id: 'minecraft:diamond' },
     ])
+    expect(itemUsageByItem(idx).get('minecraft:diamond')?.recipes).toBe(1)
+  })
+
+  it('counts distinct recipes separately', () => {
+    // Two different recipes both use the item → two recipes.
+    const idx = index([
+      { source_kind: 'recipe', source_id: 'minecraft:diamond_block', item_id: 'minecraft:diamond' },
+      { source_kind: 'recipe', source_id: 'minecraft:diamond_sword', item_id: 'minecraft:diamond' },
+    ])
     expect(itemUsageByItem(idx).get('minecraft:diamond')?.recipes).toBe(2)
+  })
+
+  it('dedups tags and quests by source too', () => {
+    // Same tag referenced twice → one tag; same quest twice → one quest.
+    const idx = index([
+      { source_kind: 'tag', source_id: '#minecraft:coals', item_id: 'minecraft:coal' },
+      { source_kind: 'tag', source_id: '#minecraft:coals', item_id: 'minecraft:coal' },
+      { source_kind: 'quest', source_id: 'n1', item_id: 'minecraft:coal' },
+      { source_kind: 'quest', source_id: 'n1', item_id: 'minecraft:coal' },
+    ])
+    expect(itemUsageByItem(idx).get('minecraft:coal')).toEqual({ recipes: 0, quests: 1, tags: 1 })
   })
 
   it('ignores unknown source kinds', () => {
