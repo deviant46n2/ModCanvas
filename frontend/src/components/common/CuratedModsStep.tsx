@@ -6,12 +6,11 @@
 // versions AND dependencies ModCanvas cannot see — the step guides that flow
 // explicitly, naming the three required FTB deps. Non-instance-backed packs
 // (scratch projects) fall back to manual-download links.
+//
+// s70 (P1-HYGIENE): the install orchestration moved to useCuratedModsInstall
+// (unit-testable); this component is wiring + render.
 
-import { useEffect, useState } from 'react'
-import { listCuratedMods, installModrinthMod, checkCompatibility } from '../../services/mods'
-import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
-import { CORE_MOD_PATTERNS } from '../../core/pack-health/checks/mods'
-import type { CompatibilityInstall, CompatibilityIssue, CuratedMod } from '../../services/types'
+import { useCuratedModsInstall } from '../../hooks/useCuratedModsInstall'
 import type { Project } from '../../services/types'
 import { CuratedModRow } from './CuratedModRow'
 
@@ -30,180 +29,10 @@ interface CuratedModsStepProps {
 }
 
 export function CuratedModsStep({ project, onRefresh, onContinue, installedMods }: CuratedModsStepProps) {
-  const [mods, setMods] = useState<CuratedMod[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [installing, setInstalling] = useState<Set<string>>(new Set())
-  const [installed, setInstalled] = useState<Set<string>>(new Set())
-  // Missing required deps (the compat check's issues, s54-A: the step closes
-  // its own one-click loop — a pick like KubeJS pulls a dep like Rhino, and
-  // the fix appears here, not in a hidden tab).
-  const [depIssues, setDepIssues] = useState<CompatibilityIssue[]>([])
-  const [installingDep, setInstallingDep] = useState<Set<string>>(new Set())
-  // Continue auto-installs the ticked Modrinth picks (keyless API — the
-  // honest auto-install; s55: users expected "continue" to install the picks,
-  // and the step previously required clicking every row). CF picks are
-  // excluded — the guide step owns them. Unticked picks (opt-ins like
-  // Controllable) install via their row button only.
-  const [autoInstalling, setAutoInstalling] = useState(false)
-  const [autoProgress, setAutoProgress] = useState<{ name: string; done: number; total: number } | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    listCuratedMods(project.id)
-      .then((list) => {
-        if (alive) setMods(list)
-      })
-      .catch((e) => {
-        if (alive) setError(typeof e === 'string' ? e : e?.message || String(e))
-      })
-    return () => {
-      alive = false
-    }
-  }, [project.id])
-
-  useEffect(() => {
-    let alive = true
-    checkCompatibility(project.id)
-      .then((result) => {
-        if (alive) setDepIssues(result.issues)
-      })
-      .catch(() => {
-        /* a failed dep check degrades to no claim — the Mods tab can retry */
-      })
-    return () => {
-      alive = false
-    }
-  }, [project.id])
-
-  async function refreshDepCheck() {
-    try {
-      const result = await checkCompatibility(project.id)
-      setDepIssues(result.issues)
-      // Feed the health report's persistent (non-blocking) dep warnings
-      // (s55 ruling: warn, don't gate).
-      usePackHealthStore.getState().setDepIssues(result.issues)
-    } catch {
-      /* same degrade-to-no-claim rule */
-    }
-  }
-
-  async function handleInstall(mod: CuratedMod) {
-    if (installing.has(mod.mod_id)) return
-    setInstalling((prev) => new Set(prev).add(mod.mod_id))
-    setError(null)
-    try {
-      await installModrinthMod({
-        projectId: project.id,
-        modId: mod.mod_id,
-        slug: mod.slug,
-        name: mod.name,
-        description: mod.description,
-      })
-      setInstalled((prev) => new Set(prev).add(mod.mod_id))
-      // The pick's own deps may now be missing — close the loop inline.
-      await refreshDepCheck()
-    } catch (e: any) {
-      setError(typeof e === 'string' ? e : e?.message || String(e))
-    } finally {
-      setInstalling((prev) => {
-        const next = new Set(prev)
-        next.delete(mod.mod_id)
-        return next
-      })
-    }
-  }
-
-  async function handleInstallDep(install: CompatibilityInstall) {
-    if (installingDep.has(install.mod_id)) return
-    setInstallingDep((prev) => new Set(prev).add(install.mod_id))
-    setError(null)
-    try {
-      await installModrinthMod({
-        projectId: project.id,
-        modId: install.mod_id,
-        slug: install.slug,
-        name: install.name,
-      })
-      await refreshDepCheck()
-    } catch (e: any) {
-      setError(typeof e === 'string' ? e : e?.message || String(e))
-    } finally {
-      setInstallingDep((prev) => {
-        const next = new Set(prev)
-        next.delete(install.mod_id)
-        return next
-      })
-    }
-  }
-
-  async function handleContinue() {
-    setAutoInstalling(true)
-    const failures: string[] = []
-    // Required mods with a Modrinth slug that the scan doesn't show yet —
-    // they install automatically (s56). The gate list is the source of
-    // truth: a future required mod is one row with a slug, no wizard edits.
-    // CF-only required mods (FTB Quests) have no slug — the Prism guide step
-    // owns them.
-    const scannedNames = (installedMods ?? []).map((n) => n.toLowerCase())
-    // The picks loop installs these — the gate loop must not double-install
-    // a mod that is both a ticked pick and a gate entry (KubeJS).
-    const pickIds = new Set(autoInstallTargets.map((m) => m.mod_id))
-    const gateAutoTargets = CORE_MOD_PATTERNS.filter(
-      (core) =>
-        core.modrinthSlug &&
-        !pickIds.has(core.modrinthSlug) &&
-        !scannedNames.some((n) => core.pattern.test(n)) &&
-        !installed.has(core.modrinthSlug),
-    )
-    const autoTargets = autoInstallTargets
-    const total = autoTargets.length + gateAutoTargets.length
-    try {
-      for (const mod of autoTargets) {
-        try {
-          setAutoProgress({ name: mod.name, done: autoTargets.indexOf(mod), total })
-          await installModrinthMod({
-            projectId: project.id,
-            modId: mod.mod_id,
-            slug: mod.slug,
-            name: mod.name,
-            description: mod.description,
-          })
-          setInstalled((prev) => new Set(prev).add(mod.mod_id))
-        } catch (e: any) {
-          failures.push(`${mod.name}: ${typeof e === 'string' ? e : e?.message || String(e)}`)
-        }
-      }
-      for (const core of gateAutoTargets) {
-        try {
-          setAutoProgress({ name: core.name, done: autoTargets.length + gateAutoTargets.indexOf(core), total })
-          await installModrinthMod({
-            projectId: project.id,
-            modId: core.modrinthSlug!,
-            slug: core.modrinthSlug!,
-            name: core.name,
-            description: core.copy,
-          })
-          setInstalled((prev) => new Set(prev).add(core.modrinthSlug!))
-        } catch (e: any) {
-          failures.push(`${core.name}: ${typeof e === 'string' ? e : e?.message || String(e)}`)
-        }
-      }
-      // The picks' own deps may now be missing — close the loop (s54-A).
-      await refreshDepCheck()
-    } finally {
-      setAutoInstalling(false)
-      setAutoProgress(null)
-    }
-    if (failures.length > 0) {
-      setError(`Couldn't install some mods — retry them below:\n${failures.join('\n')}`)
-    }
-    try {
-      await onRefresh()
-    } catch {
-      /* a failed refresh degrades to a shorter green check, not a dead end */
-    }
-    onContinue(needsPrismGuide)
-  }
+  const {
+    mods, error, installing, installed, depIssues, installingDep,
+    autoInstalling, autoProgress, handleInstall, handleInstallDep, handleContinue,
+  } = useCuratedModsInstall(project)
 
   const coreMods = mods?.filter((m) => m.core && m.source !== 'curseforge') ?? []
   const funMods = mods?.filter((m) => !m.core && m.source !== 'curseforge') ?? []
@@ -219,6 +48,16 @@ export function CuratedModsStep({ project, onRefresh, onContinue, installedMods 
   // action list is a broken affordance — the guide step owns that mod. The
   // flag below still routes the wizard there.
   const needsPrismGuide = mods?.some((m) => m.source === 'curseforge') ?? false
+
+  const onSave = async () => {
+    await handleContinue(autoInstallTargets, installedMods)
+    try {
+      await onRefresh()
+    } catch {
+      /* a failed refresh degrades to a shorter green check, not a dead end */
+    }
+    onContinue(needsPrismGuide)
+  }
 
   return (
     <div>
@@ -314,7 +153,7 @@ export function CuratedModsStep({ project, onRefresh, onContinue, installedMods 
         >
           Skip
         </button>
-        <button className="btn-primary" onClick={handleContinue} disabled={autoInstalling}>
+        <button className="btn-primary" onClick={onSave} disabled={autoInstalling}>
           {autoInstalling ? 'Installing…' : 'Continue'}
         </button>
       </div>

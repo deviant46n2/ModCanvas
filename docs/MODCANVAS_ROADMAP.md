@@ -203,7 +203,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, **14 example behaviors** — minimal complete vocabulary showcase, both backends, s70) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
 | Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Partially implemented (s65 ruling)** — CI verification matrix DONE: `.github/workflows/verify.yml` (ubuntu + windows) runs the suite on every push; the integrity gate stays the source of truth, CI is a second witness (roadmap risk #6). Release artifacts: still absent — local `pnpm build` only (P0-DISTRIB release-artifact half, separated s65). |
 | Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
-| HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
+| HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm — by design, not debt (s70).** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`); the structured editor then defaults to Raw mode for a leaf-string root. `config-editor.md:35-38` already documents HOCON/`.cfg`/`.snbt`/KubeJS `.js` as fall-back-to-raw formats. No HOCON arm is planned — the docs never claimed one (the audit note that did was corrected at s70). |
 | Modpack Model / unified model | this document's problem statement | **Does not exist** — see §7. The correct form is the Pack Index. |
 
 ### 3.4 Dead, partial, or duplicated systems (the cleanup list)
@@ -300,8 +300,11 @@ its entries as current drift.
 - `docs/audit-2026-08-05.md` cites deleted files (`progression.rs`, `commands/progression.rs`,
   `ingest.rs`, `imports/snbt.rs`) — dated snapshot by definition (it is a historical record);
   the "remaining debt" list needs a refresh pass against the current tree.
-- `docs/config-editor.md` lists HOCON among parsed formats; the parser has no HOCON arm.
-  **Still open** (P1-HYGIENE).
+- ~~`docs/config-editor.md` lists HOCON among parsed formats; the parser has no HOCON arm.~~
+  **superseded (s70, P1-HYGIENE)**: the doc was re-read — `config-editor.md:35-38` lists
+  HOCON among the formats that FALL BACK TO RAW (a leaf-string root defaults the editor to
+  Raw mode), not among the parsed set. The docs were already truthful; this roadmap note
+  misread them. No parser arm, no doc change — resolved as a non-issue.
 - ~~`docs/engine-renders.md` and `featureparity.md` audit notes~~ — **fixed** in the audit:
   featureparity.md references were removed (README, PROJECT_BIBLE, this doc); **errata
   (2026-08-16):** the audit's "never committed" claim was wrong — the file existed since
@@ -351,12 +354,12 @@ Every item here exists and works. The roadmap's relationship to each is
 | 3 | Progress simulation | `core/quest/progress.ts`, `QuestCanvas.tsx:249` | Works | **Keep**; Pack Health Tier 2 consumes it (§10) |
 | 4 | Recipe editor (grid, 6 types, disable, bulk replace, JSON import) | `RecipeEditor.tsx`, `core/recipe/*` | Deep | **Keep**; templates/cheat-sheet follow-ups (todo.md:349-361) |
 | 5 | Recipe scan + script generation (KubeJS/CT) | `recipes/mod.rs`, `scriptgen/*` | Deep | **Keep**; behavior-system compiler backend (§11.4) |
-| 6 | Config structured+raw editor | `config-editor.tsx`, `config_parser/` | Works | **Keep**; add HOCON arm or drop from docs (P1-HYGIENE) |
+| 6 | Config structured+raw editor | `config-editor.tsx`, `config_parser/` | Works | **Keep**; no HOCON arm planned — HOCON falls back to Raw mode by design (docs already truthful, s70) |
 | 7 | Mods search/install/compat | `ModsTab.tsx`, `mod_intelligence/` | Works (search/install) | **PRISM-LEAN (s53)** — in-app search/install DEPRECATED; Mods tab hands off to Prism (`open_prism_instance`). Diagnosis (scan, track, compat-check) stays. Chunk-2 deletion booked (§0 row 6). |
 | 8 | Pack Health Tier 1 | `core/pack-health/*` | Works | **Harden** (trust-scope gaps) + **Expand** to Tier 2 (§10) |
 | 9 | History/undo w/ journal | `core/history/*`, `history-provider.tsx` | Works | **Keep**; mini-wizards must route through it |
 | 10 | Pack import (mrpack/CF/packwiz/instance) + FTB import | `imports/*` | Works (entry points partially dead) | **Integrate** into wizard's instance-pick; wire or prune dead variants |
-| 11 | Pack export (mrpack, CF zip, FTB layout-aware export) | `imports/mod.rs:294`, `imports/curseforge.rs:293`, `export/mod.rs:26` | Works; **CF export drops Modrinth mods** (bug); quest export layout version-aware since s42 (1.21.x → FlatChapters only) | **Harden** — fix the bug (P1-HYGIENE-2) |
+| 11 | Pack export (mrpack, CF zip, FTB layout-aware export) | `imports/mod.rs:294`, `imports/curseforge/export.rs:18`, `export/mod.rs:26` | Works; **CF export ships non-CF mod jars** (s34 fix, test-locked `curseforge_tests.rs` — Modrinth/local jars travel in overrides/mods, fail-loud on missing jar); quest export layout version-aware since s42 (1.21.x → FlatChapters only) | **Harden** — the "drops Modrinth mods" bug was fixed at s34; row kept for historical trace |
 | 12 | Launcher attach + Test launch | `launcher.rs`, `minecraft/launch.rs` | Works | **Keep**; the wizard's final Launch button |
 | 13 | Companion rendering/texture extraction | companion Java, `engine-renders.md` | Works | **Harden** for wizard-driven first launch (P0-LAUNCH) |
 | 14 | Texture pipeline (index, lazy materialization, animations, tags) | `instance_textures/`, `texture-loader.ts` | Works | **Keep**; Pack Index item/tag spine (P1-PACKINDEX) |
@@ -1349,10 +1352,15 @@ Conventions:
   9 tests lock broadcast counting (app/tool excluded), status derivation (unidentified
   counts as connected — the stale-jar pill contract), handshake role mutation, and the
   port report — no listener or AppHandle needed (25 ws_ipc tests total, 473 Rust).
-  Remaining: a true end-to-end socket test would need a Tauri test harness — parked
-  with reason; the pure seams cover the decision logic. 300-line splits where the split
-  improves the design
-  (never for its own sake); HOCON parser arm or drop the docs claim.
+  **DONE (s70):** the 300-line split (CuratedModsStep → `useCuratedModsInstall` hook,
+  component 335→173, +6 hook tests locking the auto-install orchestration) and the two
+  line-limit parks written (WorkbenchEventHandler — cohesive dispatcher; integrity-check
+  — already modularized). **Resolved as non-issues (s70):** the HOCON parser arm — the
+  docs already list HOCON as fall-back-to-raw, never parsed (audit note misread them);
+  the CF export "drops Modrinth mods" bug — fixed at s34 and test-locked. Remaining: a
+  true end-to-end socket test would need a Tauri test harness — parked with reason; the
+  pure seams cover the decision logic. P1-HYGIENE is effectively complete: only the
+  parked end-to-end socket test and the park-with-reason line-limit entries remain.
 - **Complexity:** Medium (WebSocket framing + role
   routing; start with routing/classification pure-function tests, `ws_protocol.rs`
   classify_client_info is the natural unit — this half is DONE, s52).

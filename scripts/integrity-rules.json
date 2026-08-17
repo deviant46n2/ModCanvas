@@ -22,6 +22,16 @@
         "reason": "ACCEPTED (s54): the PrismLauncherDriver grew shared spawn plumbing + --show/launcher methods for the Flatpak-fallback fix (313 lines). One cohesive driver file — splitting it for the numeric limit would scatter the binary-resolution + flatpak-env logic and obscure ownership. AGENTS.md 'COHESION > ARBITRARY LINE COUNT'. TRIPWIRE: a future non-cohesive addition to this file must split it",
         "since": "2026-08-14T19:30:00",
         "kind": "accepted"
+      },
+      {
+        "path": "workbench-companion-neoforge-1.21/src/main/java/com/modcanvas/companion/client/WorkbenchEventHandler.java",
+        "reason": "PARKED (s70, P1-HYGIENE ruling): 365 lines but a cohesive event dispatcher — every handler shares the player-null guard + sendCommand + the server-thread dispatch, and the heavy subsystems (ItemRenderQueue, AssetExporter, ItemIconRenderer) are already extracted. Splitting the reload handlers would scatter shared dispatch infra across files for the numeric limit (AGENTS.md 'COHESION > ARBITRARY LINE COUNT'). TRIPWIRE: a new independent subsystem added here must extract to its own file",
+        "since": "2026-08-17T21:00:00"
+      },
+      {
+        "path": "scripts/integrity-check.mjs",
+        "reason": "PARKED (s70, P1-HYGIENE ruling): 306 lines (6 over) but already modularized — the heavy checks live in integrity-git/doc/build/suite.mjs; this file is the orchestrator + reporting + 3 small inline checks. Extracting the last checks for 6 lines is ceremony, not design. TRIPWIRE: a new check added here must extract to its own module",
+        "since": "2026-08-17T21:00:00"
       }
     ],
     "asset-bundle": [
