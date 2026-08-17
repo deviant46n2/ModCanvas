@@ -1208,8 +1208,15 @@ Conventions:
   used" footer — hover an item in the picker to see its recipe/quest/tag usage counts,
   fed by `get_pack_index` (memoized per project by `services/pack-index.ts`, so the
   picker never rescan-per-open) + the pure reverse-lookup (`core/pack-index/item-usage.ts`,
-  unit-tested). The recipe-editor half of the completion criterion (item-click in the
-  recipe explorer) is a follow-up consumer on the same seam.
+  unit-tested). **Recipe-editor consumer shipped (s68):** the recipe palette's hover
+  tooltip now shows the same "used in" footer (item → recipe/quest/tag counts) — the
+  completion criterion's recipe-editor half. Reuses the same memoized `get_pack_index` +
+  the pure `itemUsageByItem`/`usageSummaryText` helpers (this consumer is the first
+  *tested* instance of the pattern; the icon picker still inlines its counting).
+  Freshness: the palette refetches (invalidate + re-fetch) when a save/disable/reload
+  changes the pack on disk (`usageRefreshKey` bumped in `RecipeEditor.tsx`); failures
+  degrade to no footer, never block. **Completion criterion met: "where is this used"
+  resolves in BOTH the item picker (s67) and the recipe editor (s68).**
 
 #### P1-HEALTH-2 — Pack Health Tier 2: progression topology
 

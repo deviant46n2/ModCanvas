@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { itemUsageByItem, usageForItem } from './item-usage'
+import { itemUsageByItem, usageForItem, usageSummaryText } from './item-usage'
 import type { PackIndex } from '../../services/pack-index'
 
 function index(references: PackIndex['references']): PackIndex {
@@ -45,5 +45,24 @@ describe('itemUsageByItem', () => {
 
   it('returns zeros for unreferenced items', () => {
     expect(usageForItem(index([]), 'minecraft:air')).toEqual({ recipes: 0, quests: 0, tags: 0 })
+  })
+})
+
+describe('usageSummaryText', () => {
+  it('renders the not-referenced line when all counts are zero', () => {
+    expect(usageSummaryText({ recipes: 0, quests: 0, tags: 0 })).toBe(
+      'Not referenced by any recipe, quest, or tag in this pack',
+    )
+  })
+
+  it('joins non-zero parts with pluralization', () => {
+    expect(usageSummaryText({ recipes: 1, quests: 2, tags: 0 })).toBe(
+      'Used in 1 recipe, 2 quests',
+    )
+  })
+
+  it('omits zero parts and singulars correctly', () => {
+    expect(usageSummaryText({ recipes: 0, quests: 0, tags: 1 })).toBe('Used in 1 tag')
+    expect(usageSummaryText({ recipes: 3, quests: 0, tags: 0 })).toBe('Used in 3 recipes')
   })
 })

@@ -5,6 +5,7 @@ import { filterRegistryItems } from '../../services/item-registry'
 import { filterTagCatalog } from '../../core/recipe/tag-filter'
 import { isUsableTextureValue } from '../../services/texture-loader'
 import { setDragPayload, clearDragPayload } from '../../core/recipe/dnd'
+import { usageSummaryText, type ItemUsage } from '../../core/pack-index/item-usage'
 import '../../recipe-styles/item-browser.css'
 
 /** A picked ingredient: either an item id or a `#tag` (tag: true). */
@@ -28,6 +29,10 @@ interface ItemBrowserProps {
   onShowRecipesUsing?: (itemOrTagId: string) => void
   /** pick mode: hide the tag section (output slots are items only). */
   allowTags?: boolean
+  /** Pack Index usage counts per item (P1-PACKINDEX consumer). When present,
+   *  the hover tooltip adds the "used in" footer line. Optional — the other
+   *  ItemBrowser consumers (pickers, loot, behavior) don't pass it. */
+  usageByItem?: Map<string, ItemUsage> | null
 }
 
 const CELL_SIZE = 40
@@ -105,6 +110,7 @@ export function ItemBrowser({
   onDragStart,
   onShowRecipesUsing,
   allowTags = true,
+  usageByItem,
 }: ItemBrowserProps) {
   const [search, setSearch] = useState('')
   const [hoveredItem, setHoveredItem] = useState<ItemRegistryEntry | null>(null)
@@ -226,6 +232,11 @@ export function ItemBrowser({
           <div className="browser-tooltip-name">{hoveredItem.name}</div>
           <div className="browser-tooltip-id">{hoveredItem.id}</div>
           {hoveredItem.mod_id && <div className="browser-tooltip-mod">{hoveredItem.mod_id}</div>}
+          {usageByItem && (
+            <div className="browser-tooltip-usage">
+              {usageSummaryText(usageByItem.get(hoveredItem.id) ?? { recipes: 0, quests: 0, tags: 0 })}
+            </div>
+          )}
         </div>
       )}
     </div>

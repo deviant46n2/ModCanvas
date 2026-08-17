@@ -209,3 +209,14 @@
   letter-spacing: 0.04em;
   margin-top: 1px;
 }
+
+/* Pack Index usage footer (P1-PACKINDEX consumer): the "used in" line added
+   to the hover tooltip when the palette passes usage counts. */
+.browser-tooltip-usage {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-default);
+  white-space: nowrap;
+}

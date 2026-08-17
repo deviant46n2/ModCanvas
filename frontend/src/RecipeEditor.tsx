@@ -18,7 +18,7 @@ import { normalizeLoader } from './core/recipe/loader';
 import { validateRecipe, hasErrors, issuesByPath } from './core/recipe/validation';
 import { subscribeMaterialized } from './services/texture-loader';
 import { AnimationProvider } from './components/quest/animation-context';
-import type { RecipeIngredient } from './core/recipe/recipe-store';
+import type { Recipe, RecipeIngredient } from './core/recipe/recipe-store';
 import {
   readScriptPreviewPref,
   writeScriptPreviewPref,
@@ -72,12 +72,25 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   // it). The palette owns its own item/tag search internally.
   const [explorerQuery, setExplorerQuery] = useState('');
 
+  // Pack Index consumer freshness (P1-PACKINDEX): bumped whenever a mutation
+  // changes the pack's recipes on disk (save / disable / reload), so the
+  // palette invalidates + refetches the usage footer instead of serving stale
+  // counts for the whole editor session.
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
+  const bumpUsageRefresh = () => setUsageRefreshKey((k) => k + 1);
+
   const { textureIndex, animations, loading: indexLoading } = useInstanceTextures(projectPath);
   const { showSaveDialog, saveMessage, save: saveRecipes } = useRecipeSave(projectId);
   const { toggleDisable } = useRecipeDisable(projectId);
   const manifestRecipes = useMemo(() => manifestRecipesFrom(disabledScripts), [disabledScripts]);
 
   const handleToggleDisable = createToggleDisableHandler(toggleDisable);
+  // Superset refresh: only the kubejs/ct disable path writes to disk
+  // immediately (comment-out via IPC); authored/vanilla toggles change the
+  // store until Save. Bumping on all disables is simpler than plumbing the
+  // path through, and one index rebuild per deliberate action is cheap.
+  const handleToggleDisableAndRefresh = (recipe: Recipe) =>
+    handleToggleDisable(recipe).then(bumpUsageRefresh);
   // Instance item registry + local tag catalog back the two palette tabs. The
   // quest editor may already have scanned this instance; only scan here when
   // the store is empty so the two editors share one scan.
@@ -88,6 +101,9 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const [, setTextureTick] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const { reloading, reloadMsg, reloadRecipes } = useRecipeReload(projectPath, loadRecipesFromPack);
+  // Reload re-scans the pack on disk (external edits) — the memoized index
+  // would serve the old snapshot, so bump the refresh key after the reload.
+  const handleReloadRecipes = () => reloadRecipes().then(bumpUsageRefresh);
   // The raw generated-script preview is opt-in for veterans — hidden by default
   // so beginners never hit code. Sticky across sessions via localStorage.
   const [showScriptPreview, setShowScriptPreview] = useState(readScriptPreviewPref);
@@ -162,8 +178,11 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
   const handleSetCount = useCallback((row: number, col: number, count: number) => {
     handleGridChange(applyCellCount(gridCells, row, col, count));
   }, [gridCells, handleGridChange]);
-  const handleSaveRecipes = () => {
-    saveRecipes(recipes, markClean);
+  const handleSaveRecipes = async () => {
+    await saveRecipes(recipes, markClean);
+    // Bump only after the write completes — the index must reflect the new
+    // scripts, not the pre-save pack.
+    bumpUsageRefresh();
   };
 
   const handleNewRecipe = () => {
@@ -184,6 +203,8 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
       lastId = addRecipe(recipeFromImported(entry));
     }
     if (lastId) selectRecipe(lastId);
+    // No usage-refresh bump here: imported recipes reach the pack only on Save,
+    // which bumps. The index reflects the pack on disk, not the editor buffer.
   };
 
   const handleDeleteRecipe = () => {
@@ -224,7 +245,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         onToggleScriptPreview={toggleScriptPreview}
         reloading={reloading}
         reloadMsg={reloadMsg}
-        onReload={reloadRecipes}
+        onReload={handleReloadRecipes}
         onImport={() => setShowImport(true)}
         onAddGuided={guided.openWizard}
       />
@@ -239,7 +260,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
           const copyId = duplicateRecipe(id);
           if (copyId) selectRecipe(copyId);
         }}
-        onToggleDisable={handleToggleDisable}
+        onToggleDisable={handleToggleDisableAndRefresh}
         explorerQuery={explorerQuery}
         onQueryChange={setExplorerQuery}
         onBulkReplace={setBulkReplaceIds}
@@ -267,6 +288,7 @@ export function RecipeEditor({ projectId, projectPath, minecraftVersion = '1.21.
         tagCatalog={tagCatalog}
         getRegistryTextureUrl={getRegistryTextureUrl}
         onShowRecipesUsing={handleShowRecipesUsing}
+        usageRefreshKey={usageRefreshKey}
       />
 
       <RecipeEditorModals

@@ -14,7 +14,7 @@
     "line-limit": [
       {
         "path": "frontend/src/RecipeEditor.tsx",
-        "reason": "P0-BEGINNER (s47): beginnerMode additions pushed the file to 305 lines. Parked by student decision 2026-08-12 (pay-later debt-triage) — TRIPWIRE: the next touching edit to RecipeEditor.tsx MUST split it (extract the script-preview-pref seam) or update this entry",
+        "reason": "P0-BEGINNER (s47): beginnerMode additions pushed the file to 305 lines. Re-parked 2026-08-16 (s68, student ruling) at 327 lines — the P1-PACKINDEX usage-refresh wiring grew it by 22. The file is a coordinator (threads 12+ handlers); splitting for the numeric limit would scatter prop-wiring across an extra indirection layer (AGENTS.md 'COHESION > ARBITRARY LINE COUNT', s52). TRIPWIRE: past 400 lines the next touching edit MUST split it (extract the script-preview-pref + usage-refresh seams) or update this entry",
         "since": "2026-08-12T08:30:00"
       },
       {

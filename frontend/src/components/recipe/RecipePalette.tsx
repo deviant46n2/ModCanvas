@@ -6,6 +6,8 @@ import { setDragPayload, clearDragPayload } from '../../core/recipe/dnd';
 import { getTagItems, requestResolveTags, subscribeTagChanges } from '../../services/smart-filter-tags';
 import { filterTagCatalog } from '../../core/recipe/tag-filter';
 import { ItemBrowser } from './ItemBrowser';
+import { getPackIndex, invalidatePackIndex } from '../../services/pack-index';
+import { itemUsageByItem, type ItemUsage } from '../../core/pack-index/item-usage';
 
 interface RecipePaletteProps {
   /** Full instance item registry (filtered internally). */
@@ -17,6 +19,11 @@ interface RecipePaletteProps {
   getTextureUrl: (itemId: string) => string | null;
   /** Highlight recipes using an item (`id`) or tag (`#id`). */
   onShowRecipesUsing: (itemOrTagId: string) => void;
+  /** Pack Index consumer (P1-PACKINDEX): project id + a refresh key bumped
+   *  whenever a save/disable/reload changed the pack on disk. The memoized
+   *  index is refetched (after invalidation) when the key changes. */
+  projectId: string;
+  usageRefreshKey: number;
 }
 
 const MEMBER_ROW_HEIGHT = 24;
@@ -111,14 +118,31 @@ export function RecipePalette({
   instancePath,
   getTextureUrl,
   onShowRecipesUsing,
+  projectId,
+  usageRefreshKey,
 }: RecipePaletteProps) {
   const [activeTab, setActiveTab] = useState<'items' | 'tags'>('items');
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [, setTagTick] = useState(0);
+  const [usageByItem, setUsageByItem] = useState<Map<string, ItemUsage> | null>(null);
 
   // Re-render tag rows when members finish resolving (they arrive async).
   useEffect(() => subscribeTagChanges(() => setTagTick((t) => t + 1)), []);
+
+  // Pack Index "where is this used" footer (P1-PACKINDEX consumer): fetch the
+  // memoized index once per project, rebuild the reverse lookup. The refresh
+  // key bumps when a save/disable/reload changed the pack on disk — invalidate
+  // then refetch so the counts stay honest. Failures degrade to no footer
+  // (the palette must never block on the index).
+  useEffect(() => {
+    let cancelled = false
+    if (usageRefreshKey > 0) invalidatePackIndex(projectId)
+    getPackIndex(projectId)
+      .then((idx) => { if (!cancelled) setUsageByItem(itemUsageByItem(idx)) })
+      .catch(() => { if (!cancelled) setUsageByItem(null) })
+    return () => { cancelled = true }
+  }, [projectId, usageRefreshKey]);
 
   const toggleTag = (tagId: string) => {
     setExpanded((prev) => {
@@ -169,6 +193,7 @@ export function RecipePalette({
             mode="browse"
             onDragStart={() => {}}
             onShowRecipesUsing={onShowRecipesUsing}
+            usageByItem={usageByItem}
           />
         </div>
       ) : (

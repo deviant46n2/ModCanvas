@@ -41,6 +41,7 @@ interface RecipeEditorBodyProps {
   tagCatalog: ItemTagInfo[];
   getRegistryTextureUrl: (itemId: string) => string | null;
   onShowRecipesUsing: (itemOrTagId: string) => void;
+  usageRefreshKey: number;
 }
 
 export function RecipeEditorBody({
@@ -78,6 +79,7 @@ export function RecipeEditorBody({
   tagCatalog,
   getRegistryTextureUrl,
   onShowRecipesUsing,
+  usageRefreshKey,
 }: RecipeEditorBodyProps) {
   return (
     <div className="recipe-editor-body">
@@ -129,6 +131,8 @@ export function RecipeEditorBody({
         instancePath={projectPath}
         getTextureUrl={getRegistryTextureUrl}
         onShowRecipesUsing={onShowRecipesUsing}
+        projectId={projectId}
+        usageRefreshKey={usageRefreshKey}
       />
       </>
         )}

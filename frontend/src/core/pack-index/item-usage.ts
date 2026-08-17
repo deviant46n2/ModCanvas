@@ -38,3 +38,19 @@ export function itemUsageByItem(index: PackIndex): Map<string, ItemUsage> {
 export function usageForItem(index: PackIndex, itemId: string): ItemUsage {
   return itemUsageByItem(index).get(itemId) ?? { recipes: 0, quests: 0, tags: 0 }
 }
+
+/**
+ * The hover-footer copy for one item's usage, matching the icon-picker's
+ * wording exactly so both consumers read the same. Pure — the component
+ * decides when to render it. Zero counts render the "not referenced" line.
+ */
+export function usageSummaryText(usage: ItemUsage): string {
+  if (usage.recipes === 0 && usage.quests === 0 && usage.tags === 0) {
+    return 'Not referenced by any recipe, quest, or tag in this pack'
+  }
+  const parts: string[] = []
+  if (usage.recipes > 0) parts.push(`${usage.recipes} recipe${usage.recipes === 1 ? '' : 's'}`)
+  if (usage.quests > 0) parts.push(`${usage.quests} quest${usage.quests === 1 ? '' : 's'}`)
+  if (usage.tags > 0) parts.push(`${usage.tags} tag${usage.tags === 1 ? '' : 's'}`)
+  return `Used in ${parts.join(', ')}`
+}
