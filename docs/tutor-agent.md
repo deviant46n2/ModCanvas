@@ -52,6 +52,12 @@ is updated in the same pass so the student can read their own progress.
 loop: teach → implement (with generalist) → review (with tutor) → the tutor
 forces the "explain it back" pass on anything AI produced.
 
+The `advisor` agent (see `docs/advisor-agent.md`) is the read-only
+architectural steward: it reviews consequential proposals against repo
+evidence and git history before implementation, and never writes code. For
+consequential work the full loop is: propose → advisor review → implement →
+tutor review/explain-back.
+
 ## Notes
 
 - Requires an opencode restart to load the new agent/commands (config is read at
