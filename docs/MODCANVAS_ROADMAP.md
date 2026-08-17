@@ -60,6 +60,14 @@ yet" — not as a build list.**
   full-capture sweep, no companion changes. The rest of this item (other
   rendering infrastructure) stays deferred.
 - Additional maintainer tooling
+- Raw pack-file browsing surface — **RULED OUT as an in-app build (s69)**: raw file access
+  is the OS file manager's / VS Code's job (delegation precedents: `open_assets_folder`
+  s49 via the shell plugin, Prism handoff s53 — the PRISM-LEAN pattern). Veteran file
+  access is served by delegating (reveal-in-folder / open-in-VS-Code style buttons), never
+  a tree UI. The only ModCanvas-native half — file→surface routing (this `.snbt` is
+  chapter 3, this recipe json drives the recipes tab) — stays parked inside the §9.5
+  driver (`MODCANVAS_ROADMAP.md:814`); a browser UI is not required for it. TRIPWIRE: a
+  documented veteran workflow that the per-type tabs + delegation cannot serve.
 
 Deferred is not forgotten; it is deliberate. See `docs/CRITICAL_PRODUCT_AUDIT.md`
 for the findings ledger and per-item rulings.
@@ -193,7 +201,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — entries: the quest editor's `✨ Add a quest` toolbar button (everyone) and the Beginner Mode live banner (s53, first companion connect per session). The external wizard handoff (`showGuidedQuest`) was removed with the wizard step (s53). Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, 3 example behaviors) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
-| Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Does not exist.** No CI, no release artifacts pipeline (only local `pnpm build`). |
+| Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Partially implemented (s65 ruling)** — CI verification matrix DONE: `.github/workflows/verify.yml` (ubuntu + windows) runs the suite on every push; the integrity gate stays the source of truth, CI is a second witness (roadmap risk #6). Release artifacts: still absent — local `pnpm build` only (P0-DISTRIB release-artifact half, separated s65). |
 | Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm.** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`). |
 | Modpack Model / unified model | this document's problem statement | **Does not exist** — see §7. The correct form is the Pack Index. |

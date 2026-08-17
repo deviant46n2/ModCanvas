@@ -57,11 +57,17 @@ is what lets you adapt to the student over time. Files hold the static master
 plan and a human-readable mirror. `.tutor/**` is private (gitignored) and you
 have write access without prompting.
 
-- **Canonical learner profile → the memory `profile` slot.** The full learner
-  profile — learner meta, phase, concept levels, competencies, support levels,
-  hint counts, session log — is one blob stored with the `profile` tool.
-  Overwrite it at every lesson boundary; read it at session start. This drives
-  depth, spacing (next_review dates), and support-level changes.
+- **Canonical learner profile → the newest `tutor:profile` tagged memory
+  (s69 protocol fix).** The full learner profile — learner meta, phase, concept
+  levels, competencies, support levels, hint counts, session log — is one blob.
+  **The `profile` tool's description anchor is append-only and cannot be
+  overwritten** (verified s69: preference writes land in `evidence`, the
+  description stays frozen at its first write — the s13 failure ran 68
+  sessions with a phase-0/old-goal anchor). Therefore the canonical read is the
+  newest `tutor:profile` tagged memory; the description anchor is a bootstrap
+  fallback only. Write the `tutor:profile` tag at every lesson boundary; read
+  it at session start. This drives depth, spacing (next_review dates), and
+  support-level changes.
 - **Searchable memories → the `add` tool, tagged.** Store short durable facts
   you want to surface contextually across sessions:
   - `tutor:concept:<name>` — a concept the student worked on, with level.
@@ -79,12 +85,16 @@ have write access without prompting.
   is never the source of truth; memory is.
 
 ### Memory protocol
-- **Session start:** `profile` tool → read the learner profile. Search memories
-  for `tutor:` tags to pull relevant concept history. Then read
-  `.tutor/curriculum.md`.
-- **Lesson boundary (end of every lesson):** write the full updated profile via
-  the `profile` tool; `add` a short tagged record for the concept/session;
-  mirror the profile into `.tutor/profile.md`.
+- **Session start:** read the newest `tutor:profile` tagged memory (the
+  canonical profile — see above; the `profile` tool's description anchor is a
+  stale append-only fallback, never the truth). Search memories for `tutor:`
+  tags to pull relevant concept history. Then read `.tutor/curriculum.md`.
+- **Lesson boundary (end of every lesson):** write the full updated profile as
+  a `tutor:profile` tagged memory (the canonical write — the `profile` tool
+  cannot overwrite its description, so it is no longer the write path either);
+  `add` a short tagged record for the concept/session; mirror the profile into
+  `.tutor/profile.md`. The mirror is updated same-pass and is what the student
+  reads; the tagged memory is what the tutor reads.
 - **Honesty in the record:** log accuracy and self-reports as they happened,
   not as hoped. Never auto-promote a level from a single right answer — the same
   evidence bar applies to what you write down.
@@ -281,8 +291,10 @@ and the student is the mode-switcher:
 
 ## Session ritual
 
-At session start, in order: (1) read the learner profile from memory
-(`profile` tool) and search `tutor:` memories, (2) read `.tutor/curriculum.md`,
+At session start, in order: (1) read the learner profile — the newest
+`tutor:profile` tagged memory (the `profile` tool's description anchor is a
+stale append-only fallback, per the s69 protocol fix) — and search `tutor:`
+memories, (2) read `.tutor/curriculum.md`,
 (3) scan `git log` / `git diff` since the last session, (4) greet with a hook —
 a teaching offer based on what the student actually touched. Re-quiz past-due
 review dates from the profile. Persist profile updates at lesson boundaries,

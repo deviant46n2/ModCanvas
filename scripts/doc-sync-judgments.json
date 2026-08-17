@@ -144,9 +144,29 @@
    "commit": "bc5b6fc",
    "reason": "companion-authoritative item registry (BuiltInRegistries.ITEM dump, cache v4, cache-or-empty scan) — docs written in the s61 doc-sync pass: pack-health.md 'Item-existence findings' rewritten to the companion-authoritative trust semantics (connected=provable absence, pre-first-launch=empty+degraded guard), roadmap §7.2 item-registry row gains the s59 source note. Cross-commit coverage, judged 2026-08-15 doc-sync pass"
   },
-  {
-   "commit": "df80d31",
-   "reason": "companion item-icon parity fix (render BuiltInModel/BEWLR items via renderByItem) — doc-covered by the FOLLOWING commit f071e3b: engine-renders.md 'Known limits' section rewritten from 'custom-renderer blocks render blank' to the BEWLR reality (isCustomRenderer branch + renderByItem into a flushed MultiBufferSource, s60 blank-composite histogram resolved). Same-pass cross-commit coverage, judged 2026-08-15 tooling-update pass. This commit also motivated the doc-sync coverage extension to workbench-companion-neoforge-1.21/src (it would otherwise have stayed invisible)"
-  }
- ]
+{
+    "commit": "df80d31",
+    "reason": "companion item-icon parity fix (render BuiltInModel/BEWLR items via renderByItem) — doc-covered by the FOLLOWING commit f071e3b: engine-renders.md 'Known limits' section rewritten from 'custom-renderer blocks render blank' to the BEWLR reality (isCustomRenderer branch + renderByItem into a flushed MultiBufferSource, s60 blank-composite histogram resolved). Same-pass cross-commit coverage, judged 2026-08-15 tooling-update pass. This commit also motivated the doc-sync coverage extension to workbench-companion-neoforge-1.21/src (it would otherwise have stayed invisible)"
+   },
+   {
+    "commit": "931d7a1",
+    "reason": "chapter-open view fidelity (framing, theme background, guiScale) — doc-covered by quest-editor.md 'Chapter-Open View Fidelity' section (s64 clean-room, supersedes the retired featureparity.md §16 rows: framing at :993, guiScale at :995, background at :967). The commit touched root-level featureparity.md (3 lines), which is invisible to the gate's docPaths (['docs','README.md','AGENTS.md'] — integrity-rules.mjs:56) and was deliberately RETIRED at s66 (cc894a6) with its unique contents migrated BEFORE deletion; the gate reads the commit as code-without-doc, the migration is the coverage. Judged 2026-08-17 doc-sync pass"
+   },
+   {
+    "commit": "9856a01",
+    "reason": "re-frame canvas on chapter open, not node count — doc-covered by quest-editor.md 'Viewport framing' (:993-994: chapter opens centered on its content bounds via resetScroll, not fitView-stretched). Same s64-s65 fidelity arc as 931d7a1. Judged 2026-08-17 doc-sync pass"
+   },
+   {
+    "commit": "50f106f",
+    "reason": "stretch FTB theme background to fill (window-space draw) — intermediate step of the s64-s65 chapter-open fidelity arc; final state documented in quest-editor.md 'Background (theme)' (:967-983: window-space full-rect draw, tile/stretch semantics, vertex tint). Superseded by the 931d7a1 framing fix that re-landed the background handling. Judged 2026-08-17 doc-sync pass"
+   },
+   {
+    "commit": "ac9b029",
+    "reason": "revert of 50f106f (stretch theme background) — intermediate arc step: stretch landed, reverted, re-landed correctly inside 931d7a1's framing fix; quest-editor.md documents only the final state, which is what shipped. Revert doc-less by judgment (the class: a revert's intermediate state never needs doc when the final state is documented). Judged 2026-08-17 doc-sync pass"
+   },
+   {
+    "commit": "c7db3d5",
+    "reason": "companion getName() crash guard — internal defensive fix (a modded item's getName() throwing must never crash the game; try/catch wrapper in WorkbenchEventHandler). No user-visible surface change; defensive code, not a behavior the docs promise. Judged doc-less 2026-08-17 doc-sync pass"
+   }
+  ]
 }

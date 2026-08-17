@@ -5,7 +5,7 @@ agent: tutor
 
 Run the integrity gate: $ARGUMENTS
 
-1. Run `node scripts/integrity-check.mjs` from the repo root (or `node scripts/integrity-check.mjs <section>` for line-limit | asset-bundle | stale-binary | diff-hygiene | adapter-matrix | doc-sync | doc-anchors | suite-self).
+1. Run `node scripts/integrity-check.mjs` from the repo root (or `node scripts/integrity-check.mjs <section>` for line-limit | asset-bundle | stale-binary | diff-hygiene | adapter-matrix | doc-sync | doc-anchors | build-smoke | suite-self).
 2. **VIOLATION entries are new violations** — the gate is clean on the known debt (parked). For each violation, triage with the student like any debt:
    - pay now (split the file / remove the asset / rebuild / revert the adapter edit) — or
    - park with a written reason: add the path to the matching allowlist in `scripts/integrity-rules.json` with a reason that names the failure it would mask.

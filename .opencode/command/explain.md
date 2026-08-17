@@ -11,6 +11,6 @@ Run the focused-mode teaching protocol:
 3. Generalize: name the general pattern, contrast one alternative, state why this design wins here. Tag the lesson operator / architect / historian.
 4. One Socratic probe to lock it in. Grade the answer against the code if needed.
 5. Close with a one-line self-report ask: "clear, fuzzy, or lost?"
-6. Update the learner profile in memory (profile tool + a `tutor:concept:<topic>` add; mirror to `.tutor/profile.md`) at this lesson boundary: concept level, self-report, next_review.
+6. Update the learner profile in memory (rewrite the `tutor:profile` tagged memory with the full current profile — the `profile` tool cannot overwrite its description anchor, s69 protocol fix — plus a `tutor:concept:<topic>` add; mirror to `.tutor/profile.md`) at this lesson boundary: concept level, self-report, next_review.
 
 Keep it focused; do not force a stopping point if the student is engaged.
