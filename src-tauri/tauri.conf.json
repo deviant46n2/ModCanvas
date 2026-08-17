@@ -11,7 +11,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage"],
+    "targets": ["appimage", "deb"],
     "category": "DeveloperTool",
     "shortDescription": "Minecraft modpack workbench",
     "longDescription": "Offline-first desktop workbench and IDE for Minecraft modpack creators and server engineers.",
