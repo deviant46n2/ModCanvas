@@ -34,7 +34,7 @@ pub struct ReferenceFinding {
 }
 
 /// The derived Pack Index. Deterministic: same inputs → same index.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct PackIndex {
     /// Item ids present in the registry, canonical `ns:path`.
     pub items: Vec<String>,

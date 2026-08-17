@@ -4,6 +4,7 @@ import type { QuestGraphData } from '../../services/api'
 import type { ItemRegistryEntry } from '../../services/quest-types'
 import { isUsableTextureValue, textureDisplayUrl, requestMaterialize } from '../../services/texture-loader'
 import { usePackHealthStore } from '../../core/pack-health/pack-health-store'
+import { getPackIndex } from '../../services/pack-index'
 import { AnimatedSprite } from './AnimatedSprite'
 
 interface IconPickerProps {
@@ -28,7 +29,33 @@ interface IconPickerProps {
  */
 export function IconPicker({ open, target, textureIndex, graph, instancePath, onGraphChange, onClose, scheduleAutoSave }: IconPickerProps) {
   const [search, setSearch] = useState('')
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [usageByItem, setUsageByItem] = useState<Map<string, { recipes: number; quests: number; tags: number }> | null>(null)
   const itemRegistry = usePackHealthStore((s) => s.itemRegistry)
+
+  // Pack Index "where is this used" footer (P1-PACKINDEX consumer): fetch the
+  // derived index once per open, memoized per project by the service, and
+  // build the reverse lookup. Failures degrade to no footer (the picker must
+  // never block on the index).
+  useEffect(() => {
+    if (!open || !graph.project_id) return
+    let cancelled = false
+    getPackIndex(graph.project_id)
+      .then((idx) => {
+        if (cancelled) return
+        const usage = new Map<string, { recipes: number; quests: number; tags: number }>()
+        for (const ref of idx.references) {
+          const cur = usage.get(ref.item_id) ?? { recipes: 0, quests: 0, tags: 0 }
+          if (ref.source_kind === 'recipe') cur.recipes += 1
+          else if (ref.source_kind === 'quest') cur.quests += 1
+          else if (ref.source_kind === 'tag') cur.tags += 1
+          usage.set(ref.item_id, cur)
+        }
+        setUsageByItem(usage)
+      })
+      .catch(() => { if (!cancelled) setUsageByItem(null) })
+    return () => { cancelled = true }
+  }, [open, graph.project_id])
 
   const items = itemRegistry ?? []
 
@@ -130,6 +157,7 @@ export function IconPicker({ open, target, textureIndex, graph, instancePath, on
                   key={key}
                   className="icon-picker-item"
                   onClick={() => selectIcon(key)}
+                  onMouseEnter={() => setHoveredId(key)}
                   style={{ aspectRatio: '1/1', padding: '8px', minHeight: 0 }}
                 >
                   <AnimatedSprite url={textureDisplayUrl(textureIndex, key) || fallback || ''} textureKey={key} width={40} height={40} alt="" imageRendering="pixelated" className="icon-picker-img" />
@@ -138,6 +166,21 @@ export function IconPicker({ open, target, textureIndex, graph, instancePath, on
               )
             })}
           </div>
+          {usageByItem && hoveredId && (
+            <div className="icon-picker-usage" style={{ marginTop: 8, fontSize: 11, opacity: 0.75, textAlign: 'center' }}>
+              {(() => {
+                const u = usageByItem.get(hoveredId)
+                if (!u || (u.recipes === 0 && u.quests === 0 && u.tags === 0)) {
+                  return <span>Not referenced by any recipe, quest, or tag in this pack</span>
+                }
+                const parts: string[] = []
+                if (u.recipes > 0) parts.push(`${u.recipes} recipe${u.recipes === 1 ? '' : 's'}`)
+                if (u.quests > 0) parts.push(`${u.quests} quest${u.quests === 1 ? '' : 's'}`)
+                if (u.tags > 0) parts.push(`${u.tags} tag${u.tags === 1 ? '' : 's'}`)
+                return <span>Used in {parts.join(', ')}</span>
+              })()}
+            </div>
+          )}
         </div>
       </div>
     </div>

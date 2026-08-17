@@ -1197,6 +1197,19 @@ Conventions:
 - **Completion criteria:** "where is this used" answers resolve in the recipe editor and
   item picker; a broken reference surfaces as a named finding, never a silent miss; index
   build is deterministic (same instance → same index).
+- **Status (s44 + s67):** the Rust spine landed s44 (`b91a0cc` — models, build, inversion,
+  dead-reference audit, `get_pack_index` command) but was never marked here. **Finished
+  s67:** tags wired into the build (canonical `#ns:path` ids + tag→item references through
+  the same dead-reference audit — the s44 parked reason was stale: the tag index exists);
+  determinism + all-input-legs locked by `pack_index_covers_all_input_legs` /
+  `pack_index_build_is_deterministic` (build_tests.rs — the fixture caught a REAL s44 bug:
+  shaped-recipe ingredients live in `key`, never read, so they were silently missing from
+  the index; fixed). **First consumer shipped (s67):** the icon picker's "where is this
+  used" footer — hover an item in the picker to see its recipe/quest/tag usage counts,
+  fed by `get_pack_index` (memoized per project by `services/pack-index.ts`, so the
+  picker never rescan-per-open) + the pure reverse-lookup (`core/pack-index/item-usage.ts`,
+  unit-tested). The recipe-editor half of the completion criterion (item-click in the
+  recipe explorer) is a follow-up consumer on the same seam.
 
 #### P1-HEALTH-2 — Pack Health Tier 2: progression topology
 

@@ -1,17 +1,18 @@
 // Pack Index assembly (I/O layer — the hands room). Builds the derived index
-// from the existing scans: item registry, recipe scan, quest graph. Pure
-// inversion lives in `invert.rs`; this module owns WHERE the inputs come
+// from the existing scans: item registry, recipe scan, quest graph, tag index.
+// Pure inversion lives in `invert.rs`; this module owns WHERE the inputs come
 // from, never the reference logic itself (3-layer rule).
 //
 // MVP scope (s44): items + recipes (output + ingredients) + quests (rewards).
-// Tags are PARKED with a written reason: tag expansion needs the tag index
-// (`instance_textures/tags.rs`), which has a separate scan lifecycle from the
-// recipe/quest path — wiring it in is a deliberate follow-up, not a stub.
+// Tags wired in (s67): the tag index (`instance_textures/tags.rs`) has its own
+// scan lifecycle + memo — resolve_item_tags expands each tag to member items,
+// and the members feed the same dead-reference audit as recipes/quests.
 
 use crate::pack_index::models::PackIndex;
-use crate::pack_index::invert::{audit_references, quest_item_references, recipe_item_references};
+use crate::pack_index::invert::{audit_references, quest_item_references, recipe_item_references, tag_item_references};
 
 use crate::indexer::scan_instance_items;
+use crate::instance_textures::{list_item_tags_cmd, resolve_item_tags_cmd};
 use crate::recipes::scan_pack_recipes;
 use crate::quest_cache;
 
@@ -29,13 +30,18 @@ pub fn build_pack_index(
         .unwrap_or_default();
     let item_registry: std::collections::HashSet<String> = items.iter().cloned().collect();
 
-    // 2. Recipes: output item + every ingredient item.
+    // 2. Recipes: output item + every ingredient item. Shaped recipes carry
+    // ingredients in `key` (letter → ingredient); shapeless/smelt in
+    // `ingredients`. Read both so shaped-recipe ingredients are indexed.
     let recipes = scan_pack_recipes(project_path);
     let recipe_ids: Vec<String> = recipes.iter().map(|d| d.id.clone()).collect();
     let recipe_refs = recipe_item_references(recipes.iter().map(|d| {
         let mut ids = vec![d.recipe.output.item.clone()];
         if let Some(ing) = &d.recipe.ingredients {
             ids.extend(ing.iter().map(|i| i.item.clone()));
+        }
+        if let Some(key) = &d.recipe.key {
+            ids.extend(key.values().map(|i| i.item.clone()));
         }
         (d.id.as_str(), ids)
     }));
@@ -81,6 +87,19 @@ pub fn build_pack_index(
             .collect(),
         ..Default::default()
     };
+
+    // 3.5 Tags: every tag in the instance, expanded to member items. Tag ids
+    // are canonicalized to the `#ns:path` form (§8.3.1) so tag→item references
+    // resolve through the same audit as recipes/quests.
+    let project_path_str = project_path.to_string_lossy().to_string();
+    let tag_infos = list_item_tags_cmd(project_path_str.clone()).unwrap_or_default();
+    let tag_ids: Vec<String> = tag_infos.iter().map(|t| t.id.clone()).collect();
+    let tag_members = resolve_item_tags_cmd(project_path_str, tag_ids).unwrap_or_default();
+    index.tags = tag_members.keys().map(|t| format!("#{}", t)).collect();
+    let tag_refs = tag_item_references(tag_members.iter().map(|(tag, members)| {
+        (tag.as_str(), members.iter().map(|m| m.as_str()))
+    }));
+    index.references.extend(tag_refs);
 
     // 4. Dead-reference audit — every reference resolves or is named.
     audit_references(&mut index, &item_registry);

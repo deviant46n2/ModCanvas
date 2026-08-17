@@ -4,16 +4,20 @@
 // are the repo's existing stable ID forms (§8.3.1): items `ns:path`, tags
 // `#ns:path`, recipes `ns:name`, quests the graph's opaque node ids.
 //
-// MVP (s44): items + recipes (output + ingredients) + quests (rewards),
-// inverted into back-references, dead references reported as named findings.
-// Tags are PARKED (written reason in `build.rs`). Consumers — Pack Health
-// Tier 2, "where is this used" in editors — are follow-ups; the load-path
-// placement ("materialized before health, never on-demand inside a recompute",
-// roadmap §8.3.1 item 2) is a consumer decision, not this module's.
+// Scope (s44 + s67): items + recipes (output + ingredients, shaped `key`
+// included) + quests (rewards) + tags (canonical ids + expanded members), all
+// inverted into back-references with dead references reported as named
+// findings. Consumers — Pack Health Tier 2, "where is this used" in editors —
+// are follow-ups; the load-path placement ("materialized before health, never
+// on-demand inside a recompute", roadmap §8.3.1 item 2) is a consumer
+// decision, not this module's.
 
 pub mod build;
 pub mod invert;
 pub mod models;
+
+#[cfg(test)]
+mod build_tests;
 
 use crate::pack_index::models::PackIndex;
 use serde::Serialize;
