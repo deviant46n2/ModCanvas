@@ -167,6 +167,10 @@
    {
     "commit": "c7db3d5",
     "reason": "companion getName() crash guard — internal defensive fix (a modded item's getName() throwing must never crash the game; try/catch wrapper in WorkbenchEventHandler). No user-visible surface change; defensive code, not a behavior the docs promise. Judged doc-less 2026-08-17 doc-sync pass"
+   },
+   {
+    "commit": "7eea231",
+    "reason": "B1 (vanilla jar surfacing + copy-to-pack backend) shipped doc-less s72; docs written the next window s73 — docs/loot-editor.md 'Vanilla surfacing + copy-to-pack (B1, s72)' section covers scan order, dedupe, and the shared write tail. Drift paid, not forgotten. Judged 2026-08-17 doc-sync pass"
    }
   ]
 }
