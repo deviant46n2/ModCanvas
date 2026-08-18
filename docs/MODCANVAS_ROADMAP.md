@@ -37,6 +37,8 @@ strategic space, including things deliberately NOT being built yet.
 | 5 | **PRISM-LEAN (s53)** — mod EXECUTION moves to Prism Launcher | **CHUNK 1 DONE (s53)** — handoff shipped: `open_prism_instance` (`prismlauncher --show <instanceId>`), wizard curated step = curated list + "Open Prism to install these" (manual-link fallback for non-instance packs), Mods tab "Add mods in Prism" button. Docs: `docs/mods-tab.md`. | ModCanvas curates + diagnoses; Prism executes (version matching + dependency resolution — verified: FTB Quests in Prism pulls Library/Teams/Architecury; ModCanvas's own search cannot surface CF mods: `searchFilter=ftb` → 50 irrelevant hits, zero FTB mods, live-verified 2026-08-13). Student ruling; rationale: delegate risky high-surface execution to battle-tested software. |
 | 6 | **PRISM-LEAN chunk 2** — evidence-backed deletion of the deprecated add-mods machinery | **DONE (s54)** — search surface deleted: `search_mods` / `install_mod_from_search` (renamed `install_modrinth_mod`, Modrinth-only) / `search_merge.rs` / orphaned CF download fns / Mods-tab search UI / SearchResultRow / CategorySelect / SourceToggles (4 test files deleted, 2 edited, s52 evidence pattern). **Refined on ruling:** the one-click Modrinth installer was KEPT (wizard curated picks + compat panel) — keyless and loop-closing; CF installs (FTB Quests) go to Prism with explicit guide copy naming the three required deps (wizard step + core-mod gate finding). CF-key use for installs is dead everywhere. Docs: `docs/mods-tab.md`. | See row 5 for the ruling rationale. The refinement (s54): the s53 kill-list overreached on the compat one-click — Modrinth's API is keyless, so an app-diagnosed missing dep can be repaired in-app honestly; CF deps stay invisible (`CurseForgeFileInfo` parses none), so FTB Quests always installs through Prism. |
 | 7 | **Dep-gate the green check (s54-B) — RULED (s55): warn persistently, never gate; REFINED (s56): required deps of core mods gate + auto-install** | **DONE (s55 + s56)** — (s55) missing required deps surface as a persistent, NON-blocking warning in Pack Health (Mods section, `checkMissingDeps` + `depIssues` in the pack-health store, fed by every compat-check site). Launch stays open — the user may legitimately not want to install a mod right now (student ruling). The network-dependence question resolved: the compat check already degrades to no-claim on fetch failure; the store is the materialized cache. (s56) **Carve-out, student ruling after a live first-boot failure** (`kubejs requires rhino`, flatpak pair): required deps of CORE mods are the core gate's lane — Rhino joined `CORE_MOD_PATTERNS` because KubeJS's `neoforge.mods.toml` declares it required and NeoForge refuses to boot without it. The gate is now the closure of core mods over their required deps; the warning lane keeps deps of user-chosen mods. Dep issues for missing core mods are deduped out of the warning lane (blocking owns the fact), conditioned on the scan (no scan → gate silent → dep warning survives). **Auto-install (s56, student ruling: "all required mods auto installed"):** the gate list is the single source of truth — each entry carries its install path (`modrinthSlug` → auto-install on wizard Continue; no slug → manual via the Prism guide, FTB Quests = CF wall, verified not on Modrinth). A future required mod = one row with a slug, no wizard edits. | The s54-A dep loop (inline one-click installs) closed the *action* loop; this closes the *honesty* loop — a pack with an unresolved required dep is never silently blessed, but also never blocked over it. The s56 carve-out: a load-bearing dep of a core mod is not discretionary — blocking it is the wedge promise, not a gate on user choice. Auto-install extends the same logic: a required mod is not a choice, so the wizard installs it. |
+| 8 | **Loot: surface the vanilla jar + copy-to-pack (B1, s72 re-scope)** | **NOT STARTED** — scan `data/` + `mods/*.jar` only today (`pack_scan.rs:14-72`); the vanilla jar is never scanned, so a zero-mod pack sees an empty Loot tab. `find_vanilla_jars` (`indexer/vanilla.rs:33`) already locates the jar for the item indexer — reuse it: scan vanilla tables read-only (jar tables are read-only today, `LootTab.tsx:13-16`) + a "copy to pack" action that materializes an editable copy in pack `data/`. | A person with zero mods installed must have something to work with. The Loot tab is not "done" until a no-mod pack can edit real content (student ruling, s72). |
+| 9 | **Curated mod pointers for loot/worldgen domains (A, s72 re-scope)** | **NOT STARTED** — a small "want more loot/worldgen? these mods" surface per domain, reusing the PRISM-LEAN pattern (ModCanvas curates + diagnoses, Prism executes — wizard curated step, `CuratedModsStep`, "Add mods in Prism" handoff) and the curated-list machinery (`curated.rs`). | Direction A of the s72 re-scope: when vanilla options are not enough, point the user at the mods that control the domain, installed through Prism — delegation, not in-app authoring. |
 
 ### Deliberately deferred expansion
 
@@ -437,7 +439,7 @@ ceiling.
 | Mods | find, add, remove, enable/disable, compat-check | **~60% (s53 PRISM-LEAN)** — install/search DEPRECATED (Prism owns execution: versions + deps); ModCanvas keeps scan, tracking, remove/toggle, compat DIAGNOSIS + curated list | ~90% | chunk-2 deletion of the deprecated machinery; compat panel install buttons → Prism handoff | Low–Medium |
 | Progression | gating, ordering, bottlenecks, walls | **~50%** — per-quest fields + sim mode; no campaign surface | ~85% | progression-topology analytics (pure math), cross-chapter staging | Medium |
 | Behaviors | "when X, if Y, do Z" (commands, loot on kill, stage gating) | **~65% (s70)** — full §11.1 vocabulary: 10 triggers, 6 conditions, 8 actions, both backends (KubeJS + datapack), editor with live compile preview, in-game smoke-verified; 14 example behaviors in templates | ~80% | anything requiring custom logic beyond the action library; the teaching bridge ("add custom" — parked, revisit when users test the showcase) | **High** (the hard no-code problem; §11) |
-| Loot | table edits, drops, weighted tables | **~5%** — nothing | ~60% | deep loot-table composition (nested pools, conditions-in-JSON) | Medium–High |
+| Loot | table edits, drops, weighted tables | **~40% (s47 editor, s72 re-scope)** — pools/rolls/entries/weights/conditions/JSON emission shipped; vanilla-jar surfacing + copy-to-pack + curated pointers pending (queue rows 8-9) | ~60% | deep loot-table composition (nested pools, conditions-in-JSON) | Medium–High |
 | Worldgen | ores, features, structures, biomes, dimensions | **~0%** | ~40% | anything beyond datapack-JSON scope | **Very High** (dimension/terrain is the deepest) |
 | Pack health | "is my pack sound before boot" | **~95%** of Tier-1 scope | Tier 2 topology pure math | runtime-only failures (never claimable offline) | Medium |
 | Testing | launch, capture, verify | **~50%** — Test launch + companion capture | ~80% | automated in-game verification loops | High |
@@ -1608,11 +1610,22 @@ Conventions:
   (`core/loot/conditions.ts`), and new-table creation with the version-derived dir via the
   adapter matrix (`IMinecraftVersionAdapter.getLootDirName()`, locked in matrix.test.ts;
   `loot/create.rs`). Reference: `docs/loot-editor.md`.
+  **RE-SCOPED (s72, student ruling):** the Loot tab is not "done" until a zero-mod
+  pack has something editable to work with. Two additions, in the directed
+  maintenance queue (rows 8-9): (B1) surface the vanilla jar's loot tables via
+  `find_vanilla_jars` + a "copy to pack" action; (A) curated mod pointers for the
+  loot domain through the PRISM-LEAN handoff.
 - **P3-WORLDGEN** — worldgen authoring: features/ores first (datapack-JSON-scoped), biomes
   later, dimensions last. Class: New. Complexity: **Very High** — the lowest no-code
   ROI-per-effort; scope tightly or cut. **Recommendation: keep as a "scoped features/ores
   surface only" item until P3-LOOT and behaviors prove the model; treat full dimension
   authoring as Future/Investigate.**
+  **PARKED (s72, student ruling):** the worldgen *editor* stays parked — revisit when the
+  student touches worldgen again. What is possible there (written for the revisit):
+  datapack-JSON-scoped features/ores (`data/*/worldgen/configured_feature` +
+  `placed_feature`) are the tractable core (the §13 recommendation above), biomes are
+  harder, dimensions are the hardest (terrain/noise generation). Curation for the domain
+  (direction A) is NOT parked — it ships with the loot curation surface (queue row 9).
 - **P3-DISTRIB-DEEP** — publish/curation integrations (PW-GUI-style packaging, modpack
   sharing). Class: Investigate. Depends on P0-DISTRIB existing.
 
@@ -1773,7 +1786,10 @@ drift).
 ## 19. Success criteria
 
 - **MVP (P0 done):** the Bible's exit criterion is met and *verified by fresh-eyes testers*:
-  zero-code beginner creates + launches a playable 1.21.1/NeoForge pack.
+  zero-code beginner creates + launches a playable 1.21.1/NeoForge pack. **RE-SCOPED (s72,
+  student ruling):** the Loot tab is an MVP surface — a zero-mod pack must have editable
+  loot content (vanilla-jar surfacing, queue row 8) and curated pointers when vanilla isn't
+  enough (queue row 9). Worldgen authoring stays post-MVP (P3-WORLDGEN parked, s72).
 - **P1 done:** "where is this used" works across recipes/quests/items; Pack Health reports
   progression topology truthfully; the §13 P1-PARITY items are closed or explicitly parked.
 - **P2 done:** a behavior authored visually compiles to loadable KubeJS/datapack with
