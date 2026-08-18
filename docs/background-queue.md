@@ -13,4 +13,9 @@ is forgotten.
 
 ## Items
 
-(none pending)
+- [2026-08-17] Scope the Tauri `test` harness (tauri::test mock_builder) as a
+  maintenance item? (It would unlock: the parked e2e socket test, command-layer
+  tests for all 70 AppHandle/State commands, state injection. Costs a dev-dep +
+  test-feature surface. The park-with-reason at MODCANVAS_ROADMAP.md:1398 stands
+  until a decision.) — parked because the scoping question was asked and not
+  answered; the arc had already closed. Decided: PARKED (no answer given)
