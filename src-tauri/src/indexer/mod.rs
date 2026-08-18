@@ -8,7 +8,7 @@ use crate::indexer_kubejs::collect_kubejs_scripts;
 mod cache;
 mod jar;
 mod kubejs;
-mod vanilla;
+pub(crate) mod vanilla;
 
 use cache::{get_jar_meta, load_cache, save_cache, JarMeta};
 pub(crate) use vanilla::find_vanilla_jars;

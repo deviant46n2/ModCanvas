@@ -8,11 +8,21 @@ export interface DiscoveredLootTable {
   pools: number
   entries: number
   editable: boolean
+  /** True when the table came from the vanilla game jar (s72 re-scope). */
+  vanilla: boolean
 }
 
-/** Scan a pack for its loot tables (pack data folder + mod jars). */
-export async function scanPackLootTables(projectPath: string): Promise<DiscoveredLootTable[]> {
-  return invoke<DiscoveredLootTable[]>('scan_loot_tables_cmd', { projectPath })
+/** Scan a pack for its loot tables (pack data folder + mod jars + the vanilla
+ *  jar when an instance path is known — s72: a zero-mod pack gets vanilla
+ *  loot to work with). */
+export async function scanPackLootTables(
+  projectPath: string,
+  instancePath?: string,
+): Promise<DiscoveredLootTable[]> {
+  return invoke<DiscoveredLootTable[]>('scan_loot_tables_cmd', {
+    projectPath,
+    instancePath: instancePath || null,
+  })
 }
 
 /** Load one table as its canonical model (loot/editor.rs). Returns the raw
@@ -50,6 +60,23 @@ export async function createLootTable(
     name,
     dirName,
     content,
+  })
+}
+
+/** Copy a jar's loot table into the pack's own `data/` (B1, s72 re-scope:
+ *  "copy to pack" — makes a read-only vanilla/mod table editable). `source`
+ *  is the scan's `jar:<abs>!<internal>` descriptor; the target id + dir come
+ *  from the jar entry + the adapter-derived dir name. Returns the new
+ *  editable row for immediate selection. */
+export async function copyLootTableToPack(
+  projectPath: string,
+  source: string,
+  dirName: 'loot_table' | 'loot_tables',
+): Promise<DiscoveredLootTable> {
+  return invoke<DiscoveredLootTable>('copy_loot_table_to_pack_cmd', {
+    projectPath,
+    source,
+    dirName,
   })
 }
 

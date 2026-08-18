@@ -9,6 +9,7 @@ use crate::loot::model::LootTable;
 use crate::loot::DiscoveredLootTable;
 use crate::path_safety::{atomic_write_str, validate_under_root};
 use serde_json::Value;
+use std::io::Read;
 
 /// The two historical datapack dir names. A create request must name one of
 /// these exactly — the adapter matrix decides WHICH one for the pack's MC
@@ -29,19 +30,33 @@ pub fn create_loot_table_cmd(
     dir_name: String,
     content: String,
 ) -> Result<DiscoveredLootTable, String> {
-    if !LOOT_DIR_NAMES.contains(&dir_name.as_str()) {
+    let root = std::path::PathBuf::from(&project_path);
+    write_new_pack_table(&root, &namespace, &name, &dir_name, &content)
+}
+
+/// The shared write tail for new pack tables: whitelist the dir name, validate
+/// namespace/name as a safe resource path, refuse to clobber, write atomically.
+/// Used by `create_loot_table_cmd` and `copy_loot_table_to_pack_cmd` so both
+/// paths carry identical safety semantics.
+fn write_new_pack_table(
+    root: &std::path::Path,
+    namespace: &str,
+    name: &str,
+    dir_name: &str,
+    content: &str,
+) -> Result<DiscoveredLootTable, String> {
+    if !LOOT_DIR_NAMES.contains(&dir_name) {
         return Err(format!("Unknown loot dir name: {dir_name} (expected loot_table or loot_tables)"));
     }
 
-    loot_resource_rel_path(&namespace, &name)?;
+    loot_resource_rel_path(namespace, name)?;
     let full_rel = format!("data/{namespace}/{dir_name}/{name}.json");
 
-    let json: Value = serde_json::from_str(&content).map_err(|e| format!("Invalid JSON: {e}"))?;
+    let json: Value = serde_json::from_str(content).map_err(|e| format!("Invalid JSON: {e}"))?;
     let table = LootTable::from_value(&json)
         .ok_or_else(|| "Refusing to create: not a modelable loot table (pools missing)".to_string())?;
 
-    let root = std::path::PathBuf::from(&project_path);
-    let path = validate_under_root(&root, &full_rel)?;
+    let path = validate_under_root(root, &full_rel)?;
     if path.exists() {
         return Err(format!("Refusing to overwrite existing loot table {namespace}:{name}"));
     }
@@ -49,7 +64,7 @@ pub fn create_loot_table_cmd(
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create directory {}: {e}", parent.display()))?;
     }
-    atomic_write_str(&path, &content).map_err(|e| e.to_string())?;
+    atomic_write_str(&path, content).map_err(|e| e.to_string())?;
 
     Ok(DiscoveredLootTable {
         id: format!("{namespace}:{name}"),
@@ -58,7 +73,43 @@ pub fn create_loot_table_cmd(
         pools: table.pools.len(),
         entries: table.pools.iter().map(|p| p.entries.len()).sum(),
         editable: true,
+        vanilla: false,
     })
+}
+
+/// Copy a loot table OUT of a jar into the pack's own `data/` (B1, s72 re-scope:
+/// "copy to pack" for vanilla/mod-jar tables so a zero-mod pack has editable
+/// content). `source` is the scan's `jar:<abs_path>!<zip_internal_path>`
+/// descriptor; the target id + dir come from the jar entry name + the
+/// version-derived dir name (adapter matrix), exactly like a create.
+#[tauri::command]
+pub fn copy_loot_table_to_pack_cmd(
+    project_path: String,
+    source: String,
+    dir_name: String,
+) -> Result<DiscoveredLootTable, String> {
+    let (jar_path, internal) = source
+        .strip_prefix("jar:")
+        .and_then(|s| s.split_once('!'))
+        .ok_or_else(|| format!("Not a jar source: {source}"))?;
+
+    let file = std::fs::File::open(jar_path)
+        .map_err(|e| format!("Failed to open jar {}: {e}", jar_path))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Failed to read jar {}: {e}", jar_path))?;
+    let mut entry = archive
+        .by_name(internal)
+        .map_err(|e| format!("Table {} not found in jar: {e}", internal))?;
+    let mut content = String::new();
+    entry
+        .read_to_string(&mut content)
+        .map_err(|e| format!("Failed to read {}: {e}", internal))?;
+
+    let (ns, id_path) = crate::loot::pack_scan::loot_id_from_jar_entry(internal)
+        .ok_or_else(|| format!("Not a loot-table path: {internal}"))?;
+
+    let root = std::path::PathBuf::from(&project_path);
+    write_new_pack_table(&root, &ns, &id_path, &dir_name, &content)
 }
 
 /// Validate the `data/<ns>/<dir>/...` path components BETWEEN the datapack
@@ -209,6 +260,116 @@ mod tests {
         )
         .unwrap_err();
         assert!(e.contains("overwrite"), "got: {e}");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// Build a jar carrying one loot table, return (jar path, jar source).
+    fn make_jar(tmp: &std::path::Path) -> (std::path::PathBuf, String) {
+        use std::io::Write as _;
+        use zip::write::SimpleFileOptions;
+        let jar_path = tmp.join("source.jar");
+        let file = std::fs::File::create(&jar_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts = SimpleFileOptions::default();
+        zip.start_file("data/minecraft/loot_table/chests/simple_dungeon.json", opts).unwrap();
+        zip.write_all(b"{\"type\":\"minecraft:chest\",\"pools\":[{\"rolls\":1,\"entries\":[{\"type\":\"minecraft:item\",\"name\":\"minecraft:stick\"}]}]}").unwrap();
+        zip.finish().unwrap();
+        let source = format!("jar:{}!data/minecraft/loot_table/chests/simple_dungeon.json", jar_path.display());
+        (jar_path, source)
+    }
+
+    #[test]
+    fn copy_pulls_a_jar_table_into_pack_data_verbatim() {
+        let tmp = std::env::temp_dir().join(format!("loot_copy_{}", std::process::id()));
+        let root = root(&tmp);
+        let (_jar, source) = make_jar(&tmp);
+
+        let row = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            source,
+            "loot_table".to_string(),
+        )
+        .unwrap();
+        assert_eq!(row.id, "minecraft:chests/simple_dungeon");
+        assert!(row.editable, "copied table is editable pack data");
+
+        let on_disk = root.join("data/minecraft/loot_table/chests/simple_dungeon.json");
+        assert!(on_disk.is_file(), "copied to {}", on_disk.display());
+        let content = std::fs::read_to_string(&on_disk).unwrap();
+        assert!(content.contains("minecraft:stick"), "content copied from the jar, not a stub");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn copy_refuses_clobber_bad_source_and_traversal_id() {
+        let tmp = std::env::temp_dir().join(format!("loot_copy_bad_{}", std::process::id()));
+        let root = root(&tmp);
+        let (_jar, source) = make_jar(&tmp);
+
+        // Copy twice → second must refuse (no-clobber).
+        copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            source.clone(),
+            "loot_table".to_string(),
+        )
+        .unwrap();
+        let e = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            source.clone(),
+            "loot_table".to_string(),
+        )
+        .unwrap_err();
+        assert!(e.contains("overwrite"), "no-clobber, got: {e}");
+
+        // Not a jar source.
+        let e = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            "/plain/path.json".to_string(),
+            "loot_table".to_string(),
+        )
+        .unwrap_err();
+        assert!(e.contains("Not a jar source"), "got: {e}");
+
+        // Unknown dir name.
+        let e = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            source.clone(),
+            "../../evil".to_string(),
+        )
+        .unwrap_err();
+        assert!(e.contains("Unknown loot dir"), "got: {e}");
+
+        // A jar entry that is not a loot-table path (traversal-shaped id). The
+        // entry exists in the jar verbatim — the id-parser must refuse it.
+        let evil_jar = tmp.join("evil.jar");
+        {
+            use std::io::Write as _;
+            use zip::write::SimpleFileOptions;
+            let file = std::fs::File::create(&evil_jar).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file("data/evil/../../loot_table/x.json", SimpleFileOptions::default()).unwrap();
+            zip.write_all(b"{\"type\":\"minecraft:chest\",\"pools\":[]}").unwrap();
+            zip.finish().unwrap();
+        }
+        let evil = format!("jar:{}!data/evil/../../loot_table/x.json", evil_jar.display());
+        let e = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            evil,
+            "loot_table".to_string(),
+        )
+        .unwrap_err();
+        assert!(e.contains("Not a loot-table path"), "traversal-shaped entry refused: {e}");
+
+        // Missing jar file.
+        let missing = format!("jar:{}!data/minecraft/loot_table/a.json", tmp.join("nope.jar").display());
+        let e = copy_loot_table_to_pack_cmd(
+            root.to_string_lossy().into_owned(),
+            missing,
+            "loot_table".to_string(),
+        )
+        .unwrap_err();
+        assert!(e.contains("Failed to open jar"), "got: {e}");
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

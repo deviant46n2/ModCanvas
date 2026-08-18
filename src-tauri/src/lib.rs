@@ -211,6 +211,7 @@ pub fn run() {
             crate::loot::editor::read_loot_table_cmd,
             crate::loot::editor::save_loot_table_cmd,
             crate::loot::create::create_loot_table_cmd,
+            crate::loot::create::copy_loot_table_to_pack_cmd,
             crate::pack_index::get_pack_index,
             crate::recipe_disable::comment_out_recipe_call,
             crate::recipe_disable::uncomment_recipe_call,

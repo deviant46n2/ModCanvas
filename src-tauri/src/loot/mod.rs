@@ -33,6 +33,10 @@ pub struct DiscoveredLootTable {
     /// True when the table lives in the pack's own `data/` (editable on
     /// disk) rather than inside a mod jar.
     pub editable: bool,
+    /// True when the table came from the vanilla game jar (s72 re-scope:
+    /// zero-mod packs get vanilla loot to work with). False for mod-jar
+    /// and pack-data tables.
+    pub vanilla: bool,
 }
 
 /// Scan a pack for its loot tables. Walks `data/` and every mod jar/zip,
@@ -44,6 +48,12 @@ pub fn scan_pack_loot_tables(project_path: &std::path::Path) -> Vec<DiscoveredLo
 }
 
 #[tauri::command]
-pub fn scan_loot_tables_cmd(project_path: String) -> Result<Vec<DiscoveredLootTable>, String> {
-    Ok(scan_pack_loot_tables(std::path::Path::new(&project_path)))
+pub fn scan_loot_tables_cmd(
+    project_path: String,
+    instance_path: Option<String>,
+) -> Result<Vec<DiscoveredLootTable>, String> {
+    Ok(pack_scan::scan_pack_loot_tables_with_vanilla(
+        std::path::Path::new(&project_path),
+        instance_path.as_deref().map(std::path::Path::new),
+    ))
 }
