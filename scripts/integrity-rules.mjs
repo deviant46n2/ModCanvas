@@ -27,16 +27,19 @@ export const DEFAULT_RULES = {
   //   debug binary — `pnpm dev` hot-reloads frontend via Vite, so ONLY
   //     backend edits stale it (frontend edits must NOT fire STALE).
   //   release binary — embeds the frontend bundle, so both stale it.
+  //   Both embed src-tauri/templates/** via include_str! (templates/mod.rs),
+  //     so template content edits stale both (s72 coverage gap: the
+  //     readability-pass copy edits were invisible to this gate until fixed).
   staleBinaries: [
     {
       name: 'dev',
       path: 'src-tauri/target/debug/modcanvas',
-      sourcePaths: ['src-tauri/src'],
+      sourcePaths: ['src-tauri/src', 'src-tauri/templates'],
     },
     {
       name: 'release',
       path: 'src-tauri/target/release/modcanvas',
-      sourcePaths: ['src-tauri/src', 'frontend/src'],
+      sourcePaths: ['src-tauri/src', 'src-tauri/templates', 'frontend/src'],
     },
     {
       // The companion mod is a separate artifact (a game jar) with its own

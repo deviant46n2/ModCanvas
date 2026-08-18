@@ -756,10 +756,21 @@ review, before any further P0/P2 item is declared done.
 **RESOLVED-IN-PART (s65 ruling):** the tripwire's fresh-eyes launch/capture leg was
 delivered by the friend trial (s54) — wizard one-click → KubeJS → inline Rhino install →
 issue clears, FTB Quests via Prism, game launch with the companion; it surfaced 3 real
-bugs the unit suite could not see. The remaining gap is a *readability* pass on the
+bugs the unit suite could not see. The remaining gap was a *readability* pass on the
 tutorial quests themselves (ide-tour 20-quest + intro 6-quest — never read end-to-end
 in-app by a user; the oldest open UNVERIFIED claim, s49) — no game needed, no tester
-needed, the maintainer walks it in-app once. **No further external testers booked (s65):**
+needed, the maintainer walks it in-app once. **READABILITY PASS DONE (s72):** both
+chapters walked end-to-end against the tree; every quest instruction verified against
+the UI it names (file:line in the s72 session log). Five copy defects fixed across the
+templates: (1) "Find a Mod" still taught the s54-deleted Mods-tab search UI — rewritten
+to the Prism-handoff reality (`ModsTab.tsx:122` "Add mods in Prism" is the only add
+path); (2) both "Meet Your Workbench" tab lists said "Mods — find and install mods" —
+same stale claim; (3) "Connect Quests" said "canvas toolbar" but Connect is the floating
+overlay button (`AddQuestOverlay.tsx:83-89`); (4) "Undo & Redo" said "canvas toolbar"
+but Undo/Redo live in the top bar's History drawer (`HistoryDrawer.tsx:55-59`); (5)
+"Add a Chapter" omitted the move mechanics (right-click → Move to chapter, now spelled
+out). The remaining 15+ instructions were verified TRUE against the tree (labels cited
+in the session log). No further external testers booked (s65):
 the friend trial proved fresh-eyes finds real bugs, so the app hardens internally first —
 the CI verification matrix (s65) is the testing ramp — before more humans see it. The
 full 6-step fresh-eyes completion remains open with that written reason; not scheduled.
@@ -1024,6 +1035,18 @@ Conventions:
   curated mod picks, guided first quest, green check + Launch.
 - **Technical work:** ~~`createProject` gains a scaffold path~~ **DONE (chunk 1)**: `create_project` takes `template_id: Option<String>`, scaffolded via `crate::templates::scaffold_template` (atomic, path-safe, tested; see `docs/templates.md`). Remaining: a `WizardStepper` component over `useProjectState.ts`; curated-mod file; wizard → `analyzePackHealth` handoff; reuse
   `test_project` for Launch. The adapter lie is fixed (options derive from `servedMatrix`).
+- **Status (s72): COMPLETE — the §13 entry was stale against §9.3 and the tree.** The
+  "remaining" work above shipped through later sessions without a §13 status update:
+  `WizardStepper.tsx` (name → curated mods → Prism guide → green check + Launch; wired
+  `App.tsx:212-222`), the curated-mod file + step (`commands/modpack/curated.rs`
+  `CURATED` + `CuratedModsStep.tsx` + `useCuratedModsInstall`, s53–s56 PRISM-LEAN), the
+  health handoff (`HealthLaunchStep.tsx` computes the same pure report as the Health tab,
+  s49/s53), and Launch reuse (`test_project` with topbar Test defaults, s49). §9.3 holds
+  the per-step history (s49 reshape, s53 guided-quest move, s55 Prism guide step). The
+  final open node — the tutorial-quest readability pass — was closed at s72 (see §9.3).
+  Completion criteria: the fresh-eyes leg stays open by written ruling (§9.3, s65);
+  restartable-at-any-step, Pack-Health-clean scaffold, Launch-with-companion, and
+  plain-text diff-able artifacts are all satisfied by the shipped implementation.
 - **Dependencies:** none (P0 foundation). Templates must respect the no-bundling rule
   (self-authored content only).
 - **User value:** the wedge. Nothing else matters until a beginner can get to Launch.

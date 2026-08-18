@@ -9,7 +9,7 @@
             x = 0.0d
             y = 0.0d
             title = "Meet Your Workbench"
-            description = ["Welcome to ModCanvas — this is your pack workbench. The tabs at the top switch between its parts.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Behaviors — automate things while playing. Loot — control what chests and mobs drop. Mods — find and install mods. Health — checks your pack for problems.", "Click through every tab, then check me off."]
+            description = ["Welcome to ModCanvas — this is your pack workbench. The tabs at the top switch between its parts.", "Quests — the quest book you're reading right now. Recipes — add and edit crafting recipes. Configs — tweak config files safely. Behaviors — automate things while playing. Loot — control what chests and mobs drop. Mods — see your mods and add new ones (through Prism). Health — checks your pack for problems.", "Click through every tab, then check me off."]
             icon = { id = "minecraft:chest" }
             tasks = [
                 { id = "2000000000000231", type = "checkmark", title = "Visit every tab" }
