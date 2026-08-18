@@ -15,6 +15,11 @@ pub mod model;
 pub mod parse;
 pub mod pack_scan;
 
+#[cfg(test)]
+mod create_tests;
+#[cfg(test)]
+mod pack_scan_tests;
+
 use serde::{Deserialize, Serialize};
 
 /// A discovered loot table, summarized for the Loot tab list.
