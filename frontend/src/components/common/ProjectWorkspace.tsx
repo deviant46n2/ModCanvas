@@ -226,6 +226,7 @@ export function ProjectWorkspace(props: ProjectWorkspaceProps) {
               <LootTab
                 projectId={project.id}
                 projectPath={project.path}
+                instancePath={project.path}
                 minecraftVersion={project.minecraft_version}
                 modLoader={project.mod_loader}
               />

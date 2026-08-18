@@ -3,6 +3,11 @@
 > Status: **s47 — editor shipped** (pools, rolls, entries, weights, conditions,
 > JSON emission, Pack-Index-style item validation). Read-only scan MVP from s44
 > is the foundation; this doc covers the editor layer built on it.
+>
+> **s72 (B1) — vanilla surfacing + copy-to-pack:** the scan also reads the
+> vanilla game jar's tables when the instance path is known (a zero-mod pack
+> gets loot to work with), and read-only jar tables can be copied into the
+> pack's own `data/` to become editable.
 
 ## Scope
 
@@ -18,6 +23,7 @@ Roadmap completion criteria (§13 P3-LOOT):
 - [x] Emits real JSON (verbatim save, structurally validated)
 - [x] Pack Index validated (item references graded against the item universe)
 - [x] New-table creation (version-derived dir via the adapter matrix)
+- [x] Vanilla jar surfacing + copy-to-pack (B1, s72) — zero-mod packs have editable content
 
 ## Architecture (3-layer rule)
 
@@ -27,9 +33,10 @@ Roadmap completion criteria (§13 P3-LOOT):
 | Thinking (pure) | `frontend/src/core/loot/model.ts` | Frontend mirror of the Rust model: parse/serialize + `extra` maps |
 | Thinking (pure) | `frontend/src/core/loot/validation.ts` | Item-reference grading against the item universe |
 | Thinking (pure) | `frontend/src/core/loot/conditions.ts` | Typed condition views (5 typed forms, opaque fallback) |
+| Hands (I/O) | `src-tauri/src/loot/mod.rs` + `pack_scan.rs` | `scan_loot_tables_cmd` — pack `data/` + mod jars + the vanilla jar (when the instance path is known), deduped by resource id |
 | Hands (I/O) | `src-tauri/src/loot/editor.rs` | `read_loot_table_cmd` + `save_loot_table_cmd` (path-safe, atomic) |
-| Hands (I/O) | `src-tauri/src/loot/create.rs` | `create_loot_table_cmd` — dir whitelist, ns/name validation, no-clobber |
-| Hands (I/O) | `frontend/src/services/loot.ts` | IPC wrappers for scan/read/save/create + starter-table JSON |
+| Hands (I/O) | `src-tauri/src/loot/create.rs` | `create_loot_table_cmd` + `copy_loot_table_to_pack_cmd` — dir whitelist, ns/name validation, no-clobber, shared write tail |
+| Hands (I/O) | `frontend/src/services/loot.ts` | IPC wrappers for scan/read/save/create/copy + starter-table JSON |
 | State | `frontend/src/hooks/useLootEditor.ts` | Load → edit → save state machine, honest statuses |
 | Show | `frontend/src/components/loot/LootTableEditor.tsx` + `loot-entry-row.tsx` + `LootConditionList.tsx` | The editor surface; LootTab hosts it for editable tables |
 
@@ -92,6 +99,29 @@ never write an unvalidated path component. Create validates namespace/name as
 a safe resource path (traversal refused, name must be the extension-less
 resource path), refuses to clobber an existing table, and writes atomically.
 
+## Vanilla surfacing + copy-to-pack (B1, s72)
+
+The s72 MVP ruling: the Loot tab must work for a **zero-mod pack**. Two
+mechanisms:
+
+- **Vanilla jar surfacing.** `scan_loot_tables_cmd` takes an optional
+  `instance_path`. When known, `find_vanilla_jars` (the item indexer's
+  version-scoped resolver, `indexer/vanilla.rs`) locates the instance's game
+  jar and its tables are scanned **after** mod jars, so the existing
+  `dedupe_by_resource_id` (first non-editable wins, editable always wins)
+  yields **pack data > mod jars > vanilla** — matching in-game source order.
+  Vanilla tables carry `vanilla: true` so the UI badges them without
+  path-sniffing. No instance path → no vanilla tables (graceful, never wrong).
+  The frontend passes `project.path` — for Prism projects that IS the
+  instance's `minecraft` dir (`commands/project/lifecycle.rs`), the same path
+  the texture/engine pipeline already treats as the instance path.
+- **Copy-to-pack.** `copy_loot_table_to_pack_cmd(project_path, source,
+  dir_name)` reads the jar entry behind a `jar:<abs>!<internal>` descriptor,
+  derives the target id via `loot_id_from_jar_entry`, and writes through the
+  SAME tail as create (`write_new_pack_table`): dir whitelist, namespace/name
+  path validation, no-clobber, atomic write. A copied table becomes editable
+  pack data — the UI selects and opens it immediately after copying.
+
 ## Item validation (Pack Index)
 
 `frontend/src/core/loot/validation.ts` walks every `minecraft:item` entry
@@ -112,8 +142,10 @@ the Pack Index's reference universe, without a full index build per save.
 `LootTab` lists tables; selecting an **editable** (pack `data/`) table opens
 the editor. A **+ New table** button opens the create form (namespace +
 resource path; the adapter-derived dir is shown live); creating selects the
-new table immediately. Jar tables stay read-only — a jar cannot be edited in
-place. The editor offers:
+new table immediately. Jar tables — mod **or vanilla** — stay read-only (a jar
+cannot be edited in place) but carry a **Copy to pack** action: the table
+lands in the pack's `data/` under the adapter-derived dir and opens in the
+editor. The editor offers:
 
 - Pools: add/remove, rolls (count / min–max / opaque), bonus rolls.
 - Entries: item entries pick through the shared `ItemBrowser` (via
@@ -146,8 +178,12 @@ place. The editor offers:
 ## Verification
 
 - Rust: `cargo test loot::` — model round-trips, exotic rolls survival,
-  read/save commands, verbatim write, escape refusal.
-- Frontend: `pnpm test -- loot` — model mirror round-trips, validation walk.
+  read/save commands, verbatim write, escape refusal, vanilla scan order +
+  dedupe (zero-mod surface, pack-wins, no-instance = no vanilla), copy-to-pack
+  (verbatim copy, no-clobber, traversal-shaped jar entries refused).
+- Frontend: `pnpm test -- loot` — model mirror round-trips, validation walk,
+  LootTab badges (vanilla vs jar vs pack) and the copy flow (passes the
+  instance path, refreshes, opens the copied row, surfaces failures).
 - Full gates at commit: `cargo test`, `pnpm test`, `pnpm lint`, `pnpm
   integrity` (line-limit, asset-bundle, stale-binary, doc-sync), binary
   rebuilt + mtime-verified.
