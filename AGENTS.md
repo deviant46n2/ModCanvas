@@ -157,6 +157,14 @@ This project is an offline-first desktop workbench and IDE tailored for Minecraf
 - **Install Dependencies:** `pnpm install` (or `cargo check` depending on native bindings)
 - **Start Local UI Dev:** `pnpm dev`
 - **Build Release Binaries:** `pnpm build`
+- **Build Shareable Flatpak Bundle:** `./scripts/flatpak-build.sh` — the s61/s71 wrap
+  pipeline: rebuilds the release binary, wraps it with the companion jar into a
+  GNOME 50 flatpak (flatpak/com.modcanvas.app.yml), exports
+  `ModCanvas_<ver>_amd64.flatpak`, and verifies the installed binary's build-id
+  matches the freshly built one. Requires flatpak + flatpak-builder +
+  `org.gnome.Platform//50`. The flatpak-builder cache is keyed on the MANIFEST,
+  not the wrapped `path:` sources — clear `flatpak/.flatpak-builder` when the
+  binary changes but the manifest doesn't (s71 gotcha).
 
 ### Rebuild After Code Changes (Mandatory)
 - The app binary embeds both the Rust backend (`src-tauri/**`) and the frontend bundle (`frontend/**`). A stale binary silently serves old behavior — the UI cannot tell you the backend changed.

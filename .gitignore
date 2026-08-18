@@ -22,6 +22,11 @@ workbench-companion-archived/*/out/
 # Flatpak release bundles — build artifacts, regenerable from .flatpak-builder/cache
 *.flatpak
 
+# Flatpak wrap build state (s61 pipeline) — regenerable from the manifest
+flatpak/build-out/
+flatpak/build-repo/
+flatpak/.flatpak-builder/
+
 # Private tutor state (learner profile + curriculum) — never commit
 .tutor/
 backups/

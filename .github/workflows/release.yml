@@ -1,0 +1,106 @@
+# release.yml — the P0-DISTRIB release-artifact half (s65 ruling, separated
+# from the CI verification matrix). Trigger: a `v*` tag pushed to master.
+#
+# Scope (the ruling):
+#   * Linux: AppImage + deb (the release binary via `NO_STRIP=1 pnpm build`;
+#     the NO_STRIP flag is required on this repo's dev machine — linuxdeploy
+#     cannot parse CachyOS `.relr.dyn` — and is harmless on CI).
+#   * Windows: NSIS installer (Windows artifact, gated on the s65 matrix
+#     existing first — it does; distribution follows verification).
+#   * macOS: NOT in scope (no CI runner; roadmap defers until runners exist).
+#   * Uploads the bundle dirs as workflow artifacts, then attaches them to a
+#     GitHub Release for the tag.
+#
+# Not in scope (parked with reasons, see roadmap §P0-DISTRIB):
+#   * Code signing — revisit when the project has users who need it.
+#   * Flatpak bundle in CI — the s61/s71 wrap pipeline is a LOCAL build
+#     (host binary + companion jar + host libbz2); the Flathub variant is a
+#     separate from-source artifact, deliberately not built yet.
+#
+# Known-good states get tags, not branches (s48): a release is the master tip
+# at a tag. `git tag v0.1.0 && git push origin v0.1.0`.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux
+          - os: windows-latest
+            artifact: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tauri system deps (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update &&
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Build release bundles
+        run: NO_STRIP=1 pnpm build
+
+      - name: Upload bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}-bundles
+          path: |
+            src-tauri/target/release/bundle/appimage/**
+            src-tauri/target/release/bundle/deb/**
+            src-tauri/target/release/bundle/nsis/**
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

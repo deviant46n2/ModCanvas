@@ -201,7 +201,7 @@ documented capability had no code behind it, it is labeled **aspirational**.
 | Beginner Mode | `PROJECT_BIBLE.md:279` (§11) | **Implemented (P0-BEGINNER, s47–s49).** `useBeginnerMode` hook (`hooks/useBeginnerMode.ts`) toggles `beginnerMode` app-wide; the TopBar carries the toggle, and `ProjectWorkspace`/`ConfigsTab`/`RecipeEditor`/`RecipeEditorHeader` hide raw surfaces when it is on. The `intro` template (see Templates row) is the beginner wedge; both shipped templates end with a self-removing **Shed the Guide** lesson. Not yet a full surface-hiding state machine (raw editor access is gated per-surface, not per-mode). |
 | Mini-wizards | `PROJECT_BIBLE.md:271` (§10.4) | **Partially implemented (P0-MINIWIZ).** `GuidedQuestWizard` (`components/quest/GuidedQuestWizard.tsx`, 170 lines) guides a first quest — entries: the quest editor's `✨ Add a quest` toolbar button (everyone) and the Beginner Mode live banner (s53, first companion connect per session). The external wizard handoff (`showGuidedQuest`) was removed with the wizard step (s53). Only the quest mini-wizard exists; recipe/config/behavior mini-wizards not built. |
 | Templates / scaffolded packs | `PROJECT_BIBLE.md:262` (§10.2 step 3) | **Partially implemented (P0-WIZARD chunks 1–2; s49 rekey).** `create_project` accepts an optional `template_id` and scaffolds a content package into `<project>/config/ftbquests/quests/` (`src-tauri/src/templates/`, embedded via `include_str!`). Two templates ship: `intro` (6-quest core loop, Beginner Mode) and `ide-tour` (21-quest feature walkthrough, pure tool teaching, **14 example behaviors** — minimal complete vocabulary showcase, both backends, s70) — both end with a self-removing **Shed the Guide** lesson. Scaffold refuses instances that already have a quest book. Config profiles + recipe content pending. |
-| Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Partially implemented (s65 ruling)** — CI verification matrix DONE: `.github/workflows/verify.yml` (ubuntu + windows) runs the suite on every push; the integrity gate stays the source of truth, CI is a second witness (roadmap risk #6). Release artifacts: still absent — local `pnpm build` only (P0-DISTRIB release-artifact half, separated s65). |
+| Distribution / CI / release | `PROJECT_BIBLE.md:188,311` (§8.1 item 5, risk 4) | **Partially implemented (s65–s71)** — CI verification matrix DONE (s65): `.github/workflows/verify.yml` (ubuntu + windows) runs the suite on every push; the integrity gate stays the source of truth, CI is a second witness (roadmap risk #6). Release artifacts PARTIALLY DONE (s70–s71): Linux AppImage+deb via `NO_STRIP=1 pnpm build`; shareable Flatpak via `./scripts/flatpak-build.sh` (verified bundle); `.github/workflows/release.yml` on `v*` tags (Linux + Windows NSIS). Remaining: Flathub submission, AUR, code signing, macOS — all deferred with written reasons (see §P0-DISTRIB). |
 | Progression editor / campaign surface | §3.1 of this doc (progression tab killed pre-s49; workspace-actions.md tab list corrected 2026-08-13) | **Does not exist.** Per-quest progression fields + canvas simulation mode only (`core/quest/progress.ts`). The "progression" tab was killed; the 7-tab strip is health/mods/configs/quests/recipes/loot/behaviors. |
 | HOCON config parsing | `config_parser/mod.rs` enum, `config.rs:46` | **Missing parser arm — by design, not debt (s70).** `parse_config` falls through to raw String (`config_parser/parse.rs:8-17`); the structured editor then defaults to Raw mode for a leaf-string root. `config-editor.md:35-38` already documents HOCON/`.cfg`/`.snbt`/KubeJS `.js` as fall-back-to-raw formats. No HOCON arm is planned — the docs never claimed one (the audit note that did was corrected at s70). |
 | Modpack Model / unified model | this document's problem statement | **Does not exist** — see §7. The correct form is the Pack Index. |
@@ -1155,6 +1155,20 @@ Conventions:
   artifacts) is a distinct item, not part of the CI ruling. Future order, ruled
   separately: Flathub (real channel, real cost) → AUR (cheap, source-build, aspirational)
   → Windows artifacts (gated on the matrix).
+- **Status (s70–s71): PARTIALLY IMPLEMENTED — Linux release + shareable Flatpak done.**
+  - `deb` added to tauri bundle targets (commit 141e011) — Linux release artifacts
+    are AppImage + deb via `NO_STRIP=1 pnpm build`.
+  - Shareable Flatpak pipeline: `./scripts/flatpak-build.sh` (s61 wrap manifest +
+    s71 automation). Verified end-to-end: rebuild → wrap → export → install →
+    build-id match. Bundle: `ModCanvas_<ver>_amd64.flatpak`. Gotcha: the
+    flatpak-builder cache is keyed on the MANIFEST, not the wrapped `path:`
+    sources — clear `flatpak/.flatpak-builder` when the binary changes and the
+    manifest doesn't.
+  - Release workflow: `.github/workflows/release.yml` — a `v*` tag builds
+    Linux AppImage+deb and Windows NSIS, uploads artifacts, creates a GitHub
+    Release. NOT yet exercised (no tag pushed since it landed).
+  - STILL DEFERRED (ruled, reasons standing): Flathub submission (from-source
+    manifest variant; separate artifact); AUR; code signing; macOS (no runner).
 
 #### P0-HYGIENE-1 — Dead code & lying UI
 
